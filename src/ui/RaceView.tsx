@@ -114,7 +114,7 @@ export default function RaceView({ profile, onExit, onBest }: Props) {
           {h.wrongWay && <div className="absolute top-[40%] w-full text-center text-3xl font-black text-red-500 animate-pulse tracking-[0.3em]">⚠ FALSCHE RICHTUNG</div>}
           {h.zeroG && !h.wrongWay && <div className="absolute top-[18%] w-full text-center text-2xl font-black text-cyan-300 animate-pulse tracking-[0.4em]">⚠ SCHWERELOSIGKEIT</div>}
           {h.overheat && <div className="absolute top-[46%] w-full text-center text-xl font-black text-orange-400 animate-pulse tracking-[0.25em]">ÜBERHITZT</div>}
-          <div className="absolute bottom-2 right-6 text-[10px] tracking-[0.25em] text-white/60">{profile.gfx.showFps ? h.fps + ' FPS' : ''}</div>
+          <div className="absolute bottom-2 right-6 text-[10px] tracking-[0.25em] text-white/60">{profile.gfx.showFps ? `${h.fps} FPS · ${h.backend}` : ''}</div>
         </div>
       )}
 

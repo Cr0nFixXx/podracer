@@ -24,6 +24,8 @@ export interface GfxSettings {
   fov: number;
   drawDistance: number;
   showFps: boolean;
+  backend?: 'auto' | 'webgl'; // auto = WebGPU with WebGL2 fallback
+  batching?: boolean; // static track geometry as BatchedMesh (per-object culling, fewer draws)
 }
 
 export const PRESETS: Record<'low' | 'medium' | 'high' | 'ultra', Omit<GfxSettings, 'preset' | 'fov' | 'showFps' | 'bloomStrength' | 'anisotropy' | 'shaderDetail' | 'bumpMapping' | 'tessellation'>> = {
@@ -33,7 +35,7 @@ export const PRESETS: Record<'low' | 'medium' | 'high' | 'ultra', Omit<GfxSettin
   ultra: { renderScale: 1, shadows: 3, texRes: 2048, parallax: true, ao: true, bloom: true, godRays: true, ssr: true, motionBlur: true, cinematic: true, particles: 1.4, detail: 1.4, geometry: 3, aa: 'smaa', drawDistance: 1.3 },
 };
 
-export const defaultGfx = (): GfxSettings => ({ preset: 'high', fov: 75, showFps: true, bloomStrength: 0.5, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 1, ...PRESETS.high });
+export const defaultGfx = (): GfxSettings => ({ preset: 'high', backend: 'auto', batching: true, fov: 75, showFps: true, bloomStrength: 0.5, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 1, ...PRESETS.high });
 
 export interface PodCustom {
   colors: [string, string, string];

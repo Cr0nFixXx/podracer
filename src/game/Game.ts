@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
 import { DIFFICULTIES, PILOTS, PODS, THEMES, TRACKS } from './data';
 import { effectiveStats, type Profile } from './settings';
 import { buildTrack, type TrackData } from './trackBuilder';
@@ -9,7 +9,9 @@ import { Particles } from './particles';
 import { PostFX } from './post';
 import { AudioFX } from './audio';
 import { aiInputs, podParams, respawn, stepPod, type PodState } from './physics';
+import { applyAtmosphere } from './atmosphere';
 
+const ZERO = new THREE.Vector3();
 export const CAMERA_NAMES = ['Verfolger', 'Verfolger (fern)', 'Cockpit', 'Motorhaube', 'TV-Kamera', 'Kino-Orbit'];
 
 export interface Standing { name: string; color: string; isPlayer: boolean; gap: string; finished: boolean; }
@@ -17,7 +19,7 @@ export interface HudState {
   speed: number; place: number; total: number; lap: number; laps: number; sprint: boolean; progress: number;
   time: number; lastLap: number | null; bestLap: number | null;
   hpL: number; hpR: number; heat: number; boosting: boolean; overheat: boolean; repairing: boolean; airbrake: boolean;
-  wrongWay: boolean; zeroG: boolean; countdown: number; message: string; camName: string; fps: number; standings: Standing[]; dead: boolean;
+  wrongWay: boolean; zeroG: boolean; countdown: number; message: string; camName: string; fps: number; backend: string; standings: Standing[]; dead: boolean;
   finished: boolean;
 }
 export interface RaceResult { place: number; name: string; pod: string; color: string; isPlayer: boolean; time: number | null; bestLap: number | null; }
@@ -32,7 +34,7 @@ interface Callbacks {
 
 export class Game {
   container: HTMLDivElement; profile: Profile; cb: Callbacks;
-  renderer!: THREE.WebGLRenderer; scene = new THREE.Scene(); camera!: THREE.PerspectiveCamera;
+  renderer!: THREE.WebGPURenderer; backend = 'WebGL2'; scene = new THREE.Scene(); camera!: THREE.PerspectiveCamera;
   post!: PostFX; world!: World; td!: TrackData; particles!: Particles; audio!: AudioFX;
   sky!: ReturnType<typeof makeSky>; sun!: THREE.DirectionalLight; sunDir = new THREE.Vector3();
   pods: PodState[] = []; player!: PodState;
@@ -59,7 +61,11 @@ export class Game {
     const theme = THEMES[trackDef.theme];
     this.gripMul = theme.id === 'ice' ? 0.55 : theme.id === 'jungle' ? 0.85 : 1;
     this.cb.onLoading(0.01, 'Initialisiere Renderer …');
-    const r = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false });
+    // WebGPU first, automatic WebGL2 fallback inside WebGPURenderer (or forced via settings)
+    const r = new THREE.WebGPURenderer({ antialias: false, powerPreference: 'high-performance', forceWebGL: gfx.backend === 'webgl' });
+    await r.init();
+    this.backend = (r.backend as unknown as { isWebGPUBackend?: boolean }).isWebGPUBackend ? 'WebGPU' : 'WebGL2';
+    if (this.disposed) { r.dispose(); return; }
     r.setPixelRatio(Math.min(window.devicePixelRatio, 2) * gfx.renderScale);
     r.setSize(this.container.clientWidth, this.container.clientHeight);
     r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = theme.exposure;
@@ -76,7 +82,7 @@ export class Game {
     this.sunDir.copy(sunDirection(theme));
     const pm = new THREE.PMREMGenerator(r);
     const envScene = new THREE.Scene(); const envSky = makeSky(theme); envScene.add(envSky.mesh);
-    this.scene.environment = pm.fromScene(envScene, 0.02).texture;
+    this.scene.environment = pm.fromScene(envScene, 0.02, 1, 20000).texture;
     this.scene.environmentIntensity = 0.9;
     pm.dispose();
     this.scene.fog = new THREE.FogExp2(theme.fogColor, theme.fogDensity / gfx.drawDistance);
@@ -93,6 +99,7 @@ export class Game {
     this.cb.onLoading(0.03, 'Berechne Streckenverlauf …');
     await new Promise(res => setTimeout(res, 0));
     this.td = buildTrack(trackDef);
+    { const avgY = this.td.main.samples.reduce((a, s) => a + s.y, 0) / this.td.N; applyAtmosphere(this.scene, theme, theme.fogDensity / gfx.drawDistance, avgY - 12, this.sunDir); }
     this.world = await buildWorld(this.td, theme, gfx, (p, m) => this.cb.onLoading(0.05 + p * 0.85, m));
     if (this.disposed) return;
     this.scene.add(this.world.group);
@@ -107,7 +114,7 @@ export class Game {
     await new Promise(res => setTimeout(res, 0));
     this.createPods();
 
-    this.post = new PostFX(r, this.scene, this.camera, gfx, this.world.glossy, this.container.clientWidth * r.getPixelRatio(), this.container.clientHeight * r.getPixelRatio());
+    this.post = new PostFX(r, this.scene, this.camera, gfx);
     this.particles.setScale(this.container.clientHeight * r.getPixelRatio());
     this.audio = new AudioFX(this.profile.volume);
 
@@ -115,7 +122,8 @@ export class Game {
     this.cb.onLoading(0.97, 'Kompiliere Shader …');
     await new Promise(res => setTimeout(res, 0));
     this.updateCamera(0.016);
-    try { r.compile(this.scene, this.camera); } catch { /* ignore */ }
+    try { await r.compileAsync(this.scene, this.camera); } catch { /* ignore */ }
+    if (this.disposed) return;
 
     window.addEventListener('keydown', this.onKey); window.addEventListener('keyup', this.onKeyUp);
     this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(this.container);
@@ -143,7 +151,7 @@ export class Game {
       const pilot = PILOTS.find(p => p.id === e.def.pilotId) ?? PILOTS[0];
       const custom = e.isPlayer ? prof.custom[e.def.id] : undefined;
       const colors = custom ? custom.colors : (g > 10 ? [e.def.colors[1], e.def.colors[0], e.def.colors[2]] as [string, string, string] : e.def.colors);
-      const vis = buildPodModel(e.def, colors, this.profile.gfx.geometry);
+      const geo = this.profile.gfx.geometry; const vis = buildPodModel(e.def, colors, e.isPlayer ? geo : Math.max(1, geo - 1), this.profile.gfx.texRes); // LOD: opponents one level lower
       this.scene.add(vis.group);
       const pos = new THREE.Vector3(s.x + s.rx * lat, s.y + 1.8, s.z + s.rz * lat);
       const skill = diff.skill * (0.7 + 0.3 * pilot.skill);
@@ -253,6 +261,29 @@ export class Game {
       this.podCollisions();
       this.acc -= h; steps++;
     }
+    // hazards: periodic eruptions (1 s warning) – damage, heat and lift while erupting
+    for (const hz of this.td.hazards) {
+      const ph = (((this.raceTime + hz.phase) % hz.period) + hz.period) % hz.period;
+      hz.state = frozen ? 0 : ph < hz.period * hz.duty ? 1 : ph > hz.period - 1 ? 0.5 : 0;
+      if (hz.state < 1) continue;
+      for (const p of this.pods) {
+        if (p.dead > 0) continue;
+        const dx = p.pos.x - hz.x, dz = p.pos.z - hz.z;
+        if (dx * dx + dz * dz > hz.r ** 2 || p.pos.y > hz.y + 18) continue;
+        const P = podParams(p);
+        if (p.invuln <= 0) { p.hpL -= 12 * dt * P.sturdy; p.hpR -= 12 * dt * P.sturdy; }
+        p.heat = Math.min(1, p.heat + 0.55 * dt); p.vel.y += 28 * dt; p.shake = Math.min(1, p.shake + dt * 1.5);
+        if (p.isPlayer && this.messageT <= 0) this.showMsg(this.td.def.theme === 'lava' ? 'LAVA-SCHLOT!' : 'GEYSIR!', 0.8);
+      }
+    }
+    // set pieces (rotors, gates, collapsing arches) + their effects
+    for (const f of this.world.setPieces.update(this.clock, this.raceTime, this.pods, dt, frozen)) {
+      const d = Math.hypot(f.x - this.player.pos.x, f.z - this.player.pos.z);
+      if (f.type === 'dust') {
+        this.particles.dust(this.tmpV.set(f.x, f.y, f.z), ZERO, new THREE.Color(THEMES[this.td.def.theme].palette.ground[1]), 26);
+        if (d < 140) { this.player.shake = Math.min(1, this.player.shake + 0.6 * (1 - d / 140)); this.audio.hit(35 * (1 - d / 140)); }
+      } else if (f.type === 'collapse' && d < 600) this.showMsg('STEINSCHLAG!', 2);
+    }
     // deaths / finish
     for (const p of this.pods) {
       if (p.dead > 0) { p.dead -= dt; if (p.dead <= 0) respawn(p, this.td); }
@@ -283,7 +314,7 @@ export class Game {
     this.updateVisuals();
     this.updateCamera(dt);
     this.particles.update(dt, this.camera.position, this.clock);
-    this.world.update(this.clock);
+    this.world.update(this.clock, this.camera.position);
     this.sky.uniforms.time.value = this.clock;
     if (this.messageT > 0) this.messageT -= dt;
     this.flash = Math.max(0, this.flash - dt * 2);
@@ -331,6 +362,14 @@ export class Game {
       const dx = e.x - camPos.x, dz = e.z - camPos.z;
       if (dx * dx + dz * dz < 450 * 450) this.particles.vent(this.tmpV.set(e.x, e.y, e.z), e.type);
     }
+    for (const hz of this.td.hazards) {
+      if (hz.state <= 0) continue;
+      const dx = hz.x - camPos.x, dz = hz.z - camPos.z; if (dx * dx + dz * dz > 350 * 350) continue;
+      if (hz.state >= 1) {
+        for (let k = 0; k < 3; k++) this.particles.fire(this.tmpV.set(hz.x + (Math.random() - 0.5) * hz.r, hz.y + 0.5, hz.z + (Math.random() - 0.5) * hz.r), this.tmpV2.set(0, 60, 0));
+        if (Math.random() < 0.3) this.particles.smoke(this.tmpV.set(hz.x, hz.y + 4, hz.z), this.tmpV2.set(0, 20, 0), 0.6);
+      } else if (Math.random() < 0.25) this.particles.sparks(this.tmpV.set(hz.x, hz.y + 0.4, hz.z), this.tmpV2.set(0, 1, 0), ZERO, 2);
+    }
     for (const p of this.pods) {
       const v = p.visual!; const near = p.pos.distanceTo(camPos) < 380;
       // events
@@ -341,6 +380,7 @@ export class Game {
           if (p.isPlayer || near) this.audio.hit(e.strength * (p.isPlayer ? 1 : 0.3));
         } else if (e.type === 'land') { if (near) this.particles.dust(pos, p.vel, dustCol, 12); if (p.isPlayer) this.audio.hit(e.strength * 0.5); }
         else if (e.type === 'explode') { this.particles.explosion(pos); if (p.isPlayer) { this.audio.boom(); this.flash = 0.8; this.showMsg('TRIEBWERK ZERSTÖRT!', 2.5); } else if (near) this.audio.hit(40); }
+        else if (e.type === 'field') { if (near) this.particles.shimmer(pos, new THREE.Vector3(e.nx, 0, e.nz), new THREE.Color(theme.barrierColor).multiplyScalar(1.3)); if (p.isPlayer) this.audio.hit(e.strength * 0.12); }
         else if (e.type === 'fall') { if (p.isPlayer) this.showMsg('ABSTURZ!', 2); }
       }
       p.events.length = 0;
@@ -396,8 +436,8 @@ export class Game {
       cam.rotateZ(-p.roll * 0.18 + (p.zeroG ? Math.sin(this.clock * 0.6) * 0.25 : 0));
     } else if (mode === 2 || mode === 3) {
       const v = p.visual!; v.group.updateMatrixWorld(true);
-      const local = mode === 2 ? new THREE.Vector3(0, 1.25, -p.def.cable * 0.5 - 0.8) : new THREE.Vector3(0, 0.7, p.def.cable * 0.5 + p.def.engineLen * 0.75);
-      const look = mode === 2 ? new THREE.Vector3(0, 0.9, 40) : new THREE.Vector3(0, 0.4, 60);
+      const local = (mode === 2 ? v.eye : v.hood).clone();
+      const look = new THREE.Vector3(0, local.y - (mode === 2 ? 0.35 : 0.45), 60);
       cam.position.copy(v.body.localToWorld(local)); cam.position.x += sx * 0.5; cam.position.y += sy * 0.5;
       const up = new THREE.Vector3(0, 1, 0).applyQuaternion(v.body.getWorldQuaternion(new THREE.Quaternion()));
       cam.up.copy(up); cam.lookAt(v.body.localToWorld(look));
@@ -435,7 +475,7 @@ export class Game {
       post.godRays.uniforms.sunPos.value.set(sp3.x * 0.5 + 0.5, sp3.y * 0.5 + 0.5);
       post.godRays.uniforms.intensity.value = THREE.MathUtils.smoothstep(facing, -0.1, 0.6) * 0.55;
     }
-    post.render(dt);
+    post.render(); void dt;
   }
 
   hud(sorted: PodState[]): HudState {
@@ -457,7 +497,7 @@ export class Game {
       time: this.raceTime, lastLap: p.lapTimes.length ? p.lapTimes[p.lapTimes.length - 1] : null, bestLap: closed ? best : null,
       hpL: Math.max(0, p.hpL), hpR: Math.max(0, p.hpR), heat: p.heat, boosting: p.boosting, overheat: p.overheat, repairing: p.repairing, airbrake: p.airbraking,
       wrongWay: p.wrongWay > 1.2, zeroG: p.zeroG, countdown: this.state === 'countdown' ? this.countdown : -1,
-      message: this.messageT > 0 ? this.message : '', camName: CAMERA_NAMES[this.camMode], fps: this.fps, standings, dead: p.dead > 0, finished: p.finished,
+      message: this.messageT > 0 ? this.message : '', camName: CAMERA_NAMES[this.camMode], fps: this.fps, backend: this.backend, standings, dead: p.dead > 0, finished: p.finished,
     };
     void N;
   }

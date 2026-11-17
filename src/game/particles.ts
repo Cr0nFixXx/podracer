@@ -1,47 +1,42 @@
-import * as THREE from 'three';
-import { spriteTexture } from './textures';
+import * as THREE from 'three/webgpu';
+import * as TSLmod from 'three/tsl';
 
-const VS = /* glsl */`
-attribute float size; attribute vec4 pcol;
-varying vec4 vCol;
-uniform float scale;
-void main() {
-  vCol = pcol;
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  gl_PointSize = size * scale / max(-mv.z, 0.1);
-  gl_Position = projectionMatrix * mv;
-}`;
-const FS = /* glsl */`
-uniform sampler2D map; varying vec4 vCol;
-void main() {
-  vec4 t = texture2D(map, gl_PointCoord);
-  gl_FragColor = vec4(vCol.rgb, vCol.a * t.a);
-  if (gl_FragColor.a < 0.003) discard;
-}`;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const TSL = TSLmod as any;
+const { color, instancedBufferAttribute, length, max, oneMinus, pow, uniform, uv } = TSL;
 
+/** Soft round disc (replaces the old sprite texture; identical falloff, no square edges). */
+const softDisc = () => pow(max(oneMinus(length(uv().sub(0.5)).mul(2.0)), 0.0), 1.6);
+
+/**
+ * Particle pool rendered as ONE instanced sprite draw (PointsNodeMaterial) – works on WebGPU and WebGL2.
+ * CPU simulation, GPU upload of the live range only.
+ */
 class Pool {
   max: number; count = 0;
   pos: Float32Array; vel: Float32Array; life: Float32Array; maxLife: Float32Array;
   s0: Float32Array; s1: Float32Array; c0: Float32Array; c1: Float32Array; a0: Float32Array; drag: Float32Array; grav: Float32Array;
-  geo: THREE.BufferGeometry; points: THREE.Points; sizeAttr: THREE.BufferAttribute; colAttr: THREE.BufferAttribute; posAttr: THREE.BufferAttribute;
-  constructor(max: number, additive: boolean, tex: THREE.Texture) {
+  posAttr: THREE.InstancedBufferAttribute; sizeAttr: THREE.InstancedBufferAttribute; colAttr: THREE.InstancedBufferAttribute;
+  sprite: THREE.Sprite; mat: THREE.PointsNodeMaterial;
+  constructor(max: number, additive: boolean) {
     this.max = max;
     this.pos = new Float32Array(max * 3); this.vel = new Float32Array(max * 3);
     this.life = new Float32Array(max); this.maxLife = new Float32Array(max);
     this.s0 = new Float32Array(max); this.s1 = new Float32Array(max);
     this.c0 = new Float32Array(max * 3); this.c1 = new Float32Array(max * 3); this.a0 = new Float32Array(max);
     this.drag = new Float32Array(max); this.grav = new Float32Array(max);
-    this.geo = new THREE.BufferGeometry();
-    this.posAttr = new THREE.BufferAttribute(new Float32Array(max * 3), 3); this.posAttr.setUsage(THREE.DynamicDrawUsage);
-    this.sizeAttr = new THREE.BufferAttribute(new Float32Array(max), 1); this.sizeAttr.setUsage(THREE.DynamicDrawUsage);
-    this.colAttr = new THREE.BufferAttribute(new Float32Array(max * 4), 4); this.colAttr.setUsage(THREE.DynamicDrawUsage);
-    this.geo.setAttribute('position', this.posAttr); this.geo.setAttribute('size', this.sizeAttr); this.geo.setAttribute('pcol', this.colAttr);
-    const mat = new THREE.ShaderMaterial({
-      uniforms: { map: { value: tex }, scale: { value: 600 } }, vertexShader: VS, fragmentShader: FS,
-      transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
-    });
-    this.points = new THREE.Points(this.geo, mat); this.points.frustumCulled = false;
-    this.points.renderOrder = additive ? 5 : 4;
+    this.posAttr = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3); this.posAttr.setUsage(THREE.DynamicDrawUsage);
+    this.sizeAttr = new THREE.InstancedBufferAttribute(new Float32Array(max), 1); this.sizeAttr.setUsage(THREE.DynamicDrawUsage);
+    this.colAttr = new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4); this.colAttr.setUsage(THREE.DynamicDrawUsage);
+    const mat = new THREE.PointsNodeMaterial({ transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, sizeAttenuation: true });
+    mat.positionNode = instancedBufferAttribute(this.posAttr);
+    mat.sizeNode = instancedBufferAttribute(this.sizeAttr).mul(1.8); // matches the former gl_PointSize = size * 0.9 * viewportHeight / depth
+    const c = instancedBufferAttribute(this.colAttr);
+    mat.colorNode = c.xyz;
+    mat.opacityNode = c.w.mul(softDisc());
+    this.mat = mat;
+    this.sprite = new THREE.Sprite(mat); this.sprite.count = 0; this.sprite.frustumCulled = false;
+    this.sprite.renderOrder = additive ? 5 : 4;
   }
   spawn(p: THREE.Vector3, v: THREE.Vector3, life: number, s0: number, s1: number, c0: THREE.Color, c1: THREE.Color, a: number, drag: number, grav: number) {
     if (this.count >= this.max) return;
@@ -78,9 +73,12 @@ class Pool {
       C[i * 4 + 2] = this.c0[i * 3 + 2] + (this.c1[i * 3 + 2] - this.c0[i * 3 + 2]) * t;
       C[i * 4 + 3] = this.a0[i] * Math.min(1, t * 8) * (1 - t);
     }
-    this.geo.setDrawRange(0, this.count);
-    this.posAttr.needsUpdate = true; this.sizeAttr.needsUpdate = true; this.colAttr.needsUpdate = true;
+    this.sprite.count = this.count;
+    if (this.count > 0) for (const [a, k] of [[this.posAttr, 3], [this.sizeAttr, 1], [this.colAttr, 4]] as [THREE.InstancedBufferAttribute, number][]) {
+      a.clearUpdateRanges(); a.addUpdateRange(0, this.count * k); a.needsUpdate = true;
+    }
   }
+  dispose() { this.mat.dispose(); }
 }
 
 const _v = new THREE.Vector3(), _p = new THREE.Vector3();
@@ -88,17 +86,16 @@ const WHITE = new THREE.Color(1, 1, 1);
 
 export class Particles {
   add: Pool; alpha: Pool; amount: number;
-  ambient: THREE.Points | null = null; ambVel = new THREE.Vector3(); ambType = '';
+  ambient: THREE.Sprite | null = null; ambAttr: THREE.InstancedBufferAttribute | null = null; ambVel = new THREE.Vector3(); ambType = '';
   group = new THREE.Group();
-  tex: THREE.Texture;
   constructor(amount: number) {
     this.amount = amount;
-    this.tex = spriteTexture();
-    this.add = new Pool(Math.floor(6000 * amount) + 500, true, this.tex);
-    this.alpha = new Pool(Math.floor(5000 * amount) + 500, false, this.tex);
-    this.group.add(this.alpha.points, this.add.points);
+    this.add = new Pool(Math.floor(6000 * amount) + 500, true);
+    this.alpha = new Pool(Math.floor(5000 * amount) + 500, false);
+    this.group.add(this.alpha.sprite, this.add.sprite);
   }
-  setScale(h: number) { (this.add.points.material as THREE.ShaderMaterial).uniforms.scale.value = h * 0.9; (this.alpha.points.material as THREE.ShaderMaterial).uniforms.scale.value = h * 0.9; }
+  /** kept for API compatibility – PointsNodeMaterial scales with the canvas height automatically */
+  setScale(h: number) { void h; }
   chance(n: number) { return Math.random() < n * this.amount; }
   exhaust(p: THREE.Vector3, back: THREE.Vector3, baseVel: THREE.Vector3, col: THREE.Color, power: number, boost: number) {
     const n = Math.ceil((1 + boost * 2) * this.amount * 1.5);
@@ -134,6 +131,15 @@ export class Particles {
     _v.copy(vel).multiplyScalar(0.5).add(_p.set((Math.random() - 0.5) * 3, 2 + Math.random() * 3, (Math.random() - 0.5) * 3));
     this.add.spawn(p, _v, 0.35 + Math.random() * 0.3, 2.2, 0.5, new THREE.Color(2.5, 1.1, 0.3), new THREE.Color(0.8, 0.15, 0.03), 0.9, 1, -3);
   }
+  /** energy-barrier shimmer: short-lived additive sparks spreading along the field plane */
+  shimmer(p: THREE.Vector3, n: THREE.Vector3, col: THREE.Color) {
+    const k = Math.ceil(12 * this.amount);
+    for (let i = 0; i < k; i++) {
+      _v.set((Math.random() - 0.5) * 7, (Math.random() - 0.2) * 6, (Math.random() - 0.5) * 7).addScaledVector(n, 2.5);
+      _p.set(p.x + (Math.random() - 0.5) * 2.5, p.y + (Math.random() - 0.3) * 2.5, p.z + (Math.random() - 0.5) * 2.5);
+      this.add.spawn(_p, _v, 0.3 + Math.random() * 0.3, 0.9, 0.1, col, col, 0.85, 2.5, 0);
+    }
+  }
   vent(p: THREE.Vector3, type: string) {
     if (!this.chance(type === 'sparkle' ? 0.25 : 0.35)) return;
     const j = _p.set((Math.random() - 0.5) * 3, 0, (Math.random() - 0.5) * 3).add(p);
@@ -155,32 +161,34 @@ export class Particles {
     this.sparks(p, new THREE.Vector3(0, 1, 0), new THREE.Vector3(), 60);
   }
   initAmbient(type: string) {
-    const n = Math.floor(2500 * this.amount);
-    const g = new THREE.BufferGeometry(); const pos = new Float32Array(n * 3);
-    for (let i = 0; i < n * 3; i++) pos[i] = (Math.random() - 0.5) * 160;
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const n = Math.max(1, Math.floor(2500 * this.amount));
+    const pos = new Float32Array(n * 3); for (let i = 0; i < n * 3; i++) pos[i] = (Math.random() - 0.5) * 160;
+    const attr = new THREE.InstancedBufferAttribute(pos, 3); attr.setUsage(THREE.DynamicDrawUsage);
     const colors: Record<string, string> = { dust: '#e8c8a0', snow: '#ffffff', embers: '#ff7020', spores: '#d8ff9a', rain: '#a0b0d0', sparkle: '#e0b0ff' };
     const add = type === 'embers' || type === 'sparkle' || type === 'spores';
-    const c = new THREE.Color(colors[type]).multiplyScalar(add ? 1.5 : 1);
-    const mat = new THREE.PointsMaterial({ color: c, size: type === 'rain' ? 0.12 : type === 'dust' ? 0.35 : 0.25, map: this.tex, transparent: true, depthWrite: false, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending, opacity: type === 'dust' ? 0.35 : 0.85, sizeAttenuation: true });
-    this.ambient = new THREE.Points(g, mat); this.ambient.frustumCulled = false; this.ambType = type;
+    const mat = new THREE.PointsNodeMaterial({ transparent: true, depthWrite: false, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending, sizeAttenuation: true });
+    mat.positionNode = instancedBufferAttribute(attr);
+    mat.sizeNode = uniform(type === 'rain' ? 0.12 : type === 'dust' ? 0.35 : 0.25);
+    mat.colorNode = color(new THREE.Color(colors[type]).multiplyScalar(add ? 1.5 : 1));
+    mat.opacityNode = softDisc().mul(type === 'dust' ? 0.35 : 0.85);
+    const sp = new THREE.Sprite(mat); sp.count = n; sp.frustumCulled = false;
+    this.ambient = sp; this.ambAttr = attr; this.ambType = type;
     const vel: Record<string, [number, number, number]> = { dust: [8, 0.5, 3], snow: [2, -4, 1], embers: [1, 3, 0.5], spores: [0.5, 0.4, 0.3], rain: [1, -40, 0.5], sparkle: [0.3, 0.6, 0.2] };
     this.ambVel.set(...vel[type]);
-    this.group.add(this.ambient);
+    this.group.add(sp);
   }
   update(dt: number, cam: THREE.Vector3, t: number) {
     this.add.update(dt); this.alpha.update(dt);
-    if (this.ambient) {
-      const a = (this.ambient.geometry.attributes.position as THREE.BufferAttribute); const arr = a.array as Float32Array;
-      const R = 80;
+    if (this.ambAttr) {
+      const arr = this.ambAttr.array as Float32Array; const R = 80;
       for (let i = 0; i < arr.length; i += 3) {
         arr[i] += (this.ambVel.x + Math.sin(t + i) * 0.5) * dt; arr[i + 1] += this.ambVel.y * dt; arr[i + 2] += (this.ambVel.z + Math.cos(t * 0.7 + i) * 0.5) * dt;
         for (let k = 0; k < 3; k++) { const c = k === 0 ? cam.x : k === 1 ? cam.y : cam.z; let d = arr[i + k] - c; if (d > R) d -= 2 * R; else if (d < -R) d += 2 * R; arr[i + k] = c + d; }
       }
-      a.needsUpdate = true;
+      this.ambAttr.needsUpdate = true;
     }
   }
   clear() { this.add.count = 0; this.alpha.count = 0; }
-  dispose() { this.add.geo.dispose(); this.alpha.geo.dispose(); this.tex.dispose(); if (this.ambient) this.ambient.geometry.dispose(); }
+  dispose() { this.add.dispose(); this.alpha.dispose(); (this.ambient?.material as THREE.Material | undefined)?.dispose(); }
 }
 export { WHITE };

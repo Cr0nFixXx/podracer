@@ -1,82 +1,155 @@
 import * as THREE from 'three';
-import type { PodDef } from './data';
-import { generateTexture } from './textures';
-import { designPod } from './podDesigns';
-import { kit, type Mats } from './podParts';
+import { PILOTS, type PodDef } from './data';
+import { PartBuilder, cyl, tube, type MatKey } from './podKit';
+import { engineGeo } from './podParts';
+import { cockpitGeo, podLayout, type PodLayout } from './podDesigns';
+import { binderMaterial, flameMaterial, hullMaterial, sharedPodMaterials, suitMaterial, type FxU, type HullU } from './podMaterials';
 
 export interface PodVisual {
   group: THREE.Group;
   body: THREE.Group;
+  /** bobbing engine groups (position.y is animated by the game) */
   engines: THREE.Object3D[];
+  /** exhaust exits in body-local space */
   exhaustLocal: THREE.Vector3[];
+  /** cockpit camera eye point and hood camera point (body-local) */
+  eye: THREE.Vector3;
+  hood: THREE.Vector3;
   update: (t: number, throttle: number, boost: number, airbrake: number, dmgL: number, dmgR: number, heat: number) => void;
   dispose: () => void;
 }
 
-let panelSet: ReturnType<typeof generateTexture> | null = null;
+const staticCache = new Map<string, Map<MatKey, THREE.BufferGeometry>>();
 
-export function buildPodModel(def: PodDef, colors: [string, string, string], quality = 2): PodVisual {
-  if (!panelSet) panelSet = generateTexture('metal', ['#6a6a6a', '#8a8a8a', '#a8a8a8'], 512, 77, 8);
-  const seg = quality >= 3 ? 48 : quality === 2 ? 32 : 16;
-  const k = kit(seg);
-  const group = new THREE.Group();
-  const body = new THREE.Group();
-  group.add(body);
+/** Control cables + pod specific extras, merged in body space. */
+function staticGeo(def: PodDef, L: PodLayout, seg: number, anchors: [THREE.Vector3, THREE.Vector3]) {
+  const key = `${def.id}|${seg}`; const hit = staticCache.get(key); if (hit) return hit;
+  const pb = new PartBuilder(); const cp = new THREE.Vector3(0, L.cockpit.y, L.cockpit.z);
+  const up = new THREE.Vector3(0, 1, 0);
+  L.engines.forEach((em) => {
+    const eg = engineGeo(em.spec, seg);
+    const a = eg.pylon.clone().add(new THREE.Vector3(em.x, em.y, em.z));
+    const b = anchors[em.x < 0 ? 0 : 1].clone().add(cp);
+    const dist = a.distanceTo(b); const sag = 0.35 + dist * 0.035;
+    for (const [mat, r, off, s] of [['rubber', 0.055, 0, 1], ['dark', 0.022, 0.12, 1.18]] as [MatKey, number, number, number][]) {
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i <= 8; i++) { const t = i / 8; const p = a.clone().lerp(b, t); p.y -= sag * s * 4 * t * (1 - t); p.x += off * Math.sign(-em.x || 1) * Math.sin(t * Math.PI); pts.push(p); }
+      pb.add(mat, tube(pts, r, Math.max(24, Math.round(seg * 1.2)), mat === 'rubber' ? 8 : 5));
+    }
+    // ferrules at both ends
+    for (const [p, q] of [[a, b], [b, a]] as [THREE.Vector3, THREE.Vector3][]) {
+      const dir = q.clone().sub(p).normalize(); const m = new THREE.Matrix4().compose(p.clone().addScaledVector(dir, 0.12), new THREE.Quaternion().setFromUnitVectors(up, dir), new THREE.Vector3(1, 1, 1));
+      pb.add('chrome', cyl(0.085, 0.07, 0.24, 12), m);
+    }
+  });
+  L.extras?.(pb, L);
+  const out = pb.build(); staticCache.set(key, out); return out;
+}
 
-  const nm = panelSet.normalMap.clone(); nm.repeat.set(2, 2); nm.needsUpdate = true;
-  const ns = new THREE.Vector2(0.45, 0.45);
-  const M: Mats = {
-    paint: new THREE.MeshPhysicalMaterial({ color: colors[0], metalness: 0.62, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.08, normalMap: nm, normalScale: ns }),
-    paint2: new THREE.MeshPhysicalMaterial({ color: colors[1], metalness: 0.6, roughness: 0.34, clearcoat: 0.8, clearcoatRoughness: 0.15, normalMap: nm, normalScale: ns }),
-    chrome: new THREE.MeshStandardMaterial({ color: '#d8dce2', metalness: 1, roughness: 0.12 }),
-    dark: new THREE.MeshStandardMaterial({ color: '#14151a', metalness: 0.7, roughness: 0.5 }),
-    steel: new THREE.MeshStandardMaterial({ color: '#7a7f88', metalness: 0.9, roughness: 0.32, normalMap: nm, normalScale: ns }),
-    glow: new THREE.MeshBasicMaterial({ color: new THREE.Color(colors[2]).multiplyScalar(1.6), toneMapped: false }),
-    flame: new THREE.MeshBasicMaterial({ color: new THREE.Color(colors[2]).multiplyScalar(1.4), transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }),
-    core: new THREE.MeshBasicMaterial({ color: new THREE.Color(1.8, 1.8, 1.8), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }),
-  };
-  const mats: THREE.Material[] = Object.values(M);
-  const built = designPod(def, k, M, body, mats);
+const BINDER_PTS = 28;
 
-  // energy binder between the main engine pair
-  const pair = built.engines.slice(0, 2);
-  const bPts = 16;
-  const bGeo = new THREE.BufferGeometry(); bGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(bPts * 3), 3)); k.geos.push(bGeo);
-  const bMat = new THREE.LineBasicMaterial({ color: new THREE.Color(colors[2]).multiplyScalar(2.2), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, toneMapped: false });
-  const binder = new THREE.Line(bGeo, bMat); binder.frustumCulled = false; body.add(binder); mats.push(bMat);
-  const ends = pair.map(e => new THREE.Vector3(e.group.position.x * 0.8, e.group.position.y + e.radius * 0.3, e.group.position.z));
+export function buildPodModel(def: PodDef, colors: [string, string, string], quality = 2, texRes = 1024): PodVisual {
+  const seg = quality >= 3 ? 48 : quality === 2 ? 32 : 20;
+  const texSize = texRes >= 2048 ? 2048 : 1024;
+  const L = podLayout(def);
+  const shared = sharedPodMaterials(texSize) as Record<string, THREE.Material>;
+  const hullL = hullMaterial(colors[0], colors[1], colors[2], L.livery, texSize);
+  const hullR = hullMaterial(colors[0], colors[1], colors[2], L.livery, texSize);
+  const hullC = hullMaterial(colors[0], colors[1], colors[2], L.livery, texSize);
+  const glowCol = new THREE.Color(colors[2]);
+  const glow = new THREE.MeshBasicMaterial({ color: glowCol.clone().multiplyScalar(1.2), toneMapped: false });
+  const pilot = PILOTS.find(p => p.id === def.pilotId) ?? PILOTS[0];
+  const suit = suitMaterial(pilot.color);
+  const flameL = flameMaterial(glowCol, false), coreL = flameMaterial(glowCol, true), flameR = flameMaterial(glowCol, false), coreR = flameMaterial(glowCol, true);
+  const own: THREE.Material[] = [hullL, hullR, hullC, glow, flameL, coreL, flameR, coreR];
+  const matFor = (k: string, hull: THREE.Material) => (k === 'hull' ? hull : k === 'glow' ? glow : k === 'suit' ? suit : shared[k]);
 
-  body.position.z = -built.cockpitZ * 0.25;
-
-  const flames = built.engines.flatMap(e => e.flames);
-  const flaps = built.engines.flatMap(e => e.flaps);
-  const update = (t: number, throttle: number, boost: number, airbrake: number, dmgL: number, dmgR: number, heat: number) => {
-    const fl = 0.3 + throttle * 0.8 + boost * 0.9;
-    flames.forEach((f, i) => {
-      const flick = 0.85 + Math.sin(t * 55 + i) * 0.08 + Math.random() * 0.1;
-      const dmg = i % 4 < 2 ? dmgL : dmgR;
-      f.scale.set(1 + boost * 0.3, 1 + boost * 0.3, fl * flick * (dmg < 0.15 ? 0.3 + Math.random() * 0.7 : 1));
-    });
-    const hc = new THREE.Color(colors[2]).lerp(new THREE.Color('#ff5a1a'), Math.max(0, heat - 0.6) * 2.5);
-    (M.flame as THREE.MeshBasicMaterial).color.copy(hc).multiplyScalar(1.4 + boost * 1.4);
-    (M.glow as THREE.MeshBasicMaterial).color.copy(hc).multiplyScalar(1.6 + boost * 1.4);
-    built.engines.forEach(e => { if (e.fan) e.fan.rotation.z += 0.3 + throttle * 0.8; });
-    flaps.forEach(f => (f.rotation.x = -f.userData.s * airbrake * 1.1));
-    if (ends.length === 2) {
-      const arr = (binder.geometry.attributes.position as THREE.BufferAttribute).array as Float32Array;
-      for (let i = 0; i < bPts; i++) {
-        const f = i / (bPts - 1); const p = ends[0].clone().lerp(ends[1], f);
-        const amp = Math.sin(f * Math.PI) * 0.35;
-        p.y += Math.sin(t * 40 + f * 14) * amp + (Math.random() - 0.5) * amp * 0.8;
-        arr[i * 3] = p.x; arr[i * 3 + 1] = p.y; arr[i * 3 + 2] = p.z;
-      }
-      binder.geometry.attributes.position.needsUpdate = true;
+  const group = new THREE.Group(); const body = new THREE.Group(); group.add(body);
+  body.position.z = -L.cockpit.z * 0.25;
+  const addMeshes = (parts: Map<string, THREE.BufferGeometry>, parent: THREE.Object3D, hull: THREE.Material) => {
+    for (const [k, g] of parts) {
+      const mat = matFor(k, hull); if (!mat) continue;
+      const m = new THREE.Mesh(g, mat); const fx = k === 'glow' || k === 'glass';
+      m.castShadow = !fx; m.receiveShadow = !fx; if (k === 'glass') m.renderOrder = 1; parent.add(m);
     }
   };
-  const dispose = () => { k.geos.forEach(g => g.dispose()); mats.forEach(m => m.dispose()); nm.dispose(); };
-  return {
-    group, body, engines: built.engines.map(e => e.group),
-    exhaustLocal: built.engines.map(e => e.exhaust.clone().add(body.position)),
-    update, dispose,
+
+  const engines: THREE.Object3D[] = []; const exhaustLocal: THREE.Vector3[] = [];
+  const fans: THREE.Mesh[] = []; const flaps: { m: THREE.Mesh; sign: number }[] = []; const flames: { m: THREE.Mesh; side: number }[] = [];
+  let frontZ = -Infinity, topY = 0, sumY = 0;
+  for (const em of L.engines) {
+    const eg = engineGeo(em.spec, seg);
+    const side = em.x < 0 ? -1 : 1; const hull = side < 0 ? hullL : hullR;
+    const mount = new THREE.Group(); mount.position.set(em.x, em.y, em.z); body.add(mount);
+    const bob = new THREE.Group(); mount.add(bob); engines.push(bob);
+    addMeshes(eg.parts, bob, hull);
+    const fan = new THREE.Mesh(eg.fan, shared.dark); fan.position.z = eg.fanZ; fan.castShadow = false; bob.add(fan); fans.push(fan);
+    for (const f of eg.flaps) { const m = new THREE.Mesh(f.geo, hull); m.position.copy(f.pivot); m.castShadow = true; m.receiveShadow = true; bob.add(m); flaps.push({ m, sign: f.sign }); }
+    for (const core of [false, true]) {
+      const m = new THREE.Mesh(core ? eg.flameCore : eg.flameOuter, side < 0 ? (core ? coreL : flameL) : (core ? coreR : flameR));
+      m.position.z = eg.flameZ; m.renderOrder = 2; bob.add(m); flames.push({ m, side });
+    }
+    exhaustLocal.push(new THREE.Vector3(em.x, em.y, em.z + eg.exhaustZ));
+    frontZ = Math.max(frontZ, em.z + eg.frontZ); topY = Math.max(topY, em.y + eg.R); sumY += em.y;
+  }
+
+  // cockpit + pilot
+  const ck = cockpitGeo(L, seg);
+  const cockpit = new THREE.Group(); cockpit.position.set(0, L.cockpit.y, L.cockpit.z); body.add(cockpit);
+  addMeshes(ck.parts, cockpit, hullC);
+  addMeshes(staticGeo(def, L, seg, ck.info.anchors), body, hullC);
+
+  // energy binder ribbon
+  let binder: { geo: THREE.BufferGeometry; a: THREE.Vector3; b: THREE.Vector3; u: FxU } | null = null;
+  if (L.binder) {
+    const A = L.engines[L.binder[0]], B = L.engines[L.binder[1]]; const ea = engineGeo(A.spec, seg), eb = engineGeo(B.spec, seg);
+    const a = new THREE.Vector3(A.x + Math.sign(B.x - A.x) * ea.R * 0.97, A.y + ea.R * 0.2, A.z + ea.L * 0.12);
+    const b = new THREE.Vector3(B.x + Math.sign(A.x - B.x) * eb.R * 0.97, B.y + eb.R * 0.2, B.z + eb.L * 0.12);
+    const geo = new THREE.BufferGeometry();
+    const uv = new Float32Array(BINDER_PTS * 4 * 2); const idx: number[] = [];
+    for (let i = 0; i < BINDER_PTS; i++) {
+      const f = i / (BINDER_PTS - 1); for (let k = 0; k < 4; k++) { uv[(i * 4 + k) * 2] = f; uv[(i * 4 + k) * 2 + 1] = k % 2 === 0 ? 1 : 0; }
+      if (i < BINDER_PTS - 1) for (const o of [0, 2]) { const p = i * 4 + o, q = p + 4; idx.push(p, p + 1, q, p + 1, q + 1, q); }
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(BINDER_PTS * 4 * 3), 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setIndex(idx);
+    const mat = binderMaterial(glowCol); own.push(mat);
+    const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; mesh.renderOrder = 3; body.add(mesh);
+    binder = { geo, a, b, u: mat.userData.u as FxU };
+  }
+
+  const eye = cockpit.position.clone().add(ck.info.head).add(new THREE.Vector3(0, 0.24, 0.32));
+  const hood = new THREE.Vector3(0, sumY / Math.max(1, L.engines.length) + topY * 0.35 + 0.35, frontZ - 1.2);
+
+  const hc = new THREE.Color(), hot = new THREE.Color('#ff5a1a'); const tmp = new THREE.Vector3();
+  const update = (t: number, throttle: number, boost: number, airbrake: number, dmgL: number, dmgR: number, heat: number) => {
+    const fl = 0.35 + throttle * 0.75 + boost * 0.8;
+    const spL = dmgL < 0.15 ? 0.3 + Math.random() * 0.7 : 1, spR = dmgR < 0.15 ? 0.3 + Math.random() * 0.7 : 1;
+    for (const f of flames) { const sp = f.side < 0 ? spL : spR; const w = 1 + boost * 0.25; f.m.scale.set(w, w, Math.max(0.05, fl * (0.9 + Math.random() * 0.14) * sp)); }
+    hc.copy(glowCol).lerp(hot, Math.min(1, Math.max(0, heat - 0.6) * 2.5));
+    const pw = 0.55 + throttle * 0.45 + boost * 0.5;
+    for (const [m, sp] of [[flameL, spL], [coreL, spL], [flameR, spR], [coreR, spR]] as [THREE.Material, number][]) { const u = m.userData.u as FxU; u.uTime.value = t; u.uColor.value.copy(hc); u.uPower.value = pw * sp; }
+    glow.color.copy(hc).multiplyScalar(1.1 + boost * 0.3);
+    for (const f of fans) f.rotation.z += 0.25 + throttle * 0.9;
+    for (const f of flaps) f.m.rotation.y = f.sign * airbrake * 1.05;
+    const uL = hullL.userData.u as HullU, uR = hullR.userData.u as HullU;
+    uL.uScorch.value = Math.min(1, (1 - dmgL) * 1.1 + Math.max(0, heat - 0.75) * 0.8); uL.uHeat.value = heat; uL.uWear.value = 0.28 + (1 - dmgL) * 0.35;
+    uR.uScorch.value = Math.min(1, (1 - dmgR) * 1.1 + Math.max(0, heat - 0.75) * 0.8); uR.uHeat.value = heat; uR.uWear.value = 0.28 + (1 - dmgR) * 0.35;
+    if (binder) {
+      const arr = binder.geo.attributes.position.array as Float32Array; const w = 0.16 + boost * 0.08;
+      for (let i = 0; i < BINDER_PTS; i++) {
+        const f = i / (BINDER_PTS - 1); tmp.copy(binder.a).lerp(binder.b, f);
+        const amp = Math.sin(f * Math.PI) * 0.32;
+        tmp.y += Math.sin(f * Math.PI) * 0.18 + Math.sin(t * 38 + f * 13) * amp * 0.6 + (Math.random() - 0.5) * amp * 0.7;
+        tmp.z += Math.sin(t * 27 + f * 9) * amp * 0.35;
+        const o = i * 12;
+        arr[o] = tmp.x; arr[o + 1] = tmp.y + w; arr[o + 2] = tmp.z; arr[o + 3] = tmp.x; arr[o + 4] = tmp.y - w; arr[o + 5] = tmp.z;
+        arr[o + 6] = tmp.x; arr[o + 7] = tmp.y; arr[o + 8] = tmp.z + w; arr[o + 9] = tmp.x; arr[o + 10] = tmp.y; arr[o + 11] = tmp.z - w;
+      }
+      binder.geo.attributes.position.needsUpdate = true;
+      binder.u.uTime.value = t; binder.u.uColor.value.copy(hc);
+      binder.u.uPower.value = (0.55 + throttle * 0.35 + boost * 0.6) * Math.min(1, Math.min(dmgL, dmgR) * 3);
+    }
   };
+  const dispose = () => { own.forEach(m => m.dispose()); binder?.geo.dispose(); };
+  return { group, body, engines, exhaustLocal, eye, hood, update, dispose };
 }

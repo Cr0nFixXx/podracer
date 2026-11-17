@@ -211,7 +211,17 @@ export function generateTexture(kind: TexKind, palette: string[], size: number, 
             if (lane < 0.005 && Math.floor(v * 24) % 2 === 0) { direct = [0.85, 0.85, 0.8]; r = 0.35; e = 0.2; h = 0.6; }
             if (edge > 0.035 && edge < 0.045) { direct = [0.9, 0.75, 0.1]; e = 0.15; }
           }
-          if (kind === 'lavaRoad') { N.worley(u, v, 6, w); const g = (1 - sstep(0.0, 0.025, w[1] - w[0])) * sstep(0.4, 0.55, N.fbm(u, v, 3, 3)); e = g * (edge > 0.08 ? 0.8 : 0); h -= g * 0.25; }
+          if (kind === 'road') {
+            // repaired asphalt patches with sealed seams, expansion joints, centre dashes, oil stains on the racing line
+            N.worley(u, v, 5, w2);
+            const patch = w2[2] > 0.76 && edge > 0.09;
+            if (patch) { t -= 0.11; r -= 0.07; h -= 0.03; if (w2[1] - w2[0] < 0.014) { t -= 0.22; h -= 0.12; r += 0.12; } }
+            const jv = (v * 6) % 1; const joint = 1 - sstep(0.0, 0.0035, Math.min(jv, 1 - jv));
+            t -= joint * 0.3; h -= joint * 0.3; r += joint * 0.1;
+            const oil = sstep(0.68, 0.8, N.fbm(u + 0.31, v, 6, 3)) * racing; t -= oil * 0.2; r -= oil * 0.3;
+            if (Math.abs(u - 0.5) < 0.0045 && (v * 10) % 1 < 0.55) { direct = [0.86, 0.84, 0.78]; r = 0.5; h = 0.56; }
+          }
+                    if (kind === 'lavaRoad') { N.worley(u, v, 6, w); const g = (1 - sstep(0.0, 0.025, w[1] - w[0])) * sstep(0.4, 0.55, N.fbm(u, v, 3, 3)); e = g * (edge > 0.08 ? 0.8 : 0); h -= g * 0.25; }
           // edge dirt + white line + kerbs
           const dirt = sstep(0.12, 0.04, edge);
           t -= dirt * 0.15; r += dirt * 0.08;
@@ -246,6 +256,22 @@ export function generateTexture(kind: TexKind, palette: string[], size: number, 
           r = 0.75 - moss * 0.15 - leaf * 0.1;
           if (leaf > 0.5 && w[3] > 0.7) direct = [0.32 + w[3] * 0.15, 0.22, 0.08];
           if (stone > 0.3) direct = [0.38, 0.37, 0.33];
+          break;
+        }
+        case 'gravel': {
+          N.worley(u, v, 34, w); const p1 = 1 - sstep(0.0, 0.42, w[0]);
+          N.worley(u, v, 90, w2); const p2 = 1 - sstep(0.0, 0.45, w2[0]);
+          const f = N.fbm(u, v, 8, 4); const big = p1 * (0.6 + w[2] * 0.4), small = p2 * (0.5 + w2[2] * 0.5);
+          h = Math.max(big * 0.9, small * 0.55) + f * 0.1 + grain * 0.05;
+          t = (big > small ? w[3] : w2[3] * 0.8 + 0.1) * 0.8 + f * 0.2 - (1 - Math.max(p1, p2)) * 0.12; r = 0.86 - big * 0.15;
+          break;
+        }
+        case 'cracked': {
+          N.worley(u, v, 10, w); const edge = w[1] - w[0]; const crack = 1 - sstep(0.0, 0.03, edge);
+          N.worley(u, v, 26, w2); const fineC = 1 - sstep(0.0, 0.025, w2[1] - w2[0]); const f = N.fbm(u, v, 6, 4);
+          h = 0.55 + sstep(0.0, 0.25, edge) * 0.2 - crack * 0.45 - fineC * 0.12 + f * 0.08 + grain * 0.03;
+          t = 0.55 + w[2] * 0.25 + f * 0.25 - crack * 0.45 - fineC * 0.15; r = 0.7 + f * 0.15 + crack * 0.2;
+          e = crack * (0.6 + 0.4 * f);
           break;
         }
         case 'metal': {
@@ -300,8 +326,8 @@ export function generateTexture(kind: TexKind, palette: string[], size: number, 
     const cav = clamp01(0.5 + (H[i] - Hb[i]) * 3.5);
     const ao = 0.62 + 0.38 * Math.min(1, cav * 1.25);
     const tint = 0.92 + 0.16 * N.noise(x / size * 6, y / size * 6, 6);
-    map[i * 4] = Math.min(255, C[i * 3] * ao * tint * 255); map[i * 4 + 1] = Math.min(255, C[i * 3 + 1] * ao * (0.5 + tint * 0.5) * 255); map[i * 4 + 2] = Math.min(255, C[i * 3 + 2] * ao * 255); map[i * 4 + 3] = 255;
-    nrm[i * 4] = (nx * 0.5 + 0.5) * 255; nrm[i * 4 + 1] = (ny * 0.5 + 0.5) * 255; nrm[i * 4 + 2] = (nz * 0.5 + 0.5) * 255; nrm[i * 4 + 3] = 255;
+    map[i * 4] = Math.min(255, C[i * 3] * ao * tint * 255); map[i * 4 + 1] = Math.min(255, C[i * 3 + 1] * ao * (0.5 + tint * 0.5) * 255); map[i * 4 + 2] = Math.min(255, C[i * 3 + 2] * ao * 255); map[i * 4 + 3] = H[i] * 255; // packed height
+    nrm[i * 4] = (nx * 0.5 + 0.5) * 255; nrm[i * 4 + 1] = (ny * 0.5 + 0.5) * 255; nrm[i * 4 + 2] = (nz * 0.5 + 0.5) * 255; nrm[i * 4 + 3] = clamp01(R[i] + (0.5 - cav) * 0.2) * 255; // packed roughness
     rh[i * 4] = H[i] * 255; rh[i * 4 + 1] = clamp01(R[i] + (0.5 - cav) * 0.2) * 255; rh[i * 4 + 2] = cav * 255; rh[i * 4 + 3] = 255;
   }
   const set: TexSet = { map: toTex(map, size, true, aniso), normalMap: toTex(nrm, size, false, aniso), rhMap: toTex(rh, size, false, aniso) };
@@ -342,4 +368,28 @@ export function spriteTexture() {
     d[i] = d[i + 1] = d[i + 2] = 255; d[i + 3] = Math.pow(a, 1.6) * 255;
   }
   const t = new THREE.DataTexture(d, s, s); t.needsUpdate = true; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearFilter; return t;
+}
+
+// close-range micro detail: RGB = tangent normal, A = albedo factor (tileable aggregate / grit)
+let microTex: THREE.DataTexture | null = null;
+export function microTexture() {
+  if (microTex) return microTex;
+  const S = 512; const N = new TileNoise(777); const w: number[] = [0, 0, 0, 0];
+  const H = new Float32Array(S * S), A = new Float32Array(S * S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const u = x / S, v = y / S; const i = y * S + x;
+    N.worley(u, v, 40, w); const peb = 1 - sstep(0.0, 0.45, w[0]);
+    const f = N.fbm(u, v, 16, 4);
+    H[i] = peb * (0.45 + w[2] * 0.55) * 0.7 + f * 0.3;
+    A[i] = clamp01(0.5 + (w[2] - 0.5) * 0.55 * peb + (f - 0.5) * 0.45 - (1 - peb) * 0.08);
+  }
+  const d = new Uint8Array(S * S * 4);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const i = y * S + x; const xm = (x - 1 + S) % S, xp = (x + 1) % S, ym = ((y - 1 + S) % S) * S, yp = ((y + 1) % S) * S;
+    const gx = H[y * S + xp] - H[y * S + xm], gy = H[yp + x] - H[ym + x];
+    let nx = -gx * 3, ny = -gy * 3, nz = 1; const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
+    d[i * 4] = (nx * 0.5 + 0.5) * 255; d[i * 4 + 1] = (ny * 0.5 + 0.5) * 255; d[i * 4 + 2] = (nz * 0.5 + 0.5) * 255; d[i * 4 + 3] = A[i] * 255;
+  }
+  microTex = toTex(d, S, false, 8);
+  return microTex;
 }

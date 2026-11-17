@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import type { PilotDef, PodDef, StatKey } from './data';
-import { frameAt, nearestGlobal, nearestOnPath, type Obstacle, type TrackData } from './trackBuilder';
+import { frameAt, gateDrop, nearestGlobal, nearestOnPath, rotorAngle, type Obstacle, type TrackData } from './trackBuilder';
 import type { PodVisual } from './podModel';
+import { podCollision } from './podDesigns';
 
 export interface Inputs { throttle: number; brake: number; steer: number; boost: boolean; airbrake: boolean; repair: boolean; }
 
@@ -15,7 +16,7 @@ export interface PodState {
   lap: number; passedMid: boolean; rel: number; prog: number; finished: boolean; finishTime: number; lapStart: number; lapTimes: number[];
   dead: number; invuln: number; lastSafePath: number; lastSafeIdx: number; wrongWay: number;
   roll: number; pitch: number; shake: number;
-  events: { type: 'wall' | 'obstacle' | 'land' | 'explode' | 'pod' | 'fall'; strength: number; x: number; y: number; z: number; nx: number; nz: number }[];
+  events: { type: 'wall' | 'obstacle' | 'land' | 'explode' | 'pod' | 'fall' | 'field'; strength: number; x: number; y: number; z: number; nx: number; nz: number }[];
   visual: PodVisual | null;
   ai: AIState | null;
   place: number;
@@ -39,7 +40,7 @@ export function podParams(p: PodState) {
     heatRate: 0.38 - 0.16 * s.cooling,
     repair: 6 + 16 * s.repair,
     sturdy: 1.25 - 0.5 * s.repair,
-    width: p.def.spread / 2 + p.def.engineRad * 0.6,
+    width: podCollision(p.def).halfW, // true half width of the visual model
   };
 }
 
@@ -50,6 +51,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   const inp = p.input;
   if (p.dead > 0) return;
   if (p.invuln > 0) p.invuln -= dt;
+  { const pc = p as unknown as { obCd?: number; wCd?: number }; if (pc.obCd) pc.obCd = Math.max(0, pc.obCd - dt); if (pc.wCd) pc.wCd = Math.max(0, pc.wCd - dt); }
   // steering smoothing
   const target = inp.steer;
   const rate = Math.sign(target) !== Math.sign(p.steer) && Math.abs(p.steer) > 0.05 ? 9 : target === 0 ? 7 : 4.5;
@@ -165,28 +167,65 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
     p.hpL -= dmg * 0.5; p.hpR -= dmg * 0.5; p.shake = Math.min(1, p.shake + 0.4);
     p.events.push({ type: 'land', strength: -p.vel.y, x: p.pos.x, y: fr.groundY, z: p.pos.z, nx: 0, nz: 0 });
   }
+  // tunnel ceilings (shortcut tunnels: arch of radius hw+1.5, apex `roof` m) and zero-G energy tubes
+  if (S.roof > 0 && !fr.gap) {
+    const l = Math.min(1, Math.abs(fr.lat) / (fr.hw + 1.5));
+    const ceil = fr.groundY + 1 + (S.roof - 1) * Math.sqrt(1 - l * l) - 1.1;
+    if (p.pos.y > ceil) {
+      const imp = Math.max(0, p.vel.y); p.pos.y = ceil; if (p.vel.y > 0) p.vel.y *= -0.3;
+      if (imp > 6 && p.invuln <= 0) { const dmg = Math.min(20, (imp - 6) * 0.8 * P.sturdy); p.hpL -= dmg * 0.5; p.hpR -= dmg * 0.5; p.shake = Math.min(1, p.shake + 0.3); p.events.push({ type: 'wall', strength: imp, x: p.pos.x, y: p.pos.y + 1, z: p.pos.z, nx: 0, nz: 0 }); }
+    }
+  }
+  if (p.zeroG) {
+    const dy = p.pos.y - (fr.groundY + 7), dl = fr.lat, dist = Math.hypot(dl, dy), R = fr.hw + 1.4;
+    if (dist > R) {
+      const rl = dl / dist, ry = dy / dist, k = dist - R;
+      p.pos.x -= S.rx * rl * k; p.pos.z -= S.rz * rl * k; p.pos.y -= ry * k;
+      const vr = (p.vel.x * S.rx + p.vel.z * S.rz) * rl + p.vel.y * ry;
+      if (vr > 0) {
+        p.vel.x -= S.rx * rl * vr * 1.3; p.vel.z -= S.rz * rl * vr * 1.3; p.vel.y -= ry * vr * 1.3;
+        if (vr > 2) p.events.push({ type: 'field', strength: vr, x: p.pos.x + S.rx * rl * 2, y: p.pos.y + ry * 2, z: p.pos.z + S.rz * rl * 2, nx: -S.rx * rl, nz: -S.rz * rl });
+      }
+    }
+  }
   if (gap && p.pos.y < S.y - 14) { p.events.push({ type: 'fall', strength: 1, x: p.pos.x, y: p.pos.y, z: p.pos.z, nx: 0, nz: 0 }); kill(p, 1.6, false); return; }
 
-  // walls
-  const open = fr.lat > 0 ? S.openR : S.openL;
-  const limit = open ? fr.hw + 24 : fr.hw - P.width * 0.55;
-  if (Math.abs(fr.lat) > limit && !fr.gap) {
-    const sg = Math.sign(fr.lat); const pen = Math.abs(fr.lat) - limit;
-    p.pos.x -= S.rx * sg * pen; p.pos.z -= S.rz * sg * pen;
-    const vt = (p.vel.x * S.rx + p.vel.z * S.rz) * sg;
-    if (vt > 0) {
-      p.vel.x -= S.rx * sg * vt * 1.35; p.vel.z -= S.rz * sg * vt * 1.35;
-      const impact = vt;
-      const scrub = 1 - Math.min(0.35, impact * 0.012 + 0.01);
-      p.vel.x *= scrub; p.vel.z *= scrub;
-      const trackYaw = Math.atan2(S.tx, S.tz);
-      const d = wrapAngle(trackYaw - p.yaw);
-      if (Math.abs(d) < 1.4) p.yaw += d * Math.min(1, 0.15 + impact * 0.01);
-      if (impact > 4 && p.invuln <= 0) {
-        const dmg = Math.min(28, Math.max(0, impact - 9) * 0.7 * P.sturdy);
-        if (sg > 0) p.hpR -= dmg; else p.hpL -= dmg;
-        p.shake = Math.min(1, p.shake + impact * 0.02);
-        p.events.push({ type: 'wall', strength: impact, x: p.pos.x + S.rx * sg * P.width, y: p.pos.y, z: p.pos.z + S.rz * sg * P.width, nx: -S.rx * sg, nz: -S.rz * sg });
+  // walls: rails (finite height, energy field above) / cliff rock (infinite) / zero-G tube field – per collision circle
+  if (!fr.gap) {
+    const C = podCollision(p.def).circles; const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
+    let best = 0, nx = 0, nz = 0, hx = 0, hz = 0, side = 0, soft = false;
+    for (const c of C) {
+      const wx = p.pos.x + c.x * cy + c.z * sy, wz = p.pos.z - c.x * sy + c.z * cy;
+      const cs = path.samples[nearestOnPath(path, wx, wz, p.idx, 8, 8)];
+      if (cs.gap) continue;
+      const lat = (wx - cs.x) * cs.rx + (wz - cs.z) * cs.rz; const sg = lat >= 0 ? 1 : -1;
+      const pen = Math.abs(lat) + c.r - (sg > 0 ? cs.wallR : cs.wallL);
+      if (pen > best) {
+        best = pen; nx = -cs.rx * sg; nz = -cs.rz * sg; hx = wx - nx * c.r; hz = wz - nz * c.r; side = c.side;
+        const cliff = (sg > 0 ? cs.hR : cs.hL) > 0;
+        const railTop = cs.y + cs.ramp - sg * cs.hw * cs.bank + 1.55;
+        soft = !cliff && (cs.zeroG || p.pos.y - 0.9 > railTop); // flying over the rail → energy field, no crash
+      }
+    }
+    if (best > 0) {
+      p.pos.x += nx * best; p.pos.z += nz * best;
+      const vt = -(p.vel.x * nx + p.vel.z * nz);
+      if (vt > 0 && soft) {
+        p.vel.x += nx * vt * 1.15; p.vel.z += nz * vt * 1.15;
+        if (vt > 2) p.events.push({ type: 'field', strength: vt, x: hx, y: p.pos.y, z: hz, nx, nz });
+      } else if (vt > 0) {
+        p.vel.x += nx * vt * 1.35; p.vel.z += nz * vt * 1.35;
+        const scrub = 1 - Math.min(0.35, vt * 0.012 + 0.01); p.vel.x *= scrub; p.vel.z *= scrub;
+        const d = wrapAngle(Math.atan2(S.tx, S.tz) - p.yaw);
+        if (Math.abs(d) < 1.4) p.yaw += d * Math.min(1, 0.15 + vt * 0.01);
+        const wc = p as unknown as { wCd?: number };
+        if (vt > 4 && p.invuln <= 0 && !(wc.wCd! > 0)) { // pinned pods: one wall hit per 0.2 s, not per substep
+          wc.wCd = 0.2;
+          const dmg = Math.min(28, Math.max(0, vt - 9) * 0.7 * P.sturdy);
+          if (side < 0) p.hpL -= dmg; else if (side > 0) p.hpR -= dmg; else { p.hpL -= dmg * 0.5; p.hpR -= dmg * 0.5; }
+          p.shake = Math.min(1, p.shake + vt * 0.02);
+          p.events.push({ type: 'wall', strength: vt, x: hx, y: p.pos.y, z: hz, nx, nz });
+        }
       }
     }
   }
@@ -195,8 +234,9 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   const buckets = td.obstaclesByPath[p.path]; const b0 = Math.floor(p.idx / 10);
   for (let bb = b0 - 1; bb <= b0 + 1; bb++) {
     const list = buckets.get(bb); if (!list) continue;
-    for (const o of list) collideObstacle(p, o, P.width, P.sturdy);
+    for (const o of list) if (o.kind !== 3) collideObstacle(p, o, P.sturdy);
   }
+  if (td.setPieces.length) collideSetPieces(p, td, time, P.sturdy);
 
   // progress
   const N = td.N;
@@ -230,23 +270,87 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   p.shake *= Math.exp(-dt * 3);
 }
 
-function collideObstacle(p: PodState, o: Obstacle, w: number, sturdy: number) {
-  const dx = p.pos.x - o.x, dz = p.pos.z - o.z; const d = Math.hypot(dx, dz);
-  const R = o.r + w * 0.6;
-  const height = o.kind === 1 ? 9 : o.r * 1.6;
-  if (d > R || d < 0.001 || p.pos.y > o.y + height + 1) return;
-  const nx = dx / d, nz = dz / d;
-  p.pos.x = o.x + nx * R; p.pos.z = o.z + nz * R;
-  const vn = p.vel.x * nx + p.vel.z * nz;
-  if (vn < 0) {
-    p.vel.x -= nx * vn * 1.5; p.vel.z -= nz * vn * 1.5;
-    if (vn < -4) { const sc = Math.max(0.6, 1 + vn * 0.004); p.vel.x *= sc; p.vel.z *= sc; }
-    if (p.invuln <= 0) {
-      const dmg = Math.min(38, Math.max(0, -vn - 6) * 0.9 * sturdy);
-      const side = (nx * Math.cos(p.yaw) - nz * Math.sin(p.yaw)) > 0 ? 0 : 1;
-      if (side) p.hpR -= dmg; else p.hpL -= dmg;
-      p.shake = Math.min(1, p.shake + 0.5);
-      p.events.push({ type: 'obstacle', strength: -vn, x: o.x + nx * o.r, y: p.pos.y, z: o.z + nz * o.r, nx, nz });
+function collideObstacle(p: PodState, o: Obstacle, sturdy: number) {
+  const height = o.kind === 1 || o.kind === 4 ? 9 : o.r * 1.6;
+  if (p.pos.y > o.y + height + 1.5) return;
+  const C = podCollision(p.def).circles; const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
+  for (const c of C) {
+    const wx = p.pos.x + c.x * cy + c.z * sy, wz = p.pos.z - c.x * sy + c.z * cy;
+    const dx = wx - o.x, dz = wz - o.z; const d = Math.hypot(dx, dz); const R = o.r + c.r;
+    if (d >= R || d < 1e-3) continue;
+    const nx = dx / d, nz = dz / d;
+    p.pos.x += nx * (R - d); p.pos.z += nz * (R - d);
+    const vn = p.vel.x * nx + p.vel.z * nz;
+    if (vn < 0) {
+      p.vel.x -= nx * vn * 1.5; p.vel.z -= nz * vn * 1.5;
+      if (vn < -4) { const sc = Math.max(0.6, 1 + vn * 0.004); p.vel.x *= sc; p.vel.z *= sc; }
+      const pc = p as unknown as { obCd?: number };
+      if (p.invuln <= 0 && !(pc.obCd! > 0)) { // one damage hit per 0.35 s (pods pinned by rotor arms no longer melt)
+        pc.obCd = 0.35;
+        const dmg = Math.min(38, Math.max(0, -vn - 6) * 0.9 * sturdy) * (p.isPlayer ? 1 : 0.45); // AI cannot read dense obstacle fields as well as players
+        if (c.side < 0) p.hpL -= dmg; else if (c.side > 0) p.hpR -= dmg; else { p.hpL -= dmg * 0.5; p.hpR -= dmg * 0.5; }
+        p.shake = Math.min(1, p.shake + 0.5);
+        p.events.push({ type: 'obstacle', strength: -vn, x: o.x + nx * o.r, y: p.pos.y, z: o.z + nz * o.r, nx, nz });
+      }
+    }
+    return; // one contact per obstacle and step
+  }
+}
+
+function collideSetPieces(p: PodState, td: TrackData, time: number, sturdy: number) {
+  const C = podCollision(p.def).circles; const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
+  const hurt = (dmg: number, side: number, x: number, z: number, nx: number, nz: number, strength: number) => {
+    if (p.invuln > 0) return;
+    const hp = p as unknown as { spHit?: number }; if (time - (hp.spHit ?? -9) < 0.7) return; hp.spHit = time; // one hit per arm pass, not per substep
+    if (!p.isPlayer) dmg *= 0.45;
+    if (side < 0) p.hpL -= dmg; else if (side > 0) p.hpR -= dmg; else { p.hpL -= dmg * 0.5; p.hpR -= dmg * 0.5; }
+    p.shake = Math.min(1, p.shake + 0.45); p.events.push({ type: 'obstacle', strength, x, y: p.pos.y, z, nx, nz });
+  };
+  for (const sp of td.setPieces) {
+    const dxc = p.pos.x - sp.x, dzc = p.pos.z - sp.z; const reach = sp.type === 'rotor' ? sp.armLen + 14 : sp.hw + 40;
+    if (dxc * dxc + dzc * dzc > reach * reach) continue;
+    if (sp.type === 'rotor') {
+      if (p.pos.y > sp.y + 5) continue; // above the arms
+      const a0 = rotorAngle(sp, time);
+      for (const c of C) {
+        const wx = p.pos.x + c.x * cy + c.z * sy, wz = p.pos.z - c.x * sy + c.z * cy;
+        for (let k = 0; k < sp.arms; k++) {
+          const a = a0 + (k / sp.arms) * Math.PI * 2, ux = Math.cos(a), uz = Math.sin(a);
+          const t = Math.max(1.8, Math.min(sp.armLen, (wx - sp.x) * ux + (wz - sp.z) * uz));
+          const qx = sp.x + ux * t, qz = sp.z + uz * t; let nx = wx - qx, nz = wz - qz; const d = Math.hypot(nx, nz), R = c.r + 0.8;
+          if (d >= R) continue;
+          if (d < 1e-3) { nx = -uz; nz = ux; } else { nx /= d; nz /= d; }
+          p.pos.x += nx * (R - d); p.pos.z += nz * (R - d);
+          const vax = -uz * sp.speed * t, vaz = ux * sp.speed * t; // arm velocity ω × r
+          const vn = (p.vel.x - vax) * nx + (p.vel.z - vaz) * nz;
+          if (vn < 0) { p.vel.x -= nx * vn * 1.7; p.vel.z -= nz * vn * 1.7; if (vn < -5) hurt(Math.min(16, (-vn - 5) * 0.6 * sturdy), c.side, qx, qz, nx, nz, -vn); }
+        }
+      }
+    } else if (sp.type === 'gate') {
+      const s = td.main.samples[sp.idx]; const w3 = (2 * sp.hw) / 3;
+      const sgn = ((p.pos.x - sp.x) * s.tx + (p.pos.z - sp.z) * s.tz) >= 0 ? 1 : -1;
+      for (const c of C) {
+        const wx = p.pos.x + c.x * cy + c.z * sy, wz = p.pos.z - c.x * sy + c.z * cy;
+        const along = (wx - sp.x) * s.tx + (wz - sp.z) * s.tz; const pen = c.r + 0.35 - along * sgn;
+        if (pen <= 0 || pen > c.r * 2 + 3) continue;
+        const lat = (wx - sp.x) * s.rx + (wz - sp.z) * s.rz; let blocked = false;
+        for (let k = 0; k < 3; k++) { const l0 = -sp.hw + k * w3; if (lat + c.r < l0 || lat - c.r > l0 + w3) continue; if (sp.y + 0.2 + (1 - gateDrop(sp, k, time)) * 9.5 < p.pos.y + 1.0) blocked = true; }
+        if (!blocked) continue;
+        const nx = s.tx * sgn, nz = s.tz * sgn; p.pos.x += nx * pen; p.pos.z += nz * pen;
+        const vn = p.vel.x * nx + p.vel.z * nz;
+        if (vn < 0) { p.vel.x -= nx * vn * 1.5; p.vel.z -= nz * vn * 1.5; if (vn < -5) hurt(Math.min(24, (-vn - 5) * 0.8 * sturdy), c.side, wx, wz, nx, nz, -vn); }
+        break;
+      }
+    } else if (sp.state === 1) {
+      for (const r of sp.rocks) {
+        if (r.landed || (r.hits & (1 << p.id)) || Math.abs(p.pos.y - r.y) > r.r + 1.5) continue;
+        for (const c of C) {
+          const wx = p.pos.x + c.x * cy + c.z * sy, wz = p.pos.z - c.x * sy + c.z * cy; const dx = wx - r.x, dz = wz - r.z, d = Math.hypot(dx, dz);
+          if (d > r.r + c.r) continue;
+          r.hits |= 1 << p.id; const nx = d > 1e-3 ? dx / d : 1, nz = d > 1e-3 ? dz / d : 0;
+          p.vel.x += nx * 8; p.vel.z += nz * 8; p.vel.y -= 6; hurt(22 * sturdy, c.side, r.x, r.z, nx, nz, 30); break;
+        }
+      }
     }
   }
 }
@@ -279,7 +383,7 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
   const adt = Math.min(0.1, Math.max(0, time - (ai.lastT ?? time))); ai.lastT = time;
   const spd0 = Math.hypot(p.vel.x, p.vel.z);
   if (spd0 < 8 && time > 3 && !p.finished && p.dead <= 0) ai.stuck = (ai.stuck ?? 0) + adt; else ai.stuck = 0;
-  if ((ai.stuck ?? 0) > 2.5) { ai.stuck = 0; p.lastSafeIdx = p.idx; p.lastSafePath = p.path; respawn(p, td); return; }
+  if ((ai.stuck ?? 0) > 2.5) { ai.stuck = 0; const n0 = td.paths[p.path].samples.length; p.lastSafeIdx = td.paths[p.path].closed ? (p.idx + 25) % n0 : Math.min(n0 - 3, p.idx + 25); p.lastSafePath = p.path; respawn(p, td); return; }
   const path = td.paths[p.path]; const S = path.samples; const n = S.length;
   const speed = Math.hypot(p.vel.x, p.vel.z);
   const at = (k: number) => S[path.closed ? ((p.idx + k) % n + n) % n : Math.max(0, Math.min(n - 1, p.idx + k))];
@@ -306,6 +410,11 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
   for (let bb = bStart; bb <= bStart + 6; bb++) {
     const list = buckets.get(path.closed ? bb % Math.ceil(n / 10) : bb); if (!list) continue;
     for (const o of list) {
+      if (o.hz !== undefined) { // geysers: only avoid if erupting (or about to) when we get there
+        let a2 = o.idx - p.idx; if (path.closed && a2 < -n / 2) a2 += n; const h = td.hazards[o.hz];
+        const ph = (((time + (a2 * 2) / Math.max(30, speed) + h.phase) % h.period) + h.period) % h.period;
+        if (ph > h.period * h.duty + 0.6 && ph < h.period - 2.2) continue;
+      }
       let ahead = o.idx - p.idx; if (path.closed && ahead < -n / 2) ahead += n;
       if (ahead < -5 || ahead > 50) continue;
       const clear = o.r + P.width + 2.5;
@@ -317,6 +426,18 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
       }
     }
   }
+  // portcullis gates: aim for a section that will be open on arrival
+  if (p.path === 0) for (const sp of td.setPieces) {
+    if (sp.type !== 'gate') continue;
+    let ahead = sp.idx - p.idx; if (path.closed && ahead < -n / 2) ahead += n;
+    if (ahead < 0 || ahead > 80) continue;
+    const eta = time + (ahead * 2) / Math.max(30, speed), w3 = (2 * sp.hw) / 3; let bk = -1, bd = 1e9;
+    for (let k = 0; k < 3; k++) {
+      if (Math.max(gateDrop(sp, k, eta - 0.5), gateDrop(sp, k, eta), gateDrop(sp, k, eta + 0.5)) > 0.15) continue;
+      const c = -sp.hw + (k + 0.5) * w3; if (Math.abs(c - lat) < bd) { bd = Math.abs(c - lat); bk = k; }
+    }
+    if (bk >= 0) { const c = -sp.hw + (bk + 0.5) * w3; lat = c + Math.max(-w3 * 0.22, Math.min(w3 * 0.22, lat - c)); }
+  }
   // other pods
   for (const q of pods) {
     if (q === p || q.dead > 0 || q.path !== p.path) continue;
@@ -325,7 +446,7 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
     if (q === player && Math.abs(ahead) < 4 && p.pilot.aggression > 0.75 && Math.sin(time * 0.7 + ai.noiseT) > 0.6) lat = q.lat; // ramming
   }
   const s0 = S[p.idx];
-  const lim = s0.openL || s0.openR ? t.hw + 10 : t.hw - P.width - 0.5;
+  const lim = s0.openL || s0.openR ? t.hw + 10 : Math.min(t.wallL, t.wallR) - P.width - 0.5;
   lat = Math.max(-lim, Math.min(lim, lat));
   const tx = t.x + t.rx * lat, tz = t.z + t.rz * lat;
   const desired = Math.atan2(tx - p.pos.x, tz - p.pos.z);

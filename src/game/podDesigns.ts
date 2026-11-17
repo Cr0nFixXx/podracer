@@ -1,235 +1,232 @@
 import * as THREE from 'three';
 import type { PodDef } from './data';
-import { PILOTS } from './data';
-import { box, cable, cablePylon, makeEngine, type EngineOut, type Kit, type Mats } from './podParts';
+import type { EngineSpec } from './podParts';
+import { PartBuilder, M4, cyl, extrude, lathe, loft, loftRim, prof, rbox, sphere, torus, tube, type Section } from './podKit';
 
-export interface Built { engines: EngineOut[]; cockpitZ: number; }
+export type CockpitStyle = 'pod' | 'wedge' | 'saucer' | 'long';
+export interface EngineMount { spec: EngineSpec; x: number; y: number; z: number; }
+export interface PodLayout {
+  engines: EngineMount[];
+  cockpit: { style: CockpitStyle; hw: number; len: number; y: number; z: number; pilot: number };
+  binder: [number, number] | null;
+  livery: number;
+  extras?: (pb: PartBuilder, L: PodLayout) => void;
+}
+export interface CockpitInfo { head: THREE.Vector3; anchors: [THREE.Vector3, THREE.Vector3]; }
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+const spec = (L: number, R: number, style: EngineSpec['style'], bands: number, blades: number, spike = true, fins = 0): EngineSpec => ({ L, R, style, bands, blades, spike, fins });
 
-function pilot(k: Kit, parent: THREE.Object3D, color: string, scale: number, x = 0, y = 0, z = 0) {
-  const skin = new THREE.MeshStandardMaterial({ color: '#c89868', roughness: 0.6 });
-  const suit = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.2 });
-  const visor = new THREE.MeshStandardMaterial({ color: '#9fd8ff', metalness: 0.9, roughness: 0.05 });
-  const g = new THREE.Group(); g.scale.setScalar(scale); g.position.set(x, y, z);
-  k.mesh(new THREE.CapsuleGeometry(0.3, 0.35, 5, 10), suit, g).position.y = 0.25;
-  const head = k.mesh(new THREE.SphereGeometry(0.22, 16, 12), skin, g); head.position.y = 0.78; head.scale.set(0.95, 1.15, 1);
-  for (const sd of [-1, 1]) { const e = k.mesh(new THREE.SphereGeometry(0.07, 10, 8), visor, g); e.scale.set(1, 0.7, 0.45); e.position.set(sd * 0.08, 0.8, 0.18); }
-  for (const sd of [-1, 1]) { const a = k.mesh(new THREE.CapsuleGeometry(0.06, 0.3, 4, 8), suit, g); a.position.set(sd * 0.34, 0.35, 0.12); a.rotation.z = sd * 0.9; a.rotation.x = 0.5; }
-  parent.add(g);
-  return [skin, suit, visor];
+// ------------------------------------------------------------------ layouts
+export function podLayout(def: PodDef): PodLayout {
+  const pair = (s: EngineSpec, sp: number, y: number, z: number) => [{ spec: s, x: -sp, y, z }, { spec: s, x: sp, y, z }];
+  switch (def.id) {
+    case 'aurora': {
+      const s = spec(9, 1.15, 'turbine', 6, 18);
+      return { engines: pair(s, 2.5, 0, 4), cockpit: { style: 'pod', hw: 0.95, len: 3.4, y: 0.1, z: -6, pilot: 1 }, binder: [0, 1], livery: 0,
+        extras: (pb) => { for (const sd of [-1, 1]) for (const s2 of [-1, 1]) { pb.add('hull', rbox(0.95, 0.08, 8.2, 0.03), M4.trs(sd * 2.5 + s2 * 1.5, -0.32, 4, 0, 0, s2 * -0.12), [0, 0, 3]); pb.add('steel', rbox(0.06, 0.12, 8.3, 0.02), M4.trs(sd * 2.5 + s2 * 1.97, -0.38, 4, 0, 0, s2 * -0.12)); } } };
+    }
+    case 'brute': {
+      const s = spec(8, 1.5, 'split', 7, 20, false);
+      return { engines: pair(s, 2.4, 0, 2), cockpit: { style: 'wedge', hw: 1.1, len: 3.0, y: 0.25, z: -9, pilot: 1.05 }, binder: [0, 1], livery: 2,
+        extras: (pb) => {
+          const fin = extrude([[0, 0], [2.2, 0], [2.7, 2.7], [1.6, 2.7]], 0.12, 0.03); fin.rotateY(Math.PI / 2);
+          pb.add('hull', fin, M4.t(-2.4, 1.45, 1.2), [0, 0, 3]);
+          pb.add('steel', rbox(0.3, 0.4, 1.6, 0.05), M4.t(-2.4, 1.6, 0.2));
+        } };
+    }
+    case 'gasvaro': {
+      const s = spec(6, 0.8, 'quad', 4, 12);
+      return { engines: [...pair(s, 1.6, 0, 3), ...pair(s, 3.4, 0, 3), ...pair(s, 2.5, 1.55, 4)], cockpit: { style: 'long', hw: 0.75, len: 3.6, y: 0, z: -7, pilot: 0.95 }, binder: [0, 1], livery: 1,
+        extras: (pb) => { for (const sd of [-1, 1]) { pb.add('steel', tube([V(sd * 1.6, 0.7, 3.4), V(sd * 2.05, 1.3, 3.7), V(sd * 2.5, 2.1, 4)], 0.07, 12, 8)); pb.add('steel', tube([V(sd * 3.4, 0.7, 3.4), V(sd * 2.95, 1.3, 3.7), V(sd * 2.5, 2.1, 4)], 0.07, 12, 8)); } } };
+    }
+    case 'bomquad': {
+      const s = spec(5.5, 1.1, 'ring', 4, 14);
+      return { engines: [{ spec: s, x: -2.4, y: 0, z: 1 }, { spec: s, x: 2.4, y: 0, z: 1 }, { spec: s, x: -1.6, y: 0.35, z: 7.2 }, { spec: s, x: 1.6, y: 0.35, z: 7.2 }], cockpit: { style: 'saucer', hw: 1.0, len: 2.4, y: 0.2, z: -6, pilot: 0.95 }, binder: [2, 3], livery: 3,
+        extras: (pb) => { for (const sd of [-1, 1]) pb.add('rubber', tube([V(sd * 2.4, 1.7, 1.9), V(sd * 2.0, 1.2, 3.6), V(sd * 1.6, 2.0, 5.4)], 0.045, 16, 6)); } };
+    }
+    case 'mavik': {
+      const s = spec(8, 0.62, 'needle', 6, 10);
+      return { engines: pair(s, 1.7, 0, 3), cockpit: { style: 'pod', hw: 0.72, len: 2.5, y: -0.05, z: -5.5, pilot: 0.92 }, binder: [0, 1], livery: 1 };
+    }
+    case 'rattis': {
+      const s = spec(6, 0.85, 'blade', 4, 14);
+      return { engines: pair(s, 1.7, 0, 2.5), cockpit: { style: 'wedge', hw: 0.78, len: 2.6, y: -0.1, z: -3.2, pilot: 0.92 }, binder: [0, 1], livery: 2 };
+    }
+    case 'aldo': {
+      const s = spec(9, 1.0, 'long', 7, 16, true, 6);
+      return { engines: pair(s, 2.3, 0, 3.5), cockpit: { style: 'long', hw: 0.85, len: 3.2, y: 0, z: -6, pilot: 1 }, binder: [0, 1], livery: 0 };
+    }
+    case 'teemo': {
+      const s = spec(5, 1.25, 'heavy', 4, 20, true);
+      return { engines: [{ spec: s, x: -2.3, y: -0.4, z: 0 }, { spec: s, x: 2.3, y: -0.4, z: 0 }, { spec: s, x: -2.3, y: 1.45, z: 6 }, { spec: s, x: 2.3, y: 1.45, z: 6 }], cockpit: { style: 'saucer', hw: 0.82, len: 2.2, y: 0.35, z: -5.5, pilot: 0.95 }, binder: [0, 1], livery: 3,
+        extras: (pb) => { for (const sd of [-1, 1]) { pb.add('dark', rbox(0.3, 0.3, 3.6, 0.06), M4.trs(sd * 2.3, 0.55, 3.0, -0.31, 0, 0)); pb.add('hazard', rbox(0.32, 0.06, 1.2, 0.02), M4.trs(sd * 2.3, 0.73, 3.0, -0.31, 0, 0)); } } };
+    }
+    case 'elana': {
+      const s = spec(8.5, 0.78, 'needle', 6, 12);
+      return { engines: pair(s, 2, 0, 3), cockpit: { style: 'long', hw: 0.8, len: 3.3, y: 0, z: -6, pilot: 0.95 }, binder: [0, 1], livery: 1,
+        extras: (pb, L) => { const fin = extrude([[0, 0], [1.1, 0], [1.4, 1.3], [0.9, 1.3]], 0.07, 0.02); fin.rotateY(Math.PI / 2); pb.add('hull', fin, M4.t(0, L.cockpit.y + 0.3, L.cockpit.z - 0.7), [0, 0, 3]); } };
+    }
+    default: { // odo – ram
+      const s = spec(7, 1.3, 'heavy', 5, 16, false);
+      return { engines: pair(s, 2.4, 0, 3), cockpit: { style: 'wedge', hw: 1.0, len: 2.8, y: 0, z: -5.5, pilot: 1 }, binder: [0, 1], livery: 2,
+        extras: (pb, L) => {
+          const z = L.cockpit.z + L.cockpit.len * 0.5 + 0.35;
+          pb.add('steel', rbox(3.0, 0.5, 0.35, 0.06), M4.trs(0, L.cockpit.y - 0.25, z, 0.35, 0, 0));
+          pb.add('hazard', rbox(3.02, 0.16, 0.37, 0.03), M4.trs(0, L.cockpit.y - 0.08, z + 0.06, 0.35, 0, 0));
+          for (const sd of [-1, 1]) pb.add('dark', rbox(0.12, 0.12, 0.9, 0.03), M4.t(sd * 0.9, L.cockpit.y - 0.3, z - 0.45));
+        } };
+    }
+  }
 }
 
-const cockTexCache = new Map<string, { albedo: THREE.Texture; emissive: THREE.Texture }>();
-function cockpitTextures(accent: string) {
-  const hit = cockTexCache.get(accent); if (hit) return hit;
-  const W = 512, H = 512;
-  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d')!;
-  const ev = document.createElement('canvas'); ev.width = W; ev.height = H; const ec = ev.getContext('2d')!;
-  ec.fillStyle = '#000'; ec.fillRect(0, 0, W, H);
-  c.fillStyle = '#181b22'; c.fillRect(0, 0, W, H);
-  // padded panels with stitching
-  for (let py = 0; py < 4; py++) for (let px = 0; px < 4; px++) {
-    const x = px * 128 + 8, y = py * 128 + 8;
-    const g = c.createLinearGradient(x, y, x + 112, y + 112); g.addColorStop(0, '#323844'); g.addColorStop(1, '#14171d');
-    c.fillStyle = g; c.fillRect(x, y, 112, 112);
-    c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 2; c.strokeRect(x + 5, y + 5, 102, 102);
-    c.strokeStyle = 'rgba(0,0,0,0.55)'; c.strokeRect(x + 8, y + 8, 96, 96);
+// ------------------------------------------------------------------ cockpit
+type Row = [number, number, number, number, number, number];
+const TEMPLATES: Record<CockpitStyle, Row[]> = {
+  pod: [[-0.5, 0.3, 0.26, 0.26, 2.2, 0], [-0.45, 0.7, 0.46, 0.44, 2.4, 0], [-0.36, 0.9, 0.46, 0.52, 2.6, 0], [-0.24, 0.98, 0.4, 0.55, 2.6, 0.5], [-0.08, 1, 0.36, 0.56, 2.6, 0.6], [0.06, 0.96, 0.36, 0.54, 2.6, 0.5], [0.18, 0.86, 0.42, 0.48, 2.4, 0], [0.32, 0.64, 0.38, 0.38, 2.3, 0], [0.44, 0.34, 0.24, 0.24, 2.2, 0], [0.5, 0.08, 0.07, 0.08, 2, 0]],
+  wedge: [[-0.5, 0.55, 0.3, 0.3, 4, 0], [-0.44, 0.92, 0.38, 0.4, 4, 0], [-0.3, 1, 0.34, 0.42, 4, 0.5], [-0.1, 1, 0.3, 0.4, 4, 0.58], [0.06, 0.96, 0.28, 0.36, 4, 0.5], [0.18, 0.88, 0.3, 0.3, 3.6, 0], [0.34, 0.66, 0.2, 0.22, 3.2, 0], [0.5, 0.3, 0.05, 0.08, 3, 0]],
+  saucer: [[-0.5, 0.4, 0.3, 0.3, 2, 0], [-0.4, 0.85, 0.5, 0.5, 2.1, 0], [-0.25, 1, 0.46, 0.58, 2.2, 0.5], [-0.05, 1.04, 0.42, 0.6, 2.2, 0.6], [0.12, 0.98, 0.42, 0.58, 2.2, 0.5], [0.26, 0.84, 0.48, 0.5, 2.1, 0], [0.4, 0.58, 0.4, 0.4, 2, 0], [0.5, 0.2, 0.16, 0.16, 2, 0]],
+  long: [[-0.5, 0.3, 0.24, 0.24, 2.4, 0], [-0.44, 0.74, 0.4, 0.4, 2.5, 0], [-0.32, 0.9, 0.36, 0.46, 2.6, 0.5], [-0.16, 0.92, 0.32, 0.48, 2.6, 0.58], [-0.02, 0.88, 0.32, 0.46, 2.6, 0.5], [0.1, 0.78, 0.36, 0.42, 2.5, 0], [0.26, 0.58, 0.32, 0.34, 2.4, 0], [0.4, 0.36, 0.22, 0.22, 2.2, 0], [0.5, 0.08, 0.06, 0.07, 2, 0]],
+};
+
+function catmull(p0: number, p1: number, p2: number, p3: number, t: number) { const t2 = t * t, t3 = t2 * t; return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3); }
+
+/** Smoothly resample sparse template rows into dense sections (scaled to metres). */
+function sections(style: CockpitStyle, hw: number, len: number, perSpan: number): Section[] {
+  const T = TEMPLATES[style]; const out: Section[] = [];
+  for (let i = 0; i < T.length - 1; i++) for (let k = 0; k < perSpan; k++) {
+    const t = k / perSpan; const g = (j: number) => T[Math.max(0, Math.min(T.length - 1, j))];
+    const f = (c: number) => catmull(g(i - 1)[c], g(i)[c], g(i + 1)[c], g(i + 2)[c], t);
+    const e = t * t * (3 - 2 * t); const open = g(i)[5] + (g(i + 1)[5] - g(i)[5]) * e;
+    out.push({ z: f(0) * len, w: Math.max(0.02, f(1)) * hw, hT: Math.max(0.02, f(2)) * hw, hB: Math.max(0.02, f(3)) * hw, n: f(4), open: Math.max(0, Math.min(0.85, open)) });
   }
-  // instrument cluster
-  c.fillStyle = '#0b0d13'; c.fillRect(0, 300, W, 96);
-  for (let i = 0; i < 8; i++) {
-    const x = 32 + i * 62;
-    c.strokeStyle = '#46505f'; c.lineWidth = 4; c.beginPath(); c.arc(x, 348, 24, 0, 7); c.stroke();
-    c.fillStyle = '#10131a'; c.beginPath(); c.arc(x, 348, 19, 0, 7); c.fill();
-    ec.strokeStyle = i % 3 === 0 ? '#ff4040' : accent; ec.lineWidth = 3; ec.beginPath(); ec.arc(x, 348, 13, Math.PI, 0); ec.stroke();
-    ec.fillStyle = accent; ec.fillRect(x - 1, 342, 2, 9);
-  }
-  // switch row
-  for (let i = 0; i < 10; i++) { ec.fillStyle = i % 2 ? '#39e07a' : accent; ec.fillRect(26 + i * 48, 412, 14, 9); c.fillStyle = '#0c0e14'; c.fillRect(24 + i * 48, 410, 18, 13); }
-  // warning chevrons
-  c.fillStyle = '#e8c030'; for (let i = 0; i < W; i += 26) { c.beginPath(); c.moveTo(i, 494); c.lineTo(i + 13, 494); c.lineTo(i + 6, 508); c.fill(); }
-  // rivets
-  c.fillStyle = '#a4acb6'; for (let y = 6; y < H; y += 64) for (let x = 6; x < W; x += 64) { c.beginPath(); c.arc(x, y, 3, 0, 7); c.fill(); }
-  const mk = (canvas: HTMLCanvasElement) => { const t = new THREE.CanvasTexture(canvas); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
-  const out = { albedo: mk(cv), emissive: mk(ev) }; cockTexCache.set(accent, out); return out;
+  const l = T[T.length - 1]; out.push({ z: l[0] * len, w: l[1] * hw, hT: l[2] * hw, hB: l[3] * hw, n: l[4], open: 0 });
+  return out;
 }
 
-type CockpitStyle = 'sleek' | 'armored' | 'bubble' | 'compact' | 'racer';
-
-/** Detailed open cockpit with textured interior, seat, roll hoop, instruments and a style variation. */
-function openCockpit(k: Kit, M: Mats, parent: THREE.Object3D, w: number, len: number, pilotColor: string, pilotScale: number, style: CockpitStyle = 'racer') {
-  const tex = cockpitTextures(pilotColor);
-  const interior = (M.paint as THREE.MeshStandardMaterial).clone();
-  interior.map = tex.albedo; interior.emissiveMap = tex.emissive; interior.emissive = new THREE.Color('#ffffff'); interior.emissiveIntensity = 0.55; interior.color.set('#ffffff');
-  const leather = new THREE.MeshStandardMaterial({ color: '#3a2c24', roughness: 0.85 });
-  const glass = new THREE.MeshPhysicalMaterial({ color: '#9fd8ff', transparent: true, opacity: 0.3, roughness: 0.02, metalness: 0.05, side: THREE.DoubleSide, depthWrite: false });
-
-  // hull
-  const tub = new THREE.CylinderGeometry(w * 0.55, w * 0.72, len, 20); tub.rotateX(Math.PI / 2); tub.scale(1, 0.5, 1); k.mesh(tub, interior, parent);
-  k.mesh(box(w * 1.05, 0.08, len * 0.92, 0, -w * 0.22, 0), M.steel, parent);
-  // riveted cockpit rim
-  const rim = new THREE.TorusGeometry(w * 0.52, 0.035, 8, 28); rim.rotateX(Math.PI / 2); rim.scale(1, 1, len / w * 0.8); k.mesh(rim, M.chrome, parent).position.y = w * 0.02;
-
-  // seat: cushion, backrest, headrest
-  k.mesh(box(w * 0.5, 0.1, len * 0.42, 0, -w * 0.14, -len * 0.04), leather, parent);
-  k.mesh(box(w * 0.46, w * 0.42, 0.08, 0, w * 0.02, -len * 0.26), leather, parent);
-  k.mesh(box(w * 0.28, 0.14, 0.1, 0, w * 0.28, -len * 0.28), leather, parent);
-  for (const sd of [-1, 1]) k.mesh(box(0.06, 0.16, len * 0.36, sd * w * 0.24, -w * 0.06, -len * 0.04), leather, parent);
-
-  // roll hoop / cage
-  const hoop = (z: number, h: number) => {
-    for (const sd of [-1, 1]) k.mesh(box(0.05, h, 0.05, sd * w * 0.4, h / 2 - w * 0.1, z), M.steel, parent);
-    k.mesh(box(w * 0.86, 0.05, 0.05, 0, h - w * 0.1, z), M.steel, parent);
-  };
-  hoop(-len * 0.26, w * 0.7);
-  if (style === 'armored') { hoop(len * 0.02, w * 0.6); for (const sd of [-1, 1]) k.mesh(box(0.04, 0.04, len * 0.3, sd * w * 0.4, w * 0.45, -len * 0.12), M.steel, parent); }
-
-  // side armor or consoles
+function pilotParts(pb: PartBuilder, s: number, hip: THREE.Vector3) {
+  const base = new THREE.Matrix4().compose(hip, new THREE.Quaternion(), V(s, s, s));
+  const at = (m: THREE.Matrix4) => base.clone().multiply(m);
+  const torso = lathe(prof([[0, 0], [0.16, 0, 1], [0.19, 0.12], [0.21, 0.32], [0.19, 0.44], [0.12, 0.52], [0.06, 0.56], [0, 0.57]]), 18, 0);
+  torso.rotateX(-Math.PI / 2); torso.scale(1.15, 1, 0.82);
+  pb.add('suit', torso, at(M4.trs(0, 0, 0, 0.22, 0, 0)));
+  // harness straps
+  for (const sd of [-1, 1]) pb.add('leather', rbox(0.05, 0.5, 0.02, 0.01), at(M4.trs(sd * 0.09, 0.27, 0.19, 0.22, 0, sd * 0.12)));
+  pb.add('chrome', cyl(0.035, 0.035, 0.02, 10), at(M4.trs(0, 0.25, 0.205, Math.PI / 2 + 0.22, 0, 0)));
+  const head = V(0, 0.71, 0.17);
+  pb.add('skin', sphere(0.112, 18, 14), at(M4.trs(head.x, head.y - 0.015, head.z + 0.02, 0, 0, 0, 0.95, 1.05, 1)));
+  pb.add('leather', sphere(0.128, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), at(M4.trs(head.x, head.y + 0.01, head.z - 0.015, -0.25, 0, 0, 1, 1.05, 1.08)));
+  pb.add('rubber', torus(0.122, 0.013, 6, 24), at(M4.trs(head.x, head.y + 0.035, head.z, Math.PI / 2 - 0.2, 0, 0)));
   for (const sd of [-1, 1]) {
-    const thick = style === 'armored' ? w * 0.34 : w * 0.2;
-    k.mesh(box(thick, w * 0.28, len * 0.78, sd * (w * 0.5 + thick * 0.3), -w * 0.04, 0), style === 'armored' ? M.paint2 : interior, parent);
-    // button row on the console
-    for (let i = 0; i < 4; i++) k.mesh(box(0.05, 0.03, 0.05, sd * w * 0.42, w * 0.12, -len * 0.1 + i * 0.14), M.glow, parent);
+    pb.add('dark', cyl(0.045, 0.048, 0.045, 14), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.105, Math.PI / 2, 0, 0)));
+    pb.add('visor', sphere(0.04, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.128, Math.PI / 2, 0, 0, 1, 0.45, 1)));
   }
-
-  // dashboard + gauges
-  k.mesh(box(w * 0.72, 0.14, 0.26, 0, 0.0, len * 0.3), interior, parent);
-  for (let i = 0; i < 5; i++) {
-    const gz = len * 0.4, gx = (i - 2) * w * 0.13;
-    k.mesh(new THREE.TorusGeometry(0.055, 0.012, 6, 14).rotateX(1.1).translate(gx, 0.1, gz), M.chrome, parent);
-    k.mesh(new THREE.CircleGeometry(0.045, 12).rotateX(-0.5).translate(gx, 0.1, gz), M.glow, parent);
+  pb.add('leather', torus(0.075, 0.03, 8, 18), at(M4.trs(0, 0.56, 0.12, Math.PI / 2 - 0.25, 0, 0)));
+  const hands: THREE.Vector3[] = [];
+  for (const sd of [-1, 1]) {
+    const sh = V(sd * 0.22, 0.46, 0.09), el = V(sd * 0.3, 0.27, 0.3), hd = V(sd * 0.21, 0.31, 0.5);
+    pb.add('suit', sphere(0.085, 12, 10), at(M4.t(sh.x, sh.y, sh.z)));
+    pb.add('suit', tube([sh, el, hd], 0.055, 14, 10), base);
+    pb.add('leather', sphere(0.062, 12, 10), at(M4.trs(hd.x, hd.y, hd.z + 0.02, 0, 0, 0, 1, 0.9, 1.2)));
+    hands.push(hd.clone().multiplyScalar(s).add(hip));
   }
-  // throttle lever
-  k.mesh(box(0.03, 0.2, 0.03, w * 0.3, 0.16, len * 0.16), M.chrome, parent);
-
-  // pedals
-  for (const sd of [-1, 1]) k.mesh(box(0.07, 0.1, 0.05, sd * 0.12, -w * 0.16, len * 0.3).rotateX(-0.4), M.steel, parent);
-
-  // windscreen
-  if (style === 'bubble') {
-    const dome = new THREE.SphereGeometry(w * 0.55, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-    const d = k.mesh(dome, glass, parent); d.position.set(0, 0, 0); d.scale.set(1, 0.85, len / w * 0.55);
-  } else if (style === 'armored') {
-    const slit = new THREE.BoxGeometry(w * 0.6, 0.16, 0.03); slit.translate(0, w * 0.18, len * 0.34); slit.rotateX(-0.5);
-    k.mesh(slit, glass, parent);
-  } else {
-    const ws = new THREE.SphereGeometry(w * 0.42, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2);
-    const scr = k.mesh(ws, glass, parent); scr.position.set(0, w * 0.08, len * 0.2); scr.scale.set(1, style === 'compact' ? 0.4 : 0.6, 0.65);
-    for (const sd of [-1, 1]) k.mesh(box(0.025, w * 0.3, 0.025, sd * w * 0.3, w * 0.16, len * 0.26), M.chrome, parent);
-  }
-
-  // antenna
-  if (style !== 'compact') {
-    k.mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.6, 6).translate(-w * 0.3, w * 0.34, -len * 0.2), M.steel, parent);
-    k.mesh(new THREE.SphereGeometry(0.035, 8, 6).translate(-w * 0.3, w * 0.66, -len * 0.2), M.glow, parent);
-  }
-  // rear winglets
-  if (style === 'racer' || style === 'sleek') for (const sd of [-1, 1]) { const f = k.mesh(box(0.05, w * 0.4, len * 0.3, sd * w * 0.62, w * 0.16, -len * 0.3), M.paint2, parent); f.rotation.z = sd * 0.3; }
-
-  pilot(k, parent, pilotColor, pilotScale, 0, -w * 0.06, -len * 0.08);
-  return [glass, interior, leather];
+  return { head: head.clone().multiplyScalar(s).add(hip), hands };
 }
 
-export function designPod(def: PodDef, k: Kit, M: Mats, body: THREE.Group, extraMats: THREE.Material[]): Built {
-  const pilotColor = (PILOTS.find(p => p.id === def.pilotId) ?? PILOTS[0]).color;
-  const engines: EngineOut[] = [];
-  const place = (x: number, y: number, z: number, L: number, R: number, o: { bands?: number; blades?: number; spike?: boolean; fins?: number } = {}) => {
-    y = Math.max(y, R - 0.9);
-    const e = makeEngine(k, M, L, R, { style: def.engine, ...o }); e.group.position.set(x, y, z); body.add(e.group);
-    e.exhaust.add(V(x, y, z)); engines.push(e); return e;
-  };
-  let cockpitZ = -def.cable * 0.5;
+const cockpitCache = new Map<string, { parts: Map<string, THREE.BufferGeometry>; info: CockpitInfo }>();
 
-  if (def.id === 'aurora') {
-    // Anakin-style: long banded turbines, radial faces with gold spikes, yellow anti-grav panels, slim cockpit far behind
-    const L = 9, R = 1.15, sp = 2.5;
-    for (const sd of [-1, 1]) {
-      const e = place(sd * sp, 0, 4, L, R, { bands: 6, blades: 18 });
-      for (const s2 of [-1, 1]) { const p = k.mesh(box(0.9, 0.12, L * 0.95, sd * sp + s2 * 1.5, -0.3, 4), M.paint2, body); p.rotation.z = s2 * -0.12; }
-      cablePylon(k, M, e.group, 1.6);
-      cable(k, M.dark, body, V(sd * sp, 1.6, 4.5), V(sd * 0.4, 0.4, cockpitZ + 0.8), 0.5, 0.05);
-    }
-    cockpitZ = -6;
-    const c = new THREE.Group(); c.position.set(0, 0.1, cockpitZ); body.add(c);
-    extraMats.push(...openCockpit(k, M, c, 1.5, 3.2, pilotColor, 1.3, 'sleek'));
-    k.mesh(new THREE.ConeGeometry(0.3, 1.4, 12).rotateX(-Math.PI / 2), M.paint2, c).position.z = 2.2;
-  } else if (def.id === 'brute') {
-    // Sebulba-style: huge plug engines with radial cooling slats, orange split housings, tall rear fin, cockpit far ahead
-    const L = 8, R = 1.5, sp = 2.2;
-    for (const sd of [-1, 1]) {
-      const e = place(sd * sp, 0, 2, L, R, { bands: 7, blades: 20, spike: false });
-      // cooling slats sitting on top of the engine
-      for (let i = 0; i < 9; i++) k.mesh(box(0.05, 0.5, L * 0.5, (i - 4) * 0.17, R + 0.25, -L * 0.15), M.steel, e.group);
-      // split cowl over the engine
-      const cowl = k.mesh(box(R * 2.2, 0.5, L * 0.45, 0, R * 0.55, L * 0.05), M.paint, e.group); cowl.rotation.z = sd * 0.12;
-      cablePylon(k, M, e.group, 2);
-      if (sd === -1) { // rear stabiliser fin, attached to the engine
-        k.mesh(box(0.12, 2.4, 1.8, 0, R + 1.2, -L * 0.3), M.paint, e.group);
-        k.mesh(box(0.08, 2.0, 1.4, 0.1, R + 1.2, -L * 0.3), M.paint2, e.group);
-      }
-    }
-    cockpitZ = -9;
-    const c = new THREE.Group(); c.position.set(0, 0.3, cockpitZ); body.add(c);
-    extraMats.push(...openCockpit(k, M, c, 1.3, 2.6, pilotColor, 1.1, 'armored'));
-    for (const sd of [-1, 1]) cable(k, M.dark, body, V(sd * sp, R + 2, 2), V(sd * 0.3, 0.6, cockpitZ + 0.6), 0.3, 0.045);
-  } else if (def.id === 'gasvaro') {
-    const L = 6, R = 0.8;
-    [[-2.6, 0.6], [2.6, 0.6], [-1.5, -0.5], [1.5, -0.5], [-3.2, -0.1], [3.2, -0.1]].forEach(([x, y], i) => { const e = place(x, y, 3, L, R, { bands: 4, blades: 12 }); if (i < 2) cablePylon(k, M, e.group, 1.2); });
-    cockpitZ = -7;
-    const c = new THREE.Group(); c.position.set(0, 0, cockpitZ); body.add(c);
-    extraMats.push(...openCockpit(k, M, c, 1.2, 3.4, pilotColor, 1.2, 'racer'));
-    for (const sd of [-1, 1]) cable(k, M.dark, body, V(sd * 2.6, 1.8, 3), V(sd * 0.3, 0.4, cockpitZ + 0.8), 0.6, 0.04);
-  } else if (def.id === 'bomquad') {
-    // four engines in two rows (Ben Quadinaros)
-    const L = 5.5, R = 1.1;
-    [[-2.4, 0, 1], [2.4, 0, 1], [-1.6, 0.3, 7], [1.6, 0.3, 7]].forEach(([x, y, z]) => place(x, y, z, L, R, { bands: 4, blades: 14 }));
-    cockpitZ = -6;
-    const c = new THREE.Group(); c.position.set(0, 0.2, cockpitZ); body.add(c);
-    extraMats.push(...openCockpit(k, M, c, 1.4, 2.4, pilotColor, 1.1, 'bubble'));
-    for (const sd of [-1, 1]) cable(k, M.dark, body, V(sd * 2.4, 1.2, 1), V(sd * 0.3, 0.5, cockpitZ + 0.5), 0.5, 0.04);
-  } else if (def.id === 'mavik') {
-    const L = 8, R = 0.6, sp = 1.7;
-    for (const sd of [-1, 1]) { const e = place(sd * sp, 0, 3, L, R, { bands: 6, blades: 10 }); cablePylon(k, M, e.group, 1); cable(k, M.dark, body, V(sd * sp, 1, 3), V(sd * 0.25, 0.3, -4), 0.4, 0.03); }
-    cockpitZ = -5.5;
-    const c = new THREE.Group(); c.position.set(0, -0.1, cockpitZ); body.add(c);
-    extraMats.push(...openCockpit(k, M, c, 1.1, 2.2, pilotColor, 1, 'compact'));
-  } else if (def.id === 'rattis') {
-    const L = 6, R = 0.85, sp = 1.6;
-    for (const sd of [-1, 1]) place(sd * sp, 0, 2.5, L, R, { bands: 4, blades: 14 });
-    cockpitZ = -1.5;
-    const c = new THREE.Group(); c.position.set(0, -0.2, cockpitZ); body.add(c);
-    extraMats.push(...openCockpit(k, M, c, 1.2, 2.4, pilotColor, 1, 'compact'));
-    for (const sd of [-1, 1]) cable(k, M.dark, body, V(sd * sp, 0.9, 2.5), V(sd * 0.3, 0.3, cockpitZ + 0.4), 0.3, 0.035);
-  } else if (def.id === 'aldo') {
-    const L = 9, R = 1, sp = 2.3;
-    for (const sd of [-1, 1]) { const e = place(sd * sp, 0, 3.5, L, R, { bands: 7, blades: 16, fins: 6 }); cablePylon(k, M, e.group, 1.4); cable(k, M.dark, body, V(sd * sp, 1.4, 3.5), V(sd * 0.35, 0.4, -4.5), 0.5, 0.04); }
-    cockpitZ = -6;
-    const c = new THREE.Group(); c.position.set(0, 0, cockpitZ); body.add(c);
-    extraMats.push(...openCockpit(k, M, c, 1.3, 3, pilotColor, 1.1, 'sleek'));
-  } else if (def.id === 'teemo') {
-    // Teemto-style: four big drum engines with red spikes, two rows, tiny cockpit
-    const L = 5, R = 1.25;
-    [[-2.3, -0.6, 0.5], [2.3, -0.6, 0.5], [-2.3, 1.3, 5.5], [2.3, 1.3, 5.5]].forEach(([x, y, z]) => place(x, y, z, L, R, { bands: 4, blades: 20 }));
-    cockpitZ = -5.5;
-    const c = new THREE.Group(); c.position.set(0, 0.4, cockpitZ); body.add(c);
-    extraMats.push(...openCockpit(k, M, c, 1.1, 2, pilotColor, 0.95, 'armored'));
-    for (const sd of [-1, 1]) { cable(k, M.dark, body, V(sd * 2.3, 0.6, 0.5), V(sd * 0.25, 0.6, cockpitZ + 0.4), 0.4, 0.035); cable(k, M.dark, body, V(sd * 2.3, 2.5, 5.5), V(sd * 0.25, 0.7, cockpitZ + 0.4), 0.8, 0.035); }
-  } else if (def.id === 'elana') {
-    const L = 8.5, R = 0.75, sp = 2;
-    for (const sd of [-1, 1]) { const e = place(sd * sp, 0, 3, L, R, { bands: 6, blades: 12 }); cablePylon(k, M, e.group, 1.2); cable(k, M.dark, body, V(sd * sp, 1.2, 3), V(sd * 0.3, 0.4, -4.5), 0.45, 0.035); }
-    cockpitZ = -6;
-    const c = new THREE.Group(); c.position.set(0, 0, cockpitZ); body.add(c);
-    extraMats.push(...openCockpit(k, M, c, 1.2, 3.2, pilotColor, 1.1, 'sleek'));
-    k.mesh(box(0.08, 1.4, 1, 0, 0.9, -1.2), M.paint2, c);
-  } else {
-    // ram: heavy engines, front plough
-    const L = 7, R = 1.3, sp = 2.4;
-    for (const sd of [-1, 1]) { const e = place(sd * sp, 0, 3, L, R, { bands: 5, blades: 16 }); cablePylon(k, M, e.group, 1.5); cable(k, M.dark, body, V(sd * sp, 1.5, 3), V(sd * 0.35, 0.4, -4), 0.5, 0.045); }
-    cockpitZ = -5.5;
-    const c = new THREE.Group(); c.position.set(0, 0, cockpitZ); body.add(c);
-    extraMats.push(...openCockpit(k, M, c, 1.4, 2.6, pilotColor, 1.1, 'armored'));
-    k.mesh(box(3.2, 0.35, 1, 0, -0.3, 1.8), M.steel, c);
+/** Hollow lofted cockpit tub with interior, dashboard, windscreen, controls, pilot and fittings (cockpit-local space). */
+export function cockpitGeo(L: PodLayout, seg: number) {
+  const c = L.cockpit; const key = `${c.style}|${c.hw}|${c.len}|${c.pilot}|${seg}`;
+  const hit = cockpitCache.get(key); if (hit) return hit;
+  const pb = new PartBuilder(); const hw = c.hw, len = c.len;
+  const secs = sections(c.style, hw, len, seg >= 40 ? 6 : seg >= 28 ? 4 : 3);
+  const segC = Math.max(24, seg);
+  pb.add('hull', loft(secs, segC, 2));
+  // ---- hollow interior: inner shell between the closed rows around the opening ----
+  let iA = secs.findIndex(s => (s.open ?? 0) > 0.001) - 1; let iB = secs.length - 1;
+  for (let j = secs.length - 1; j >= 0; j--) if ((secs[j].open ?? 0) > 0.001) { iB = j + 1; break; }
+  iA = Math.max(0, iA); iB = Math.min(secs.length - 1, iB);
+  const th = 0.05 * hw + 0.02;
+  const outerSub = secs.slice(iA, iB + 1);
+  const inner: Section[] = outerSub.map(s => ({ ...s, w: s.w - th, hT: s.hT - th, hB: s.hB - th }));
+  pb.add('interior', loft(inner, segC, 0, [true, true], true));
+  pb.add('chrome', loftRim(outerSub, inner, segC));
+  const zA = secs[iA].z, zB = secs[iB].z; let wMax = 0, hBm = 0; for (const s of outerSub) { wMax = Math.max(wMax, s.w); hBm = Math.max(hBm, s.hB); }
+  const mid = outerSub[Math.floor(outerSub.length / 2)];
+  const rimY = mid.hT * Math.pow(Math.cos(((mid.open ?? 0.5) * Math.PI) / 2), 2 / (mid.n ?? 2.4));
+  const floorY = -(mid.hB - th);
+  // ---- seat + pilot ----
+  const hipZ = zA + (zB - zA) * 0.4, hipY = floorY * 0.5;
+  pb.add('leather', rbox(0.56, 0.12, 0.5, 0.05), M4.t(0, hipY - 0.06, hipZ + 0.08));
+  pb.add('leather', rbox(0.56, 0.7, 0.12, 0.06), M4.trs(0, hipY + 0.3, hipZ - 0.2, -0.15, 0, 0));
+  pb.add('leather', rbox(0.3, 0.2, 0.12, 0.05), M4.trs(0, hipY + 0.78, hipZ - 0.27, -0.15, 0, 0));
+  const pil = pilotParts(pb, c.pilot, V(0, hipY, hipZ));
+  // ---- control levers under the hands ----
+  for (const hd of pil.hands) {
+    const base = V(hd.x, floorY + 0.05, hd.z + 0.1);
+    pb.add('steel', tube([base, V(hd.x, (base.y + hd.y) / 2, hd.z + 0.08), V(hd.x, hd.y - 0.07, hd.z)], 0.022, 8, 6));
+    pb.add('rubber', cyl(0.032, 0.032, 0.12, 10), M4.t(hd.x, hd.y - 0.06, hd.z));
+    pb.add('glow', sphere(0.018, 8, 6), M4.t(hd.x, hd.y + 0.01, hd.z + 0.03));
   }
-  return { engines, cockpitZ };
+  // ---- dashboard + gauges ----
+  const D = new THREE.Matrix4().compose(V(0, rimY - 0.06, zB - 0.16 * len * 0.3 - 0.12), new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.65, 0, 0)), V(1, 1, 1));
+  const dw = Math.min(wMax * 1.3, 1.5);
+  pb.add('interior', rbox(dw, 0.06, 0.34, 0.03), D);
+  for (let i = 0; i < 5; i++) {
+    const gx = (i - 2) * dw * 0.18; const m = D.clone().multiply(M4.trs(gx, 0.032, 0.02 * (i % 2), -Math.PI / 2, 0, 0));
+    pb.add('glow', new THREE.CircleGeometry(0.04, 16), m);
+    pb.add('chrome', torus(0.045, 0.008, 6, 18), m);
+  }
+  // ---- windscreen with chrome frame ----
+  const ws = c.style === 'wedge' ? [0.85, 0.2, 0.42] : c.style === 'saucer' ? [1.0, 0.45, 0.7] : c.style === 'long' ? [0.72, 0.34, 0.58] : [0.9, 0.32, 0.48];
+  const wsM = M4.trs(0, rimY - 0.02, zB - 0.42 * (zB - zA), 0, 0, 0, wMax * ws[0], ws[1], ws[2]);
+  pb.add('glass', sphere(1, 28, 10, 0, Math.PI, 0, Math.PI / 2), wsM);
+  pb.add('chrome', torus(1, 0.022, 6, 28, Math.PI), wsM.clone().multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2)));
+  // ---- side pods with louvres ----
+  const spZ = zA + (zB - zA) * 0.25;
+  for (const sd of [-1, 1]) {
+    pb.add('hull', rbox(0.3 * hw, 0.34 * hw, 0.42 * len, 0.06), M4.t(sd * wMax * 0.97, -0.08 * hw, spZ), [0, 0, 3]);
+    for (let i = 0; i < 5; i++) pb.add('dark', rbox(0.02, 0.22 * hw, 0.03, 0.006), M4.trs(sd * (wMax * 0.97 + 0.15 * hw + 0.01), -0.08 * hw, spZ - 0.12 * len + i * 0.06 * len, 0, sd * 0.6, 0));
+    pb.add('dark', lathe(prof([[0.11 * hw, -0.1, 1], [0.11 * hw, 0.05, 1], [0.08 * hw, 0.05, 1], [0.0, -0.05]]), 16, 0), M4.t(sd * wMax * 0.97, -0.08 * hw, spZ + 0.21 * len + 0.02));
+  }
+  // ---- belly repulsor ----
+  pb.add('dark', rbox(wMax * 1.1, 0.07, len * 0.5, 0.03), M4.t(0, -hBm - 0.03, zA + (zB - zA) * 0.5));
+  pb.add('glow', rbox(wMax * 0.7, 0.025, len * 0.42, 0.01), M4.t(0, -hBm - 0.075, zA + (zB - zA) * 0.5));
+  // ---- tail fins, lights, antenna, nose ----
+  const rear = secs[1];
+  for (const sd of [-1, 1]) {
+    const fin = extrude([[0, 0], [0.55, 0], [0.75, 0.55 * hw], [0.45, 0.55 * hw]], 0.04, 0.012); fin.rotateY(Math.PI / 2);
+    pb.add('hull', fin, M4.trs(sd * rear.w * 0.45, rear.hT * 0.6, secs[2].z, 0, 0, sd * -0.35), [0, 0, 3]);
+    pb.add('glow', sphere(0.045, 10, 8), M4.t(sd * rear.w * 0.62, 0, secs[0].z + 0.06));
+  }
+  pb.add('dark', cyl(0.012, 0.016, 0.9, 6), M4.t(-rear.w * 0.3, rear.hT + 0.45, rear.z + 0.15));
+  pb.add('glow', sphere(0.03, 8, 6), M4.t(-rear.w * 0.3, rear.hT + 0.92, rear.z + 0.15));
+  pb.add('chrome', lathe(prof([[0.07 * hw, 0], [0.05 * hw, 0.12], [0.0, 0.3]]), 16, 0), M4.t(0, 0, len * 0.5 - 0.02));
+  // ---- cable anchors ----
+  const fr = secs[Math.min(secs.length - 1, iB + 2)];
+  const anchors: [THREE.Vector3, THREE.Vector3] = [V(-fr.w * 0.45, fr.hT * 0.75 + 0.06, fr.z), V(fr.w * 0.45, fr.hT * 0.75 + 0.06, fr.z)];
+  for (const a of anchors) { pb.add('chrome', torus(0.06, 0.02, 6, 14), M4.trs(a.x, a.y, a.z, 0, Math.PI / 2, 0)); pb.add('steel', rbox(0.1, 0.1, 0.16, 0.02), M4.t(a.x, a.y - 0.07, a.z)); }
+  const out = { parts: pb.build() as Map<string, THREE.BufferGeometry>, info: { head: pil.head, anchors } };
+  cockpitCache.set(key, out);
+  return out;
+}
+
+// ------------------------------------------------------------------ collision shape
+export interface CollCircle { x: number; z: number; r: number; side: number } // pod-local (group space), side -1 = left engines (hpL)
+const collCache = new Map<string, { circles: CollCircle[]; halfW: number }>();
+/** Collision circles derived from the visual layout: two per engine + cockpit (+ wide extras). */
+export function podCollision(def: PodDef) {
+  const hit = collCache.get(def.id); if (hit) return hit;
+  const L = podLayout(def); const bz = -L.cockpit.z * 0.25;
+  const circles: CollCircle[] = [];
+  for (const e of L.engines) {
+    const side = e.x < 0 ? -1 : 1;
+    const R = e.spec.R * 1.05 + (e.spec.style === 'blade' ? 0.45 : 0) + (e.spec.style === 'ring' ? 0.3 : 0);
+    for (const f of [0.3, -0.3]) circles.push({ x: e.x, z: e.z + e.spec.L * f + bz, r: R, side });
+  }
+  if (def.id === 'aurora') for (const sd of [-1, 1]) for (const f of [2.5, -2.5]) circles.push({ x: sd * 4.0, z: 4 + f + bz, r: 0.6, side: sd });
+  circles.push({ x: 0, z: L.cockpit.z + bz, r: L.cockpit.hw * 1.05, side: 0 });
+  let halfW = 0; for (const c of circles) halfW = Math.max(halfW, Math.abs(c.x) + c.r);
+  const out = { circles, halfW }; collCache.set(def.id, out); return out;
 }

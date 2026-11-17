@@ -4,6 +4,8 @@ import type { TrackDef } from './data';
 export const DS = 2; // sample spacing in meters
 export const WIDTH_SCALE = 2.0; // global road width multiplier
 export const SC_HW = 12; // shortcut half width
+export const RAIL_INSET = 0.3; // guard-rail inner face, metres inside the road edge
+export const CANYON_OUTSET = 0.5; // canyon rock face, metres outside the road edge
 
 export interface Sample {
   x: number; y: number; z: number;
@@ -18,11 +20,16 @@ export interface Sample {
   canyon: boolean;
   openL: boolean; openR: boolean;
   link: number; // linked path id
+  wallL: number; wallR: number; // barrier offsets from the centreline (rails / canyon rock) used for collision
+  hL: number; hR: number; // cliff wall height per side (0 = no cliff → guard rail)
+  roof: number; // tunnel ceiling height above the road (0 = open sky)
   vmax: number; // ai reference speed
   s: number;
 }
 
-export interface Obstacle { path: number; idx: number; lat: number; r: number; kind: number; x: number; y: number; z: number; }
+export interface Obstacle { path: number; idx: number; lat: number; r: number; kind: number; x: number; y: number; z: number; hz?: number } // kind 3 = AI keep-out only (hazard / rotor disc), kind 4 = set-piece solid (no generic visual)
+/** Periodic eruption zone (methane geyser / lava vent). state: 0 idle, 0.5 warning, 1 erupting (set by Game). */
+export interface Hazard { idx: number; lat: number; r: number; x: number; y: number; z: number; period: number; phase: number; duty: number; state: number; }
 
 export interface Path {
   id: number;
@@ -43,6 +50,8 @@ export interface TrackData {
   finishIdx: number;
   obstacles: Obstacle[];
   obstaclesByPath: Map<number, Obstacle[]>[];
+  hazards: Hazard[];
+  setPieces: SetPiece[];
   arches: number[];
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number; minY: number; maxY: number };
 }
@@ -113,7 +122,7 @@ function finalizeSamples(S: Sample[], closed: boolean) {
 }
 
 function makeSample(p: THREE.Vector3, hw: number, s: number): Sample {
-  return { x: p.x, y: p.y, z: p.z, tx: 0, tz: 1, rx: -1, rz: 0, hw, bank: 0, curv: 0, ramp: 0, gap: false, zeroG: false, canyon: false, openL: false, openR: false, link: -1, vmax: 200, s };
+  return { x: p.x, y: p.y, z: p.z, tx: 0, tz: 1, rx: -1, rz: 0, hw, bank: 0, curv: 0, ramp: 0, gap: false, zeroG: false, canyon: false, openL: false, openR: false, link: -1, wallL: hw, wallR: hw, hL: 0, hR: 0, roof: 0, vmax: 200, s };
 }
 
 export function buildTrack(def: TrackDef): TrackData {
@@ -170,6 +179,9 @@ export function buildTrack(def: TrackDef): TrackData {
   if (def.theme === 'oovo') for (const [a, b] of def.canyons.slice(0, 2)) for (let i = Math.floor(a * N); i < Math.floor(b * N); i++) samples[(i + N) % N].zeroG = true;
   // canyon flags
   for (const [a, b] of def.canyons) for (let i = Math.floor(a * N); i < Math.floor(b * N); i++) samples[(i + N) % N].canyon = true;
+  // cliff mode per canyon range: 0 both walls, 1 left wall only, 2 right wall only (half-canyon with a view), 3 none (zero-G tube)
+  const rngC = mulberry32(hashStr(def.id + '|cliff'));
+  const canyonModes = def.canyons.map(([a, b], ci) => ({ a: Math.floor(a * N), b: Math.floor(b * N), mode: def.theme === 'oovo' && ci < 2 ? 3 : (() => { const r = rngC(); return r < 0.4 ? 0 : r < 0.7 ? 1 : 2; })() }));
   // ramps & gaps
   const taken: number[] = [];
   for (const r of def.ramps) {
@@ -231,6 +243,26 @@ export function buildTrack(def: TrackDef): TrackData {
     }
   }
 
+  // cliff heights per side (tapered over 50 m at gorge entrances) – shared by walls, terrain plateaus, rails and collision
+  const cliffH = (s: Sample, side: number) => 14 + fbm1(s.s * 0.004 + side * 10) * 36;
+  for (const cm of canyonModes) {
+    const len = cm.b - cm.a; if (cm.mode === 3) continue;
+    for (let k = 0; k < len; k++) {
+      const s = samples[((cm.a + k) % N + N) % N]; if (!s.canyon || s.zeroG) continue;
+      const tp0 = Math.max(0, Math.min(1, k / 25, (len - 1 - k) / 25)); const tp = tp0 * tp0 * (3 - 2 * tp0);
+      if (cm.mode !== 2 && !s.openL) s.hL = 3 + (cliffH(s, -1) - 3) * tp;
+      if (cm.mode !== 1 && !s.openR) s.hR = 3 + (cliffH(s, 1) - 3) * tp;
+    }
+  }
+  for (let pi = 1; pi < paths.length; pi++) {
+    const ss = paths[pi].samples, n2 = ss.length;
+    for (let i = 0; i < n2; i++) { const s = ss[i]; if (!s.openL) s.hL = cliffH(s, -1) * 0.8; if (!s.openR) s.hR = cliffH(s, 1) * 0.8; if (i >= Math.floor(n2 * 0.25) && i <= Math.floor(n2 * 0.75)) s.roof = 12; }
+  }
+  // collision walls: guard rails RAIL_INSET inside the edge, cliff rock CANYON_OUTSET outside, zero-G tube wall, open joins none
+  for (const p of paths) for (const s of p.samples) {
+    s.wallL = s.openL ? s.hw + 30 : s.zeroG ? s.hw + 1 : s.hL > 0 ? s.hw + CANYON_OUTSET : s.hw - RAIL_INSET;
+    s.wallR = s.openR ? s.hw + 30 : s.zeroG ? s.hw + 1 : s.hR > 0 ? s.hw + CANYON_OUTSET : s.hw - RAIL_INSET;
+  }
   // obstacles
   const obstacles: Obstacle[] = [];
   const startIdx = closed ? 30 : 45;
@@ -252,6 +284,47 @@ export function buildTrack(def: TrackDef): TrackData {
       obstacles.push({ path: p, idx, lat, r: 2, kind: 0, x: s.x + s.rx * lat, y: s.y, z: s.z + s.rz * lat });
     }
   }
+  // hazards (geysers / vents) – also registered as kind-3 pseudo obstacles so the AI steers around them
+  const hazards: Hazard[] = [];
+  for (const [a, b, cnt] of def.hazards ?? []) {
+    for (let c = 0; c < cnt; c++) {
+      const idx = (Math.floor((a + (b - a) * rng()) * N) + N) % N; const s = samples[idx];
+      if (!okSpot(s) || Math.abs(idx - startIdx) < 80 || hazards.some(h => Math.abs(h.idx - idx) < 25)) continue;
+      const lat = (rng() * 2 - 1) * s.hw * 0.55; const x = s.x + s.rx * lat, z = s.z + s.rz * lat, y = s.y - lat * s.bank;
+      hazards.push({ idx, lat, r: 4.5, x, y, z, period: 4 + rng() * 3, phase: rng() * 10, duty: 0.3, state: 0 });
+      obstacles.push({ path: 0, idx, lat, r: 4.5, kind: 3, x, y, z, hz: hazards.length - 1 });
+    }
+  }
+  // set pieces: rotors / portcullis gates prefer straights, collapsing arches prefer gorges
+  const setPieces: SetPiece[] = [];
+  const cdist = (a: number, b: number) => { const d = Math.abs(a - b); return closed ? Math.min(d, N - d) : d; };
+  const spOk = (i: number, type: string) => {
+    const s = samples[i]; if (!okSpot(s) || s.zeroG) return false;
+    if (closed ? cdist(i, startIdx) < 110 : (i < startIdx + 110 || i > finishIdx - 70)) return false;
+    for (let k = -30; k <= 30; k += 3) { const q = samples[((i + k) % N + N) % N]; if (q.gap || q.ramp > 0 || q.openL || q.openR || q.zeroG) return false; }
+    if (hazards.some(h => cdist(h.idx, i) < 50) || setPieces.some(o => cdist(o.idx, i) < 120)) return false;
+    if (obstacles.some(o => o.path === 0 && o.kind < 3 && cdist(o.idx, i) < 45)) return false; // never stack a set piece onto an obstacle field
+    return type === 'arch' || Math.abs(s.curv) < 1 / 350;
+  };
+  for (const type of ['rotor', 'gate', 'arch'] as const) for (const f of def.setPieces?.[type] ?? []) {
+    let best = -1, bs = 1e9; const c0 = Math.floor(f * N); const win = Math.floor(N * 0.08);
+    for (let k = -win; k <= win; k += 3) {
+      const i = closed ? ((c0 + k) % N + N) % N : c0 + k; if (i < 0 || i >= N || !spOk(i, type)) continue;
+      const sc = Math.abs(k) * 0.02 + Math.abs(samples[i].curv) * 2000 - (type === 'arch' && samples[i].hL > 0 && samples[i].hR > 0 ? 30 : 0);
+      if (sc < bs) { bs = sc; best = i; }
+    }
+    if (best < 0) continue;
+    const s = samples[best];
+    const sp: SetPiece = { type, idx: best, x: s.x, y: s.y, z: s.z, hw: s.hw, lat: 0, armLen: 0, arms: 0, speed: 0, phase: rng() * 10, period: 6.5 + rng() * 1.5, state: 0, rocks: [] };
+    if (type === 'rotor') {
+      sp.lat = (rng() < 0.5 ? -1 : 1) * s.hw * 0.3; sp.armLen = Math.max(8, Math.min(17, s.hw * 0.42)); sp.arms = rng() < 0.5 ? 2 : 3;
+      sp.speed = (0.75 + rng() * 0.5) * (rng() < 0.5 ? -1 : 1);
+      sp.x = s.x + s.rx * sp.lat; sp.z = s.z + s.rz * sp.lat; sp.y = s.y - sp.lat * s.bank;
+      obstacles.push({ path: 0, idx: best, lat: sp.lat, r: 1.8, kind: 4, x: sp.x, y: sp.y, z: sp.z });
+      obstacles.push({ path: 0, idx: best, lat: sp.lat, r: sp.armLen + 1.5, kind: 3, x: sp.x, y: sp.y, z: sp.z });
+    }
+    setPieces.push(sp);
+  }
   const obstaclesByPath: Map<number, Obstacle[]>[] = paths.map(() => new Map());
   for (const o of obstacles) {
     const m = obstaclesByPath[o.path]; const b = Math.floor(o.idx / 10);
@@ -270,7 +343,7 @@ export function buildTrack(def: TrackDef): TrackData {
     bounds.minZ = Math.min(bounds.minZ, s.z); bounds.maxZ = Math.max(bounds.maxZ, s.z);
     bounds.minY = Math.min(bounds.minY, s.y); bounds.maxY = Math.max(bounds.maxY, s.y);
   }
-  return { def, paths, main, N, startIdx, finishIdx, obstacles, obstaclesByPath, arches, bounds };
+  return { def, paths, main, N, startIdx, finishIdx, obstacles, obstaclesByPath, hazards, setPieces, arches, bounds };
 }
 
 function findShortcut(S: Sample[], N: number, fa: number, closed: boolean): [number, number] | null {
@@ -324,7 +397,7 @@ export function nearestGlobal(path: Path, x: number, z: number, from = 0, to = -
   return best;
 }
 
-export interface Frame { idx: number; lat: number; along: number; groundY: number; gap: boolean; zeroG: boolean; hw: number; s: Sample; }
+export interface Frame { idx: number; lat: number; along: number; groundY: number; gap: boolean; zeroG: boolean; hw: number; wallL: number; wallR: number; s: Sample; }
 export function frameAt(path: Path, idx: number, x: number, z: number): Frame {
   const S = path.samples, n = S.length; const s = S[idx];
   const dx = x - s.x, dz = z - s.z;
@@ -336,5 +409,24 @@ export function frameAt(path: Path, idx: number, x: number, z: number): Frame {
   const bank = s.bank + (s2.bank - s.bank) * f;
   const hw = s.hw + (s2.hw - s.hw) * f;
   const clampedLat = Math.max(-hw, Math.min(hw, lat));
-  return { idx, lat, along, groundY: y + ramp - clampedLat * bank, gap: s.gap, zeroG: s.zeroG, hw, s };
+  return { idx, lat, along, groundY: y + ramp - clampedLat * bank, gap: s.gap, zeroG: s.zeroG, hw, wallL: s.wallL + (s2.wallL - s.wallL) * f, wallR: s.wallR + (s2.wallR - s.wallR) * f, s };
 }
+
+// ---- set pieces ----
+export interface SpRock { x: number; y: number; z: number; vx: number; vy: number; vz: number; r: number; landed: boolean; hits: number; }
+export interface SetPiece {
+  type: 'rotor' | 'gate' | 'arch'; idx: number; x: number; y: number; z: number; hw: number;
+  lat: number; armLen: number; arms: number; speed: number; phase: number; period: number;
+  state: number; rocks: SpRock[]; // arch: 0 intact, 1 collapsing, 2 collapsed
+}
+export function rotorAngle(sp: SetPiece, time: number) { return sp.phase + sp.speed * time; }
+function gatePhase(sp: SetPiece, k: number, time: number) { let ph = ((time + sp.phase) / sp.period - k / 3) % 1; if (ph < 0) ph += 1; return ph; }
+/** 0 = fully raised … 1 = fully lowered; one section at a time, 0.4 s drop, ~1.3 s closed */
+export function gateDrop(sp: SetPiece, k: number, time: number) {
+  const ph = gatePhase(sp, k, time); const ss = (a: number, b: number, x: number) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  return ph < 0.06 ? ss(0, 0.06, ph) : ph < 0.26 ? 1 : ph < 0.32 ? 1 - ss(0.26, 0.32, ph) : 0;
+}
+export function gateWarn(sp: SetPiece, k: number, time: number) { return gatePhase(sp, k, time) > 0.86; }
+function h1(i: number) { const s = Math.sin(i * 127.1 + 31.7) * 43758.5453; return s - Math.floor(s); }
+function vn1(x: number) { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return h1(i) + (h1(i + 1) - h1(i)) * u; }
+function fbm1(x: number) { return (vn1(x) * 0.5 + vn1(x * 2.03 + 5.2) * 0.25 + vn1(x * 4.1 + 1.7) * 0.125) / 0.875; }

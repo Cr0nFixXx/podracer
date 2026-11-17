@@ -1,110 +1,114 @@
-import * as THREE from 'three';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
-import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
-import { SSRPass } from 'three/examples/jsm/postprocessing/SSRPass.js';
-import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
-import { FXAAPass } from 'three/examples/jsm/postprocessing/FXAAPass.js';
+import * as THREE from 'three/webgpu';
+import * as TSLmod from 'three/tsl';
+import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js';
+import { ao } from 'three/examples/jsm/tsl/display/GTAONode.js';
+import { ssr } from 'three/examples/jsm/tsl/display/SSRNode.js';
+import { smaa } from 'three/examples/jsm/tsl/display/SMAANode.js';
+import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
+import { radialBlur } from 'three/examples/jsm/tsl/display/radialBlur.js';
 import type { GfxSettings } from './settings';
 
-const GodRaysShader = {
-  uniforms: { tDiffuse: { value: null }, sunPos: { value: new THREE.Vector2(0.5, 0.5) }, intensity: { value: 0.0 }, sunColor: { value: new THREE.Color(1, 0.9, 0.7) } },
-  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-  fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse; uniform vec2 sunPos; uniform float intensity; uniform vec3 sunColor; varying vec2 vUv;
-    void main() {
-      vec4 base = texture2D(tDiffuse, vUv);
-      if (intensity <= 0.001) { gl_FragColor = base; return; }
-      vec2 delta = (vUv - sunPos) / 56.0 * 0.9;
-      vec2 uv = vUv; float illum = 1.0; vec3 acc = vec3(0.0);
-      float dither = fract(sin(dot(vUv, vec2(12.9898, 78.233))) * 43758.5453);
-      uv -= delta * dither;
-      for (int i = 0; i < 56; i++) {
-        uv -= delta;
-        vec3 s = texture2D(tDiffuse, clamp(uv, 0.0, 1.0)).rgb;
-        float l = dot(s, vec3(0.299, 0.587, 0.114));
-        acc += max(s * smoothstep(2.0, 6.0, l), 0.0) * illum;
-        illum *= 0.965;
-      }
-      acc /= 56.0;
-      float fall = 1.0 - smoothstep(0.0, 0.8, length(vUv - sunPos));
-      gl_FragColor = vec4(base.rgb + acc * sunColor * intensity * 2.6 * fall, base.a);
-    }`,
-};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const TSL = TSLmod as any;
+const {
+  Fn, Loop, blendColor, colorToDirection, convertToTexture, directionToColor, float, int, length, luminance, metalness, mix, mrt,
+  normalView, oneMinus, output, pass, pow, renderOutput, roughness, sample, screenUV, smoothstep, step, uniform, vec2, vec3, vec4,
+} = TSL;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type N = any;
+const ssInv = (a: number, b: number, x: N) => oneMinus(smoothstep(b, a, x));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AnyTHREE = THREE as any;
 
-const CinematicShader = {
-  uniforms: {
-    tDiffuse: { value: null }, time: { value: 0 }, speed: { value: 0 }, ca: { value: 0.002 }, vignette: { value: 0.9 },
-    grain: { value: 0.035 }, blur: { value: 1.0 }, damage: { value: 0.0 }, boost: { value: 0.0 }, flash: { value: 0.0 }, enabled: { value: 1.0 },
-  },
-  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-  fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse; uniform float time, speed, ca, vignette, grain, blur, damage, boost, flash, enabled; varying vec2 vUv;
-    float rnd(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233)) + time * 13.0) * 43758.5453); }
-    void main() {
-      vec2 c = vUv - 0.5; float r = length(c);
-      vec3 col;
-      float bs = blur * speed * smoothstep(0.15, 0.6, r) * 0.035;
-      if (bs > 0.0005) {
-        vec3 acc = vec3(0.0);
-        for (int i = 0; i < 10; i++) { float f = float(i) / 9.0; acc += texture2D(tDiffuse, 0.5 + c * (1.0 - bs * f)).rgb; }
-        col = acc / 10.0;
-      } else col = texture2D(tDiffuse, vUv).rgb;
-      if (enabled > 0.5) {
-        float a = (ca + speed * 0.004 + damage * 0.006) * r;
-        col.r = mix(col.r, texture2D(tDiffuse, vUv - c * a * 2.0).r, 0.8);
-        col.b = mix(col.b, texture2D(tDiffuse, vUv + c * a * 2.0).b, 0.8);
-        // grading: subtle teal shadows / warm highlights
-        float l = dot(col, vec3(0.299, 0.587, 0.114));
-        col = mix(col, col * vec3(0.92, 1.0, 1.08), smoothstep(0.4, 0.0, l) * 0.35);
-        col = mix(col, col * vec3(1.06, 1.0, 0.92), smoothstep(0.4, 1.2, l) * 0.3);
-        col += vec3(0.6, 0.85, 1.0) * boost * smoothstep(0.3, 0.75, r) * 0.25;
-        col *= 1.0 - vignette * pow(r * 1.25, 2.6) * 0.75;
-        col = mix(col, vec3(l) * vec3(1.4, 0.4, 0.3), damage * smoothstep(0.25, 0.8, r) * 0.5);
-        col += (rnd(vUv * 731.0) - 0.5) * grain * (0.6 + l);
-      }
-      col += vec3(1.0, 0.9, 0.8) * flash;
-      gl_FragColor = vec4(col, 1.0);
-    }`,
-};
-
+/**
+ * Post-processing as a TSL RenderPipeline (WebGPU + WebGL2 fallback backend).
+ * scene pass (+MRT normal/metal-rough when SSR or GTAO are on) → SSR → GTAO → bloom (subtle) → god rays →
+ * cinematic (speed blur, CA, grading, vignette, damage, boost, flash – NO film grain) → tone mapping → SMAA/FXAA.
+ */
 export class PostFX {
-  composer: EffectComposer;
-  godRays: ShaderPass | null = null;
-  cine: ShaderPass;
-  bloom: UnrealBloomPass | null = null;
-  ssr: SSRPass | null = null;
-  gtao: GTAOPass | null = null;
-  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, gfx: GfxSettings, glossy: THREE.Mesh[], w: number, h: number) {
-    const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: 0 });
-    this.composer = new EffectComposer(renderer, rt);
-    if (gfx.ssr && glossy.length) {
-      this.ssr = new SSRPass({ renderer, scene, camera, width: w, height: h, selects: glossy, groundReflector: null } as unknown as ConstructorParameters<typeof SSRPass>[0]);
-      this.ssr.thickness = 0.4; this.ssr.maxDistance = 120; this.ssr.opacity = 0.6; (this.ssr as unknown as { blur: boolean }).blur = true;
-      this.composer.addPass(this.ssr);
-    } else this.composer.addPass(new RenderPass(scene, camera));
-    if (gfx.ao) {
-      this.gtao = new GTAOPass(scene, camera, Math.floor(w * 0.5), Math.floor(h * 0.5));
-      this.gtao.blendIntensity = 0.85;
-      this.gtao.updateGtaoMaterial({ radius: 2.5, distanceExponent: 1.2, thickness: 3, scale: 1, samples: 12 });
-      this.composer.addPass(this.gtao);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pipeline: any;
+  cine: { uniforms: { time: { value: number }; speed: { value: number }; boost: { value: number }; damage: { value: number }; flash: { value: number } } };
+  godRays: { uniforms: { sunPos: { value: THREE.Vector2 }; intensity: { value: number } } } | null = null;
+
+  constructor(renderer: THREE.WebGPURenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, gfx: GfxSettings) {
+    const u = { time: uniform(0), speed: uniform(0), boost: uniform(0), damage: uniform(0), flash: uniform(0) };
+    this.cine = { uniforms: u };
+    const scenePass = pass(scene, camera);
+    const needMRT = gfx.ssr || gfx.ao;
+    if (needMRT) scenePass.setMRT(mrt({ output, normal: directionToColor(normalView), metalrough: vec2(metalness, roughness) }));
+    const sceneColor = scenePass.getTextureNode('output');
+    let col: N = sceneColor;
+
+    if (needMRT) {
+      const depth = scenePass.getTextureNode('depth');
+      scenePass.getTexture('normal').type = THREE.UnsignedByteType;
+      scenePass.getTexture('metalrough').type = THREE.UnsignedByteType;
+      const nNode = scenePass.getTextureNode('normal');
+      const normal = sample((uvN: N) => colorToDirection(nNode.sample(uvN)));
+      if (gfx.ssr) {
+        const mr = scenePass.getTextureNode('metalrough');
+        const s = ssr(sceneColor, depth, normal, { metalnessNode: mr.r, roughnessNode: mr.g, camera });
+        s.resolutionScale = 0.5;
+        col = blendColor(col, s);
+      }
+      if (gfx.ao) {
+        const a = ao(depth, normal, camera); a.resolutionScale = 0.5;
+        col = col.mul(a.getTextureNode().sample(screenUV).r);
+      }
     }
-    if (gfx.bloom && gfx.bloomStrength > 0) { this.bloom = new UnrealBloomPass(new THREE.Vector2(Math.floor(w / 2), Math.floor(h / 2)), 0.25 * gfx.bloomStrength, 0.3, 1.6); this.composer.addPass(this.bloom); }
-    if (gfx.godRays) { this.godRays = new ShaderPass(GodRaysShader); this.composer.addPass(this.godRays); }
-    this.cine = new ShaderPass(CinematicShader);
-    this.cine.uniforms.enabled.value = gfx.cinematic ? 1 : 0;
-    this.cine.uniforms.blur.value = gfx.motionBlur ? 1 : 0;
-    this.cine.uniforms.grain.value = gfx.cinematic ? 0.03 : 0;
-    this.cine.uniforms.vignette.value = gfx.cinematic ? 0.9 : 0.3;
-    this.composer.addPass(this.cine);
-    this.composer.addPass(new OutputPass());
-    if (gfx.aa === 'smaa') this.composer.addPass(new SMAAPass());
-    else if (gfx.aa === 'fxaa') this.composer.addPass(new FXAAPass());
+
+    // subtle bloom (high threshold) – spec: no excessive bloom / overexposure
+    if (gfx.bloom && gfx.bloomStrength > 0) col = col.add(bloom(col, 0.25 * gfx.bloomStrength, 0.3, 1.6));
+
+    // god rays: radial blur of the HDR bright pass towards the sun
+    if (gfx.godRays) {
+      const sunPos = uniform(new THREE.Vector2(0.5, 0.5)), intensity = uniform(0);
+      this.godRays = { uniforms: { sunPos, intensity } };
+      const skyMask = step(0.999999, scenePass.getTextureNode('depth').sample(screenUV).r);
+      const bright = (c: N) => vec4(c.rgb.mul(smoothstep(2.0, 6.0, luminance(c.rgb))).mul(skyMask), 1.0);
+      const blurred: N = radialBlur(bright(col), { center: sunPos, weight: float(1.0), decay: float(0.965), count: int(48), exposure: float(1.0) });
+      const rays = blurred.rgb.sub(bright(col).rgb).mul(2.0).max(0.0);
+      const fall = oneMinus(smoothstep(0.0, 0.8, length(screenUV.sub(sunPos))));
+      col = vec4(col.rgb.add(rays.mul(vec3(1.0, 0.9, 0.7)).mul(intensity).mul(1.6).mul(fall)), 1.0);
+    }
+
+    // cinematic pass
+    const src = convertToTexture(col);
+    const motion = gfx.motionBlur, cineOn = gfx.cinematic, vignette = gfx.cinematic ? 0.9 : 0.3;
+    const cinematic = Fn(() => {
+      const uvv = screenUV; const c = uvv.sub(0.5); const r = length(c);
+      let base: N;
+      if (motion) {
+        const bs = u.speed.mul(smoothstep(0.15, 0.6, r)).mul(0.035);
+        const acc = vec3(0).toVar();
+        Loop(10, ({ i }: { i: N }) => { acc.addAssign(src.sample(c.mul(oneMinus(bs.mul(float(i).div(9.0)))).add(0.5)).rgb); });
+        base = acc.div(10.0);
+      } else base = src.sample(uvv).rgb;
+      let g: N = base;
+      if (cineOn) {
+        const a = float(0.002).add(u.speed.mul(0.004)).add(u.damage.mul(0.006)).mul(r);
+        g = vec3(mix(base.r, src.sample(uvv.sub(c.mul(a).mul(2.0))).r, 0.8), base.g, mix(base.b, src.sample(uvv.add(c.mul(a).mul(2.0))).b, 0.8));
+        const l = luminance(g);
+        g = mix(g, g.mul(vec3(0.92, 1.0, 1.08)), ssInv(0.4, 0.0, l).mul(0.35));
+        g = mix(g, g.mul(vec3(1.06, 1.0, 0.92)), smoothstep(0.4, 1.2, l).mul(0.3));
+        g = g.add(vec3(0.6, 0.85, 1.0).mul(u.boost).mul(smoothstep(0.3, 0.75, r)).mul(0.25));
+        g = mix(g, vec3(l).mul(vec3(1.4, 0.4, 0.3)), u.damage.mul(smoothstep(0.25, 0.8, r)).mul(0.5));
+      }
+      g = g.mul(oneMinus(pow(r.mul(1.25), 2.6).mul(vignette * 0.75)));
+      return vec4(g.add(vec3(1.0, 0.9, 0.8).mul(u.flash)), 1.0);
+    })();
+
+    const RP = AnyTHREE.RenderPipeline ?? AnyTHREE.PostProcessing;
+    this.pipeline = new RP(renderer);
+    if (gfx.aa === 'none') this.pipeline.outputNode = cinematic;
+    else {
+      this.pipeline.outputColorTransform = false;
+      const out = renderOutput(cinematic);
+      this.pipeline.outputNode = gfx.aa === 'smaa' ? smaa(out) : fxaa(out);
+    }
   }
-  setSize(w: number, h: number) { this.composer.setSize(w, h); }
-  render(dt: number) { this.composer.render(dt); }
-  dispose() { this.composer.dispose(); }
+  setSize(w: number, h: number) { void w; void h; /* pass nodes follow the renderer size */ }
+  render() { this.pipeline.render(); }
+  dispose() { this.pipeline.dispose?.(); }
 }

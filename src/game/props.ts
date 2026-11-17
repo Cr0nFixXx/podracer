@@ -29,7 +29,7 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
   const metal = new THREE.MeshStandardMaterial({ color: '#7d828c', metalness: 0.9, roughness: 0.32 });
   const darkMetal = new THREE.MeshStandardMaterial({ color: '#33363d', metalness: 0.8, roughness: 0.45 });
   disp.push(metal, darkMetal);
-  const sideOK = (s: Sample, side: number) => !s.gap && s.ramp === 0 && !(side > 0 ? s.openR : s.openL);
+  const sideOK = (s: Sample, side: number) => !s.gap && s.ramp === 0 && !(side > 0 ? s.openR : s.openL) && !((side > 0 ? s.hR : s.hL) > 0);
   const nearStart = (i: number) => { const d = Math.abs(i - td.startIdx); return Math.min(d, N - d) < 70 || (!td.main.closed && Math.abs(i - td.finishIdx) < 70); };
   const inst = (geo: THREE.BufferGeometry, mat: THREE.Material, mats: THREE.Matrix4[], shadow = true, colors?: THREE.Color[]) => {
     if (!mats.length) return null;
@@ -56,7 +56,7 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
     for (let i = 0; i < N; i += 4) {
       const s = S[i]; if (Math.abs(s.curv) < 1 / 160 || i - lastI < 22 || nearStart(i)) continue;
       const side = s.curv > 0 ? -1 : 1; // outer side
-      if (!sideOK(s, side) || s.canyon) continue;
+      if (!sideOK(s, side)) continue;
       const off = s.hw + 5; const x = s.x + s.rx * side * off, z = s.z + s.rz * side * off;
       if (!clear(x, z, 3.5, 0.3)) continue;
       lastI = i;
@@ -107,7 +107,7 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
     const step = Math.round(170 / 2 / Math.max(0.5, det));
     for (let i = 0, k = 0; i < N; i += step, k++) {
       const s = S[i]; const side = k % 2 ? 1 : -1;
-      if (!sideOK(s, side) || s.canyon) continue;
+      if (!sideOK(s, side)) continue;
       const off = s.hw + 9; const x = s.x + s.rx * side * off, z = s.z + s.rz * side * off;
       if (!clear(x, z, 2, 1)) continue;
       const gy = heightAt(x, z); const hgt = s.y + 22 - gy;
@@ -141,7 +141,7 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
     const base: { x: number; y: number; z: number; yaw: number; ph: number }[] = []; const poles: THREE.Matrix4[] = []; const colors: THREE.Color[] = [];
     const palette = ['#d8432f', '#e8b830', '#2f7ad8', '#ffffff', theme.barrierColor, '#30b070'];
     for (let i = 0; i < N; i += 15) {
-      const s = S[i]; if (Math.abs(s.curv) > 1 / 400 || nearStart(i) || s.canyon) continue;
+      const s = S[i]; if (Math.abs(s.curv) > 1 / 400 || nearStart(i)) continue;
       if (rng() > 0.55 * det) continue;
       for (const side of [-1, 1]) {
         if (!sideOK(s, side)) continue;
@@ -161,25 +161,29 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
     });
   }
 
-  // ---------- 4. energy gates over the track ----------
+  // ---------- 4. energy gates over the track (merged per material across all gates) ----------
   {
-    const ringMat = new THREE.MeshBasicMaterial({ color: barrier.clone().multiplyScalar(1.6), toneMapped: false, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+    const ringMat = new THREE.MeshBasicMaterial({ color: barrier.clone().multiplyScalar(1.6), transparent: true, opacity: 0.85, side: THREE.DoubleSide });
     disp.push(ringMat);
+    const frames: THREE.BufferGeometry[] = [], rings: THREE.BufferGeometry[] = [], feet: THREE.BufferGeometry[] = [];
     const count = Math.round(N * 2 / 650);
     for (let g = 0; g < count; g++) {
       const i = Math.floor((g + 0.5) / count * N); const s = S[i];
       if (s.gap || s.ramp > 0 || nearStart(i) || s.openL || s.openR) continue;
       const R = s.hw + 5;
       if (![-1, 1].every(sd => clear(s.x + s.rx * sd * R, s.z + s.rz * sd * R, 2.6, -0.5))) continue;
-      const gate = new THREE.Group(); gate.position.set(s.x, s.y, s.z); gate.rotation.y = yawOf(s);
-      const frame = new THREE.Mesh(new THREE.TorusGeometry(R, 1.1, 14, 72, Math.PI), metal); frame.castShadow = true; gate.add(frame);
-      const inner = new THREE.Mesh(new THREE.TorusGeometry(R - 1.6, 0.25, 8, 96, Math.PI), ringMat); gate.add(inner);
-      for (let k = 1; k < 12; k++) { const a = Math.PI * k / 12; const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 2.6), ringMat); l.position.set(Math.cos(a) * R, Math.sin(a) * R, 0); gate.add(l); }
-      for (const sd of [-1, 1]) { const foot = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.6, 4, 16), darkMetal); foot.position.set(sd * R, -1, 0); foot.castShadow = true; gate.add(foot); }
-      gate.scale.y = 0.55; group.add(gate);
-      const ph = rng() * 6;
-      anim.push(t => { ringMat.opacity = 0.65 + Math.sin(t * 4 + ph) * 0.2; });
+      const m = new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y, s.z), new THREE.Quaternion().setFromAxisAngle(UP, yawOf(s)), new THREE.Vector3(1, 0.55, 1));
+      frames.push(new THREE.TorusGeometry(R, 1.1, 14, 72, Math.PI).applyMatrix4(m));
+      rings.push(new THREE.TorusGeometry(R - 1.6, 0.25, 8, 96, Math.PI).applyMatrix4(m));
+      for (let k = 1; k < 12; k++) { const a = Math.PI * k / 12; rings.push(new THREE.BoxGeometry(0.5, 0.5, 2.6).translate(Math.cos(a) * R, Math.sin(a) * R, 0).applyMatrix4(m)); }
+      for (const sd of [-1, 1]) feet.push(new THREE.CylinderGeometry(2, 2.6, 4, 16).translate(sd * R, -1, 0).applyMatrix4(m));
     }
+    const merge = (list: THREE.BufferGeometry[], mat: THREE.Material, shadow: boolean) => {
+      if (!list.length) return; const g = mergeGeometries(list.map(x => x.index ? x.toNonIndexed() : x)); list.forEach(x => x.dispose()); if (!g) return;
+      const mesh = new THREE.Mesh(g, mat); mesh.castShadow = shadow; mesh.receiveShadow = true; group.add(mesh); disp.push(g);
+    };
+    merge(frames, metal, true); merge(rings, ringMat, false); merge(feet, darkMetal, true);
+    anim.push(t => { ringMat.opacity = 0.65 + Math.sin(t * 4) * 0.2; });
   }
 
   // ---------- 5. skid / scorch marks on the road (strip decals following the surface) ----------
@@ -220,7 +224,7 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
     const crateCols = ['#8a6a44', '#6d7480', '#a8462e', '#c79a3a'], barrelCols = ['#b8342a', '#3a6ab8', '#c8a030', '#4a4a4a'];
     for (let i = 0; i < N; i += 9) {
       if (rng() > 0.22 * det) continue;
-      const s = S[i]; const side = rng() > 0.5 ? 1 : -1; if (!sideOK(s, side) || s.canyon || nearStart(i)) continue;
+      const s = S[i]; const side = rng() > 0.5 ? 1 : -1; if (!sideOK(s, side) || nearStart(i)) continue;
       const off = s.hw + 4 + rng() * 10; const cx = s.x + s.rx * side * off, cz = s.z + s.rz * side * off;
       const n = 2 + Math.floor(rng() * 5);
       for (let k = 0; k < n; k++) {
@@ -229,11 +233,30 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
         else { barrels.push(mtx(x, gy + 0.65, z, rng() * 3)); bc.push(new THREE.Color(barrelCols[Math.floor(rng() * barrelCols.length)])); }
       }
     }
-    const crateTex = canvasTex(128, 128, c => { c.fillStyle = '#bbb'; c.fillRect(0, 0, 128, 128); c.strokeStyle = '#555'; c.lineWidth = 10; c.strokeRect(5, 5, 118, 118); c.lineWidth = 6; c.beginPath(); c.moveTo(10, 10); c.lineTo(118, 118); c.moveTo(118, 10); c.lineTo(10, 118); c.stroke(); });
+    const crateTex = canvasTex(256, 256, c => {
+      const g = c.createLinearGradient(0, 0, 256, 256); g.addColorStop(0, '#d2d2d2'); g.addColorStop(1, '#a8a8a8'); c.fillStyle = g; c.fillRect(0, 0, 256, 256);
+      c.fillStyle = 'rgba(0,0,0,0.12)'; for (let y = 22; y < 236; y += 30) c.fillRect(22, y, 212, 2);              // plank seams
+      for (let i = 0; i < 300; i++) { c.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '40,30,20'},${0.05 + Math.random() * 0.08})`; c.fillRect(Math.random() * 256, Math.random() * 256, 2 + Math.random() * 18, 1); }
+      c.strokeStyle = '#4a4d52'; c.lineWidth = 18; c.strokeRect(9, 9, 238, 238);                                     // steel frame
+      c.lineWidth = 12; c.beginPath(); c.moveTo(18, 18); c.lineTo(238, 238); c.stroke();                            // brace
+      c.strokeStyle = 'rgba(255,255,255,0.25)'; c.lineWidth = 2; c.strokeRect(2, 2, 252, 252);
+      c.fillStyle = '#d9d9d9'; for (const [x, y] of [[9, 9], [247, 9], [9, 247], [247, 247], [128, 9], [128, 247], [9, 128], [247, 128]]) { c.beginPath(); c.arc(x, y, 5, 0, 7); c.fill(); }
+      c.fillStyle = '#1a1a1a'; c.font = 'bold 22px monospace'; c.textAlign = 'center'; c.fillText('PODRACE', 128, 112); c.font = 'bold 14px monospace'; c.fillText('PARTS · 7-B', 128, 134);
+      c.fillStyle = '#d9a514'; c.beginPath(); c.moveTo(196, 160); c.lineTo(236, 160); c.lineTo(236, 236); c.closePath(); c.fill();
+      c.fillStyle = '#111'; for (let k = 0; k < 4; k++) { c.beginPath(); c.moveTo(206 + k * 10, 160); c.lineTo(211 + k * 10, 160); c.lineTo(236, 185 + k * 12); c.lineTo(236, 179 + k * 12); c.fill(); }
+    });
     const cm = new THREE.MeshStandardMaterial({ map: crateTex, roughness: 0.75, metalness: 0.2 }); disp.push(cm, crateTex);
     inst(new THREE.BoxGeometry(1, 1, 1), cm, crates, true, cc);
     const bg = mergeGeometries([new THREE.CylinderGeometry(0.45, 0.45, 1.3, 16), new THREE.TorusGeometry(0.46, 0.04, 6, 16).rotateX(Math.PI / 2).translate(0, 0.35, 0), new THREE.TorusGeometry(0.46, 0.04, 6, 16).rotateX(Math.PI / 2).translate(0, -0.35, 0)].map(g => g.toNonIndexed()));
-    inst(bg, new THREE.MeshStandardMaterial({ roughness: 0.45, metalness: 0.6 }), barrels, true, bc);
+    const barrelTex = canvasTex(256, 128, c => {
+      c.fillStyle = '#c8c8c8'; c.fillRect(0, 0, 256, 128);
+      for (let i = 0; i < 160; i++) { c.fillStyle = `rgba(30,25,20,${0.04 + Math.random() * 0.1})`; c.fillRect(Math.random() * 256, Math.random() * 128, 1 + Math.random() * 2, 6 + Math.random() * 40); }
+      c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(0, 30, 256, 6); c.fillRect(0, 92, 256, 6);
+      c.fillStyle = '#e8e2d0'; c.fillRect(96, 44, 64, 40); c.fillStyle = '#d9a514'; c.beginPath(); c.moveTo(128, 50); c.lineTo(146, 78); c.lineTo(110, 78); c.closePath(); c.fill();
+      c.fillStyle = '#111'; c.font = 'bold 18px monospace'; c.textAlign = 'center'; c.fillText('!', 128, 75); c.font = 'bold 9px monospace'; c.fillText('FUEL-X', 128, 92 - 6);
+    });
+    const barrelMat = new THREE.MeshStandardMaterial({ map: barrelTex, roughness: 0.45, metalness: 0.6 }); disp.push(barrelMat, barrelTex);
+    inst(bg, barrelMat, barrels, true, bc);
   }
 
   // ---------- 7. gravel / small stones along the edges ----------
@@ -407,7 +430,7 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
   if (theme.id === 'lava') {
     for (let c = 0; c < 30; c++) { const s = S[Math.floor(rng() * N)]; const side = rng() > 0.5 ? 1 : -1; const off = s.hw + 20 + rng() * 150; const x = s.x + s.rx * side * off, z = s.z + s.rz * side * off; if (!clear(x, z, 3)) continue; emitters.push({ x, y: heightAt(x, z), z, type: rng() > 0.4 ? 'smoke' : 'embers' }); }
   }
-  if (theme.id === 'ice' || theme.id === 'jungle') {
+  if (theme.id === 'ice' || theme.id === 'jungle' || theme.id === 'malastare') {
     for (let c = 0; c < 16; c++) { const s = S[Math.floor(rng() * N)]; const side = rng() > 0.5 ? 1 : -1; const off = s.hw + 15 + rng() * 100; const x = s.x + s.rx * side * off, z = s.z + s.rz * side * off; if (!clear(x, z, 3)) continue; emitters.push({ x, y: heightAt(x, z), z, type: 'steam' }); }
   }
 

@@ -220,7 +220,7 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
 
 export function SettingsScreen({ profile, update, go }: { profile: Profile; update: Upd; go: (s: string) => void }) {
   const g = profile.gfx;
-  const set = <K extends keyof GfxSettings>(k: K, v: GfxSettings[K]) => update(p => ({ ...p, gfx: { ...p.gfx, [k]: v, preset: k === 'fov' || k === 'showFps' || k === 'bloomStrength' || k === 'anisotropy' || k === 'shaderDetail' || k === 'bumpMapping' || k === 'tessellation' ? p.gfx.preset : 'custom' } }));
+  const set = <K extends keyof GfxSettings>(k: K, v: GfxSettings[K]) => update(p => ({ ...p, gfx: { ...p.gfx, [k]: v, preset: k === 'fov' || k === 'showFps' || k === 'backend' || k === 'batching' || k === 'bloomStrength' || k === 'anisotropy' || k === 'shaderDetail' || k === 'bumpMapping' || k === 'tessellation' ? p.gfx.preset : 'custom' } }));
   const preset = (n: keyof typeof PRESETS) => update(p => ({ ...p, gfx: { ...p.gfx, ...PRESETS[n], preset: n } }));
   const webgpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
   return (
@@ -251,6 +251,8 @@ export function SettingsScreen({ profile, update, go }: { profile: Profile; upda
           <Panel title="Beleuchtung & Material">
             <Slider label="Schattenqualität" value={g.shadows} min={0} max={3} step={1} onChange={v => set('shadows', v)} fmt={v => ['Aus', '1024', '2048', '4096'][v]} />
             <Slider label="Shader-Details" value={g.shaderDetail ?? 1} min={0} max={2} step={1} onChange={v => set('shaderDetail', v)} fmt={v => ['Niedrig', 'Mittel', 'Hoch'][v]} />
+            <Toggle label="WebGL2 erzwingen (statt WebGPU)" value={g.backend === 'webgl'} onChange={v => set('backend', v ? 'webgl' : 'auto')} />
+            <Toggle label="Static Batching (BatchedMesh)" value={g.batching ?? true} onChange={v => set('batching', v)} />
             <Toggle label="Bump-Mapping" value={g.bumpMapping ?? true} onChange={v => set('bumpMapping', v)} />
             <Slider label="Tessellation" value={g.tessellation ?? 1} min={0} max={2} step={1} onChange={v => set('tessellation', v)} fmt={v => ['Aus', 'Mittel', 'Hoch'][v]} />
             <Toggle label="Parallax-Occlusion-Mapping" value={g.parallax} onChange={v => set('parallax', v)} />

@@ -1,143 +1,193 @@
 import * as THREE from 'three';
-import type { PodDef } from './data';
+import type { EngineStyle } from './data';
+import { PartBuilder, M4, blade, boltRing, cyl, extrude, lathe, prof, radial, rbox, sphere, torus, tube, type MatKey } from './podKit';
 
-/** Painted engine casing: panel grid, vents, exposed pipework, bolts and warning marks. */
-const engineTexCache = new Map<string, { albedo: THREE.Texture; emissive: THREE.Texture }>();
-/** Painted engine casing: panels, vents, heat sinks, hex grating and glowing conduits. */
-export function engineTextures(base: string, accent: string) {
-  const key = base + '|' + accent; const hit = engineTexCache.get(key); if (hit) return hit;
-  const W = 1024, H = 512;
-  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d')!;
-  const ev = document.createElement('canvas'); ev.width = W; ev.height = H; const ec = ev.getContext('2d')!;
-  ec.fillStyle = '#000'; ec.fillRect(0, 0, W, H);
-  c.fillStyle = base; c.fillRect(0, 0, W, H);
-  for (let x = 0; x < W; x += 128) { const g = c.createLinearGradient(x, 0, x + 128, 0); g.addColorStop(0, 'rgba(255,255,255,0.13)'); g.addColorStop(0.5, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.32)'); c.fillStyle = g; c.fillRect(x, 0, 128, H); }
-  // carbon weave
-  c.save(); c.globalAlpha = 0.22; c.strokeStyle = '#000'; c.lineWidth = 2;
-  for (let i = -H; i < W + H; i += 9) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i + H, H); c.stroke(); c.beginPath(); c.moveTo(i, H); c.lineTo(i + H, 0); c.stroke(); }
-  c.restore();
-  // panel grid
-  c.strokeStyle = 'rgba(0,0,0,0.72)'; c.lineWidth = 4;
-  for (let x = 0; x <= W; x += 128) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke(); }
-  for (let y = 0; y <= H; y += 128) { c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
-  c.strokeStyle = 'rgba(255,255,255,0.22)'; c.lineWidth = 2;
-  for (let x = 5; x < W; x += 128) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke(); }
-  // bolts
-  for (let y = 12; y < H; y += 64) for (let x = 12; x < W; x += 64) { c.fillStyle = '#d8dde3'; c.beginPath(); c.arc(x, y, 4.5, 0, 7); c.fill(); c.fillStyle = '#5c636c'; c.beginPath(); c.arc(x, y, 1.6, 0, 7); c.fill(); }
-  // per-panel mechanical details
-  for (let py = 0; py < 4; py++) for (let px = 0; px < 8; px++) {
-    const x = px * 128, y = py * 128; const kind = (px * 3 + py) % 4;
-    if (kind === 0) {
-      c.fillStyle = '#0b0d12'; c.fillRect(x + 16, y + 22, 96, 84);
-      c.strokeStyle = '#7a828c'; c.lineWidth = 2; for (let i = 0; i < 9; i++) { c.beginPath(); c.moveTo(x + 20, y + 28 + i * 9); c.lineTo(x + 108, y + 28 + i * 9); c.stroke(); }
-      c.strokeStyle = accent; c.lineWidth = 3; c.strokeRect(x + 14, y + 20, 100, 88);
-    } else if (kind === 1) {
-      c.fillStyle = '#10141a'; c.fillRect(x + 14, y + 18, 100, 92);
-      c.fillStyle = '#9098a2'; for (let i = 0; i < 15; i++) c.fillRect(x + 18, y + 22 + i * 6, 92, 3);
-    } else if (kind === 2) {
-      c.fillStyle = '#0e1116'; c.fillRect(x + 14, y + 18, 100, 92);
-      c.strokeStyle = accent; c.lineWidth = 1.5;
-      for (let hy = 0; hy < 5; hy++) for (let hx = 0; hx < 5; hx++) { const cx = x + 26 + hx * 19, cy = y + 32 + hy * 17 + (hx % 2) * 8; c.beginPath(); for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; c.lineTo(cx + Math.cos(a) * 6, cy + Math.sin(a) * 6); } c.closePath(); c.stroke(); }
-    } else {
-      c.strokeStyle = accent; c.lineWidth = 5; c.lineJoin = 'round'; c.beginPath(); c.moveTo(x + 18, y + 66); c.lineTo(x + 52, y + 66); c.lineTo(x + 66, y + 38); c.lineTo(x + 112, y + 38); c.stroke();
-      ec.strokeStyle = accent; ec.lineWidth = 7; ec.lineJoin = 'round'; ec.beginPath(); ec.moveTo(x + 18, y + 66); ec.lineTo(x + 52, y + 66); ec.lineTo(x + 66, y + 38); ec.lineTo(x + 112, y + 38); ec.stroke();
-      ec.fillStyle = '#ffffff'; ec.beginPath(); ec.arc(x + 112, y + 38, 4, 0, 7); ec.fill();
+/** Parametric podracer engine. Geometry is merged per material and cached per spec. */
+export interface EngineSpec { L: number; R: number; style: EngineStyle; bands: number; blades: number; spike: boolean; fins: number; }
+export interface FlapGeo { geo: THREE.BufferGeometry; pivot: THREE.Vector3; sign: number; }
+export interface EngineGeo {
+  parts: Map<MatKey, THREE.BufferGeometry>;
+  fan: THREE.BufferGeometry; fanZ: number;
+  flaps: FlapGeo[];
+  flameOuter: THREE.BufferGeometry; flameCore: THREE.BufferGeometry; flameZ: number;
+  exhaustZ: number; pylon: THREE.Vector3; frontZ: number; top: number; R: number; L: number;
+}
+
+const cache = new Map<string, EngineGeo>();
+
+function flameGeo(rn: number, len: number, seg: number) {
+  const pts: [number, number, 0][] = [];
+  for (let i = 0; i <= 12; i++) { const t = 1 - i / 12; const r = rn * Math.pow(1 - t, 0.55) * (1 + 0.18 * Math.sin(Math.PI * t)) + 0.01; pts.push([r, -t * len, 0]); }
+  return lathe(prof(pts), seg, 0);
+}
+
+export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
+  const key = `${spec.L}|${spec.R}|${spec.style}|${spec.bands}|${spec.blades}|${spec.spike}|${spec.fins}|${seg}`;
+  const hit = cache.get(key); if (hit) return hit;
+  const { L, R, style } = spec;
+  const pb = new PartBuilder();
+  const Z = (t: number) => -L / 2 + t * L;
+  const segS = Math.max(10, Math.round(seg * 0.5));
+  const bodyR = (t: number) => {
+    switch (style) {
+      case 'needle': return t < 0.3 ? 0.66 + 0.34 * Math.sin((t / 0.3) * Math.PI / 2) : 1 - 0.26 * Math.pow((t - 0.3) / 0.7, 1.5);
+      case 'heavy': return 0.86 + 0.14 * Math.sin(Math.PI * t);
+      case 'long': return t < 0.45 ? 0.82 + 0.18 * (t / 0.45) : 1.0;
+      case 'ring': return 0.92;
+      case 'blade': return 0.95;
+      default: return 1.0;
+    }
+  };
+  const split = style === 'split';
+  const bodyEnd = split ? 0.8 : 1.0;
+
+  // ---------------- outer cowling (painted, livery mode 1) ----------------
+  const pts: [number, number, (0 | 1)?][] = [];
+  const P = (t: number, r: number, hard = false) => pts.push([r * R, Z(t), hard ? 1 : 0]);
+  P(0, 0.74, true); P(0.025, 0.8); P(0.08, bodyR(0.08) * 0.94); P(0.13, bodyR(0.13));
+  const bandTs: number[] = []; for (let i = 0; i < spec.bands; i++) bandTs.push(0.2 + ((i + 0.5) / spec.bands) * 0.6);
+  let t0 = 0.13;
+  for (const tb of bandTs) {
+    if (tb > bodyEnd - 0.04) break;
+    for (let s = t0 + 0.05; s < tb - 0.03; s += 0.05) P(s, bodyR(s));
+    const rb = bodyR(tb);
+    P(tb - 0.013, rb, true); P(tb - 0.007, rb * 0.955, true); P(tb + 0.007, rb * 0.955, true); P(tb + 0.013, rb, true);
+    t0 = tb + 0.013;
+  }
+  for (let s = t0 + 0.05; s < bodyEnd - 0.07; s += 0.05) P(s, bodyR(s));
+  const rf = bodyR(0.93);
+  if (!split) { P(0.92, rf); P(0.955, rf * 1.035); P(0.985, rf * 1.02); P(1.0, rf * 0.95, true); }
+  else { P(bodyEnd - 0.02, rf, true); P(bodyEnd, rf * 0.97, true); }
+  pb.add('hull', lathe(prof(pts), seg, 1));
+
+  // ---------------- intake: throat, fan face, spinner ----------------
+  const thr = rf * 0.95 * R, faceZ = Z(0.915);
+  pb.add('steel', lathe(prof([[split ? rf * 0.97 * R : thr, split ? Z(bodyEnd) : Z(1.0)], [rf * 0.885 * R, split ? Z(bodyEnd - 0.01) : Z(0.992)], [rf * 0.86 * R, split ? Z(bodyEnd - 0.03) : Z(0.97)], [rf * 0.86 * R, faceZ, 1], [rf * 0.6 * R, faceZ]]), seg, 0));
+  pb.add('dark', lathe(prof([[rf * 0.6 * R, faceZ], [0.2 * R, faceZ]]), seg, 0));
+  if (spec.spike) pb.add('chrome', lathe(prof([[0.22 * R, faceZ, 1], [0.2 * R, faceZ + L * 0.03], [0.12 * R, Z(1.0)], [0.015 * R, Z(1.0) + L * 0.26]]), segS, 0));
+  else pb.add('chrome', lathe(prof([[0.22 * R, faceZ, 1], [0.21 * R, faceZ + L * 0.035], [0.14 * R, faceZ + L * 0.07], [0.0, faceZ + L * 0.085]]), segS, 0));
+  if (!split) pb.add('chrome', boltRing(rf * 0.985 * R, Math.round(seg * 0.6), 0.02 * R, Z(1.0) - 0.01));
+  if (style === 'heavy' || style === 'turbine') pb.add('hazard', torus(rf * 1.005 * R, 0.022 * R, 6, seg), M4.t(0, 0, Z(0.965)));
+
+  // fan (rotating) – twisted blades
+  const nb = spec.blades; const rMid = 0.52 * R;
+  const fan = radial(() => blade(0.21 * R, 0.83 * rf * R, (Math.PI * 2 * rMid / nb) * 1.25, 0.03 * R, 1.0, 0.38, 5), nb);
+  fan.computeBoundingSphere();
+
+  // ---------------- exhaust nozzle ----------------
+  pb.add('dark', lathe(prof([[0, Z(0.07)], [0.58 * R, Z(0.07), 1], [0.6 * R, Z(0.06)], [0.66 * R, Z(0), 1], [0.74 * R, Z(0)]]), seg, 0));
+  pb.add('glow', new THREE.CircleGeometry(0.5 * R, seg).rotateY(Math.PI).translate(0, 0, Z(0.07) - 0.01));
+  pb.add('glow', torus(0.6 * R, 0.018 * R, 6, seg), M4.t(0, 0, Z(0.035)));
+  // iris petals around the nozzle exit
+  const np = Math.max(10, Math.round(seg * 0.35));
+  pb.add('dark', radial(() => rbox((Math.PI * 2 * 0.72 * R / np) * 0.92, 0.025 * R, 0.09 * L, 0.01).rotateX(-0.2).translate(0, 0.72 * R, Z(0) - 0.035 * L), np));
+  pb.add('steel', torus(0.75 * R, 0.03 * R, 6, seg), M4.t(0, 0, Z(0.005)));
+
+  // ---------------- band rings + bolts ----------------
+  bandTs.forEach((tb, i) => {
+    if (tb > bodyEnd - 0.04) return;
+    const rb = bodyR(tb) * 0.955 * R;
+    pb.add(style === 'heavy' ? 'dark' : 'steel', torus(rb + 0.012 * R, (style === 'heavy' ? 0.045 : 0.032) * R, 8, seg), M4.t(0, 0, Z(tb)));
+    if (i % 2 === 0) pb.add('chrome', boltRing(rb + 0.035 * R, Math.round(seg * 0.5), 0.018 * R, Z(tb), true));
+  });
+
+  // ---------------- armour side plates (secondary paint) ----------------
+  {
+    const a0 = 0.3, a1 = split ? 0.62 : 0.7; let rmax = 0; for (let s = a0; s <= a1; s += 0.02) rmax = Math.max(rmax, bodyR(s));
+    const r0 = rmax * R + 0.01, r1 = r0 + (style === 'heavy' ? 0.06 : 0.035) * R;
+    const plate = prof([[r1, Z(a0), 1], [r1, Z(a1), 1], [r0, Z(a1), 1], [r0, Z(a0), 1], [r1, Z(a0), 1]]);
+    const span = style === 'heavy' ? 1.1 : 0.8;
+    for (const c of [Math.PI / 2, Math.PI * 1.5]) pb.add('hull', lathe(plate, Math.max(6, Math.round(seg * 0.2)), 3, c - span / 2, span));
+    // screws along the plates
+    for (const sd of [-1, 1]) for (let s = a0 + 0.03; s < a1 - 0.01; s += 0.06) for (const dy of [-0.3, 0.3]) {
+      pb.add('chrome', cyl(0.018 * R, 0.018 * R, 0.02 * R, 6), M4.trs(sd * (r1 + 0.005) * Math.cos(dy), r1 * Math.sin(dy), Z(s), 0, 0, Math.PI / 2));
     }
   }
-  // glowing status lights
-  for (let i = 0; i < 16; i++) { const x = 36 + i * 63; ec.fillStyle = i % 4 === 0 ? '#ff4040' : accent; ec.beginPath(); ec.arc(x, 256, 5, 0, 7); ec.fill(); c.fillStyle = '#090b10'; c.beginPath(); c.arc(x, 256, 8, 0, 7); c.fill(); }
-  // warning chevrons
-  c.fillStyle = '#e8c030'; for (let i = 0; i < 8; i++) { c.beginPath(); c.moveTo(14 + i * 128, 494); c.lineTo(50 + i * 128, 494); c.lineTo(32 + i * 128, 510); c.fill(); }
-  // scratches and grime
-  c.strokeStyle = 'rgba(255,255,255,0.16)'; c.lineWidth = 1; for (let i = 0; i < 80; i++) { const x = Math.random() * W, y = Math.random() * H; c.beginPath(); c.moveTo(x, y); c.lineTo(x + 18 + Math.random() * 46, y + (Math.random() - 0.5) * 5); c.stroke(); }
-  c.fillStyle = 'rgba(18,12,6,0.15)'; for (let i = 0; i < 26; i++) c.fillRect(Math.random() * W, Math.random() * H, 3 + Math.random() * 22, 2);
-  const mk = (canvas: HTMLCanvasElement) => { const t = new THREE.CanvasTexture(canvas); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.wrapS = THREE.RepeatWrapping; return t; };
-  const out = { albedo: mk(cv), emissive: mk(ev) }; engineTexCache.set(key, out); return out;
-}
 
-export interface Kit { seg: number; geos: THREE.BufferGeometry[]; mesh: (g: THREE.BufferGeometry, m: THREE.Material, parent?: THREE.Object3D) => THREE.Mesh; }
-export const kit = (seg: number): Kit => {
-  const geos: THREE.BufferGeometry[] = [];
-  return { seg, geos, mesh: (g, m, parent) => { geos.push(g); const me = new THREE.Mesh(g, m); me.castShadow = true; me.receiveShadow = true; if (parent) parent.add(me); return me; } };
-};
-export const box = (w: number, h: number, d: number, x = 0, y = 0, z = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.translate(x, y, z); return g; };
-
-export interface Mats { paint: THREE.Material; paint2: THREE.Material; chrome: THREE.Material; dark: THREE.Material; steel: THREE.Material; glow: THREE.Material; flame: THREE.Material; core: THREE.Material; }
-export interface EngineOut { group: THREE.Group; flames: THREE.Mesh[]; flaps: THREE.Mesh[]; fan: THREE.Object3D | null; exhaust: THREE.Vector3; radius: number; length: number; }
-
-export function makeEngine(k: Kit, M: Mats, L: number, R: number, opts: { bands?: number; blades?: number; spike?: boolean; fins?: number; style?: PodDef['engine'] } = {}): EngineOut {
-  const e = new THREE.Group();
-  const seg = k.seg;
-  const bands = opts.bands ?? 5;
-  const tex = engineTextures('#' + (M.paint as THREE.MeshStandardMaterial).color.getHexString(), '#' + (M.paint2 as THREE.MeshStandardMaterial).color.getHexString());
-  const casing = (M.paint as THREE.MeshStandardMaterial).clone();
-  casing.map = tex.albedo; casing.emissiveMap = tex.emissive; casing.emissive = new THREE.Color('#ffffff'); casing.emissiveIntensity = 0.8;
-  casing.color.set('#ffffff');
-  // banded barrel
-  for (let i = 0; i < bands; i++) {
-    const t = i / bands; const rr = R * (0.78 + 0.22 * Math.sin(t * Math.PI));
-    const h = L / bands * 0.86;
-    const zc = -L / 2 + (i + 0.5) * L / bands;
-    const g = new THREE.CylinderGeometry(rr, rr * 0.98, h, seg); g.rotateX(Math.PI / 2); g.translate(0, 0, zc);
-    k.mesh(g, casing, e);
-    const ring = new THREE.TorusGeometry(rr * 1.02, R * 0.035, 6, seg); ring.translate(0, 0, -L / 2 + (i + 1) * L / bands);
-    k.mesh(ring, M.chrome, e);
-    // panel seam line + small access hatch
-    if (i % 2 === 0) k.mesh(box(rr * 0.5, rr * 0.16, 0.05, 0, rr * 0.55, zc), M.paint2, e);
+  // ---------------- pipes & clamps ----------------
+  const pipeSides = style === 'needle' ? [1] : [-1, 1];
+  for (const sd of pipeSides) for (const [ang, mat, rad] of [[0.62, 'copper', 0.036], [0.85, 'steel', 0.028]] as [number, MatKey, number][]) {
+    const pp: THREE.Vector3[] = []; const tA = 0.16, tB = split ? 0.74 : 0.86;
+    for (let k = 0; k <= 8; k++) {
+      const tt = tA + (tB - tA) * (k / 8); const lift = Math.sin((k / 8) * Math.PI);
+      const rr = bodyR(tt) * R * (0.985 + 0.1 * lift) + rad * R * 1.2;
+      const a = sd * ang;
+      pp.push(new THREE.Vector3(Math.sin(a) * rr, Math.cos(a) * rr, Z(tt)));
+    }
+    pb.add(mat, tube(pp, rad * R, 40, 8));
+    for (let k = 1; k < 8; k += 2) { const p = pp[k]; pb.add('dark', torus(rad * R * 1.5, rad * R * 0.45, 6, 12), M4.t(p.x, p.y, p.z)); }
   }
-  // exposed mechanics: pipe bundles running along the top
-  for (const off of [-0.18, 0, 0.18]) {
-    const pipe = new THREE.CylinderGeometry(R * 0.045, R * 0.045, L * 0.7, 6); pipe.rotateX(Math.PI / 2); pipe.translate(off * R, R * 0.62, 0);
-    k.mesh(pipe, M.steel, e);
-  }
-  // open access panel revealing the core
-  k.mesh(box(R * 0.7, R * 0.35, L * 0.3, 0, R * 0.35, -L * 0.05), M.dark, e);
-  for (let i = 0; i < 4; i++) k.mesh(new THREE.TorusGeometry(R * 0.12, R * 0.02, 6, 12).rotateX(Math.PI / 2).translate((i - 1.5) * R * 0.16, R * 0.42, -L * 0.05), M.chrome, e);
-  // intake grille bars
-  for (let i = -3; i <= 3; i++) { const bar = new THREE.BoxGeometry(R * 0.03, R * 1.5, R * 0.03); bar.translate(i * R * 0.2, 0, L / 2 + R * 0.02); k.mesh(bar, M.steel, e); }
-  // racing stripe
-  k.mesh(box(R * 0.28, 0.06, L * 0.8, 0, R * 0.78, 0), M.paint2, e);
-  // side vents
-  for (const sd of [-1, 1]) for (let v = 0; v < 3; v++) k.mesh(box(0.05, R * 0.3, L * 0.08, sd * R * 0.9, 0, -L * 0.2 + v * L * 0.16), M.dark, e);
-  // front turbine face
-  const face = new THREE.TorusGeometry(R * 0.92, R * 0.09, 10, seg); face.translate(0, 0, L / 2); k.mesh(face, M.steel, e);
-  const blades = opts.blades ?? 16;
-  const fan = new THREE.Group();
-  const bg = new THREE.BoxGeometry(R * 0.05, R * 0.78, R * 0.02); k.geos.push(bg);
-  for (let i = 0; i < blades; i++) { const b = new THREE.Mesh(bg, M.dark); b.rotation.z = (i / blades) * Math.PI * 2; b.rotation.y = 0.35; fan.add(b); }
-  fan.position.z = L / 2 - R * 0.05; e.add(fan);
-  // central spike / hub
-  if (opts.spike !== false) {
-    const sp = new THREE.ConeGeometry(R * 0.16, L * 0.34, 14); sp.rotateX(Math.PI / 2); sp.translate(0, 0, L / 2 + L * 0.12); k.mesh(sp, M.chrome, e);
-  } else k.mesh(new THREE.SphereGeometry(R * 0.16, 12, 8), M.chrome, e).position.z = L / 2;
-  // rear nozzle
-  const noz = new THREE.CylinderGeometry(R * 0.55, R * 0.72, L * 0.1, seg); noz.rotateX(Math.PI / 2); noz.translate(0, 0, -L / 2 - L * 0.04); k.mesh(noz, M.dark, e);
-  const coreDisc = new THREE.Mesh(new THREE.CircleGeometry(R * 0.5, 20), M.glow); coreDisc.rotation.y = Math.PI; coreDisc.position.z = -L / 2 - L * 0.02; e.add(coreDisc);
-  // flame
-  const flames: THREE.Mesh[] = [];
-  const fg = new THREE.ConeGeometry(R * 0.5, L * 0.8, 16, 1, true); fg.rotateX(-Math.PI / 2); fg.translate(0, 0, -L * 0.4); k.geos.push(fg);
-  const flame = new THREE.Mesh(fg, M.flame); flame.position.z = -L / 2 - L * 0.08; e.add(flame); flames.push(flame);
-  const fc = new THREE.ConeGeometry(R * 0.24, L * 0.42, 10, 1, true); fc.rotateX(-Math.PI / 2); fc.translate(0, 0, -L * 0.2); k.geos.push(fc);
-  const fcm = new THREE.Mesh(fc, M.core); fcm.position.z = -L / 2 - L * 0.08; e.add(fcm); flames.push(fcm);
-  // airbrake flaps (top & bottom)
-  const flaps: THREE.Mesh[] = [];
-  for (const sd of [1, -1]) {
-    const fl = new THREE.Mesh(box(R * 0.9, 0.06, L * 0.2, 0, 0, -L * 0.1), M.paint2); fl.castShadow = true;
-    fl.position.set(0, sd * R * 0.95, -L * 0.15); fl.userData.s = sd; e.add(fl); flaps.push(fl);
-  }
-  // style extras
-  if (opts.style === 'long' || (opts.fins ?? 0) > 0) for (let i = 0; i < (opts.fins ?? 4); i++) k.mesh(box(0.05, R * 0.55, L * 0.05, 0, R * 0.6, -L * 0.35 + i * L * 0.12), M.paint2, e);
-  return { group: e, flames, flaps, fan, exhaust: new THREE.Vector3(0, 0, -L / 2 - L * 0.12), radius: R, length: L };
-}
 
-/** Control-cable pylon sitting on top of an engine, cables run to the cockpit anchors. */
-export function cablePylon(k: Kit, M: Mats, parent: THREE.Object3D, height: number) {
-  k.mesh(box(0.12, height, 0.12, 0, height / 2, 0), M.steel, parent);
-  k.mesh(box(0.5, 0.1, 0.3, 0, height, 0), M.steel, parent);
-}
+  // ---------------- louvre vents on the flanks ----------------
+  for (const sd of [-1, 1]) for (let i = 0; i < 6; i++) {
+    const tt = 0.17 + i * 0.022; const r = bodyR(tt) * R;
+    pb.add('dark', rbox(0.03 * R, 0.34 * R, 0.016 * L, 0.006), M4.trs(sd * (r + 0.01 * R), -0.05 * R, Z(tt), 0, sd * 0.5, 0));
+  }
 
-export function cable(k: Kit, mat: THREE.Material, parent: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, sag = 0.4, r = 0.035) {
-  const mid = a.clone().lerp(b, 0.5); mid.y -= sag;
-  const g = new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(a, mid, b), 16, r, 5, false); k.geos.push(g);
-  parent.add(new THREE.Mesh(g, mat));
+  // ---------------- heat-sink fins ----------------
+  if (style === 'long' || style === 'heavy' || spec.fins > 0) {
+    const nf = Math.max(12, spec.fins * 3); const rr = bodyR(0.22) * R;
+    pb.add('dark', radial(() => rbox(0.022 * R, 0.2 * R, 0.13 * L, 0.006).translate(0, rr + 0.09 * R, Z(0.22)), nf, 0.13));
+  }
+
+  // ---------------- belly repulsor + top pylon + sensor ----------------
+  const bellyR = bodyR(0.5) * R;
+  pb.add('dark', rbox(0.34 * R, 0.08 * R, 0.5 * L, 0.03), M4.t(0, -bellyR - 0.02 * R, Z(0.5)));
+  pb.add('glow', rbox(0.2 * R, 0.03 * R, 0.44 * L, 0.01), M4.t(0, -bellyR - 0.07 * R, Z(0.5)));
+  const topR = bodyR(0.58) * R; const py = topR + 0.42;
+  pb.add('steel', rbox(0.16, 0.46, 0.34, 0.04), M4.t(0, topR + 0.2, Z(0.58)));
+  pb.add('chrome', torus(0.1, 0.03, 8, 16), M4.trs(0, py + 0.06, Z(0.58), 0, Math.PI / 2, 0));
+  pb.add('dark', cyl(0.025, 0.025, 0.5, 6), M4.trs(0.18 * R, bodyR(0.85) * R + 0.22, Z(0.85), 0.25, 0, 0));
+  pb.add('glow', sphere(0.045, 8, 6), M4.t(0.18 * R, bodyR(0.85) * R + 0.47, Z(0.85) + 0.06));
+
+  // ---------------- style specific ----------------
+  if (split) {
+    // Split-X: four armoured petals around the intake, hinged open
+    const petal = prof([[rf * 1.02 * R, Z(bodyEnd), 1], [rf * 1.06 * R, Z(0.9)], [rf * 1.05 * R, Z(0.98)], [rf * 0.98 * R, Z(1.0), 1], [rf * 0.93 * R, Z(1.0), 1], [rf * 0.95 * R, Z(bodyEnd), 1], [rf * 1.02 * R, Z(bodyEnd)]]);
+    for (let q = 0; q < 4; q++) {
+      const c = Math.PI / 4 + q * Math.PI / 2; const gap = 0.12;
+      const g = lathe(petal, Math.max(8, Math.round(seg / 4)), 3, c - Math.PI / 4 + gap / 2, Math.PI / 2 - gap);
+      const hinge = new THREE.Vector3(Math.sin(c) * rf * R, Math.cos(c) * rf * R, Z(bodyEnd));
+      const axis = new THREE.Vector3(Math.cos(c), -Math.sin(c), 0);
+      const m = new THREE.Matrix4().makeTranslation(hinge.x, hinge.y, hinge.z).multiply(new THREE.Matrix4().makeRotationAxis(axis, -0.22)).multiply(new THREE.Matrix4().makeTranslation(-hinge.x, -hinge.y, -hinge.z));
+      pb.add('hull', g, m);
+      pb.add('steel', rbox(0.12 * R, 0.12 * R, 0.08 * L, 0.02), new THREE.Matrix4().makeTranslation(hinge.x * 1.02, hinge.y * 1.02, hinge.z));
+    }
+    // radial cooling slats on top
+    for (let i = 0; i < 9; i++) pb.add('steel', rbox(0.035 * R, 0.32 * R, 0.4 * L, 0.01), M4.t((i - 4) * 0.11 * R, R * 1.08, Z(0.45)));
+  }
+  if (style === 'ring') {
+    const rr = 1.24 * R;
+    pb.add('hull', torus(rr, 0.11 * R, 12, seg), M4.t(0, 0, Z(0.95)), [0, 0, 3]);
+    pb.add('chrome', torus(rr - 0.11 * R, 0.025 * R, 6, seg), M4.t(0, 0, Z(0.95) + 0.06 * R));
+    for (let q = 0; q < 4; q++) { const a = Math.PI / 4 + q * Math.PI / 2; const mid = (rr + rf * R) / 2; pb.add('steel', rbox(0.08 * R, rr - rf * R + 0.1 * R, 0.1 * R, 0.02), M4.trs(Math.sin(a) * mid, Math.cos(a) * mid, Z(0.95), 0, 0, -a)); }
+  }
+  if (style === 'blade') {
+    for (const sd of [-1, 1]) {
+      const g = extrude([[0, 0], [1.25 * R, -0.25 * L], [1.3 * R, -0.42 * L], [0.0, -0.6 * L]], 0.05 * R, 0.015);
+      g.rotateX(-Math.PI / 2); if (sd < 0) g.scale(-1, 1, 1);
+      pb.add('hull', g, M4.t(sd * bodyR(0.6) * R * 0.9, 0, Z(0.8)), [0, 0, 3]);
+    }
+  }
+  if (style === 'needle') pb.add('chrome', torus(rf * 0.75 * R, 0.02 * R, 6, seg), M4.t(0, 0, Z(0.97)));
+
+  // ---------------- airbrake flaps (side, hinged at front edge) ----------------
+  const flaps: FlapGeo[] = [];
+  {
+    const fr = bodyR(0.5) * R; const len = 0.22 * L;
+    for (const sd of [-1, 1]) {
+      const g = rbox(0.045 * R, 0.62 * R, len, 0.015).translate(0, 0, -len / 2);
+      const gg = new PartBuilder().add('hull', g, undefined, [0, 0, 3]).build().get('hull')!;
+      flaps.push({ geo: gg, pivot: new THREE.Vector3(sd * (fr + 0.06 * R), 0.05 * R, Z(0.62)), sign: -sd });
+    }
+  }
+
+  const rn = 0.5 * R;
+  const out: EngineGeo = {
+    parts: pb.build(), fan, fanZ: faceZ + 0.06 * L * 0.5,
+    flaps, flameOuter: flameGeo(rn, L * 0.75, Math.max(12, Math.round(seg * 0.5))), flameCore: flameGeo(rn * 0.42, L * 0.38, 12), flameZ: Z(0.07) - 0.02,
+    exhaustZ: Z(0) - 0.12 * L, pylon: new THREE.Vector3(0, py + 0.06, Z(0.58)), frontZ: Z(1.0), top: py, R, L,
+  };
+  cache.set(key, out);
+  return out;
 }

@@ -6,6 +6,16 @@ import { generateTexture } from './textures';
 import { surfaceMaterial } from './materials';
 import { mulberry32, type Path, type Sample, type TrackData } from './trackBuilder';
 import { addProps, type Emitter } from './props';
+import { addTrackDetail } from './trackDetail';
+import { StaticBatcher } from './trackMesh';
+import { addSkyline, buildTerrain, makeTerrainField } from './terrain';
+import { buildSetPieces, type SetPieceFx } from './setPieces';
+import { addLandmarks } from './landmarks';
+import { layersFor, STRATA, terrainMaterial } from './terrainMaterial';
+import { buildGroundCover } from './groundCover';
+import { buildSmoke, type SmokeSrc } from './smoke';
+import { buildLife } from './wildlife';
+import type { PodState } from './physics';
 
 // cheap 2D value noise
 function h2(x: number, y: number) { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
@@ -16,16 +26,17 @@ export function vnoise(x: number, y: number) {
   return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
 }
 function fbm(x: number, y: number, o = 5) { let s = 0, a = 0.5, f = 1; for (let i = 0; i < o; i++) { s += vnoise(x * f, y * f) * a; a *= 0.5; f *= 2.02; } return s; }
-function ridged(x: number, y: number, o = 5) { let s = 0, a = 0.5, f = 1; for (let i = 0; i < o; i++) { const n = 1 - Math.abs(vnoise(x * f, y * f) * 2 - 1); s += n * n * a; a *= 0.5; f *= 2.03; } return s; }
-const sstep = (a: number, b: number, x: number) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+export function ridged(x: number, y: number, o = 5) { let s = 0, a = 0.5, f = 1; for (let i = 0; i < o; i++) { const n = 1 - Math.abs(vnoise(x * f, y * f) * 2 - 1); s += n * n * a; a *= 0.5; f *= 2.03; } return s; }
+export const sstep = (a: number, b: number, x: number) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export interface World {
   group: THREE.Group;
   heightAt: (x: number, z: number) => number;
-  update: (t: number) => void;
+  update: (t: number, cam?: THREE.Vector3) => void;
   tvCams: THREE.Vector3[];
   glossy: THREE.Mesh[];
   emitters: Emitter[];
+  setPieces: { update: (t: number, raceTime: number, pods: PodState[], dt: number, frozen: boolean) => SetPieceFx[] };
   dispose: () => void;
 }
 
@@ -48,21 +59,25 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   await yield_();
   const groundTex = generateTexture(theme.ground, P.ground, texRes, 33, aniso, theme.emissiveGround);
   await yield_();
+  const TL = layersFor(theme.id); const lres = Math.min(1024, texRes);
+  const gravelTex = generateTexture('gravel', TL.gravel, lres, 57, aniso);
+  const basinTex = generateTexture('cracked', TL.basin, lres, 68, aniso, TL.basinEmissive);
+  const cliffTex = TL.cliff ? generateTexture('rock', TL.cliff, texRes, 79, aniso) : wallTex;
+  await yield_();
   const plx = gfx.parallax && (gfx.shaderDetail ?? 1) > 0 ? 1 : 0; const layers = (gfx.shaderDetail ?? 1) >= 2 ? 24 : 12;
   const bump = gfx.bumpMapping ?? true; const disp = (gfx.tessellation ?? 0) > 0 ? ((gfx.tessellation ?? 0) >= 2 ? 0.5 : 0.25) : 0;
-  const roadMat = surfaceMaterial(roadTex, { parallax: plx * 0.025, layers, macro: 0.12, detail: 0.35, bump, displace: disp, envMapIntensity: theme.road === 'ice' ? 1.6 : 0.6, emissive: theme.barrierColor, emissiveIntensity: 1.2 });
-  const wallMat = surfaceMaterial(wallTex, { parallax: plx * 0.06, layers, normalScale: 1.4, macro: 0.28, detail: 0.6, bump, displace: disp * 1.5, emissive: theme.id === 'crystal' ? '#c87aff' : '#ff5a10', emissiveIntensity: theme.id === 'crystal' ? 0.8 : 1.4 });
-  const groundMat = surfaceMaterial(groundTex, { repeat: [1, 1], parallax: plx * 0.04, layers, macro: 0.3, detail: 0.5, bump, triplanar: { set: wallTex, scale: 1 / 26 }, emissive: theme.emissiveGround ?? '#ff4a10', emissiveIntensity: 1.1 });
-  groundMat.vertexColors = true;
+  const hwAvg = td.main.samples.reduce((acc, q) => acc + q.hw, 0) / td.N;
+  const roadMat = surfaceMaterial(roadTex, { cloud: theme.clouds * 0.4, parallax: plx * 0.025, layers, wet: theme.ambient === 'rain' ? 0.85 : theme.road === 'mud' ? 0.12 : 0, puddles: theme.ambient === 'rain' ? 0.38 : 0.22, rain: theme.ambient === 'rain', snow: theme.id === 'ice' ? 1 : 0, macro: 0.12, detail: 0.35, bump, displace: disp, micro: 0.9, microScale: [(2 * hwAvg) / 1.7, Math.max(24, hwAvg * 1.4) / 1.7], envMapIntensity: theme.road === 'ice' ? 1.6 : 0.6, emissive: theme.barrierColor, emissiveIntensity: 1.2 });
+  const wallMat = surfaceMaterial(wallTex, { strata: STRATA[theme.id], cloud: theme.clouds * 0.4, parallax: plx * 0.06, layers, normalScale: 1.4, macro: 0.28, detail: 0.6, bump, displace: disp * 1.5, micro: 0.6, microScale: [18 / 1.7, 18 / 1.7], emissive: theme.id === 'crystal' ? '#c87aff' : '#ff5a10', emissiveIntensity: theme.id === 'crystal' ? 0.8 : 1.4 });
+  const groundMat = terrainMaterial({ ground: groundTex, gravel: gravelTex, basin: basinTex, rock: cliffTex, layers: TL, strata: STRATA[theme.id], cloud: theme.clouds * 0.45, bump, emissive: theme.emissiveGround ?? '#ff4a10', emissiveIntensity: 1.1 });
   disposables.push(roadMat, wallMat, groundMat);
   if (theme.road === 'ice') { roadMat.roughness = 0.6; glossy.push(); }
+  const field = makeTerrainField(td, theme); const { heightAt, nearest, roadClear, avgY } = field;
+  const batcher = new StaticBatcher(gfx.batching ?? true);
 
   progress(0.35, 'Baue Strecke …'); await yield_();
   const maxStep = geoQ >= 3 ? 2 : geoQ === 2 ? 3 : 5; // adaptive sampling: dense in curves/transitions, sparse on straights
   const across = (geoQ >= 3 ? 32 : geoQ === 2 ? 18 : 10) + ((gfx.tessellation ?? 0) >= 2 ? 16 : (gfx.tessellation ?? 0) > 0 ? 8 : 0);
-  const barrierMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.5), toneMapped: false });
-  disposables.push(barrierMat);
-  const pylonPos: THREE.Matrix4[] = [];
 
   for (const path of td.paths) {
     const S = path.samples, n = S.length;
@@ -100,30 +115,30 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
       g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
       g.setIndex(ind); g.computeVertexNormals();
-      const m = new THREE.Mesh(g, roadMat); m.receiveShadow = true; group.add(m); disposables.push(g);
-      if (theme.road === 'ice' || theme.road === 'cityRoad' || theme.road === 'mud') glossy.push(m);
+      // chunked → frustum culling per ~120 m (also in the shadow pass)
+      batcher.addStrip(g, roadMat, 2600, false);
     }
     // ---- skirts / walls / barriers ----
     for (const side of [-1, 1]) {
       // skirt
       const sp: number[] = [], su: number[] = [], si: number[] = [];
       const wp: number[] = [], wu: number[] = [], wi: number[] = [];
-      const bp: number[] = [], bi: number[] = [];
       const K = geoQ >= 3 ? 12 : geoQ === 2 ? 8 : 5;
       const prof: [number, number][] = [[0, 0], [0.3, 0.1], [1.5, 0.25], [1.0, 0.45], [2.5, 0.6], [5, 0.75], [9, 0.88], [15, 1.0]];
-      let sv = 0, wv = 0, bv = 0; let prevS = false, prevW = false, prevB = false; let sAcc = 0;
+      let sv = 0, wv = 0; let prevS = false, prevW = false; let sAcc = 0;
       for (let k = 0; k < idxs.length; k++) {
         const s = S[idxs[k]]; if (k > 0) { const pr = S[idxs[k - 1]]; sAcc += Math.hypot(s.x - pr.x, s.z - pr.z); }
         const open = side > 0 ? s.openR : s.openL;
         const ex = s.x + s.rx * side * s.hw, ez = s.z + s.rz * side * s.hw, ey = s.y + s.ramp - side * s.hw * s.bank;
         // skirt
         const okS = !s.gap;
-        sp.push(ex, ey, ez, ex + s.rx * side * 3, ey - 16, ez + s.rz * side * 3); su.push(sAcc / 20, 0, sAcc / 20, 0.8);
+        const bx = ex + s.rx * side * 3, bz = ez + s.rz * side * 3; const depth = okS ? Math.max(6, ey - heightAt(bx, bz) + 3) : 16; // reaches the terrain everywhere
+        sp.push(ex, ey, ez, bx, ey - depth, bz); su.push(sAcc / 20, 0, sAcc / 20, depth / 20);
         if (okS && prevS) { if (side < 0) si.push(sv - 2, sv, sv - 1, sv - 1, sv, sv + 1); else si.push(sv - 2, sv - 1, sv, sv - 1, sv + 1, sv); }
         sv += 2; prevS = okS;
         // canyon wall
-        const okW = s.canyon && !open && !s.gap;
-        const H = 16 + fbm(sAcc * 0.004 + side * 10, 3.3) * 34;
+        const H = side > 0 ? s.hR : s.hL; // per-side cliff (half-canyons leave one side open)
+        const okW = H > 0 && !open && !s.gap;
         for (let j = 0; j < K; j++) {
           const f = j / (K - 1); const pf = f * (prof.length - 1); const pi = Math.min(prof.length - 2, Math.floor(pf)); const pt = pf - pi;
           const off = prof[pi][0] + (prof[pi + 1][0] - prof[pi][0]) * pt;
@@ -138,28 +153,17 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
           if (side > 0) wi.push(a, a + 1, b, b, a + 1, b + 1); else wi.push(a, b, a + 1, a + 1, b, b + 1);
         }
         wv += K; prevW = okW;
-        // energy barrier ribbon
-        const okB = !s.canyon && !open && !s.gap;
-        bp.push(ex, ey + 0.5, ez, ex, ey + 0.85, ez);
-        if (okB && prevB) bi.push(bv - 2, bv - 1, bv, bv, bv - 1, bv + 1);
-        bv += 2; prevB = okB;
-        if (okB && idxs[k] % 10 === 0) {
-          const m = new THREE.Matrix4().compose(new THREE.Vector3(ex, ey, ez), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, 1, 1));
-          pylonPos.push(m);
-        }
       }
       const mk = (p: number[], u: number[] | null, i: number[], mat: THREE.Material, shadow: boolean) => {
         if (!i.length) return;
         const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
         if (u) g.setAttribute('uv', new THREE.Float32BufferAttribute(u, 2));
         g.setIndex(i); g.computeVertexNormals();
-        const m = new THREE.Mesh(g, mat); m.castShadow = shadow; m.receiveShadow = true; group.add(m); disposables.push(g);
+        batcher.addStrip(g, mat, 2400, shadow);
       };
       mk(sp, su, si, wallMat, false);
       mk(wp, wu, wi, wallMat, true);
-      const bmat = side > 0 ? barrierMat : barrierMat;
-      bmat.side = THREE.DoubleSide;
-      mk(bp, null, bi, bmat, false);
+      // track-edge barriers: 3D guard rails in trackDetail.ts
     }
     // ---- cliff faces at gaps ----
     for (let i = 0; i < n - 1; i++) {
@@ -180,123 +184,49 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     if (path.id > 0) buildTunnel(path, group, wallMat, disposables, theme);
     if (td.def.theme === 'oovo') buildZeroGTubes(path, group, wallMat, disposables, theme);
   }
-  // pylons
-  if (pylonPos.length) {
-    const pg = mergeGeometries([new THREE.CylinderGeometry(0.15, 0.25, 2.2, 8).translate(0, 1.1, 0), new THREE.SphereGeometry(0.3, 10, 8).translate(0, 2.3, 0)]);
-    const im = new THREE.InstancedMesh(pg, new THREE.MeshStandardMaterial({ color: '#555a66', metalness: 0.9, roughness: 0.3, emissive: new THREE.Color(theme.barrierColor), emissiveIntensity: 0.35 }), pylonPos.length);
-    pylonPos.forEach((m, i) => im.setMatrixAt(i, m)); im.castShadow = true; group.add(im); disposables.push(pg);
-  }
 
-  // ---- ramps warning chevrons ----
+  // ---- ramps warning chevrons (instanced) ----
   {
-    const chevMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.3), toneMapped: false, side: THREE.DoubleSide });
-    const S = td.main.samples;
+    const chevMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.3), side: THREE.DoubleSide });
+    const S = td.main.samples; const mats: THREE.Matrix4[] = [];
     for (let i = 1; i < S.length; i++) {
-      if (S[i].ramp > 0 && S[i - 1].ramp === 0) {
-        for (let c = 0; c < 4; c++) {
-          const s = S[(i + c * 4) % S.length];
-          for (const side of [-1, 1]) {
-            const m = new THREE.Mesh(new THREE.PlaneGeometry(4, 0.6), chevMat);
-            m.position.set(s.x + s.rx * side * (s.hw * 0.4), s.y + s.ramp - side * s.hw * 0.4 * s.bank + 0.35, s.z + s.rz * side * s.hw * 0.4);
-            m.rotation.set(-Math.PI / 2, 0, -Math.atan2(s.tx, s.tz) + Math.PI / 2 + side * 0.5, 'YXZ');
-            m.rotation.order = 'YXZ'; m.rotation.y = Math.atan2(s.tx, s.tz) + side * 0.6; m.rotation.x = -Math.PI / 2;
-            group.add(m);
-          }
+      if (!(S[i].ramp > 0 && S[i - 1].ramp === 0)) continue;
+      for (let c = 0; c < 4; c++) {
+        const s = S[(i + c * 4) % S.length]; const yaw = Math.atan2(s.tx, s.tz);
+        for (const side of [-1, 1]) {
+          const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, yaw + side * 0.6, -yaw + Math.PI / 2 + side * 0.5, 'YXZ'));
+          mats.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x + s.rx * side * (s.hw * 0.4), s.y + s.ramp - side * s.hw * 0.4 * s.bank + 0.35, s.z + s.rz * side * s.hw * 0.4), q, new THREE.Vector3(1, 1, 1)));
         }
       }
     }
+    if (mats.length) { const geo = new THREE.PlaneGeometry(4, 0.6); const im = new THREE.InstancedMesh(geo, chevMat, mats.length); mats.forEach((m, k) => im.setMatrixAt(k, m)); im.computeBoundingSphere(); group.add(im); disposables.push(geo, chevMat); }
   }
 
   // ---- start / finish line ----
   addStartArea(td, group, theme, disposables, rng);
 
-  progress(0.55, 'Generiere Terrain …'); await yield_();
-  // ---------- terrain height field ----------
-  const coarse: Sample[] = []; for (const p of td.paths) for (let i = 0; i < p.samples.length; i += 4) coarse.push(p.samples[i]);
-  const cell = 40; const grid = new Map<number, Sample[]>();
-  const key = (cx: number, cz: number) => cx * 100003 + cz;
-  for (const s of coarse) { const k = key(Math.floor(s.x / cell), Math.floor(s.z / cell)); if (!grid.has(k)) grid.set(k, []); grid.get(k)!.push(s); }
-  const sparse: Sample[] = []; for (let i = 0; i < td.main.samples.length; i += 20) sparse.push(td.main.samples[i]);
-  const avgY = td.main.samples.reduce((a, s) => a + s.y, 0) / td.N;
-  const nearest = (x: number, z: number) => {
-    const cx = Math.floor(x / cell), cz = Math.floor(z / cell); let bd = 1e12, bs: Sample | null = null;
-    for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) { const arr = grid.get(key(cx + i, cz + j)); if (!arr) continue; for (const s of arr) { const d = (s.x - x) ** 2 + (s.z - z) ** 2; if (d < bd) { bd = d; bs = s; } } }
-    if (!bs) { for (const s of sparse) { const d = (s.x - x) ** 2 + (s.z - z) ** 2; if (d < bd) { bd = d; bs = s; } } }
-    return { d: Math.sqrt(bd), s: bs! };
-  };
-  // true if a circle (x,z,r) keeps at least `margin` metres distance to every road surface (all paths)
-  const roadClear = (x: number, z: number, r: number, margin = 3) => {
-    const cx = Math.floor(x / cell), cz = Math.floor(z / cell);
-    const reach = Math.ceil((r + margin + 40) / cell) + 1;
-    for (let i = -reach; i <= reach; i++) for (let j = -reach; j <= reach; j++) {
-      const arr = grid.get(key(cx + i, cz + j)); if (!arr) continue;
-      for (const q of arr) { const d = Math.hypot(q.x - x, q.z - z); if (d - q.hw - 1 < r + margin) return false; }
-    }
-    return true;
-  };
+  progress(0.55, 'Generiere Terrain (LOD) …'); await yield_();
   const T = theme.terrain;
-  const heightAt = (x: number, z: number) => {
-    const { d, s } = nearest(x, z);
-    const near = s.y - 3.5 - Math.abs(s.bank) * s.hw;
-    let far: number;
-    const nx = x * 0.002, nz = z * 0.002;
-    switch (T) {
-      case 'canyon': far = s.y + 22 + fbm(nx * 3, nz * 3) * 25 + sstep(500, 1600, d) * ridged(nx, nz) * 160; break;
-      case 'mountains': far = avgY - 5 + fbm(nx * 2, nz * 2) * 30 + sstep(200, 1400, d) * ridged(nx * 0.8, nz * 0.8) * 320; break;
-      case 'dunes': far = avgY - 4 + fbm(nx * 4, nz * 4) * 30; break;
-      case 'lava': far = avgY - 18 + sstep(0.45, 0.75, fbm(nx * 2.5, nz * 2.5)) * 40 + sstep(400, 1600, d) * ridged(nx, nz) * 220; break;
-      case 'jungle': far = avgY - 6 + fbm(nx * 3, nz * 3) * 35 + sstep(300, 1500, d) * ridged(nx, nz) * 140; break;
-      case 'city': far = -160; break;
-      case 'prison': far = -400; break;
-      case 'ocean': far = avgY - 30 + sstep(0.55, 0.75, fbm(nx * 2, nz * 2)) * 45; break;
-      default: far = avgY;
-    }
-    const blendStart = s.hw + 8;
-    let h = near + (far - near) * sstep(blendStart, blendStart + (T === 'canyon' ? 40 : 120), d);
-    if (T === 'city') h = Math.min(h, s.y - 30) * (d < s.hw + 10 ? 1 : 1);
-    if (T === 'city' || T === 'prison') h = T === 'city' ? -160 : -400;
-    if (s.gap && d < s.hw + 40) h = Math.min(h, s.y - 55 + sstep(s.hw, s.hw + 40, d) * 40);
-    if (T === 'lava' && d < s.hw + 30) h = Math.min(h, near - sstep(s.hw + 4, s.hw + 30, d) * 14);
-    return h;
-  };
-
   const b = td.bounds; const margin = 2600 * gfx.drawDistance;
   const W = b.maxX - b.minX + margin * 2, D = b.maxZ - b.minZ + margin * 2;
-  const segs = geoQ >= 3 ? 640 : geoQ === 2 ? 400 : 200;
-  const tg = new THREE.PlaneGeometry(W, D, segs, Math.round(segs * D / W));
-  tg.rotateX(-Math.PI / 2);
   const cxm = (b.minX + b.maxX) / 2, czm = (b.minZ + b.maxZ) / 2;
-  tg.translate(cxm, 0, czm);
-  const tp = tg.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i < tp.count; i++) { tp.setY(i, heightAt(tp.getX(i), tp.getZ(i))); if (i % 20000 === 0) { progress(0.55 + 0.25 * i / tp.count, 'Generiere Terrain …'); await yield_(); } }
-  tg.computeVertexNormals();
-  const tn = tg.attributes.normal as THREE.BufferAttribute;
-  const cols = new Float32Array(tp.count * 3);
-  const rockC = new THREE.Color(P.wall[1]), gC = new THREE.Color('#ffffff');
-  for (let i = 0; i < tp.count; i++) {
-    const slope = 1 - tn.getY(i); const t = sstep(0.12, 0.35, slope);
-    const c = gC.clone().lerp(rockC.clone().multiplyScalar(1.6), t * 0.2);
-    const v = 0.85 + vnoise(tp.getX(i) * 0.01, tp.getZ(i) * 0.01) * 0.3;
-    cols[i * 3] = c.r * v; cols[i * 3 + 1] = c.g * v; cols[i * 3 + 2] = c.b * v;
-  }
-  tg.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-  const tuv = tg.attributes.uv as THREE.BufferAttribute;
-  for (let i = 0; i < tuv.count; i++) tuv.setXY(i, tp.getX(i) / 30, tp.getZ(i) / 30);
-  const terrain = new THREE.Mesh(tg, groundMat); terrain.receiveShadow = true; group.add(terrain); disposables.push(tg);
+  await buildTerrain(field, theme, gfx, groundMat, batcher, { cx: cxm, cz: czm, W, D }, (p, m) => progress(0.55 + 0.25 * p, m));
+  addSkyline(theme, group, disposables, avgY, { cx: cxm, cz: czm, W, D });
 
   // water / lava plane
-  let animTex: THREE.Texture[] = [];
+  const waterY = T === 'lava' ? Math.min(avgY - 14, td.bounds.minY - 8) : (T === 'jungle' || theme.id === 'ice') ? Math.min(avgY - 12, td.bounds.minY - 12) : T === 'ocean' ? avgY - 26 : -1e9;
+  let animTex: THREE.Texture[] = []; const scrolls: { value: THREE.Vector2 }[] = [];
   if (T === 'lava') {
     const lt = generateTexture('basalt', ['#0a0605', '#1a0d08', '#2a140a'], 512, 99, 8, '#ff7a20');
     const lm = surfaceMaterial(lt, { repeat: [W / 120, D / 120], emissive: '#ff7020', emissiveIntensity: 2.6 });
-    const lp = new THREE.Mesh(new THREE.PlaneGeometry(W, D), lm); lp.rotation.x = -Math.PI / 2; lp.position.set(cxm, avgY - 14, czm); group.add(lp);
-    animTex = [lm.map!, lm.emissiveMap!, lm.normalMap!];
+    const lp = new THREE.Mesh(new THREE.PlaneGeometry(W, D), lm); lp.rotation.x = -Math.PI / 2; lp.position.set(cxm, Math.min(avgY - 14, td.bounds.minY - 8), czm); group.add(lp);
+    scrolls.push(lm.userData.scroll as { value: THREE.Vector2 });
     disposables.push(lm);
   } else if (T === 'jungle' || theme.id === 'ice') {
     const nt = generateTexture('snow', ['#888', '#999', '#aaa'], 512, 55, 8);
-    const wm = new THREE.MeshStandardMaterial({ color: theme.id === 'ice' ? '#7aa8c8' : '#1a4a40', roughness: theme.id === 'ice' ? 0.15 : 0.04, metalness: 0.3, normalMap: nt.normalMap.clone(), envMapIntensity: 1.5 });
+    const wm = new THREE.MeshStandardMaterial({ color: theme.id === 'ice' ? '#7aa8c8' : '#1a4a40', roughness: theme.id === 'ice' ? 0.18 : 0.12, metalness: 0.3, normalMap: nt.normalMap.clone(), envMapIntensity: 1.5 });
     wm.normalMap!.repeat.set(W / 60, D / 60); wm.normalMap!.needsUpdate = true;
-    const wp = new THREE.Mesh(new THREE.PlaneGeometry(W, D), wm); wp.rotation.x = -Math.PI / 2; wp.position.set(cxm, avgY - 8, czm); wp.receiveShadow = true; group.add(wp); glossy.push(wp);
+    const wp = new THREE.Mesh(new THREE.PlaneGeometry(W, D), wm); wp.rotation.x = -Math.PI / 2; wp.position.set(cxm, waterY, czm); wp.receiveShadow = true; group.add(wp); glossy.push(wp);
     animTex = [wm.normalMap!]; disposables.push(wm);
   } else if (T === 'ocean') {
     const wt = generateTexture('snow', ['#8ab', '#9bc', '#acd'], 512, 44, 8);
@@ -327,15 +257,27 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   addObstacles(td, group, theme, wallMat, disposables);
   progress(0.9, 'Platziere Streckendetails …'); await yield_();
   const props = addProps(td, theme, group, gfx, heightAt, disposables, rng, roadClear);
+  const setPieces = buildSetPieces(td, theme, group, disposables, wallMat);
+  const landRock = surfaceMaterial(wallTex, { strata: STRATA[theme.id], cloud: theme.clouds * 0.4, macro: 0.35, detail: 0.25, normalScale: 1.3, bump, emissive: theme.id === 'lava' ? '#ff5a10' : '#c87aff', emissiveIntensity: theme.id === 'lava' ? 0.8 : theme.id === 'crystal' ? 0.5 : 0 });
+  disposables.push(landRock);
+  const smokes: SmokeSrc[] = [];
+  addLandmarks(td, theme, group, disposables, field, rng, landRock, props.emitters, smokes);
+  progress(0.92, 'Belebe Landschaft …'); await yield_();
+  const smoke = buildSmoke(smokes, theme, td, field, group, disposables, rng, waterY);
+  const cover = buildGroundCover(td, theme, gfx, field, waterY, rng, group, disposables);
+  const life = buildLife(td, theme, field, waterY, rng, group, disposables, gfx.detail);
 
   // tv cams
   const tvCams: THREE.Vector3[] = [];
   const S = td.main.samples;
   for (let i = 0; i < S.length; i += 110) { const s = S[i]; const side = (i / 110) % 2 ? 1 : -1; tvCams.push(new THREE.Vector3(s.x + s.rx * side * (s.hw + 6), s.y + 7 + (s.canyon ? 6 : 0), s.z + s.rz * side * (s.hw + 6))); }
 
+  const detail = addTrackDetail(td, theme, group, disposables, rng, wallMat, { across, disp, detail: gfx.detail, tvCams, batcher });
+  batcher.build(group, disposables);
+
   progress(0.95, 'Kompiliere Shader …'); await yield_();
-  const update = (t: number) => { for (const tx of animTex) { tx.offset.x = t * 0.004; tx.offset.y = t * 0.006; } props.update(t); };
-  return { group, heightAt, update, tvCams, glossy, emitters: props.emitters, dispose: () => disposables.forEach(d => d.dispose()) };
+  const update = (t: number, cam?: THREE.Vector3) => { smoke.update(t); life.update(t); if (cam) cover.update(cam); for (const tx of animTex) { tx.offset.x = t * 0.004; tx.offset.y = t * 0.006; } for (const sc of scrolls) sc.value.set(t * 0.004, t * 0.006); props.update(t); detail.update(t); };
+  return { group, heightAt, update, tvCams, glossy, emitters: props.emitters, setPieces, dispose: () => disposables.forEach(d => d.dispose()) };
 }
 
 function buildTunnel(path: Path, group: THREE.Group, mat: THREE.Material, disp: { dispose: () => void }[], theme: ThemeDef) {
@@ -535,44 +477,46 @@ function scatterDecor(theme: ThemeDef, group: THREE.Group, td: TrackData, height
 }
 
 function addArches(td: TrackData, group: THREE.Group, mat: THREE.Material, disp: { dispose: () => void }[], rng: () => number, roadClear: (x: number, z: number, r: number, margin?: number) => boolean) {
-  const S = td.main.samples;
+  const S = td.main.samples; const list: THREE.BufferGeometry[] = [];
   for (const idx of td.arches) {
     const s = S[idx]; const span = s.hw + 12;
     const feetOk = [-1, 1].every(sd => roadClear(s.x + s.rx * sd * span, s.z + s.rz * sd * span, 5, 0));
     if (!feetOk) continue;
     const g = new THREE.TorusGeometry(span, 4 + rng() * 3, 16, 48, Math.PI);
     const p = g.attributes.position as THREE.BufferAttribute;
-    for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const n = 0.8 + fbm(x * 0.15, y * 0.15 + z * 0.2, 4) * 0.6; p.setXYZ(i, x + (x * 0.06) * (n - 1) * 5, y * (0.75 + rng() * 0.0) + (n - 1) * 3, z * n * 1.6); }
+    for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const n = 0.8 + fbm(x * 0.15, y * 0.15 + z * 0.2, 4) * 0.6; p.setXYZ(i, x + (x * 0.06) * (n - 1) * 5, y * 0.75 + (n - 1) * 3, z * n * 1.6); }
     g.computeVertexNormals();
     const uv = g.attributes.uv as THREE.BufferAttribute; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 6, uv.getY(i) * 2);
-    const m = new THREE.Mesh(g, mat); m.position.set(s.x, s.y - 3, s.z); m.rotation.y = Math.atan2(s.tx, s.tz);
-    m.scale.y = 1.2 + rng() * 0.8;
-    m.castShadow = true; m.receiveShadow = true; group.add(m); disp.push(g);
+    g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y - 3, s.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, 1.2 + rng() * 0.8, 1)));
+    list.push(g);
   }
+  if (!list.length) return;
+  const merged = mergeGeometries(list); list.forEach(g => g.dispose()); if (!merged) return;
+  const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh); disp.push(merged);
 }
 
 function addObstacles(td: TrackData, group: THREE.Group, theme: ThemeDef, rockMat: THREE.Material, disp: { dispose: () => void }[]) {
   const metal = new THREE.MeshStandardMaterial({ color: '#7a7f88', metalness: 0.85, roughness: 0.35 });
-  const warn = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.5), toneMapped: false });
+  const warn = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.5) });
   disp.push(metal, warn);
-  const rg = rockGeo(2, 9, 0.8); disp.push(rg);
+  const rocks: THREE.Matrix4[] = [], cols: THREE.Matrix4[] = [], rings: THREE.Matrix4[] = [], boxes: THREE.Matrix4[] = [], lights: THREE.Matrix4[] = [];
+  const q = new THREE.Quaternion(), e = new THREE.Euler(), I = new THREE.Quaternion();
+  const C = (x: number, y: number, z: number, qq: THREE.Quaternion, sx: number, sy: number, sz: number) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), qq, new THREE.Vector3(sx, sy, sz));
   for (const o of td.obstacles) {
-    let m: THREE.Object3D;
-    if (o.kind === 0) { m = new THREE.Mesh(rg, rockMat); m.scale.setScalar(o.r * 1.1); m.position.set(o.x, o.y + o.r * 0.4, o.z); }
-    else if (o.kind === 1) {
-      const gr = new THREE.Group();
-      const col = new THREE.Mesh(new THREE.CylinderGeometry(o.r * 0.8, o.r, 9, 16), rockMat); col.position.y = 4.5; gr.add(col);
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(o.r * 0.95, 0.15, 6, 20), warn); ring.rotation.x = Math.PI / 2; ring.position.y = 2; gr.add(ring);
-      gr.position.set(o.x, o.y, o.z); m = gr;
-    } else {
-      const gr = new THREE.Group();
-      const bx = new THREE.Mesh(new THREE.BoxGeometry(o.r * 1.5, o.r * 1.2, o.r * 1.5), metal); bx.position.y = o.r * 0.6; bx.rotation.y = o.idx; gr.add(bx);
-      const l = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), warn); l.position.y = o.r * 1.25; gr.add(l);
-      gr.position.set(o.x, o.y, o.z); m = gr;
-    }
-    m.traverse(c => { c.castShadow = true; c.receiveShadow = true; });
-    group.add(m);
+    if (o.kind >= 3) continue; // hazard vents / set-piece solids have their own visuals
+    if (o.kind === 0) { e.set(o.idx * 0.7, o.idx * 1.3, 0); q.setFromEuler(e); rocks.push(C(o.x, o.y + o.r * 0.4, o.z, q.clone(), o.r * 1.1, o.r * 1.1, o.r * 1.1)); }
+    else if (o.kind === 1) { cols.push(C(o.x, o.y + 4.5, o.z, I, o.r, 9, o.r)); rings.push(C(o.x, o.y + 2, o.z, I, o.r, o.r, o.r)); }
+    else { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), o.idx); boxes.push(C(o.x, o.y + o.r * 0.6, o.z, q.clone(), o.r * 1.5, o.r * 1.2, o.r * 1.5)); lights.push(C(o.x, o.y + o.r * 1.25, o.z, I, 1, 1, 1)); }
   }
+  const inst = (geo: THREE.BufferGeometry, mat: THREE.Material, list: THREE.Matrix4[], shadow = true) => {
+    if (!list.length) { geo.dispose(); return; }
+    const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((m, i) => im.setMatrixAt(i, m)); im.castShadow = shadow; im.receiveShadow = true; im.computeBoundingSphere(); group.add(im); disp.push(geo);
+  };
+  inst(rockGeo(2, 9, 0.8), rockMat, rocks);
+  inst(new THREE.CylinderGeometry(0.8, 1, 1, 16), rockMat, cols);
+  inst(new THREE.TorusGeometry(0.95, 0.07, 6, 24).rotateX(Math.PI / 2), warn, rings, false);
+  inst(new THREE.BoxGeometry(1, 1, 1), metal, boxes);
+  inst(new THREE.SphereGeometry(0.3, 8, 6), warn, lights, false);
 }
 
 function buildZeroGTubes(path: Path, group: THREE.Group, mat: THREE.Material, disp: { dispose: () => void }[], theme: ThemeDef) {
