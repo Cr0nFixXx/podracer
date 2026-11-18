@@ -25,6 +25,7 @@ export interface GfxSettings {
   drawDistance: number;
   showFps: boolean;
   backend?: 'auto' | 'webgl'; // auto = WebGPU with WebGL2 fallback
+  csm?: boolean; // cascaded shadow maps (Ultra preset; opt-in elsewhere)
   batching?: boolean; // static track geometry as BatchedMesh (per-object culling, fewer draws)
 }
 
@@ -32,7 +33,7 @@ export const PRESETS: Record<'low' | 'medium' | 'high' | 'ultra', Omit<GfxSettin
   low: { renderScale: 0.75, shadows: 0, texRes: 512, parallax: false, ao: false, bloom: false, godRays: false, ssr: false, motionBlur: false, cinematic: false, particles: 0.35, detail: 0.4, geometry: 1, aa: 'none', drawDistance: 0.6 },
   medium: { renderScale: 1, shadows: 1, texRes: 1024, parallax: false, ao: false, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 0.6, detail: 0.7, geometry: 2, aa: 'fxaa', drawDistance: 0.8 },
   high: { renderScale: 1, shadows: 2, texRes: 1024, parallax: true, ao: false, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 1, detail: 1, geometry: 2, aa: 'smaa', drawDistance: 1 },
-  ultra: { renderScale: 1, shadows: 3, texRes: 2048, parallax: true, ao: true, bloom: true, godRays: true, ssr: true, motionBlur: true, cinematic: true, particles: 1.4, detail: 1.4, geometry: 3, aa: 'smaa', drawDistance: 1.3 },
+  ultra: { csm: true, renderScale: 1, shadows: 3, texRes: 2048, parallax: true, ao: true, bloom: true, godRays: true, ssr: true, motionBlur: true, cinematic: true, particles: 1.4, detail: 1.4, geometry: 3, aa: 'smaa', drawDistance: 1.3 },
 };
 
 export const defaultGfx = (): GfxSettings => ({ preset: 'high', backend: 'auto', batching: true, fov: 75, showFps: true, bloomStrength: 0.5, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 1, ...PRESETS.high });

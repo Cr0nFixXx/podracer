@@ -189,10 +189,13 @@ export function generateTexture(kind: TexKind, palette: string[], size: number, 
           const streak = N.noise2(u, v, 160, 4) * 0.6 + N.noise2(u, v, 320, 8) * 0.4; // hover streaks along v
           const racing = Math.exp(-Math.pow((u - 0.5 - (N.noise2(u, v, 1, 2) - 0.5) * 0.25) / 0.16, 2));
           const scorch = sstep(0.62, 0.75, N.fbm(u, v, 5, 4));
-          N.worley(u, v, 72, w); const peb = (1 - sstep(0.08, 0.3, w[0])) * (w[2] > 0.7 ? 1 : 0);
+          // session 12: fine, sparse, flat aggregate instead of big round pebbles (parallax/displacement turned them into dimples)
+          N.worley(u, v, 170, w); const peb = (1 - sstep(0.04, 0.16, w[0])) * (w[2] > 0.86 ? 1 : 0);
           N.worley(u, v, 10, w2); const crack = (1 - sstep(0.0, 0.018, w2[1] - w2[0])) * sstep(0.45, 0.6, N.fbm(u, v, 4, 3));
-          h = 0.5 + f * 0.25 + streak * 0.12 + peb * 0.25 - crack * 0.35 + grain * 0.04;
-          t = 0.35 + f * 0.45 + streak * 0.2 - racing * 0.2 - scorch * 0.3 - crack * 0.2 - peb * 0.1;
+          const agg = N.noise(u * size, v * size, size) * 0.5 + fine * 0.5; // per-texel stone grain
+          const rut = Math.exp(-Math.pow((Math.abs(u - 0.5) - 0.16) / 0.035, 2)) * (0.6 + 0.4 * N.noise2(u, v, 40, 3)); // worn hover ruts
+          h = 0.5 + f * 0.12 + streak * 0.1 + peb * 0.08 - crack * 0.35 + agg * 0.07 - rut * 0.05;
+          t = 0.35 + f * 0.45 + streak * 0.2 - racing * 0.2 - scorch * 0.3 - crack * 0.2 + peb * 0.08 + (agg - 0.5) * 0.1 - rut * 0.08;
           r = 0.82 - racing * 0.15 - streak * 0.08;
           if (kind === 'mud') { const pud = sstep(0.56, 0.62, N.fbm(u, v, 4, 4)); r = r * (1 - pud) + 0.05 * pud; h = h * (1 - pud) + 0.22 * pud; t -= pud * 0.3; }
           if (kind === 'ice') {

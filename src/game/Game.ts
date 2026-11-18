@@ -5,6 +5,7 @@ import { buildTrack, type TrackData } from './trackBuilder';
 import { buildWorld, type World } from './world';
 import { makeSky, sunDirection } from './sky';
 import { buildPodModel } from './podModel';
+import { CSMShadowNode } from 'three/examples/jsm/csm/CSMShadowNode.js';
 import { Particles } from './particles';
 import { PostFX } from './post';
 import { AudioFX } from './audio';
@@ -19,6 +20,8 @@ export interface HudState {
   speed: number; place: number; total: number; lap: number; laps: number; sprint: boolean; progress: number;
   time: number; lastLap: number | null; bestLap: number | null;
   hpL: number; hpR: number; heat: number; boosting: boolean; overheat: boolean; repairing: boolean; airbrake: boolean;
+  /** session 10: attitude HUD – roll (rad), pitch command (-1 raise … 1 nose down), handbrake slide, active airbrake sides */
+  roll: number; pitchC: number; sliding: boolean; abL: boolean; abR: boolean;
   wrongWay: boolean; zeroG: boolean; countdown: number; message: string; camName: string; fps: number; backend: string; standings: Standing[]; dead: boolean;
   finished: boolean;
 }
@@ -48,7 +51,7 @@ export class Game {
   message = ''; messageT = 0; finishShown = false; postTimer = 0;
   gripMul = 1; lastBeep = 99;
   raf = 0; ro: ResizeObserver | null = null;
-  tmpV = new THREE.Vector3(); tmpV2 = new THREE.Vector3();
+  tmpV = new THREE.Vector3(); tmpV2 = new THREE.Vector3(); glowCol = new THREE.Color(); dustCol = new THREE.Color(); tmpV3 = new THREE.Vector3(); lastDt = 0.016; frameNo = 0; wetCam = 0;
   prevCamBtn = false;
 
   constructor(container: HTMLDivElement, profile: Profile, cb: Callbacks) {
@@ -93,6 +96,16 @@ export class Game {
     if (ms) { sun.shadow.mapSize.set(ms, ms); }
     const sc = sun.shadow.camera; sc.left = -130; sc.right = 130; sc.top = 130; sc.bottom = -130; sc.near = 10; sc.far = 900;
     sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.8;
+    // session 9: cascaded shadow maps (High/Ultra) – 3 cascades, sharper near shadows + longer range at similar cost
+    // (far cascades see few casters: decor cells cast < 240 m, pods < 110 m)
+    if (gfx.csm && gfx.shadows >= 2 && ms) { // Ultra preset (or opt-in); cascades are set up on the first frame after compile
+      try {
+        const cs = Math.min(ms, 2048); sun.shadow.mapSize.set(cs, cs);
+        const csm = new CSMShadowNode(sun, { cascades: 3, maxFar: 800 * gfx.drawDistance, mode: 'practical', lightMargin: 160 });
+        (csm as unknown as { fade: boolean }).fade = true;
+        (sun.shadow as unknown as { shadowNode: unknown }).shadowNode = csm;
+      } catch { /* fall back to the single shadow map */ }
+    }
     this.scene.add(sun); this.scene.add(sun.target); this.sun = sun;
 
     // track & world
@@ -122,7 +135,18 @@ export class Game {
     this.cb.onLoading(0.97, 'Kompiliere Shader …');
     await new Promise(res => setTimeout(res, 0));
     this.updateCamera(0.016);
-    try { await r.compileAsync(this.scene, this.camera); } catch { /* ignore */ }
+    // warm-up (session 7): build every pod far-LOD proxy now and compile ALL pipelines (frustum culling off,
+    // both LOD states, shadow + post passes) – lazily built proxies/first-use shaders caused the hitches right after the start
+    const culled: THREE.Object3D[] = [];
+    this.scene.traverse(o => { if ((o as THREE.Mesh).isMesh && o.frustumCulled) { o.frustumCulled = false; culled.push(o); } });
+    try {
+      for (const p of this.pods) p.visual?.setLod(1000);
+      await r.compileAsync(this.scene, this.camera);
+      for (const p of this.pods) p.visual?.setLod(0);
+      await r.compileAsync(this.scene, this.camera);
+      this.post.render();
+    } catch { /* ignore */ }
+    for (const o of culled) o.frustumCulled = true;
     if (this.disposed) return;
 
     window.addEventListener('keydown', this.onKey); window.addEventListener('keyup', this.onKeyUp);
@@ -160,7 +184,7 @@ export class Game {
         name: e.isPlayer ? 'Du' : pilot.name, color: e.isPlayer ? '#ffffff' : pilot.color,
         pos, vel: new THREE.Vector3(), yaw: Math.atan2(s.tx, s.tz), yawRate: 0, steer: 0,
         path: 0, idx, lat, grounded: true, zeroG: false, air: 0, groundY: s.y, prevGroundY: s.y,
-        input: { throttle: 0, brake: 0, steer: 0, boost: false, airbrake: false, repair: false },
+        input: { throttle: 0, brake: 0, steer: 0, boost: false, airbrake: false, repair: false, handbrake: false, abL: false, abR: false, roll: 0, pitch: 0 },
         hpL: 100, hpR: 100, heat: 0, boosting: false, overheat: false, repairing: false, airbraking: false,
         lap: 0, passedMid: true, rel: 0, prog: 0, finished: false, finishTime: 0, lapStart: 0, lapTimes: [],
         dead: 0, invuln: 0, lastSafePath: 0, lastSafeIdx: idx, wrongWay: 0, roll: 0, pitch: 0, shake: 0, events: [], visual: vis,
@@ -204,11 +228,17 @@ export class Game {
 
   readInput() {
     const k = this.keys; const inp = this.player.input;
-    let steer = (k.has('ArrowRight') || k.has('KeyD') ? 1 : 0) - (k.has('ArrowLeft') || k.has('KeyA') ? 1 : 0);
-    let throttle = k.has('ArrowUp') || k.has('KeyW') ? 1 : 0;
-    let brake = k.has('ArrowDown') || k.has('KeyS') ? 1 : 0;
-    let boost = k.has('ShiftLeft') || k.has('ShiftRight') || k.has('Space');
-    let airbrake = k.has('KeyE') || k.has('ControlLeft') || k.has('KeyQ');
+    // session 9 key map: W thrust · S reverse thrust · A/D steer · Space handbrake/slide · ←/→ roll 90° · ↑ pitch (nose down) · ↓ raise
+    // Q/E left/right airbrake · Ctrl both airbrakes · Shift boost · R repair · C view
+    let steer = (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0);
+    let throttle = k.has('KeyW') ? 1 : 0;
+    let brake = k.has('KeyS') ? 1 : 0;
+    let boost = k.has('ShiftLeft') || k.has('ShiftRight');
+    let airbrake = k.has('ControlLeft') || k.has('ControlRight');
+    let abL = k.has('KeyQ'), abR = k.has('KeyE');
+    let handbrake = k.has('Space');
+    let roll = (k.has('ArrowRight') ? 1 : 0) - (k.has('ArrowLeft') ? 1 : 0);
+    let pitch = (k.has('ArrowUp') ? 1 : 0) - (k.has('ArrowDown') ? 1 : 0);
     let repair = k.has('KeyR');
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     for (const gp of pads) {
@@ -217,13 +247,15 @@ export class Game {
       const rt = gp.buttons[7]?.value ?? 0, lt = gp.buttons[6]?.value ?? 0;
       if (rt > 0.05) throttle = Math.max(throttle, rt); if (lt > 0.05) brake = Math.max(brake, lt);
       if (gp.buttons[0]?.pressed) boost = true;
-      if (gp.buttons[1]?.pressed || gp.buttons[4]?.pressed || gp.buttons[5]?.pressed) airbrake = true;
+      if (gp.buttons[1]?.pressed) airbrake = true; if (gp.buttons[4]?.pressed) abL = true; if (gp.buttons[5]?.pressed) abR = true;
+      if (gp.buttons[10]?.pressed) handbrake = true; const rx = gp.axes[2] ?? 0, ry = gp.axes[3] ?? 0; if (Math.abs(rx) > 0.5) roll = Math.sign(rx); if (Math.abs(ry) > 0.35) pitch = -Math.sign(ry);
       if (gp.buttons[2]?.pressed) repair = true;
       const cam = !!gp.buttons[3]?.pressed; if (cam && !this.prevCamBtn) this.cycleCamera(); this.prevCamBtn = cam;
       if (gp.buttons[9]?.pressed && !this.paused) this.setPaused(true);
       break;
     }
     inp.steer = steer; inp.throttle = throttle; inp.brake = brake; inp.boost = boost; inp.airbrake = airbrake; inp.repair = repair;
+    inp.abL = abL; inp.abR = abR; inp.handbrake = handbrake; inp.roll = roll; inp.pitch = pitch;
   }
 
   loop = (now: number) => {
@@ -239,6 +271,7 @@ export class Game {
   };
 
   update(dt: number) {
+    this.lastDt = dt; this.frameNo++;
     this.clock += dt;
     const frozen = this.state === 'countdown';
     if (this.state === 'countdown') {
@@ -314,7 +347,8 @@ export class Game {
     this.updateVisuals();
     this.updateCamera(dt);
     this.particles.update(dt, this.camera.position, this.clock);
-    this.world.update(this.clock, this.camera.position);
+    this.world.update(this.clock, this.camera.position, this.player?.pos);
+    this.updateFalls();
     this.sky.uniforms.time.value = this.clock;
     if (this.messageT > 0) this.messageT -= dt;
     this.flash = Math.max(0, this.flash - dt * 2);
@@ -344,7 +378,8 @@ export class Game {
       if (rv < 0) {
         const jv = -rv * 0.65;
         a.vel.x -= nx * jv; a.vel.z -= nz * jv; b.vel.x += nx * jv; b.vel.z += nz * jv;
-        const dmg = Math.max(0, -rv - 4) * 0.9;
+        // session 10: AI-vs-AI contact damage × 0.35, capped – pack bumps used to chain-explode the field (player contacts unchanged)
+        const dmg = Math.min(a.isPlayer || b.isPlayer ? 999 : 30, Math.max(0, -rv - 4) * 0.9 * (a.isPlayer || b.isPlayer ? 1 : 0.35));
         if (dmg > 0) {
           a.hpL -= dmg * 0.5; a.hpR -= dmg * 0.5; b.hpL -= dmg * 0.5; b.hpR -= dmg * 0.5;
           a.shake = Math.min(1, a.shake + 0.3); b.shake = Math.min(1, b.shake + 0.3);
@@ -354,9 +389,29 @@ export class Game {
     }
   }
 
+  /** session 14: fall ambience – roar by distance to the nearest fall, mist / embers at the base, spray when pods cut through a cascade */
+  updateFalls() {
+    const falls = this.world.falls; if (!falls.length) return;
+    const cam = this.camera.position; let best = 1e9, lava = false;
+    for (const f of falls) {
+      const d = Math.hypot(f.x - cam.x, f.z - cam.z, (f.y - cam.y) * 0.5);
+      if (d < best) { best = d; lava = f.kind === 'lava'; }
+      if (d < 240 && f.kind !== 'ice' && Math.random() < 0.6) this.particles.fallMist(this.tmpV.set(f.x, f.y, f.z), f.r, f.kind === 'lava');
+      if (f.wall && d < 300) for (const p of this.pods) {
+        if (p.dead > 0) continue; const dx = p.pos.x - f.x, dz = p.pos.z - f.z;
+        if (dx * dx + dz * dz < f.r * f.r && Math.abs(p.pos.y - f.y) < 7) {
+          if (p.isPlayer) this.wetCam = 1; // lens droplets (post.ts)
+          if ((this.frameNo + p.id) % 2 === 0) this.particles.splash(this.tmpV.set(p.pos.x, f.y + 0.8, p.pos.z), p.vel);
+        }
+      }
+    }
+    const g = Math.max(0, 1 - best / 170); this.audio?.setFall(g * g, lava);
+    this.wetCam = Math.max(0, this.wetCam - this.lastDt / 3); if (this.post) this.post.cine.uniforms.wet.value = this.wetCam; // dries in 3 s
+  }
+
   updateVisuals() {
     const theme = THEMES[this.td.def.theme];
-    const dustCol = new THREE.Color(theme.palette.ground[1]);
+    const dustCol = this.dustCol.set(theme.palette.ground[1]);
     const camPos = this.camera.position;
     for (const e of this.world.emitters) {
       const dx = e.x - camPos.x, dz = e.z - camPos.z;
@@ -388,14 +443,38 @@ export class Game {
       v.group.position.copy(p.pos);
       v.group.rotation.set(0, p.yaw, 0);
       v.body.rotation.set(p.pitch, 0, p.roll);
-      v.engines.forEach((e, i) => { e.position.y = Math.sin(this.clock * 7 + i * 2 + p.id) * 0.08; });
+      // dynamic engines (session 7): each engine rises/dips with steering (outer up, inner down), springs with its own lag,
+      // noses pitch into the turn and with throttle; small hover bob on top
+      const dtv = Math.min(0.05, this.lastDt || 0.016);
+      let span = 0, dip = 0;
+      v.engines.forEach((e, i) => {
+        const side = Math.sign(e.parent!.position.x) || (i % 2 ? 1 : -1); const xAbs = Math.abs(e.parent!.position.x);
+        const ud = e.userData as { y?: number; vy?: number; rx?: number };
+        // steering: pure vertical lift (outer engine rises fully, inner settles slightly) – no tilt from steering
+        const pc = (p as unknown as { pitchC?: number }).pitchC ?? 0;
+        const st = p.steer * side; const lift = st > 0 ? st * 0.7 : st * 0.2;
+        const target = lift + Math.max(0, -pc) * 0.35 + Math.sin(this.clock * 7 + i * 2 + p.id) * 0.06;
+        const k = 60 + i * 9, c = 2 * 0.55 * Math.sqrt(k); // under-damped spring → visible overshoot
+        ud.vy = (ud.vy ?? 0) + ((target - (ud.y ?? 0)) * k - (ud.vy ?? 0) * c) * dtv; ud.y = (ud.y ?? 0) + ud.vy * dtv;
+        e.position.y = ud.y;
+        // pitch/raise keys only: BOTH engines tilt synchronously (↑ nose down, ↓ nose up)
+        ud.rx = (ud.rx ?? 0) + (pc * 0.22 - (ud.rx ?? 0)) * Math.min(1, dtv * 6);
+        e.rotation.x = ud.rx; e.rotation.z = 0;
+        span = Math.max(span, xAbs); dip = Math.max(dip, -ud.y * side * Math.sign(p.roll || 1));
+      });
+      // ground clearance: lift the body so the lowest engine never sinks below ~0.45 m (engine radius ≈ 1 m, hover 1.7 m)
+      const sb = this.td.paths[p.path]?.samples[p.idx]; const relRoll = p.roll - (sb && p.grounded ? Math.atan(sb.bank) : 0); // roll relative to the (banked) road
+      const drop = span * Math.abs(Math.sin(relRoll)) + Math.max(0, dip) + Math.abs(Math.sin(p.pitch)) * 4;
+      v.body.position.y += (Math.max(0, drop - 0.25) - v.body.position.y) * Math.min(1, dtv * 12);
+      const camD = p.isPlayer ? 0 : this.camera.position.distanceTo(p.pos);
+      v.setLod(camD);
       v.update(this.clock, p.input.throttle, p.boosting ? 1 : 0, p.airbraking ? 1 : 0, p.hpL / 100, p.hpR / 100, p.heat);
       if (!v.group.visible || !near) continue;
       v.group.updateMatrixWorld(true);
       const back = this.tmpV2.set(-Math.sin(p.yaw), 0, -Math.cos(p.yaw));
-      const glow = new THREE.Color(p.isPlayer ? this.profile.custom[p.def.id].colors[2] : p.def.colors[2]).multiplyScalar(0.9);
+      const glow = this.glowCol.set(p.isPlayer ? this.profile.custom[p.def.id].colors[2] : p.def.colors[2]).multiplyScalar(0.9);
       v.exhaustLocal.forEach((loc, i) => {
-        const wp = v.body.localToWorld(loc.clone());
+        const wp = v.body.localToWorld(this.tmpV3.copy(loc));
         this.particles.exhaust(wp, back, p.vel, glow, p.input.throttle, p.boosting ? 1 : 0);
         const hp = i % 2 === 0 ? p.hpL : p.hpR;
         if (hp < 45) this.particles.smoke(wp, p.vel, 1 - hp / 45);
@@ -403,9 +482,17 @@ export class Game {
       });
       const sp = Math.hypot(p.vel.x, p.vel.z);
       if (p.grounded && sp > 25 && p.pos.y - p.groundY < 3) {
-        const n = sp > 90 ? 2 : 1;
-        this.particles.dust(this.tmpV.set(p.pos.x, p.groundY + 0.3, p.pos.z), p.vel, dustCol, n);
+        // less dust from pods directly ahead of the camera (visibility) – halved emission inside 60 m
+        const dCam = p.isPlayer ? 99 : this.camera.position.distanceTo(p.pos);
+        if (dCam > 60 || (this.frameNo + p.id) % 2 === 0) this.particles.dust(this.tmpV.set(p.pos.x, p.groundY + 0.3, p.pos.z), p.vel, dustCol, 1);
       }
+      // session 10: slide → dust plumes from both engine pods, lateral sound for the player
+      const sliding = !!(p as unknown as { sliding?: boolean }).sliding;
+      const slip = Math.abs(p.vel.x * Math.cos(p.yaw) - p.vel.z * Math.sin(p.yaw));
+      if (sliding && slip > 8 && p.pos.y - p.groundY < 3.5 && (this.frameNo + p.id) % 2 === 0) for (const loc of v.exhaustLocal) {
+        const wp = v.body.localToWorld(this.tmpV.copy(loc)); wp.y = p.groundY + 0.4; this.particles.dust(wp, p.vel, dustCol, 1);
+      }
+      if (p.isPlayer) this.audio?.setSlide(sliding ? slip : 0);
       if (p.repairing && Math.random() < 0.3) this.particles.sparks(this.tmpV.copy(p.pos).add(new THREE.Vector3(0, 1, 0)), new THREE.Vector3(0, 1, 0), p.vel, 3);
     }
   }
@@ -496,6 +583,7 @@ export class Game {
       progress: closed ? 0 : Math.max(0, Math.min(1, p.rel / (this.td.finishIdx - this.td.startIdx))),
       time: this.raceTime, lastLap: p.lapTimes.length ? p.lapTimes[p.lapTimes.length - 1] : null, bestLap: closed ? best : null,
       hpL: Math.max(0, p.hpL), hpR: Math.max(0, p.hpR), heat: p.heat, boosting: p.boosting, overheat: p.overheat, repairing: p.repairing, airbrake: p.airbraking,
+      roll: p.roll, pitchC: (p as unknown as { pitchC?: number }).pitchC ?? 0, sliding: !!(p as unknown as { sliding?: boolean }).sliding, abL: p.airbraking && !!(p.input.abL || p.input.airbrake), abR: p.airbraking && !!(p.input.abR || p.input.airbrake),
       wrongWay: p.wrongWay > 1.2, zeroG: p.zeroG, countdown: this.state === 'countdown' ? this.countdown : -1,
       message: this.messageT > 0 ? this.message : '', camName: CAMERA_NAMES[this.camMode], fps: this.fps, backend: this.backend, standings, dead: p.dead > 0, finished: p.finished,
     };

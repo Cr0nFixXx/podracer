@@ -3,81 +3,79 @@ import * as TSLmod from 'three/tsl';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
-const { color, instancedBufferAttribute, length, max, oneMinus, pow, uniform, uv } = TSL;
+const { color, instancedBufferAttribute, length, max, min, oneMinus, pow, uniform, uv, step, exp, vec2, vec3, mix, cos, sin, float, mx_noise_float } = TSL;
 
 /** Soft round disc (replaces the old sprite texture; identical falloff, no square edges). */
+const EXH_END = new THREE.Color(0.6, 0.15, 0.05), SMK0 = new THREE.Color(0.5, 0.5, 0.5), SMK1 = new THREE.Color(0.35, 0.35, 0.35);
+const MIST = new THREE.Color(0.86, 0.92, 0.95), EMB0 = new THREE.Color(2.4, 0.9, 0.2), EMB1 = new THREE.Color(0.8, 0.1, 0.02);
 const softDisc = () => pow(max(oneMinus(length(uv().sub(0.5)).mul(2.0)), 0.0), 1.6);
 
 /**
- * Particle pool rendered as ONE instanced sprite draw (PointsNodeMaterial) – works on WebGPU and WebGL2.
- * CPU simulation, GPU upload of the live range only.
+ * GPU particle pool (session 9): ring buffer of spawn records, ONE instanced sprite draw.
+ * The vertex stage evaluates the closed-form motion (exponential drag + gravity), size/colour ramps and fade
+ * from (spawn data, global time) – no per-frame CPU loop, no per-frame buffer upload: only newly spawned
+ * slots are uploaded (dirty range). Dead / unused slots collapse to size 0 (no fragments).
+ * Smoke (alpha pool): rotating noise-shaped puffs, top-lit, soft edges.
  */
 class Pool {
-  max: number; count = 0;
-  pos: Float32Array; vel: Float32Array; life: Float32Array; maxLife: Float32Array;
-  s0: Float32Array; s1: Float32Array; c0: Float32Array; c1: Float32Array; a0: Float32Array; drag: Float32Array; grav: Float32Array;
-  posAttr: THREE.InstancedBufferAttribute; sizeAttr: THREE.InstancedBufferAttribute; colAttr: THREE.InstancedBufferAttribute;
-  sprite: THREE.Sprite; mat: THREE.PointsNodeMaterial;
-  constructor(max: number, additive: boolean) {
-    this.max = max;
-    this.pos = new Float32Array(max * 3); this.vel = new Float32Array(max * 3);
-    this.life = new Float32Array(max); this.maxLife = new Float32Array(max);
-    this.s0 = new Float32Array(max); this.s1 = new Float32Array(max);
-    this.c0 = new Float32Array(max * 3); this.c1 = new Float32Array(max * 3); this.a0 = new Float32Array(max);
-    this.drag = new Float32Array(max); this.grav = new Float32Array(max);
-    this.posAttr = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3); this.posAttr.setUsage(THREE.DynamicDrawUsage);
-    this.sizeAttr = new THREE.InstancedBufferAttribute(new Float32Array(max), 1); this.sizeAttr.setUsage(THREE.DynamicDrawUsage);
-    this.colAttr = new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4); this.colAttr.setUsage(THREE.DynamicDrawUsage);
+  max: number; head = 0; time = 0;
+  a0: THREE.InstancedBufferAttribute; a1: THREE.InstancedBufferAttribute; a2: THREE.InstancedBufferAttribute; a3: THREE.InstancedBufferAttribute; a4: THREE.InstancedBufferAttribute;
+  dirtyLo = Infinity; dirtyHi = -1; wrapped = false;
+  sprite: THREE.Sprite; mat: THREE.PointsNodeMaterial; uTime: { value: number };
+  constructor(cap: number, additive: boolean) {
+    this.max = cap;
+    const mk = (n: number) => { const a = new THREE.InstancedBufferAttribute(new Float32Array(cap * n), n); a.setUsage(THREE.DynamicDrawUsage); return a; };
+    this.a0 = mk(4); // p0.xyz, birth
+    this.a1 = mk(4); // v0.xyz, life
+    this.a2 = mk(4); // drag, grav, s0, s1
+    this.a3 = mk(4); // c0.rgb, alpha
+    this.a4 = mk(4); // c1.rgb, seed
+    const A1 = this.a1.array as Float32Array; for (let i = 0; i < cap; i++) A1[i * 4 + 3] = -1; // never born → dead
+    const uT = uniform(0); this.uTime = uT;
+    const i0 = instancedBufferAttribute(this.a0), i1 = instancedBufferAttribute(this.a1), i2 = instancedBufferAttribute(this.a2), i3 = instancedBufferAttribute(this.a3), i4 = instancedBufferAttribute(this.a4);
+    const t = uT.sub(i0.w).max(0.0); const life = i1.w; const u = t.div(life.max(1e-3));
+    const alive = step(0.0, life).mul(step(u, 1.0));
+    const k = i2.x.max(1e-3), g = i2.y; const e = oneMinus(exp(k.negate().mul(t))).div(k);
+    const pos = vec3(i0.x.add(i1.x.mul(e)), i0.y.add(i1.y.add(g.div(k)).mul(e)).sub(g.mul(t).div(k)), i0.z.add(i1.z.mul(e)));
     const mat = new THREE.PointsNodeMaterial({ transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, sizeAttenuation: true });
-    mat.positionNode = instancedBufferAttribute(this.posAttr);
-    mat.sizeNode = instancedBufferAttribute(this.sizeAttr).mul(1.8); // matches the former gl_PointSize = size * 0.9 * viewportHeight / depth
-    const c = instancedBufferAttribute(this.colAttr);
-    mat.colorNode = c.xyz;
-    mat.opacityNode = c.w.mul(softDisc());
+    mat.positionNode = pos;
+    mat.sizeNode = mix(i2.z, i2.w, u).mul(1.8).mul(alive);
+    mat.colorNode = mix(i3.xyz, i4.xyz, u);
+    const fade = i3.w.mul(min(u.mul(8.0), 1.0)).mul(oneMinus(u)).mul(alive);
+    if (additive) mat.opacityNode = fade.mul(softDisc());
+    else {
+      // smoke puff: rotated uv, low-freq noise breaks the disc into billows, brighter top (sun) / darker base
+      const c = uv().sub(0.5); const ang = i4.w.mul(6.283).add(t.mul(i4.w.sub(0.5)));
+      const ca = cos(ang), sa = sin(ang); const r = vec2(c.x.mul(ca).sub(c.y.mul(sa)), c.x.mul(sa).add(c.y.mul(ca)));
+      const n = mx_noise_float(vec3(r.mul(3.2), i4.w.mul(17.0).add(t.mul(0.35)))).mul(0.5).add(0.5);
+      const d = length(r).mul(2.0).add(n.sub(0.5).mul(0.55));
+      const puff = pow(max(oneMinus(d), 0.0), 1.35);
+      mat.opacityNode = fade.mul(puff);
+      mat.colorNode = mix(i3.xyz, i4.xyz, u).mul(mix(float(0.78), float(1.12), uv().y)).mul(n.mul(0.25).add(0.88));
+    }
     this.mat = mat;
-    this.sprite = new THREE.Sprite(mat); this.sprite.count = 0; this.sprite.frustumCulled = false;
+    this.sprite = new THREE.Sprite(mat); this.sprite.count = cap; this.sprite.frustumCulled = false;
     this.sprite.renderOrder = additive ? 5 : 4;
   }
   spawn(p: THREE.Vector3, v: THREE.Vector3, life: number, s0: number, s1: number, c0: THREE.Color, c1: THREE.Color, a: number, drag: number, grav: number) {
-    if (this.count >= this.max) return;
-    const i = this.count++;
-    this.pos[i * 3] = p.x; this.pos[i * 3 + 1] = p.y; this.pos[i * 3 + 2] = p.z;
-    this.vel[i * 3] = v.x; this.vel[i * 3 + 1] = v.y; this.vel[i * 3 + 2] = v.z;
-    this.life[i] = 0; this.maxLife[i] = life; this.s0[i] = s0; this.s1[i] = s1;
-    this.c0[i * 3] = c0.r; this.c0[i * 3 + 1] = c0.g; this.c0[i * 3 + 2] = c0.b;
-    this.c1[i * 3] = c1.r; this.c1[i * 3 + 1] = c1.g; this.c1[i * 3 + 2] = c1.b;
-    this.a0[i] = a; this.drag[i] = drag; this.grav[i] = grav;
-  }
-  kill(i: number) {
-    const j = --this.count; if (i === j) return;
-    const c3 = (arr: Float32Array) => { arr[i * 3] = arr[j * 3]; arr[i * 3 + 1] = arr[j * 3 + 1]; arr[i * 3 + 2] = arr[j * 3 + 2]; };
-    c3(this.pos); c3(this.vel); c3(this.c0); c3(this.c1);
-    this.life[i] = this.life[j]; this.maxLife[i] = this.maxLife[j]; this.s0[i] = this.s0[j]; this.s1[i] = this.s1[j];
-    this.a0[i] = this.a0[j]; this.drag[i] = this.drag[j]; this.grav[i] = this.grav[j];
+    const i = this.head; this.head = (this.head + 1) % this.max; if (this.head === 0) this.wrapped = true;
+    const A0 = this.a0.array as Float32Array, A1 = this.a1.array as Float32Array, A2 = this.a2.array as Float32Array, A3 = this.a3.array as Float32Array, A4 = this.a4.array as Float32Array; const o = i * 4;
+    A0[o] = p.x; A0[o + 1] = p.y; A0[o + 2] = p.z; A0[o + 3] = this.time;
+    A1[o] = v.x; A1[o + 1] = v.y; A1[o + 2] = v.z; A1[o + 3] = life;
+    A2[o] = drag; A2[o + 1] = grav; A2[o + 2] = s0; A2[o + 3] = s1;
+    A3[o] = c0.r; A3[o + 1] = c0.g; A3[o + 2] = c0.b; A3[o + 3] = a;
+    A4[o] = c1.r; A4[o + 1] = c1.g; A4[o + 2] = c1.b; A4[o + 3] = Math.random();
+    if (i < this.dirtyLo) this.dirtyLo = i; if (i > this.dirtyHi) this.dirtyHi = i;
   }
   update(dt: number) {
-    for (let i = this.count - 1; i >= 0; i--) {
-      this.life[i] += dt;
-      if (this.life[i] >= this.maxLife[i]) { this.kill(i); continue; }
-      const d = Math.exp(-this.drag[i] * dt);
-      this.vel[i * 3] *= d; this.vel[i * 3 + 1] = this.vel[i * 3 + 1] * d - this.grav[i] * dt; this.vel[i * 3 + 2] *= d;
-      this.pos[i * 3] += this.vel[i * 3] * dt; this.pos[i * 3 + 1] += this.vel[i * 3 + 1] * dt; this.pos[i * 3 + 2] += this.vel[i * 3 + 2] * dt;
-    }
-    const P = this.posAttr.array as Float32Array, S = this.sizeAttr.array as Float32Array, C = this.colAttr.array as Float32Array;
-    for (let i = 0; i < this.count; i++) {
-      const t = this.life[i] / this.maxLife[i];
-      P[i * 3] = this.pos[i * 3]; P[i * 3 + 1] = this.pos[i * 3 + 1]; P[i * 3 + 2] = this.pos[i * 3 + 2];
-      S[i] = this.s0[i] + (this.s1[i] - this.s0[i]) * t;
-      C[i * 4] = this.c0[i * 3] + (this.c1[i * 3] - this.c0[i * 3]) * t;
-      C[i * 4 + 1] = this.c0[i * 3 + 1] + (this.c1[i * 3 + 1] - this.c0[i * 3 + 1]) * t;
-      C[i * 4 + 2] = this.c0[i * 3 + 2] + (this.c1[i * 3 + 2] - this.c0[i * 3 + 2]) * t;
-      C[i * 4 + 3] = this.a0[i] * Math.min(1, t * 8) * (1 - t);
-    }
-    this.sprite.count = this.count;
-    if (this.count > 0) for (const [a, k] of [[this.posAttr, 3], [this.sizeAttr, 1], [this.colAttr, 4]] as [THREE.InstancedBufferAttribute, number][]) {
-      a.clearUpdateRanges(); a.addUpdateRange(0, this.count * k); a.needsUpdate = true;
-    }
+    this.time += dt; this.uTime.value = this.time;
+    if (this.dirtyHi < 0) return;
+    const lo = this.wrapped ? 0 : this.dirtyLo, hi = this.wrapped ? this.max - 1 : this.dirtyHi;
+    for (const a of [this.a0, this.a1, this.a2, this.a3, this.a4]) { a.clearUpdateRanges(); a.addUpdateRange(lo * 4, (hi - lo + 1) * 4); a.needsUpdate = true; }
+    this.dirtyLo = Infinity; this.dirtyHi = -1; this.wrapped = false;
   }
+  get count() { return this.max; }
+  clear() { const A1 = this.a1.array as Float32Array; for (let i = 0; i < this.max; i++) A1[i * 4 + 3] = -1; this.a1.clearUpdateRanges(); this.a1.needsUpdate = true; this.head = 0; }
   dispose() { this.mat.dispose(); }
 }
 
@@ -101,16 +99,30 @@ export class Particles {
     const n = Math.ceil((1 + boost * 2) * this.amount * 1.5);
     for (let i = 0; i < n; i++) {
       _v.copy(back).multiplyScalar(20 + power * 30 + Math.random() * 10).add(baseVel).addScaledVector(_p.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), 4);
-      this.add.spawn(p, _v, 0.1 + Math.random() * 0.1 + boost * 0.08, 0.7 + boost * 0.6, 0.15, col, new THREE.Color(0.6, 0.15, 0.05), 0.55, 2, 0);
+      this.add.spawn(p, _v, 0.1 + Math.random() * 0.1 + boost * 0.08, 0.7 + boost * 0.6, 0.15, col, EXH_END, 0.55, 2, 0);
     }
-    if (this.chance(0.3)) { _v.copy(baseVel).multiplyScalar(0.6).addScaledVector(back, 10); this.alpha.spawn(p, _v, 1.2, 1.5, 6, new THREE.Color(0.5, 0.5, 0.5), new THREE.Color(0.35, 0.35, 0.35), 0.12, 1.5, -1); }
+    if (this.chance(0.2)) { _v.copy(baseVel).multiplyScalar(0.6).addScaledVector(back, 10); this.alpha.spawn(p, _v, 0.9, 1.2, 4, SMK0, SMK1, 0.07, 1.5, -1); }
   }
   dust(p: THREE.Vector3, vel: THREE.Vector3, col: THREE.Color, n = 1) {
     for (let i = 0; i < n; i++) {
-      if (!this.chance(0.7)) continue;
-      _v.copy(vel).multiplyScalar(0.25).add(_p.set((Math.random() - 0.5) * 12, Math.random() * 5, (Math.random() - 0.5) * 12));
-      _p.copy(p).add(new THREE.Vector3((Math.random() - 0.5) * 3, 0, (Math.random() - 0.5) * 3));
-      this.alpha.spawn(_p, _v, 1.2 + Math.random(), 2, 10 + Math.random() * 6, col, col, 0.35, 1.2, -0.5);
+      if (!this.chance(0.45)) continue;
+      _v.copy(vel).multiplyScalar(0.25).add(_p.set((Math.random() - 0.5) * 10, Math.random() * 3, (Math.random() - 0.5) * 10));
+      _p.copy(p); _p.x += (Math.random() - 0.5) * 3; _p.z += (Math.random() - 0.5) * 3;
+      // session 7: smaller, thinner, shorter-lived puffs (visibility behind other pods + fill-rate)
+      this.alpha.spawn(_p, _v, 0.7 + Math.random() * 0.6, 1.5, 4 + Math.random() * 3, col, col, 0.15, 1.6, -0.3);
+    }
+  }
+  /** fall base (session 14): drifting mist for water, rising embers for lava */
+  fallMist(p: THREE.Vector3, spread: number, lava: boolean) {
+    _p.set(p.x + (Math.random() - 0.5) * spread, p.y + 0.5, p.z + (Math.random() - 0.5) * spread);
+    if (lava) { _v.set((Math.random() - 0.5) * 3, 4 + Math.random() * 6, (Math.random() - 0.5) * 3); this.add.spawn(_p, _v, 1 + Math.random(), 0.5, 0.15, EMB0, EMB1, 0.9, 0.6, 3); }
+    else { _v.set((Math.random() - 0.5) * 2.5, 1.5 + Math.random() * 2.5, (Math.random() - 0.5) * 2.5); this.alpha.spawn(_p, _v, 1.4 + Math.random(), 2, 7, MIST, MIST, 0.1, 0.8, -0.2); }
+  }
+  /** spray burst when a pod cuts through a waterfall (droplets thrown up, falling back) */
+  splash(p: THREE.Vector3, vel: THREE.Vector3) {
+    for (let i = 0; i < 3; i++) {
+      _v.copy(vel).multiplyScalar(0.35); _v.x += (Math.random() - 0.5) * 9; _v.y += 3 + Math.random() * 6; _v.z += (Math.random() - 0.5) * 9;
+      this.alpha.spawn(p, _v, 0.6 + Math.random() * 0.5, 1, 4.5, MIST, MIST, 0.22, 1.4, 6);
     }
   }
   sparks(p: THREE.Vector3, normal: THREE.Vector3, vel: THREE.Vector3, n = 20) {
@@ -188,7 +200,7 @@ export class Particles {
       this.ambAttr.needsUpdate = true;
     }
   }
-  clear() { this.add.count = 0; this.alpha.count = 0; }
+  clear() { this.add.clear(); this.alpha.clear(); }
   dispose() { this.add.dispose(); this.alpha.dispose(); (this.ambient?.material as THREE.Material | undefined)?.dispose(); }
 }
 export { WHITE };

@@ -4,7 +4,11 @@ import { frameAt, gateDrop, nearestGlobal, nearestOnPath, rotorAngle, type Obsta
 import type { PodVisual } from './podModel';
 import { podCollision } from './podDesigns';
 
-export interface Inputs { throttle: number; brake: number; steer: number; boost: boolean; airbrake: boolean; repair: boolean; }
+export interface Inputs {
+  throttle: number; brake: number; steer: number; boost: boolean; airbrake: boolean; repair: boolean;
+  /** session 9: handbrake / slide, one-sided airbrakes, knife-edge roll (-1 left … 1 right), pitch (+1 nose down, -1 raise) */
+  handbrake?: boolean; abL?: boolean; abR?: boolean; roll?: number; pitch?: number;
+}
 
 export interface PodState {
   id: number; isPlayer: boolean; def: PodDef; pilot: PilotDef; stats: Record<StatKey, number>;
@@ -22,9 +26,11 @@ export interface PodState {
   place: number;
 }
 
-export interface AIState { stuck?: number; lastT?: number; skill: number; speedF: number; lineOff: number; takeShortcut: boolean; boostUntil: number; repairMode: boolean; noiseT: number; rubber: number; }
+export interface AIState { stuck?: number; lastT?: number; skill: number; speedF: number; lineOff: number; takeShortcut: boolean; boostUntil: number; repairMode: boolean; noiseT: number; rubber: number; dpCost?: Float32Array; dpFrom?: Int16Array; dpX?: Float32Array; dpLat?: number; knifeUntil?: number; knifeDir?: number; }
 
 export const GRAVITY = 34;
+/** share of gravity that acts along the road slope (session 16): 9 % grade ≈ ±2.4 m/s² */
+export const SLOPE_K = 0.8;
 const HOVER = 1.7;
 
 export function podParams(p: PodState) {
@@ -40,7 +46,7 @@ export function podParams(p: PodState) {
     heatRate: 0.38 - 0.16 * s.cooling,
     repair: 6 + 16 * s.repair,
     sturdy: 1.25 - 0.5 * s.repair,
-    width: podCollision(p.def).halfW, // true half width of the visual model
+    width: podCollision(p.def).halfW * (1 - 0.5 * Math.min(1, Math.abs((p as unknown as { knife?: number }).knife ?? 0) / 1.5708)), // knife-edge roll halves the width
   };
 }
 
@@ -61,7 +67,13 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   let vf = p.vel.x * fx + p.vel.z * fz;
   let vr = p.vel.x * rx + p.vel.z * rz;
   const hp = (p.hpL + p.hpR) / 200;
-  p.airbraking = inp.airbrake && vf > 15;
+  // session 9: knife-edge roll (±90°), pitch/raise, one-sided airbrakes, handbrake slide
+  const ext = p as unknown as { knife?: number; pitchC?: number; sliding?: boolean };
+  ext.knife = (ext.knife ?? 0) + ((inp.roll ?? 0) * Math.PI / 2 - (ext.knife ?? 0)) * Math.min(1, dt * 6);
+  ext.pitchC = (ext.pitchC ?? 0) + ((inp.pitch ?? 0) - (ext.pitchC ?? 0)) * Math.min(1, dt * 4);
+  const abL = !!inp.abL || inp.airbrake, abR = !!inp.abR || inp.airbrake, abBoth = abL && abR;
+  p.airbraking = (abL || abR) && vf > 15;
+  const slide = !!inp.handbrake && p.grounded && vf > 12 && !frozen; ext.sliding = slide;
   p.repairing = inp.repair && !frozen;
 
   // heat / boost
@@ -77,7 +89,12 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   const sp = Math.abs(vf);
   const lowF = Math.min(1, sp / 22);
   const highF = 1 - 0.32 * Math.min(1, sp / P.vmax);
-  let omega = p.steer * P.turn * lowF * highF * (p.airbraking ? P.abTurn : 1) * (p.grounded ? 1 : 0.55);
+  let omega = p.steer * P.turn * lowF * highF * (p.airbraking ? (abBoth ? P.abTurn : (1 + P.abTurn) / 2) : 1) * (p.grounded ? 1 : 0.55) * (slide ? 1.35 : 1);
+  if (p.airbraking && !abBoth) omega += (abR ? 1 : -1) * P.turn * 0.5 * lowF; // single airbrake drags that side → yaw towards it
+  { // session 16: banked curves – steering into the bank turns up to 50 % harder, against it up to 25 % weaker (grounded only)
+    const bk = td.paths[p.path]?.samples[p.idx]?.bank ?? 0;
+    if (p.grounded && bk !== 0 && p.steer !== 0) omega *= 1 + Math.max(-0.25, Math.min(0.5, bk * Math.sign(p.steer) * 1.6));
+  }
   omega += (p.hpR - p.hpL) / 100 * 0.25 * lowF; // damage pull
   if (p.zeroG) omega *= 1.4;
   if (frozen) omega = 0;
@@ -85,7 +102,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   p.yaw -= p.yawRate * dt;
 
   // thrust
-  let vmaxE = P.vmax * (0.72 + 0.28 * hp) * (p.boosting ? 1.32 : 1) * (p.repairing ? 0.55 : 1);
+  const pc = ext.pitchC; let vmaxE = P.vmax * (0.72 + 0.28 * hp) * (p.boosting ? 1.32 : 1) * (p.repairing ? 0.55 : 1) * (1 + 0.04 * Math.max(0, pc) - 0.05 * Math.max(0, -pc));
   if (p.isPlayer === false && p.ai) vmaxE *= p.ai.speedF * p.ai.rubber;
   if (!frozen) {
     if (inp.throttle > 0) {
@@ -95,10 +112,16 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
       if (ratio > 1) vf -= (vf - vmaxE) * 1.2 * dt;
     }
     if (inp.brake > 0) { if (vf > 0) vf = Math.max(0, vf - 55 * inp.brake * dt); else vf = Math.max(-18, vf - 14 * inp.brake * dt); }
-    if (p.airbraking) vf = Math.max(10, vf - P.abDecel * dt);
+    if (p.airbraking) vf = Math.max(10, vf - P.abDecel * (abBoth ? 1 : 0.55) * dt);
+    if (slide) vf = Math.max(0, vf - 9 * dt);
   } else vf *= Math.exp(-3 * dt);
   vf *= Math.exp(-(inp.throttle > 0 ? 0.04 : 0.28) * dt);
-  vr *= Math.exp(-P.grip * gripMul * dt * (p.airbraking ? 0.45 : 1) * (p.grounded ? 1 : 0.15));
+  // session 16: gravity along the slope – climbs cost speed, descents give it back (not on jump ramps, in gaps or in zero-G)
+  if (p.grounded && !p.zeroG && !frozen) {
+    const sm = td.paths[p.path]?.samples[p.idx];
+    if (sm && sm.ramp === 0 && !sm.gap) { const grade = Math.max(-0.2, Math.min(0.2, (p.groundY - p.prevGroundY) / Math.max(0.05, Math.abs(vf) * dt))); vf -= GRAVITY * SLOPE_K * grade * dt; }
+  }
+  vr *= Math.exp(-P.grip * gripMul * dt * (p.airbraking ? 0.45 : 1) * (p.grounded ? 1 : 0.15) * (slide ? 0.12 : 1)); // handbrake: lateral grip almost gone → drift
   // after turning, refresh forward basis to apply velocity
   const fx2 = Math.sin(p.yaw), fz2 = Math.cos(p.yaw), rx2 = -fz2, rz2 = fx2;
   p.vel.x = fx2 * vf + rx2 * vr; p.vel.z = fz2 * vf + rz2 * vr;
@@ -139,7 +162,8 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   p.prevGroundY = p.groundY;
   p.groundY = fr.groundY;
   const bob = Math.sin(time * 3 + p.id) * 0.12;
-  const targetY = fr.groundY + HOVER + bob;
+  const pcy = (p as unknown as { pitchC?: number }).pitchC ?? 0;
+  const targetY = fr.groundY + HOVER + bob + Math.max(0, -pcy) * 2.2 - Math.max(0, pcy) * 0.35; // ↓ raise / ↑ nose down
   const wasGrounded = p.grounded;
   p.zeroG = fr.zeroG && !fr.gap;
   if (p.zeroG) {
@@ -149,7 +173,9 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
     p.grounded = false;
   } else if (!gap && p.pos.y <= targetY + 0.8) {
     const k = 140, c = 20;
-    p.vel.y += ((targetY - p.pos.y) * k - p.vel.y * c) * dt;
+    // damper works against the ground's own vertical speed (slopes, banks) → the pod keeps its hover height on climbs instead of sagging
+    const gvs = wasGrounded ? Math.max(-45, Math.min(45, (fr.groundY - p.prevGroundY) / dt)) : 0;
+    p.vel.y += ((targetY - p.pos.y) * k - (p.vel.y - gvs) * c) * dt;
     if (p.pos.y < fr.groundY + 0.6) {
       const gv = (p.groundY - p.prevGroundY) / dt;
       p.pos.y = fr.groundY + 0.6; p.vel.y = Math.max(p.vel.y, Math.min(60, gv));
@@ -262,10 +288,11 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
 
   // visual attitude
   const latV = vr;
-  const targetRoll = p.steer * 0.55 + latV * 0.012 + (p.airbraking ? p.steer * 0.25 : 0);
+  const kn = (p as unknown as { knife?: number }).knife ?? 0;
+  const targetRoll = kn + Math.max(-0.42, Math.min(0.42, p.steer * 0.42 + latV * 0.008 + (p.airbraking ? p.steer * 0.15 : 0))) * (1 - Math.min(1, Math.abs(kn) / 1.5708)) + (p.grounded ? Math.atan(S.bank) : 0); // clamped lean + knife-edge roll + road bank (pod lies parallel to a banked curve)
   p.roll += (targetRoll - p.roll) * Math.min(1, dt * 6);
   const hs = Math.max(10, Math.hypot(p.vel.x, p.vel.z));
-  const targetPitch = -Math.atan2(p.vel.y, hs) * 0.8 + (p.boosting ? -0.05 : 0) + (p.airbraking ? 0.08 : 0);
+  const targetPitch = -Math.atan2(p.vel.y, hs) * 0.8 + (p.boosting ? -0.05 : 0) + (p.airbraking ? 0.08 : 0) + ((p as unknown as { pitchC?: number }).pitchC ?? 0) * 0.2;
   p.pitch += (targetPitch - p.pitch) * Math.min(1, dt * 5);
   p.shake *= Math.exp(-dt * 3);
 }
@@ -378,6 +405,7 @@ export function respawn(p: PodState, td: TrackData) {
 }
 
 // ===================== AI =====================
+const AI_ROWS = 14, AI_LANES = 15, AI_DENSE = 3; // lane-grid search only for dense obstacle fields
 export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: number, player: PodState | null) {
   const ai = p.ai!; const P = podParams(p);
   const adt = Math.min(0.1, Math.max(0, time - (ai.lastT ?? time))); ai.lastT = time;
@@ -404,9 +432,13 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
       }
     }
   }
-  // obstacles
+  // obstacles: lane-grid path search over every obstacle in the look-ahead window (session 6)
+  // rows every 4 samples (≈ 8 m) up to 56 samples ahead, 15 lanes across the drivable width;
+  // DP minimises blocked cells + lateral jerk + deviation from the racing line. Replaces single-obstacle dodging.
   const buckets = td.obstaclesByPath[p.path];
   const bStart = Math.floor(p.idx / 10);
+  const obs: { ahead: number; lat: number; clear: number }[] = [];
+  let latSparse = lat;
   for (let bb = bStart; bb <= bStart + 6; bb++) {
     const list = buckets.get(path.closed ? bb % Math.ceil(n / 10) : bb); if (!list) continue;
     for (const o of list) {
@@ -416,15 +448,43 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
         if (ph > h.period * h.duty + 0.6 && ph < h.period - 2.2) continue;
       }
       let ahead = o.idx - p.idx; if (path.closed && ahead < -n / 2) ahead += n;
-      if (ahead < -5 || ahead > 50) continue;
-      const clear = o.r + P.width + 2.5;
-      if (Math.abs(lat - o.lat) < clear) {
-        let dir = ahead < 18 ? (p.lat >= o.lat ? 1 : -1) : (o.lat > 0 ? -1 : 1);
-        const hwO = S[o.idx].hw - P.width;
-        if (Math.abs(o.lat + dir * clear) > hwO) dir = -dir;
-        lat = o.lat + dir * clear * 1.1;
+      if (ahead < -5 || ahead > 60) continue;
+      obs.push({ ahead, lat: o.lat, clear: o.r + P.width + 1.8 });
+      if (ahead <= 50) { // classic single-obstacle dodge (used when the field is sparse)
+        const clear = o.r + P.width + 2.5;
+        if (Math.abs(latSparse - o.lat) < clear) { let dir = ahead < 18 ? (p.lat >= o.lat ? 1 : -1) : (o.lat > 0 ? -1 : 1); const hwO = S[o.idx].hw - P.width; if (Math.abs(o.lat + dir * clear) > hwO) dir = -dir; latSparse = o.lat + dir * clear * 1.1; }
       }
     }
+  }
+  let fieldSlow = 1;
+  if (obs.length < AI_DENSE) lat = latSparse;
+  else {
+    const R = AI_ROWS, Ln = AI_LANES, cost = ai.dpCost ?? (ai.dpCost = new Float32Array(R * Ln)), from = ai.dpFrom ?? (ai.dpFrom = new Int16Array(R * Ln)), xs = ai.dpX ?? (ai.dpX = new Float32Array(R * Ln));
+    const maxShift = Math.max(3.5, 11 * 45 / Math.max(45, speed)); // reachable lateral offset per row at this speed
+    let blockedNear = 0;
+    for (let k = 0; k < R; k++) {
+      const ah = (k + 1) * 4; const sk = at(ah);
+      const hwR = Math.max(2, Math.min(sk.hw, sk.wallL, sk.wallR) - P.width - 0.6);
+      for (let j = 0; j < Ln; j++) {
+        const x = -hwR + (j / (Ln - 1)) * hwR * 2; const c = k * Ln + j; xs[c] = x;
+        let blk = 0;
+        for (const o of obs) { const along = Math.abs(o.ahead - ah) * 2; if (along > o.clear + 6) continue; const d = Math.abs(x - o.lat); if (d < o.clear) blk += 1 - d / o.clear * 0.5; }
+        if (blk > 0 && k < 6) blockedNear++;
+        let best = 0, bi = -1;
+        if (k === 0) { const dx = Math.abs(x - p.lat); best = dx > maxShift * 1.4 ? 900 + dx : dx * 0.25; }
+        else { best = 1e9; for (let i = 0; i < Ln; i++) { const dx = Math.abs(x - xs[c - Ln - j + i]); const v = cost[(k - 1) * Ln + i] + dx * dx * 0.035 + (dx > maxShift ? 600 : 0); if (v < best) { best = v; bi = i; } } }
+        cost[c] = best + blk * 2000 + Math.abs(x - lat) * 0.06 * (1 + k * 0.1); from[c] = bi;
+      }
+    }
+    let bj = 0; for (let j = 1; j < Ln; j++) if (cost[(R - 1) * Ln + j] < cost[(R - 1) * Ln + bj]) bj = j;
+    const bestCost = cost[(R - 1) * Ln + bj];
+    // backtrack to the target row (≈ 60 % of the steering look-ahead, at least the first row)
+    const rT = Math.max(0, Math.min(R - 1, Math.round((look * 0.3) / 4) - 1));
+    let j = bj; for (let k = R - 1; k > rT; k--) j = from[k * Ln + j];
+    lat = xs[rT * Ln + j];
+    ai.dpLat = lat;
+    // dense fields: slow down so the path stays reachable; no free path at all → brake harder
+    if (bestCost > 1500) { fieldSlow = 0.85; if (ai.skill > 0.45 && time > (ai.knifeUntil ?? 0) - 0.2) { ai.knifeUntil = time + 1.3; ai.knifeDir = ai.knifeDir ?? (p.id % 2 ? 1 : -1); } } void blockedNear; // no free line → knife-edge roll (halves width)
   }
   // portcullis gates: aim for a section that will be open on arrival
   if (p.path === 0) for (const sp of td.setPieces) {
@@ -445,10 +505,21 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
     if (ahead > 0 && ahead < 14 && Math.abs(q.lat - lat) < 6) lat = q.lat + (q.lat > 0 ? -7 : 7);
     if (q === player && Math.abs(ahead) < 4 && p.pilot.aggression > 0.75 && Math.sin(time * 0.7 + ai.noiseT) > 0.6) lat = q.lat; // ramming
   }
+  // session 10: obstacle clearance has the last word – pod-avoidance / ramming used to push pack members back into rocks
+  let nearBlock = 999;
+  for (const o of obs) {
+    if (o.ahead > -2 && o.ahead < 40 && Math.abs(lat - o.lat) < o.clear * 1.15) {
+      const dir = Math.sign(lat - o.lat) || (p.lat >= o.lat ? 1 : -1);
+      lat = o.lat + dir * o.clear * 1.1;
+    }
+    // obstacle whose footprint our CURRENT lateral position still overlaps → steer at a point just before it
+    if (o.ahead > 0 && o.ahead < 45 && Math.abs(p.lat - o.lat) < o.clear) nearBlock = Math.min(nearBlock, o.ahead);
+  }
   const s0 = S[p.idx];
   const lim = s0.openL || s0.openR ? t.hw + 10 : Math.min(t.wallL, t.wallR) - P.width - 0.5;
   lat = Math.max(-lim, Math.min(lim, lat));
-  const tx = t.x + t.rx * lat, tz = t.z + t.rz * lat;
+  const ts = nearBlock < 999 ? at(Math.max(4, Math.min(look, Math.round(nearBlock * 0.7)))) : t; // short look-ahead while dodging
+  const tx = ts.x + ts.rx * lat, tz = ts.z + ts.rz * lat;
   const desired = Math.atan2(tx - p.pos.x, tz - p.pos.z);
   const diff = wrapAngle(desired - p.yaw);
   let steer = Math.max(-1, Math.min(1, -diff * 3.4 + p.yawRate * 0.15));
@@ -457,7 +528,7 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
   let vlim = 999, rampAhead = false;
   for (let k = 0; k < 90; k += 3) { const s2 = at(k); vlim = Math.min(vlim, s2.vmax); if (s2.ramp > 0 || s2.gap) rampAhead = true; }
   const turnF = (P.turn / 1.6) * (0.85 + 0.3 * ai.skill);
-  const vTarget = rampAhead ? 999 : vlim * turnF * (1 + (P.abTurn - 1.5) * 0.3);
+  const vTarget = (rampAhead ? 999 : vlim * turnF * (1 + (P.abTurn - 1.5) * 0.3)) * fieldSlow;
   let throttle = 1, brake = 0, airbrake = false;
   if (speed > vTarget + 4) throttle = 0;
   if (speed > vTarget + 14) airbrake = true;
@@ -475,6 +546,14 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
     ai.rubber = 1 + Math.max(-0.05, Math.min(0.06, gap / 6000));
   }
   if (p.finished) { throttle = 0; brake = speed > 25 ? 1 : 0; boost = false; airbrake = speed > 30; }
+  // session 10: new manoeuvres – power slide in hairpins, inner-side airbrake, knife-edge roll, nose-down on fast straights
+  const hairpin = Math.abs(cAvg) * 35 > 0.45;
+  let handbrake = false, abL = false, abR = false, pitch = 0;
+  if (!p.finished && hairpin && !rampAhead && ai.skill > 0.5 && speed > vTarget + 18 && speed < vTarget + 70) { handbrake = true; airbrake = false; brake = 0; throttle = 1; }
+  if (airbrake && Math.abs(steer) > 0.35) { if (steer > 0) abR = true; else abL = true; airbrake = false; }
+  if (!rampAhead && vlim > 220 && !hairpin && ai.skill > 0.6 && p.heat < 0.8) pitch = 1;
+  const roll = time < (ai.knifeUntil ?? 0) ? (ai.knifeDir ?? 1) : 0;
+  p.input.handbrake = handbrake; p.input.abL = abL; p.input.abR = abR; p.input.roll = roll; p.input.pitch = pitch;
   p.input.steer = steer; p.input.throttle = throttle; p.input.brake = brake; p.input.airbrake = airbrake;
   p.input.boost = boost && !ai.repairMode; p.input.repair = ai.repairMode && !rampAhead;
 }

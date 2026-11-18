@@ -1,13 +1,10 @@
 import * as THREE from 'three/webgpu';
+import { specAA } from './specAA';
 import * as TSLmod from 'three/tsl';
 // TSL's TypeScript generics are stricter than the runtime API – shader graphs are typed loosely on purpose.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
-const {
-  Break, Fn, If, Loop, abs, clamp, color, cross, dFdx, dFdy, dot, float, inverseSqrt, length, materialColor, materialRoughness, max, mix,
-  normalLocal, normalMap, normalViewGeometry, normalWorldGeometry, normalize, positionLocal, positionView, positionWorld, pow, select,
-  oneMinus, smoothstep, texture, uniform, uv, vec2, vec3, vertexColor, floor, fract, min, sin, time,
-} = TSL;
+const { Break, Fn, If, Loop, abs, clamp, color, cross, dFdx, dFdy, dot, float, inverseSqrt, length, materialColor, materialRoughness, max, mix, normalLocal, normalMap, normalViewGeometry, normalWorldGeometry, normalize, positionLocal, positionView, positionWorld, pow, select, oneMinus, smoothstep, texture, uniform, uv, vec2, vec3, vertexColor, floor, fract, min, sin, time } = TSL;
 import { macroTexture, microTexture, type TexSet } from './textures';
 import { cloudShade, strataTint, type StrataDef } from './terrainMaterial';
 
@@ -18,6 +15,8 @@ import { cloudShade, strataTint, type StrataDef } from './terrainMaterial';
  * ---------------------------------------------------------------------------------------------- */
 
 export interface SurfaceOpts {
+  /** local wet patches in world space (road under waterfall cascades), max 8 */
+  wetZones?: { x: number; z: number; r: number }[];
   repeat?: [number, number];
   parallax?: number; // scale, 0 = off
   layers?: number;
@@ -119,6 +118,10 @@ export function surfaceMaterial(set: TexSet, o: SurfaceOpts = {}) {
     snowM = max(snowM, smoothstep(0.64, 0.74, texture(macroTexture(), wpos.mul(1 / 23).add(0.1)).r).mul(0.45 * snowAmt));
   }
 
+  // local wet zones (session 15) – zone constants are baked into the shader, no uniforms
+  let zoneW: N = null;
+  for (const z of (o.wetZones ?? []).slice(0, 8)) { const w = oneMinus(smoothstep(z.r * 0.4, z.r, length(wpos.sub(vec2(z.x, z.z))))); zoneW = zoneW ? max(zoneW, w) : w; }
+
   // ---- albedo: base map, macro anti-tiling, micro grit, vertex colour, triplanar rock on slopes ----
   const macro = macroTexture();
   const macroV = texture(macro, baseUV.mul(0.0931)).r.mul(0.6).add(texture(macro, baseUV.mul(0.0217).add(0.37)).g.mul(0.4));
@@ -141,6 +144,7 @@ export function surfaceMaterial(set: TexSet, o: SurfaceOpts = {}) {
     col = mix(col, tp.mul(color(o.triplanar.tint ?? '#ffffff')), triBlend);
   }
   if (wetAmt > 0) col = col.mul(1 - 0.4 * wetAmt).mul(mix(float(1), float(0.72), puddle));
+  if (zoneW) col = col.mul(mix(float(1), float(0.58), zoneW));
   if (snowAmt > 0) col = mix(col, vec3(0.9, 0.94, 1.0), snowM);
   if (o.strata) col = col.mul(strataTint(o.strata));
   if (o.cloud) col = col.mul(cloudShade(o.cloud));
@@ -159,6 +163,7 @@ export function surfaceMaterial(set: TexSet, o: SurfaceOpts = {}) {
       n = mix(n, texture(o.triplanar.set.normalMap, triUV).xyz.mul(2).sub(1), triBlend.mul(0.8));
     }
     if (wetAmt > 0) n = mix(n, vec3(ripple, 1.0), puddle);
+    if (zoneW) n = mix(n, vec3(sin(wpos.x.mul(2.3).add(time.mul(3.1))).mul(0.06), sin(wpos.y.mul(2.9).sub(time.mul(2.4))).mul(0.06), 1.0), zoneW.mul(0.8)); // thin flowing film
     if (snowAmt > 0) n = mix(n, vec3(0, 0, 1), snowM.mul(0.8));
     mat.normalNode = normalMap(normalize(n).mul(0.5).add(0.5));
   }
@@ -166,8 +171,9 @@ export function surfaceMaterial(set: TexSet, o: SurfaceOpts = {}) {
   // ---- roughness (G channel of the height/roughness map) ----
   let rough: N = texture(set.rhMap, pUV).g.mul(materialRoughness);
   if (wetAmt > 0) rough = mix(rough.mul(1 - 0.45 * wetAmt), float(0.035), puddle);
+  if (zoneW) rough = mix(rough, float(0.05), zoneW.mul(0.9));
   if (snowAmt > 0) rough = mix(rough, float(0.62), snowM);
-  mat.roughnessNode = rough;
+  mat.roughnessNode = specAA(rough);
 
   // ---- emissive ----
   if (set.emissiveMap) mat.emissiveNode = texture(set.emissiveMap, pUV).rgb.mul(color(o.emissive ?? '#ffffff')).mul(o.emissiveIntensity ?? 2);

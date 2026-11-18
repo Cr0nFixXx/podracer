@@ -31,7 +31,35 @@ export class AudioFX {
       this.others = ctx.createOscillator(); this.others.type = 'sawtooth'; this.othersGain = ctx.createGain(); this.othersGain.gain.value = 0;
       const of = ctx.createBiquadFilter(); of.type = 'lowpass'; of.frequency.value = 500;
       this.others.connect(of); of.connect(this.othersGain); this.othersGain.connect(this.master); this.others.start();
+      // session 10: slide hiss (band-passed noise, gain driven by lateral slip)
+      this.slide = ctx.createBufferSource(); this.slide.buffer = this.noiseBuf; this.slide.loop = true;
+      this.slideFilter = ctx.createBiquadFilter(); this.slideFilter.type = 'bandpass'; this.slideFilter.frequency.value = 1800; this.slideFilter.Q.value = 1.4;
+      this.slideGain = ctx.createGain(); this.slideGain.gain.value = 0;
+      this.slide.connect(this.slideFilter); this.slideFilter.connect(this.slideGain); this.slideGain.connect(this.master); this.slide.start();
     } catch { this.ctx = null; }
+  }
+  slide?: AudioBufferSourceNode; slideFilter?: BiquadFilterNode; slideGain?: GainNode;
+  /** slip: lateral speed (m/s) while sliding, 0 otherwise */
+  setSlide(slip: number) {
+    if (!this.ctx || !this.slideGain || !this.slideFilter) return; const t = this.ctx.currentTime;
+    this.slideGain.gain.setTargetAtTime(Math.min(0.22, slip / 120), t, 0.06);
+    this.slideFilter.frequency.setTargetAtTime(1200 + slip * 25, t, 0.08);
+  }
+  fallSrc?: AudioBufferSourceNode; fallFilter?: BiquadFilterNode; fallGain?: GainNode;
+  /** waterfall roar / lavafall rumble (session 14): g = 0..1 by distance; created lazily on first use */
+  setFall(g: number, lava: boolean) {
+    if (!this.ctx) return;
+    if (!this.fallSrc) {
+      if (g <= 0) return;
+      this.fallSrc = this.ctx.createBufferSource(); this.fallSrc.buffer = this.noiseBuf; this.fallSrc.loop = true; this.fallSrc.playbackRate.value = 0.8;
+      this.fallFilter = this.ctx.createBiquadFilter(); this.fallFilter.Q.value = 0.5;
+      this.fallGain = this.ctx.createGain(); this.fallGain.gain.value = 0;
+      this.fallSrc.connect(this.fallFilter); this.fallFilter.connect(this.fallGain); this.fallGain.connect(this.master); this.fallSrc.start();
+    }
+    const t = this.ctx.currentTime;
+    this.fallFilter!.type = lava ? 'lowpass' : 'bandpass';
+    this.fallFilter!.frequency.setTargetAtTime(lava ? 150 : 520 + g * 900, t, 0.2);
+    this.fallGain!.gain.setTargetAtTime(g * (lava ? 0.32 : 0.22), t, 0.15);
   }
   resume() { this.ctx?.resume(); }
   suspend() { this.ctx?.suspend(); }

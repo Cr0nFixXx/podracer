@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { specAA } from './specAA';
 import * as TSLmod from 'three/tsl';
 import { braidNormal, carbonTexture, hazardTexture, hullTextures, interiorTextures } from './podTextures';
 import type { MatKey } from './podKit';
@@ -62,7 +63,7 @@ export function hullMaterial(c1: string, c2: string, glow: string, livery: numbe
   const hScorch = clamp(u.uScorch.mul(ssInv(0.72, 0.0, a)).mul(hMask.a.mul(0.7).add(0.55)), 0.0, 0.95);
   col = mix(col, vec3(0.02, 0.018, 0.016), hScorch);
   mat.colorNode = col.mul(hMask.r);
-  mat.roughnessNode = clamp(mix(materialRoughness.mul(hMask.g.mul(0.6).add(0.7)), hMask.g.mul(0.3).add(0.28), hWear).add(hGrime.mul(0.35)).add(hScorch.mul(0.45)), 0.04, 1.0);
+  mat.roughnessNode = specAA(clamp(mix(materialRoughness.mul(hMask.g.mul(0.6).add(0.7)), hMask.g.mul(0.3).add(0.28), hWear).add(hGrime.mul(0.35)).add(hScorch.mul(0.45)), 0.04, 1.0), 0.8, 0.1);
   mat.metalnessNode = mix(materialMetalness, float(1), hWear).mul(oneMinus(hScorch.mul(0.7))).mul(oneMinus(hGrime.mul(0.3)));
   mat.clearcoatNode = float(0.85).mul(oneMinus(hWear)).mul(oneMinus(hGrime.mul(0.7))).mul(oneMinus(hScorch));
   mat.normalNode = normalMap(texture(tex.normal, tuv), vec2(0.85, 0.85));

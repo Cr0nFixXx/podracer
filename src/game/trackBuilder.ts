@@ -85,6 +85,97 @@ function findStraight(S: Sample[], N: number, at: number, closed: boolean, taken
   return ((best % N) + N) % N;
 }
 
+/** AI reference speeds from curvature (+ bonus in banked curves), limited so that every corner can still be braked for. */
+function refSpeeds(S: Sample[], closed: boolean) {
+  const n = S.length; const get = (i: number) => closed ? S[(i + n) % n] : S[Math.max(0, Math.min(n - 1, i))];
+  for (let i = 0; i < n; i++) {
+    let k = 0; for (let j = -6; j <= 6; j++) k = Math.max(k, Math.abs(get(i + j).curv));
+    S[i].vmax = Math.min(200, (1.35 / Math.max(k, 1e-4)) * (1 + 1.1 * Math.abs(S[i].bank)));
+    if (S[i].ramp > 0 || S[i].gap) S[i].vmax = 200;
+  }
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = n - 1; i >= 0; i--) {
+      const nx = closed ? S[(i + 1) % n] : S[Math.min(n - 1, i + 1)];
+      S[i].vmax = Math.min(S[i].vmax, Math.sqrt(nx.vmax * nx.vmax + 2 * 38 * DS));
+    }
+    if (!closed) break;
+  }
+}
+
+// ---------------------------------------------------------------- session 16: relief (climbs / descents) + banked curves
+/** steepest grade per track (rise / run); default 9 % */
+const RELIEF_GRADE: Record<string, number> = { aquilaris: 0.05, neon: 0.06, oovo: 0.06, executioner: 0.07, methane: 0.07, frost: 0.1, crystal: 0.1, dunepass: 0.1, howler: 0.11 };
+const RELIEF_DEFAULT = 0.09;
+/** smooth 2D value noise in −1..1 (quintic fade) */
+function vn2(x: number, z: number, seed: number) {
+  const h = (i: number, j: number) => { const q = Math.sin(i * 127.1 + j * 311.7 + seed * 0.137) * 43758.5453; return q - Math.floor(q); };
+  const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz;
+  const ux = fx * fx * fx * (fx * (fx * 6 - 15) + 10), uz = fz * fz * fz * (fz * (fz * 6 - 15) + 10);
+  const a = h(ix, iz), b = h(ix + 1, iz), c = h(ix, iz + 1), d = h(ix + 1, iz + 1);
+  return (a + (b - a) * ux + (c - a) * uz + (a - b - c + d) * ux * uz) * 2 - 1;
+}
+/**
+ * Rolling relief: the track follows a hill field defined in plan (x, z), so neighbouring sections rise and fall together.
+ * Protected zones keep their designed profile (relief held constant → no added slope): start grid, sprint start / finish,
+ * ramps + gaps + landings. The amplitude is solved per track so that the steepest 10-m grade equals the target.
+ */
+function applyRelief(S: Sample[], closed: boolean, def: TrackDef, ramps: [number, number][]) {
+  const n = S.length; const seed = hashStr(def.id) % 1000; const target = RELIEF_GRADE[def.id] ?? RELIEF_DEFAULT;
+  const R = new Float32Array(n);
+  for (let i = 0; i < n; i++) R[i] = vn2(S[i].x / 520, S[i].z / 520, seed) + 0.4 * vn2(S[i].x / 230 + 9.1, S[i].z / 230 + 4.7, seed + 17);
+  const zones: [number, number][] = []; const start = closed ? 30 : 45;
+  zones.push([start - 60, start + 70]); if (!closed) { zones.push([0, start + 70]); zones.push([n - 110, n - 1]); }
+  for (const [i0, len] of ramps) zones.push([i0 - 50, i0 + len + 75]);
+  const hw = new Float32Array(n), hv = new Float32Array(n), hs = new Float32Array(n); // max weight, Σ w·value, Σ w (overlapping zones average)
+  for (const [a, b] of zones) {
+    const c = Math.round((a + b) / 2); const rc = R[closed ? ((c % n) + n) % n : Math.max(0, Math.min(n - 1, c))]; const fade = 45;
+    for (let k = a - fade; k <= b + fade; k++) {
+      let i = k; if (closed) i = ((k % n) + n) % n; else if (k < 0 || k >= n) continue;
+      const w0 = k < a ? (k - (a - fade)) / fade : k > b ? (b + fade - k) / fade : 1; const w = w0 * w0 * (3 - 2 * w0);
+      hw[i] = Math.max(hw[i], w); hv[i] += w * rc; hs[i] += w;
+    }
+  }
+  for (let i = 0; i < n; i++) if (hs[i] > 0) R[i] += (hv[i] / hs[i] - R[i]) * hw[i];
+  for (let pass = 0; pass < 2; pass++) { // smooth along the track
+    const r0 = Float32Array.from(R);
+    for (let i = 0; i < n; i++) { let q = 0, c = 0; for (let k = -8; k <= 8; k++) { let j = i + k; if (closed) j = (j + n) % n; else if (j < 0 || j >= n) continue; q += r0[j]; c++; } R[i] = q / c; }
+  }
+  // amplitude from the target grade (≈ ±20 m at 9 %), then a slope limiter instead of global scaling: only the too-steep
+  // bits are cut back (Lipschitz envelope: peaks are lowered until |dy/ds| ≤ target), crests and dips are rounded afterwards
+  const A = 20 * target / RELIEF_DEFAULT; const y = Float32Array.from(S, (q, i) => q.y + A * R[i]);
+  const step = target * DS; const rounds = closed ? 2 : 1;
+  for (let r = 0; r < rounds; r++) {
+    for (let i = closed ? 0 : 1; i < n; i++) { const pv = y[(i - 1 + n) % n]; if (y[i] > pv + step) y[i] = pv + step; }
+    for (let i = closed ? n - 1 : n - 2; i >= 0; i--) { const nx = y[(i + 1) % n]; if (y[i] > nx + step) y[i] = nx + step; }
+  }
+  for (let pass = 0; pass < 3; pass++) { // vertical curvature: round crests / dips over ≈ 40 m
+    const y0 = Float32Array.from(y);
+    for (let i = 0; i < n; i++) { let q = 0, c = 0; for (let k = -10; k <= 10; k++) { let j = i + k; if (closed) j = (j + n) % n; else if (j < 0 || j >= n) continue; q += y0[j]; c++; } y[i] = q / c; }
+  }
+  for (let i = 0; i < n; i++) S[i].y = y[i];
+}
+/**
+ * Banked curves: superelevation from curvature, up to ±7 m at the road edge (max slope 0.34), eased in and out over ≈ 90 m.
+ * Level at the start grid / sprint ends, on ramps and gaps, in zero-G tubes and at shortcut junctions. Recomputes AI speeds.
+ */
+function applyBanking(S: Sample[], closed: boolean, shortcut: boolean, start: number) {
+  const n = S.length; const raw = new Float32Array(n), mask = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const q = S[i]; const lim = Math.min(0.34, 7 / Math.max(1, q.hw));
+    raw[i] = Math.max(-lim, Math.min(lim, q.curv * 48));
+    let m = q.zeroG || q.gap || q.ramp > 0 || q.openL || q.openR ? 0 : 1;
+    if (!shortcut && Math.abs(i - start) < 45) m = 0;
+    if (!closed && (i < 30 || i > n - 60)) m = 0;
+    mask[i] = m;
+  }
+  const er = Float32Array.from(mask); // level zones grow by 25 samples
+  for (let i = 0; i < n; i++) if (mask[i] === 0) for (let k = -25; k <= 25; k++) { const j = closed ? ((i + k) % n + n) % n : i + k; if (j >= 0 && j < n) er[j] = 0; }
+  const blur = (a: Float32Array, w: number) => { const o = new Float32Array(n); for (let i = 0; i < n; i++) { let q = 0, c = 0; for (let k = -w; k <= w; k++) { let j = i + k; if (closed) j = ((j % n) + n) % n; else if (j < 0 || j >= n) continue; const wt = w + 1 - Math.abs(k); q += a[j] * wt; c += wt; } o[i] = q / c; } return o; };
+  const mB = blur(er, 16), bB = blur(blur(raw, 14), 10);
+  for (let i = 0; i < n; i++) S[i].bank = bB[i] * mB[i];
+  refSpeeds(S, closed);
+}
+
 function finalizeSamples(S: Sample[], closed: boolean) {
   const n = S.length;
   const get = (i: number) => closed ? S[(i + n) % n] : S[Math.max(0, Math.min(n - 1, i))];
@@ -106,19 +197,7 @@ function finalizeSamples(S: Sample[], closed: boolean) {
     S[i].curv = s / c;
     const bl = Math.min(0.2, 2.4 / Math.max(1, S[i].hw)); S[i].bank = Math.max(-bl, Math.min(bl, S[i].curv * 14));
   }
-  // AI reference speeds
-  for (let i = 0; i < n; i++) {
-    let k = 0; for (let j = -6; j <= 6; j++) k = Math.max(k, Math.abs(get(i + j).curv));
-    S[i].vmax = Math.min(200, 1.35 / Math.max(k, 1e-4));
-    if (S[i].ramp > 0 || S[i].gap) S[i].vmax = 200;
-  }
-  for (let pass = 0; pass < 2; pass++) {
-    for (let i = n - 1; i >= 0; i--) {
-      const nx = closed ? S[(i + 1) % n] : S[Math.min(n - 1, i + 1)];
-      S[i].vmax = Math.min(S[i].vmax, Math.sqrt(nx.vmax * nx.vmax + 2 * 38 * DS));
-    }
-    if (!closed) break;
-  }
+  refSpeeds(S, closed);
 }
 
 function makeSample(p: THREE.Vector3, hw: number, s: number): Sample {
@@ -190,6 +269,8 @@ export function buildTrack(def: TrackDef): TrackData {
     for (let k = 0; k < nr; k++) { const t = (k + 1) / nr; samples[(i0 + k) % N].ramp = r.h * Math.pow(t, 1.7); }
     for (let k = 0; k < ng; k++) { const sm = samples[(i0 + nr + k) % N]; sm.gap = true; }
   }
+  // session 16: climbs and descents (before tangents / shortcuts, which take their heights from these samples)
+  applyRelief(samples, closed, def, taken.map((i0, k) => [i0, Math.round((def.ramps[k].len + def.ramps[k].gap) / DS)] as [number, number]));
   finalizeSamples(samples, closed);
   const main: Path = { id: 0, samples, closed, length, mainFrom: 0, mainTo: N - 1, side: 0 };
   const paths: Path[] = [main];
@@ -243,6 +324,9 @@ export function buildTrack(def: TrackDef): TrackData {
     }
   }
 
+  // session 16: banked curves on every path (flags for ramps, gaps, zero-G and junctions are final here; obstacles below use the bank)
+  for (const pth of paths) applyBanking(pth.samples, pth.closed, pth.id > 0, closed ? 30 : 45);
+
   // cliff heights per side (tapered over 50 m at gorge entrances) – shared by walls, terrain plateaus, rails and collision
   const cliffH = (s: Sample, side: number) => 14 + fbm1(s.s * 0.004 + side * 10) * 36;
   for (const cm of canyonModes) {
@@ -268,11 +352,17 @@ export function buildTrack(def: TrackDef): TrackData {
   const startIdx = closed ? 30 : 45;
   const finishIdx = closed ? startIdx : N - 40;
   const okSpot = (s: Sample) => !s.gap && s.ramp === 0 && !s.openL && !s.openR;
-  for (const [a, b, cnt] of def.obstacles) {
+  // session 7: ~45 % fewer obstacles, min. 9 samples (≈ 18 m) apart along the track unless laterally far apart,
+  // and never closer than 9 m to the track edge-to-edge corridor → a readable line always exists
+  const OB_DENSITY = 0.55;
+  for (const [a, b, cnt0] of def.obstacles) {
+    const cnt = Math.max(2, Math.round(cnt0 * OB_DENSITY));
     for (let c = 0; c < cnt; c++) {
       const idx = (Math.floor((a + (b - a) * rng()) * N) + N) % N;
       const s = samples[idx]; if (!okSpot(s) || Math.abs(idx - startIdx) < 60) continue;
-      const r = 1.8 + rng() * 1.8; const lat = (rng() * 2 - 1) * (s.hw - r - 3);
+      const r = 1.6 + rng() * 1.4; const lat = (rng() * 2 - 1) * (s.hw - r - 3);
+      const cd = (i: number, j: number) => { const d = Math.abs(i - j); return closed ? Math.min(d, N - d) : d; };
+      if (obstacles.some(o => o.path === 0 && cd(o.idx, idx) < 9 && Math.abs(o.lat - lat) < o.r + r + 10)) continue;
       const y = s.y - lat * s.bank;
       obstacles.push({ path: 0, idx, lat, r, kind: Math.floor(rng() * 3), x: s.x + s.rx * lat, y, z: s.z + s.rz * lat });
     }
@@ -310,7 +400,7 @@ export function buildTrack(def: TrackDef): TrackData {
     let best = -1, bs = 1e9; const c0 = Math.floor(f * N); const win = Math.floor(N * 0.08);
     for (let k = -win; k <= win; k += 3) {
       const i = closed ? ((c0 + k) % N + N) % N : c0 + k; if (i < 0 || i >= N || !spOk(i, type)) continue;
-      const sc = Math.abs(k) * 0.02 + Math.abs(samples[i].curv) * 2000 - (type === 'arch' && samples[i].hL > 0 && samples[i].hR > 0 ? 30 : 0);
+      const sc = Math.abs(k) * 0.02 + Math.abs(samples[i].curv) * 2000 + Math.abs(samples[i].bank) * 300 - (type === 'arch' && samples[i].hL > 0 && samples[i].hR > 0 ? 30 : 0);
       if (sc < bs) { bs = sc; best = i; }
     }
     if (best < 0) continue;

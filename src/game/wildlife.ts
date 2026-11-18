@@ -7,7 +7,9 @@ import type { TrackData } from './trackBuilder';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
-const { abs, attribute, clamp, cos, float, hash, instanceIndex, max, oneMinus, positionGeometry, positionLocal, sin, smoothstep, step, time, vec3, vertexColor } = TSL;
+const { abs, attribute, clamp, cos, float, hash, instanceIndex, max, oneMinus, positionGeometry, positionLocal, sin, smoothstep, step, time, vec3, vertexColor, mix, uniform, instancedBufferAttribute } = TSL;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type N = any;
 
 /**
  * Life in the landscape: bird flocks (soaring raptors, gulls, bats, glowing moths), grazing herds (bantha-like),
@@ -94,18 +96,20 @@ function barge() {
 }
 
 // ------------------------------------------------------------------ materials
-function lifeMat(kind: 'walker' | 'bird' | 'hover' | 'static', o: { speed?: number; hip?: number; amp?: number; soar?: boolean; neckBase?: number; side?: THREE.Side } = {}) {
+function lifeMat(kind: 'walker' | 'bird' | 'hover' | 'static', o: { speed?: number; hip?: number; amp?: number; soar?: boolean; neckBase?: number; side?: THREE.Side; gait?: N; fold?: THREE.InstancedBufferAttribute } = {}) {
   const mat = new THREE.MeshStandardNodeMaterial({ vertexColors: true, side: o.side ?? THREE.FrontSide }); mat.roughness = 0.8; mat.metalness = 0.05;
   const a = attribute('aAnim', 'float'); const ph = hash(instanceIndex).mul(6.2832);
   if (kind === 'walker') {
-    const hip = o.hip ?? 1.55; const tt = time.mul(o.speed ?? 3).add(ph); const legW = clamp(oneMinus(positionGeometry.y.div(hip)), 0, 1);
+    const hip = o.hip ?? 1.55; const tt = (o.gait ?? time.mul(o.speed ?? 3)).add(ph); /* gait = CPU-accumulated leg phase (gallop when fleeing) */ const legW = clamp(oneMinus(positionGeometry.y.div(hip)), 0, 1);
     const isA = step(0.5, a).mul(step(a, 1.5)), isB = step(1.5, a).mul(step(a, 2.5)), isN = step(2.5, a);
     const lift = max(sin(tt), 0).mul(isA).add(max(sin(tt.add(Math.PI)), 0).mul(isB)).mul(legW).mul(o.amp ?? 0.3);
     const nW = clamp(positionGeometry.y.sub(o.neckBase ?? 8).div(9), 0, 1).mul(isN);
     mat.positionNode = positionLocal.add(vec3(sin(tt.mul(0.23)).mul(nW).mul(0.9), lift.add(sin(tt.mul(2)).mul(0.04 * hip)), cos(tt.mul(0.19)).mul(nW).mul(0.6)));
   } else if (kind === 'bird') {
     const gate = o.soar ? smoothstep(-0.3, 0.5, sin(time.mul(0.55).add(ph))).mul(0.85).add(0.15) : float(1);
-    mat.positionNode = positionLocal.add(vec3(0, sin(time.mul(o.speed ?? 10).add(ph.mul(3))).mul(abs(a)).mul(o.amp ?? 0.5).mul(gate), 0));
+    const flap = sin(time.mul(o.speed ?? 10).add(ph.mul(3))).mul(abs(a)).mul(o.amp ?? 0.5).mul(gate);
+    const fold = o.fold ? instancedBufferAttribute(o.fold) : float(0); // 1 = perched: wings folded down, no flapping
+    mat.positionNode = positionLocal.add(vec3(0, mix(flap, abs(a).mul(-(o.amp ?? 0.5) * 0.55), fold), 0));
   } else if (kind === 'hover') mat.positionNode = positionLocal.add(vec3(0, sin(time.mul(2.1).add(ph)).mul(o.amp ?? 0.12), 0));
   mat.emissiveNode = max(vertexColor().sub(1.0), 0.0).mul(1.4);
   return mat;
@@ -128,10 +132,14 @@ const LIFE: Record<string, LifeCfg> = {
 };
 LIFE.mesa = { ...LIFE.desert, herds: { n: 3, size: 7, fur: '#6a3e2a', horn: '#e0d0b8', scale: 1 } };
 
-export function buildLife(td: TrackData, theme: ThemeDef, field: TerrainField, waterY: number, rng: () => number, group: THREE.Group, disp: Disp, detail: number) {
+/** x/z/r footprint; `top` = perch height (rocks) */
+export interface LifeZone { x: number; z: number; r: number; top?: number }
+
+export function buildLife(td: TrackData, theme: ThemeDef, field: TerrainField, waterY: number, rng: () => number, group: THREE.Group, disp: Disp, detail: number, avoid: LifeZone[] = [], perches: LifeZone[] = []) {
   const cfg = LIFE[theme.id]; const ups: ((t: number, dt: number) => void)[] = [];
   let lastT = -1, frame = 0;
-  const update = (t: number) => { const dt = lastT < 0 ? 0 : Math.min(0.1, Math.max(0, t - lastT)); lastT = t; frame++; for (const f of ups) f(t, dt); };
+  let threat: THREE.Vector3 | undefined; // player position (herds flee, birds take off)
+  const update = (t: number, th?: THREE.Vector3) => { threat = th; const dt = lastT < 0 ? 0 : Math.min(0.1, Math.max(0, t - lastT)); lastT = t; frame++; for (const f of ups) f(t, dt); };
   if (!cfg) return { update, count: 0 };
   const S = td.main.samples, N = S.length; const b = td.bounds; const cx0 = (b.minX + b.maxX) / 2, cz0 = (b.minZ + b.maxZ) / 2;
   const avgY = S.reduce((a, s) => a + s.y, 0) / N; const span = Math.max(b.maxX - b.minX, b.maxZ - b.minZ);
@@ -144,9 +152,11 @@ export function buildLife(td: TrackData, theme: ThemeDef, field: TerrainField, w
   };
   /** open ground: a circle of radius R whose rim keeps `clear` metres from every road and stays above water */
   const openCircle = (minD: number, maxD: number, R: number, clear: number) => {
-    for (let t = 0; t < 60; t++) {
+    for (let t = 0; t < 90; t++) {
       const s = S[Math.floor(rng() * N)]; const side = rng() < 0.5 ? -1 : 1; const d = minD + rng() * (maxD - minD);
-      const x = s.x + s.rx * side * (s.hw + d + R), z = s.z + s.rz * side * (s.hw + d + R); let ok = true;
+      const x = s.x + s.rx * side * (s.hw + d + R), z = s.z + s.rz * side * (s.hw + d + R);
+      // session 15: the path must not run through landmarks, spires, mesas or falls
+      let ok = !avoid.some(a => Math.abs(Math.hypot(a.x - x, a.z - z) - R) < a.r + 20);
       for (let k = 0; k < 10 && ok; k++) { const a = (k / 10) * Math.PI * 2; const px = x + Math.cos(a) * R, pz = z + Math.sin(a) * R; if (field.distToTrack(px, pz) < clear || field.heightAt(px, pz) < waterY + 1) ok = false; }
       if (ok) return { x, z };
     }
@@ -157,50 +167,83 @@ export function buildLife(td: TrackData, theme: ThemeDef, field: TerrainField, w
   // ---- birds ----
   if (cfg.birds) {
     const B = cfg.birds; const col = rgb(B.color, B.glow ? 2.2 : 1);
-    const flocks: { x: number; z: number; y: number; r: number; w: number; n: number; off: number[] }[] = [];
+    const flocks: { x: number; z: number; y: number; r: number; w: number; n: number; off: number[]; mode: number; tm: number; g: number; px: number; pz: number; py: number; pr: number }[] = [];
+    // perch (session 15): nearest boulder within 500 m, else a spot on the ground / water below the flock
+    const perchFor = (x: number, z: number) => {
+      let b: LifeZone | null = null, bd = 500; for (const pc of perches) { const d = Math.hypot(pc.x - x, pc.z - z); if (d < bd) { bd = d; b = pc; } }
+      if (b) return { px: b.x, pz: b.z, py: (b.top ?? field.heightAt(b.x, b.z)) + 0.25, pr: Math.max(0.8, b.r * 0.5) };
+      return { px: x, pz: z, py: Math.max(field.heightAt(x, z), waterY) + 0.3, pr: 5 };
+    };
     for (let f = 0; f < Math.max(1, Math.round(B.flocks * detail)); f++) {
       const s = S[Math.floor(rng() * N)]; const side = rng() < 0.5 ? -1 : 1; const d = 30 + rng() * 380; const x = s.x + s.rx * side * (s.hw + d), z = s.z + s.rz * side * (s.hw + d);
       const r = 18 + rng() * 70; const speed = B.soar ? 9 + rng() * 5 : 12 + rng() * 6;
-      flocks.push({ x, z, y: Math.max(field.heightAt(x, z), waterY) + B.alt[0] + rng() * (B.alt[1] - B.alt[0]), r, w: (speed / r) * (rng() < 0.5 ? -1 : 1), n: B.size, off: Array.from({ length: B.size * 3 }, () => rng()) });
+      flocks.push({ x, z, y: Math.max(field.heightAt(x, z), waterY) + B.alt[0] + rng() * (B.alt[1] - B.alt[0]), r, w: (speed / r) * (rng() < 0.5 ? -1 : 1), n: B.size, off: Array.from({ length: B.size * 3 }, () => rng()), mode: 0, tm: 6 + rng() * 30, g: 0, ...perchFor(x, z) });
     }
     const n = flocks.reduce((a, f) => a + f.n, 0);
-    const im = inst(bird(col, B.span), lifeMat('bird', { speed: B.soar ? 7 : 13, amp: B.span * 0.45, soar: B.soar, side: THREE.DoubleSide }), n, false);
-    ups.push(t => {
-      let i = 0;
-      for (const f of flocks) for (let k = 0; k < f.n; k++) {
-        const o = f.off; const a = f.w * t + o[k * 3] * (B.soar ? 6.28 : 1.4); const rr = f.r * (B.soar ? 0.6 + o[k * 3 + 1] * 0.8 : 0.85 + o[k * 3 + 1] * 0.3);
-        const x = f.x + Math.cos(a) * rr, z = f.z + Math.sin(a) * rr, y = f.y + Math.sin(t * 0.4 + o[k * 3 + 2] * 6) * 4 + o[k * 3 + 2] * 10;
-        const dir = f.w > 0 ? 1 : -1; const yaw = Math.atan2(-Math.sin(a) * dir, Math.cos(a) * dir);
-        setM(im, i++, x, y, z, yaw, 0, -dir * (B.soar ? 0.35 : 0.2), 1);
+    const fold = new THREE.InstancedBufferAttribute(new Float32Array(n), 1); fold.setUsage(THREE.DynamicDrawUsage);
+    const im = inst(bird(col, B.span), lifeMat('bird', { speed: B.soar ? 7 : 13, amp: B.span * 0.45, soar: B.soar, side: THREE.DoubleSide, fold }), n, false);
+    // test hook (harness view "p"): put every flock on its perch and report the first perch
+    group.userData.perchTest = () => { for (const f of flocks) { f.mode = 2; f.g = 1; f.tm = 999; } return flocks[0] ? { x: flocks[0].px, y: flocks[0].py, z: flocks[0].pz, r: flocks[0].pr } : null; };
+    ups.push((t, dt) => {
+      let i = 0; const F = fold.array as Float32Array;
+      for (const f of flocks) {
+        // perch cycle: air → glide down → perched → take off (at once when the player comes within 110 m)
+        const dTh = threat ? Math.hypot(threat.x - f.px, threat.z - f.pz) : 1e9;
+        f.tm -= dt;
+        if (f.mode === 0 && f.tm <= 0 && dTh > 260) f.mode = 1;
+        else if (f.mode === 1 && f.g >= 0.999) { f.mode = 2; f.tm = 14 + f.off[0] * 16; }
+        else if (f.mode === 2 && (f.tm <= 0 || dTh < 110)) f.mode = 3;
+        else if (f.mode === 3 && f.g <= 0.001) { f.mode = 0; f.tm = 22 + f.off[1] * 30; }
+        f.g = Math.max(0, Math.min(1, f.g + (f.mode === 1 || f.mode === 2 ? dt / 5 : -dt / 2.2))); // slow glide down, quick burst up
+        const e = f.g * f.g * (3 - 2 * f.g);
+        for (let k = 0; k < f.n; k++) {
+          const o = f.off; const a = f.w * t + o[k * 3] * (B.soar ? 6.28 : 1.4); const rr = f.r * (B.soar ? 0.6 + o[k * 3 + 1] * 0.8 : 0.85 + o[k * 3 + 1] * 0.3);
+          const x = f.x + Math.cos(a) * rr, z = f.z + Math.sin(a) * rr, y = f.y + Math.sin(t * 0.4 + o[k * 3 + 2] * 6) * 4 + o[k * 3 + 2] * 10;
+          const dir = f.w > 0 ? 1 : -1; const yaw = Math.atan2(-Math.sin(a) * dir, Math.cos(a) * dir);
+          const pa = o[k * 3] * 6.283 + k * 2.4, prr = f.pr * (0.2 + o[k * 3 + 1] * 0.8); // perch slot on the rock
+          const qx = f.px + Math.cos(pa) * prr, qz = f.pz + Math.sin(pa) * prr;
+          const landed = Math.max(0, (e - 0.9) * 10); F[i] = landed;
+          setM(im, i++, x + (qx - x) * e, y + (f.py - y) * e, z + (qz - z) * e, yaw + (pa - yaw) * landed, 0, -dir * (B.soar ? 0.35 : 0.2) * (1 - e), 1);
+        }
       }
-      im.instanceMatrix.needsUpdate = true;
+      fold.needsUpdate = true; im.instanceMatrix.needsUpdate = true;
     });
     count += n;
   }
 
   // ---- herds ----
   if (cfg.herds) {
-    const H = cfg.herds; const herds: { cx: number; cz: number; r: number; a: number; w: number; m: { ox: number; oz: number; y: number; s: number; ph: number }[] }[] = [];
+    const H = cfg.herds; const herds: { cx: number; cz: number; r: number; a: number; w: number; m: { ox: number; oz: number; y: number; s: number; ph: number }[]; panic: number; yaw: number; init: boolean }[] = [];
     for (let h = 0; h < Math.max(1, Math.round(H.n * detail)); h++) {
       const r = 50 + rng() * 110; const c = openCircle(60, 520, r + 18, 26); if (!c) continue;
       const m = Array.from({ length: H.size }, () => ({ ox: (rng() - 0.5) * 22, oz: (rng() - 0.5) * 26, y: 0, s: H.scale * (0.8 + rng() * 0.4), ph: rng() * 6 }));
-      herds.push({ cx: c.x, cz: c.z, r, a: rng() * 6.28, w: ((1.2 + rng() * 0.8) / r) * (rng() < 0.5 ? -1 : 1), m });
+      herds.push({ cx: c.x, cz: c.z, r, a: rng() * 6.28, w: ((1.2 + rng() * 0.8) / r) * (rng() < 0.5 ? -1 : 1), m, panic: 0, yaw: 0, init: false });
     }
     const n = herds.reduce((a, h) => a + h.m.length, 0);
     if (n) {
-      const im = inst(bantha(rgb(H.fur), rgb(H.horn)), lifeMat('walker', { speed: 2.6, hip: 1.55, amp: 0.28 }), n, true);
+      const gait = uniform(0); // accumulated leg phase – speeds up while a herd flees
+      const im = inst(bantha(rgb(H.fur), rgb(H.horn)), lifeMat('walker', { speed: 2.6, hip: 1.55, amp: 0.28, gait }), n, true);
       herds.forEach(h => h.m.forEach(mm => { mm.y = field.heightAt(h.cx + Math.cos(h.a) * h.r, h.cz + Math.sin(h.a) * h.r); }));
       ups.push((_t, dt) => {
-        let i = 0;
+        let i = 0, maxP = 0;
         for (const h of herds) {
-          h.a += h.w * dt; const hx = h.cx + Math.cos(h.a) * h.r, hz = h.cz + Math.sin(h.a) * h.r; const dir = h.w > 0 ? 1 : -1;
-          const fx = -Math.sin(h.a) * dir, fz = Math.cos(h.a) * dir; const yaw = Math.atan2(fx, fz);
+          // flee (session 15): fright within 120 m of the player → gallop along the circle away from the threat, calm down slowly
+          const x0 = h.cx + Math.cos(h.a) * h.r, z0 = h.cz + Math.sin(h.a) * h.r;
+          const dT = threat ? Math.hypot(x0 - threat.x, z0 - threat.z) : 1e9; const scared = dT < 120;
+          if (scared && threat && h.panic < 0.25) { const sg = h.w > 0 ? 1 : -1; if (Math.hypot(h.cx + Math.cos(h.a + 0.08 * sg) * h.r - threat.x, h.cz + Math.sin(h.a + 0.08 * sg) * h.r - threat.z) < dT) h.w = -h.w; }
+          h.panic += ((scared ? 1 : 0) - h.panic) * Math.min(1, dt * (scared ? 3 : 0.3)); maxP = Math.max(maxP, h.panic);
+          h.a += h.w * dt * (1 + 5 * h.panic); const hx = h.cx + Math.cos(h.a) * h.r, hz = h.cz + Math.sin(h.a) * h.r; const dir = h.w > 0 ? 1 : -1;
+          const yawT = Math.atan2(-Math.sin(h.a) * dir, Math.cos(h.a) * dir);
+          if (!h.init) { h.yaw = yawT; h.init = true; }
+          let dy = yawT - h.yaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI; h.yaw += dy * Math.min(1, dt * 2.5); // smooth turn-around
+          const fx = Math.sin(h.yaw), fz = Math.cos(h.yaw); const spread = 1 + 0.5 * h.panic;
           h.m.forEach((mm, k) => {
-            const x = hx + fz * mm.ox + fx * mm.oz, z = hz - fx * mm.ox + fz * mm.oz;
+            const x = hx + (fz * mm.ox + fx * mm.oz) * spread, z = hz + (-fx * mm.ox + fz * mm.oz) * spread;
             if ((frame + k) % 8 === 0) mm.y = field.heightAt(x, z);
-            setM(im, i++, x, mm.y - 0.05, z, yaw + Math.sin(_t * 0.2 + mm.ph) * 0.25, 0, 0, mm.s);
+            setM(im, i++, x, mm.y - 0.05, z, h.yaw + Math.sin(_t * 0.2 + mm.ph) * 0.25 * (1 - h.panic), 0, 0, mm.s);
           });
         }
+        gait.value += dt * 2.6 * (1 + 1.8 * maxP);
         im.instanceMatrix.needsUpdate = true;
       });
       count += n;

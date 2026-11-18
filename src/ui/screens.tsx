@@ -273,11 +273,11 @@ export function SettingsScreen({ profile, update, go }: { profile: Profile; upda
           </Panel>
           <Panel title="Steuerung" className="lg:col-span-3">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-              {[['W / ↑', 'Gas'], ['S / ↓', 'Bremse / Rückwärts'], ['A D / ← →', 'Lenken'], ['Shift / Leertaste', 'Boost (erzeugt Hitze)'], ['E / Q / Strg', 'Luftbremse (enge Kurven)'], ['R', 'Reparatur (langsamer)'], ['C', 'Kamera wechseln'], ['Esc / P', 'Pause']].map(([k, a]) => (
+              {[['W', 'Schub'], ['S', 'Umkehrschub'], ['A / D', 'Lenken links / rechts'], ['Leertaste', 'Handbremse / Sliden'], ['← / →', 'Rolle links / rechts (90°)'], ['↑', 'Neigung (Nase runter, schneller)'], ['↓', 'Anheben (mehr Bodenfreiheit)'], ['Q / E', 'Linke / rechte Luftbremse'], ['Strg', 'Beide Luftbremsen'], ['Shift', 'Boost (erzeugt Hitze)'], ['R', 'Reparatur (langsamer)'], ['C', 'Ansicht'], ['Esc / P', 'Pause']].map(([k, a]) => (
                 <div key={k} className="flex items-center gap-3 bg-black/40 border border-stone-800 p-2"><kbd className="font-display text-amber-300 text-xs bg-stone-800 px-2 py-1 min-w-[90px] text-center">{k}</kbd><span className="text-stone-300 text-xs">{a}</span></div>
               ))}
             </div>
-            <p className="text-[11px] text-stone-500 mt-3">Gamepad: RT Gas · LT Bremse · Linker Stick Lenken · A Boost · B/LB/RB Luftbremse · X Reparatur · Y Kamera</p>
+            <p className="text-[11px] text-stone-500 mt-3">Gamepad: RT Schub · LT Umkehrschub · Linker Stick Lenken · Rechter Stick Rolle/Neigung · A Boost · B beide / LB, RB einzelne Luftbremse · L3 Handbremse · X Reparatur · Y Ansicht</p>
           </Panel>
         </div>
       </div>

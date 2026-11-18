@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { specAA } from './specAA';
 import * as TSLmod from 'three/tsl';
 import { macroTexture, microTexture, type TexSet } from './textures';
 
@@ -70,7 +71,16 @@ export function cloudShade(amount: number): N {
 export interface TerrainMatOpts {
   ground: TexSet; gravel: TexSet; rock: TexSet; basin: TexSet; layers: TerrainLayers; strata: StrataDef | null | undefined;
   cloud: number; bump: boolean; rockScale?: number; emissive?: string; emissiveIntensity?: number;
+  /** close-range detail layer: [tile factor x, tile factor z, strength] (see TERRAIN_DETAIL) */
+  detail?: [number, number, number];
 }
+
+/** Per-world close-range ground detail (session 15). Factors multiply the 30 m ground UV; unequal x/z stretches the pattern
+ *  (ice: long wind drifts). Strength scales the detail normal. */
+export const TERRAIN_DETAIL: Record<string, [number, number, number]> = {
+  desert: [5.5, 5.5, 0.55], mesa: [5.5, 5.5, 0.55], ice: [3.0, 8.0, 0.75], jungle: [6.5, 6.5, 0.5], malastare: [6.5, 6.5, 0.5],
+  lava: [4.5, 4.5, 0.6], crystal: [5, 5, 0.5], aquilaris: [5.5, 5.5, 0.5],
+};
 
 export function terrainMaterial(o: TerrainMatOpts) {
   // texture budget (WebGPU: 16 sampled textures per stage incl. env + shadow maps): 4 layers × (map+height, normal+roughness)
@@ -93,17 +103,21 @@ export function terrainMaterial(o: TerrainMatOpts) {
   const wB = smoothstep(0.4, 0.6, sp.y.add(bT.a.sub(0.5).mul(0.25)).add(mv.sub(0.5).mul(0.25))).mul(ssInv(0.2, 0.07, slope));
   const wK = smoothstep(0.2, 0.36, slope.add(kT.a.sub(0.5).mul(0.2)).add(mv.sub(0.5).mul(0.1)));
   const microT = texture(microTexture(), wp.xz.mul(1 / 1.7)); const microF = float(o.bump ? 0.6 : 0).mul(ssInv(50.0, 6.0, dist));
+  // per-world detail: ground normal/roughness map again at a finer scale, only on the ground layer and near the camera (same texture → no extra binding)
+  const dS = o.detail ?? [5.5, 5.5, 0.5];
+  const dNT = texture(o.ground.normalMap, uvG.mul(vec2(dS[0], dS[1])).add(vec2(0.37, 0.11)));
+  const dF = float(o.bump ? dS[2] : 0).mul(ssInv(70.0, 8.0, dist)).mul(oneMinus(wG)).mul(oneMinus(wB)).mul(oneMinus(wK));
   let col: N = mix(mix(mix(gC, rC, wG), bC, wB), kC, wK);
   col = col.mul(mix(float(1), microT.a.mul(0.56).add(0.72), microF)).mul(vertexColor()).mul(cloudShade(o.cloud));
   mat.colorNode = col;
   if (o.bump) {
     const dec = (t: N) => t.xyz.mul(2).sub(1);
     let n: N = mix(mix(mix(dec(gNT), dec(rNT), wG), dec(bNT), wB.mul(0.8)), dec(kNT), wK.mul(0.8));
-    n = vec3(n.xy.add(microT.xy.mul(2).sub(1).mul(microF).mul(0.8)), n.z);
+    n = vec3(n.xy.add(microT.xy.mul(2).sub(1).mul(microF).mul(0.8)).add(dNT.xy.mul(2).sub(1).mul(dF)), n.z);
     mat.normalNode = normalMap(normalize(n).mul(0.5).add(0.5));
   }
   const bR = float(o.layers.basinRough).mul(bNT.a.mul(1.4));
-  mat.roughnessNode = clamp(mix(mix(mix(gNT.a, rNT.a, wG), bR, wB), kNT.a, wK), 0.03, 1.0);
+  mat.roughnessNode = specAA(clamp(mix(mix(mix(mix(gNT.a, dNT.a, dF.mul(0.5)), rNT.a, wG), bR, wB), kNT.a, wK), 0.03, 1.0), 1, 0.2);
   if (o.layers.basinMetal > 0) mat.metalnessNode = wB.mul(o.layers.basinMetal);
   let em: N = null;
   if (o.ground.emissiveMap) em = texture(o.ground.emissiveMap, uvG).rgb.mul(color(o.emissive ?? '#ffffff')).mul(o.emissiveIntensity ?? 1.1).mul(oneMinus(wK));

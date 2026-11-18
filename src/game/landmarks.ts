@@ -170,5 +170,5 @@ export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group,
     g.computeBoundingSphere();
     const m = new THREE.Mesh(g, mat); m.castShadow = false; m.receiveShadow = true; group.add(m); disp.push(g);
   }
-  return placed.length;
+  return placed; // footprints (x, z, r) – wildlife keeps clear of them
 }

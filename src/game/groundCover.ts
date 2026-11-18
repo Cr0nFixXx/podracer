@@ -1,3 +1,4 @@
+import { buildImpostors } from './impostors';
 import * as THREE from 'three/webgpu';
 import * as TSLmod from 'three/tsl';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -12,7 +13,7 @@ const { clamp, color, cos, interleavedGradientNoise, length, oneMinus, positionG
 
 /**
  * Ground cover: grass, reeds, ferns, flowers, bushes, dry scrub, stones, pebbles, ice shards, crystals, glowing fungi, scoria.
- * Placed once along the track (clustered, denser near the road), stored per 150 m cell as InstancedMesh → frustum culling
+ * Placed once along the track (clustered, denser near the road), stored per 260 m cell (session 7: fewer draws) as InstancedMesh → frustum culling
  * per cell, per-type view distance (cells hidden on the CPU, small types fade out with a dithered alpha test). Foliage sways
  * in the wind (TSL positionNode after instancing).
  */
@@ -222,12 +223,13 @@ export function buildGroundCover(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   const set = SETS[theme.id];
   const cells: { mesh: THREE.InstancedMesh; x: number; z: number; view: number }[] = [];
   if (!set) return { update: (cam: THREE.Vector3) => { void cam; }, count: 0 };
-  const CELL = 150; const S = td.main.samples, N = S.length; const km = (N * 2) / 1000; const det = gfx.detail;
+  const CELL = 260; const S = td.main.samples, N = S.length; const km = (N * 2) / 1000; const det = gfx.detail;
   const up = new THREE.Vector3(0, 1, 0), nrm = new THREE.Vector3(), q = new THREE.Quaternion(), qy = new THREE.Quaternion(), pos = new THREE.Vector3(), scl = new THREE.Vector3();
   let total = 0;
   set.forEach((t, ti) => {
     const built = GEO[t.geo](17 + ti * 31); const mat = coverMaterial(t, built.h); disp.push(built.geo, mat);
     const byCell = new Map<string, { m: THREE.Matrix4[]; c: THREE.Color[]; x: number; z: number }>();
+    const farM: THREE.Matrix4[] | null = /shrub|bush/i.test(t.geo) && t.view >= 240 ? [] : null; // session 15: far billboards for shrubs / bushes
     const want = Math.round(t.perKm * km * det); let placed = 0, guard = 0;
     while (placed < want && guard++ < want * 3) {
       const s = S[Math.floor(rng() * N)]; const side = rng() < 0.5 ? -1 : 1; const e = t.dMin + (t.dMax - t.dMin) * Math.pow(rng(), t.bias ?? 1.6);
@@ -243,7 +245,7 @@ export function buildGroundCover(td: TrackData, theme: ThemeDef, gfx: GfxSetting
         qy.setFromAxisAngle(up, rng() * Math.PI * 2); q.multiply(qy);
         const key = Math.floor(x / CELL) + ',' + Math.floor(z / CELL); let cell = byCell.get(key);
         if (!cell) { cell = { m: [], c: [], x: (Math.floor(x / CELL) + 0.5) * CELL, z: (Math.floor(z / CELL) + 0.5) * CELL }; byCell.set(key, cell); }
-        cell.m.push(new THREE.Matrix4().compose(pos.set(x, y - (t.sink ?? 0.02) * sc, z), q, scl.set(sc, sc * (0.85 + rng() * 0.3), sc)));
+        cell.m.push(new THREE.Matrix4().compose(pos.set(x, y - (t.sink ?? 0.02) * sc, z), q, scl.set(sc, sc * (0.85 + rng() * 0.3), sc))); if (farM) farM.push(cell.m[cell.m.length - 1]);
         const cc = new THREE.Color(t.cols ? t.cols[Math.floor(rng() * t.cols.length)] : '#ffffff').multiplyScalar(0.85 + rng() * 0.25); cell.c.push(cc);
         placed++;
       }
@@ -253,6 +255,11 @@ export function buildGroundCover(td: TrackData, theme: ThemeDef, gfx: GfxSetting
       cell.m.forEach((m, i) => { im.setMatrixAt(i, m); im.setColorAt(i, cell.c[i]); });
       im.castShadow = !!t.shadow; im.receiveShadow = true; im.computeBoundingSphere(); group.add(im);
       cells.push({ mesh: im, x: cell.x, z: cell.z, view: t.view + CELL * 0.75 });
+    }
+    if (farM && farM.length) { // one-draw billboards beyond the cell view distance, tinted with the mean vertex colour of the real mesh
+      const ca = built.geo.attributes.color as THREE.BufferAttribute | undefined; const tc = new THREE.Color(0.5, 0.5, 0.5);
+      if (ca) { let r = 0, g = 0, b = 0; for (let i = 0; i < ca.count; i++) { r += ca.getX(i); g += ca.getY(i); b += ca.getZ(i); } tc.setRGB(r / ca.count, g / ca.count, b / ca.count); }
+      const imp = buildImpostors(group, farM, 'bush', built.h * 1.6, built.h * 1.1, t.view - 50, tc.multiplyScalar(0.85), 90); if (imp) disp.push(imp);
     }
     total += placed;
   });

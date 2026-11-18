@@ -99,6 +99,16 @@ export default function RaceView({ profile, onExit, onBest }: Props) {
               {h.boosting && <path d="M34 96 a 86 86 0 1 1 172 0" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" opacity="0.8" strokeDasharray="220 400" />}
               <circle cx="196" cy="30" r="10" fill={h.overheat ? '#ff4040' : h.boosting ? '#39e07a' : '#14661f'} stroke="#9affb0" strokeWidth="2" />
             </svg>
+            {/* attitude indicator: roll (rotating pod bar), pitch/raise (vertical offset), airbrake sides, slide */}
+            <div className="absolute left-[96px] top-[118px] w-[76px] h-[40px] rounded-md border border-sky-300/50 bg-black/45 overflow-hidden">
+              <div className="absolute left-1/2 top-1/2 w-[50px] h-[3px] -ml-[25px] bg-cyan-300 rounded transition-none"
+                style={{ transform: `translateY(${(-h.pitchC * 9).toFixed(1)}px) rotate(${(-h.roll * 57.3).toFixed(0)}deg)` }}>
+                <div className="absolute -left-1 -top-[3px] w-[9px] h-[9px] rounded-full" style={{ background: h.abL ? '#ffb040' : '#4aa8e8' }} />
+                <div className="absolute -right-1 -top-[3px] w-[9px] h-[9px] rounded-full" style={{ background: h.abR ? '#ffb040' : '#4aa8e8' }} />
+              </div>
+              {h.sliding && <div className="absolute inset-x-0 bottom-0 text-[9px] font-black tracking-[0.2em] text-amber-300 text-center">SLIDE</div>}
+              {Math.abs(h.roll) > 1.2 && <div className="absolute inset-x-0 top-0 text-[9px] font-black tracking-[0.2em] text-cyan-200 text-center">ROLLE</div>}
+            </div>
             <div className="absolute left-[92px] top-[78px] w-[84px] text-center rounded-full border-2 border-sky-300/80 bg-sky-950/60 py-0.5">
               <span className="text-3xl font-black italic text-cyan-300 tabular-nums">{h.speed}</span>
             </div>
@@ -126,7 +136,7 @@ export default function RaceView({ profile, onExit, onBest }: Props) {
             <div className="font-display text-5xl text-amber-100 mb-8 tracking-widest">{track.name}</div>
             <div className="w-96 h-2 bg-white/10 overflow-hidden mx-auto"><div className="h-full bg-gradient-to-r from-amber-600 to-amber-300 transition-all" style={{ width: `${loading.p * 100}%` }} /></div>
             <div className="mt-3 text-stone-300 text-sm tracking-widest">{loading.msg}</div>
-            <div className="mt-10 text-stone-400 text-xs max-w-md mx-auto leading-relaxed">Tipp: Boost erhitzt die Triebwerke. Lass rechtzeitig los, bevor sie Feuer fangen – und nutze die Luftbremse (E) in Haarnadelkurven.</div>
+            <div className="mt-10 text-stone-400 text-xs max-w-md mx-auto leading-relaxed">Tipp: Boost erhitzt die Triebwerke. Lass rechtzeitig los, bevor sie Feuer fangen – nutze in Haarnadeln die kurveninnere Luftbremse (Q/E) oder slide mit der Handbremse (Leertaste). Mit ← / → rollst du dich durch enge Lücken.</div>
             {error && <div className="mt-6 text-red-400 text-sm max-w-lg">Fehler: {error}<div className="mt-3"><Btn onClick={onExit}>Zurück</Btn></div></div>}
           </div>
         </div>

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { PILOTS, type PodDef } from './data';
 import { PartBuilder, cyl, tube, type MatKey } from './podKit';
 import { engineGeo } from './podParts';
@@ -16,6 +17,8 @@ export interface PodVisual {
   eye: THREE.Vector3;
   hood: THREE.Vector3;
   update: (t: number, throttle: number, boost: number, airbrake: number, dmgL: number, dmgR: number, heat: number) => void;
+  /** distance LOD: far pods collapse ~50 meshes into one merged mesh per material; shadows only when near */
+  setLod: (dist: number) => void;
   dispose: () => void;
 }
 
@@ -47,6 +50,9 @@ function staticGeo(def: PodDef, L: PodLayout, seg: number, anchors: [THREE.Vecto
 }
 
 const BINDER_PTS = 28;
+let farMat: THREE.MeshStandardMaterial | null = null;
+/** shared material of all baked far-LOD pods (one pipeline, vertex colours) */
+function farMaterial() { return farMat ?? (farMat = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.45, roughness: 0.45 })); }
 
 export function buildPodModel(def: PodDef, colors: [string, string, string], quality = 2, texRes = 1024): PodVisual {
   const seg = quality >= 3 ? 48 : quality === 2 ? 32 : 20;
@@ -150,6 +156,48 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
       binder.u.uPower.value = (0.55 + throttle * 0.35 + boost * 0.6) * Math.min(1, Math.min(dmgL, dmgR) * 3);
     }
   };
-  const dispose = () => { own.forEach(m => m.dispose()); binder?.geo.dispose(); };
-  return { group, body, engines, exhaustLocal, eye, hood, update, dispose };
+  // ---- distance LOD (session 7): merged per-material proxy, built lazily on first use
+  const flameSet = new Set(flames.map(f => f.m));
+  let far: THREE.Group | null = null; const farGeos: THREE.BufferGeometry[] = []; const detail: THREE.Mesh[] = [];
+  let lod = -1, shadowOn = true;
+  const buildFar = () => {
+    // baked far LOD: every part merged into ONE geometry in body space, material colour baked into vertex colours,
+    // one shared opaque material + the glow material → 2 draws per pod instead of ~45 (fans/flaps/bob frozen at distance)
+    far = new THREE.Group(); body.add(far);
+    body.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(body.matrixWorld).invert(); const mm = new THREE.Matrix4();
+    const opaque: THREE.BufferGeometry[] = [], glowG: THREE.BufferGeometry[] = []; const c = new THREE.Color();
+    const hullCols = [new THREE.Color(colors[0]), new THREE.Color(colors[1])];
+    body.traverse(o => {
+      const m = o as THREE.Mesh; if (!m.isMesh || flameSet.has(m) || m.parent === far || (binder && m.geometry === binder.geo)) return;
+      detail.push(m);
+      const mat = m.material as THREE.Material & { color?: THREE.Color; metalness?: number }; if (mat.transparent && mat !== glow) return; // glass etc. skipped
+      const src = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', src.attributes.position); if (src.attributes.normal) g.setAttribute('normal', src.attributes.normal); else g.computeVertexNormals();
+      g.applyMatrix4(mm.multiplyMatrices(inv, m.matrixWorld));
+      const isHull = mat === hullL || mat === hullR || mat === hullC;
+      if (isHull) { const liv = src.attributes.aLiv as THREE.BufferAttribute | undefined; c.copy(hullCols[0]); if (liv) { const avg = Array.from({ length: Math.min(liv.count, 64) }, (_, i) => liv.getX(i)).reduce((x, y) => x + y, 0) / Math.min(liv.count, 64); c.lerp(hullCols[1], Math.min(1, Math.max(0, avg))); } }
+      else { if (mat.color) c.copy(mat.color); else c.set(0x808080); c.multiplyScalar((mat.metalness ?? 0) > 0.5 ? 0.75 : 1); }
+      const n = g.attributes.position.count, col = new Float32Array(n * 3); for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+      g.setAttribute('color', new THREE.BufferAttribute(col, 3)); src.dispose();
+      (mat === glow ? glowG : opaque).push(g);
+    });
+    for (const [list, mat] of [[opaque, farMaterial()], [glowG, glow]] as [THREE.BufferGeometry[], THREE.Material][]) {
+      if (!list.length) continue; const g = mergeGeometries(list); list.forEach(x => x.dispose()); if (!g) continue; farGeos.push(g);
+      const fm = new THREE.Mesh(g, mat); fm.castShadow = mat !== glow; fm.receiveShadow = true; far.add(fm); proxies.push(fm);
+    }
+  };
+  const proxies: THREE.Mesh[] = [];
+  const setLod = (dist: number) => {
+    const want = dist > 18 ? 1 : 0; // AI pods only; baked proxy reads fine beyond ~18 m
+    if (want !== lod) {
+      if (want === 1 && !far) buildFar();
+      lod = want; for (const pm of proxies) pm.visible = want === 1;
+      for (const m of detail) m.visible = want === 0;
+      
+    }
+    const sh = dist < 110; // sun shadow frustum is ±130 m around the player
+    if (sh !== shadowOn) { shadowOn = sh; body.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh && !flameSet.has(m)) m.castShadow = sh && m.material !== glow && !(m.material as THREE.Material).transparent; }); }
+  };
+  const dispose = () => { own.forEach(m => m.dispose()); binder?.geo.dispose(); farGeos.forEach(g => g.dispose()); };
+  return { group, body, engines, exhaustLocal, eye, hood, update, setLod, dispose };
 }
