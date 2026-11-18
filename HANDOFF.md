@@ -1,52 +1,30 @@
 # HANDOFF
 
-## Stand: 2026-11-16 (Session 5) – Landschafts-TODOs + mehr Landschaftsdetails
+## Stand: 2026-11-17 (Session 8) – Start-Lag, Grafikfehler, Sicht, Hindernisse & aktive Triebwerks-Aufhängung
 
-### Erledigt in Session 5
-1. **Gelände-Texturen** – neues `terrainMaterial.ts`:
-   - Splatting Sand / Kies / Becken / Fels mit Höhenmischung.
-   - Gesteinsschichten je Welt (`STRATA`, auch auf Schluchtwänden und Landmarken).
-   - Ziehende Wolkenschatten.
-   - Basis: neues Vertex-Attribut `aSplat` aus `terrain.ts`; Becken = abgeflachte Senken (Salzpfannen, gefrorene Seen, Sümpfe, Lavakrusten mit glühenden Rissen).
-2. **Bodenbewuchs** – `groundCover.ts`:
-   - 26 Typen über 8 Welten, rund 27.000 Instanzen im Dschungel.
-   - 150-m-Zellen mit Sichtweite je Typ, Dither-Fade, Wind.
-3. **Rauchsäulen ohne Partikel** – `smoke.ts`: Billboards (1 Draw-Call) an Schloten, Vulkanen, Wracks, Stationen, Bohrinseln und Schloten der Welten, dazu wandernde Staub-, Schnee- und Methanteufel.
-4. **Leben** – `wildlife.ts`: Vogelschwärme, Bantha-Herden, Langhals-Riesen, Sandkriecher, Landgleiter, Himmelsverkehr, Patrouillenschiffe, Lastkähne; Animation auf der GPU (Beine, Hälse, Flügel).
-5. **Neue Landmarken:** Krayt-Skelett, Feuchtfarm, Steinkreis, Leuchtturm, Wrack auf Ando Prime. **Sandverwehungen** auf Tatooine.
-6. **Fixes**
-   - WebGPU-Texturlimit (17 > 16): Höhe in `map.a`, Rauheit in `normalMap.a` gepackt.
-   - Dschungel-Wasserspiegel überflutete das Land → abgesenkt.
-   - God-Ray-Streifen durch Wasserglanz → Himmelsmaske.
-   - Alte Kegel-„Farne“ entfernt; Matsch-Straße weniger glänzend.
-   - KI-Explosionen an Hindernissen/Set-Pieces → Schaden-Cooldowns, KI-Schaden × 0,45, Set-Pieces nicht auf Hindernisfeldern.
-7. **Verifiziert**
-   - `tsc` sauber, Build ok (≈ 1,98 MB).
-   - WebGPU-Renders: Boonta, Dschungel (Langhals-Riese), Malastare (Vulkan-Aschesäule), Ando Prime, Vulkanwelt.
-   - Physik-Sims: Henker-Sprint 0 Explosionen (vorher 5), Malastare 2 (vorher 7), Boonta 0, 0 NaN.
-   - App bootet unter WebGPU mit 0 Konsolenfehlern.
+### Erledigt in Session 8
+1. **Rennstart-Lag beseitigt (`post.ts`, `Game.ts`, `particles.ts`, `podMaterials.ts`, `podModel.ts`, `trackMesh.ts`, `RaceView.tsx`)**
+   - **Ursache 1 – Fehlende Pipeline-Vorkompilierung:** `r.compileAsync(scene, cam)` kompilierte fürs Canvas-Format statt für den `HalfFloat`-`scenePass` (+ Schatten + PostFX + Partikel + Pod-Fern-LOD) → alle Pipelines kompilierten erst mitten im Countdown/Start. **Fix:** `post.warmup(renderer)` kompiliert `scenePass.compileAsync`, rendert 2 komplette Frames (inkl. Seed-Partikeln & beiden Pod-LODs) und wartet auf `queue.onSubmittedWorkDone()` noch hinter dem Ladescreen.
+   - **Ursache 2 – Fullscreen-Partikel-Overdraw an der Kamera:** `PointsNodeMaterial` teilte durch `-positionView.z` ohne Obergrenze → Abgas-/Staub-/Wetterpartikel vor/an der Verfolgerkamera wurden zu 4K-Vollbild-Quads. **Fix:** `sizeNode` auf `≤ 14–16 %` Bildhöhe gedeckelt, `0` für `vz < 1,2 m`, weicher Nah-Fade, keine Abgas-Spawns im Countdown.
+   - **Ursache 3 – 64 einzelne Pod-Shader-Pipelines am Start:** Gegner-Lack, -Flammen, -Binder & -Glow laufen jetzt über **je 1 geteilte Pipeline** mit gebackenen Vertex-Farben (**64 → 11 TSL-Pipelines, 120 → 31 Materialien** für 11 Pods am Start).
+   - **Ursache 4 – PostFX, Schatten & HUD-Filter:** `BloomNode.setResolutionScale(0.5)` (−75 % Fillrate), Schattenkarte `[0, 1024, 1536, 2048]` auf ±96 m, Ultra-SSR standardmäßig aus (optional zuschaltbar), 40-px-CSS-`drop-shadow` im 3-2-1-Countdown durch 0-ms-`textShadow` ersetzt, `smoke.ts` mit `macroTexture` statt 3D-Perlin.
 
-### Bekannt / offen
-- KI in dichten Hindernisfeldern (Malastare-100, 36–44 %) – siehe `TODO.md` §1.
-- Bewuchs-Platzierung kostet Ladezeit (3 `heightAt` je Instanz).
+2. **Restliche Grafikfehler behoben (`post.ts`, `trackMesh.ts`, `materials.ts`, `terrainMaterial.ts`, `world.ts`, `groundCover.ts`, `trackDetail.ts`)**
+   - **AO & God Rays:** `depth.sample()` in nicht-uniformem `If`/`Loop` und `GTAONode`-Artefakte ersetzt durch 4-Paar-symmetrisches Depth-AO + 14-Tap-God-Rays per ableitungsfreiem `textureLoad` (0 WGSL-Uniformity-Fehler, 0 Halos, 0 Streifen auf Ebenen, immun gegen Partikel/Gras). SSR-Composite zu 100 % in uniformem Control-Flow.
+   - **`StaticBatcher` (`trackMesh.ts`):** `BatchedMesh` (mit geteilter `_indirectTexture` zwischen Schatten- und Kamerapass) ersetzt durch räumlich gemergte 580-m-`THREE.Mesh`-Kacheln (0 `BatchedMesh`, unabhängiges Frustum-Culling, 0 Textur-Uploads/Frame).
+   - **Naht- & TBN-Fixes:** `displace = 0` auf `wallMat` und Kanten-Lock (`uv.x = 0/1`) auf `roadMat` (keine Risse an Straßenkanten/Klippen/Tunneln); 128×-vorskalierter TBN + Silhouetten-Sprungschutz in `materials.ts`/`podMaterials.ts`; singularitätsfreies `xzNormalToView` + `polygonOffset` auf Wasser/Lava; überschneidungsfreier Kuppel-LOD für ferne Büsche; Moiré-freies Energiefeld.
 
-### Test setup (nach jedem Sandbox-Reset)
-```bash
-mkdir -p /tmp/pw && cd /tmp/pw && npm init -y && npm i playwright@1.49.1 && npx playwright install chromium
-mkdir -p /tmp/libs/debs /tmp/libs/state/lists/partial /tmp/libs/cache/archives/partial && cd /tmp/libs/debs
-apt-get -o Dir::State::Lists=/tmp/libs/state/lists -o Dir::Cache=/tmp/libs/cache -o Debug::NoLocking=1 update
-apt-get -o Dir::State::Lists=/tmp/libs/state/lists -o Dir::Cache=/tmp/libs/cache download libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libasound2 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libdbus-1-3 libdrm2 libgbm1 libnspr4 libnss3 libxkbcommon0 libwayland-server0 libxi6 libxtst6 libxshmfence1 libvulkan1 libxrender1 libxext6 libx11-6 libxcb1 libxau6 libxdmcp6 libbsd0 libmd0
-for f in *.deb; do dpkg-deb -x "$f" /tmp/libs/root; done
-```
+3. **Weniger & klar erkennbare Streckenhindernisse (`trackBuilder.ts`, `world.ts`)**
+   - Hindernisanzahl um **~55 % gesenkt** (Ø **7,5 statt ~17** pro Strecke), Mindestabstand **≥ 52 m**, Freihaltezone vor Rampen und Landezonen (`-68..+42` Samples für Set-Pieces), nur 1 Säule in Abkürzungstunneln.
+   - Jedes Hindernis trägt jetzt einen leuchtenden Boden-Warnring, gelb-schwarze Warnstreifen (Kisten) bzw. mehrere Leuchtringe (Säulen) und eine hohe orange-rote Warnbake auf der Spitze (auch auf jedem Felsbrocken).
 
-### Frühere Sessions
-- S4: offene Landschaften, Halbschluchten, Landmarken, BatchedMesh, Gelände-LOD, Set-Pieces, Wetter.
-- S3: Trefferkreis-Kollision, Chunking, Streckendetails, Geysire, 4 neue Strecken.
-- S2: WebGPU + TSL. S1: High-Poly-Podracer.
+4. **Klare Sicht hinter Vordermännern (`particles.ts`, `Game.ts`)**
+   - Kein grauer Rauch mehr aus intakten Triebwerken; Bodenstaub flach (`vy < 0,9`), klein (`≤ 3,2 m`), dezent (`alpha ≤ 0,06`) und bei Gegnern unter 24 m vor der Kamera komplett unterdrückt; Schadensrauch auf `alpha ≤ 0,16` (Gegner `× 0,32`) gedämpft + Kamera-Nahfade ab 12 m.
 
-### Wichtig für den nächsten Agenten
-- Lokaler Commit ist **nicht gepusht**; die Sandbox verliert `.git` → Wiederherstellung siehe `CLAUDE.md`.
-- Neue Materialien: Texturbudget (16/Stage) beachten, gepackte Kanäle nutzen (`CLAUDE.md` → Rendering rules).
+5. **5-Punkt-Bodenkollision & dynamische Triebwerks-Aufhängung (`physics.ts`, `podModel.ts`, `podMaterials.ts`, `podDesigns.ts`, `trackBuilder.ts`, `PodPreview.tsx`)**
+   - Flughöhe `HOVER = 2,85 m`, exakte Straßenwölbung (`crown` + Randlippe) in `frameAt`/`roadSurfaceAt`, Längsneigung folgt realer Straßen-/Rampensteigung, harte 5-Punkt-Repulsor-Kollision (`MIN_ROAD_CLEAR = 0,68 m`) für linkes/rechtes Triebwerk (vorn/hinten inkl. Flügel) und Cockpit.
+   - Beim Lenken & Luftbremsen schwingen linkes und rechtes Triebwerk per Feder-Dämpfer (`ω = 11,5, ζ = 0,66`) dynamisch gegengleich auf und ab (**0,99–1,78 m Hub**, Außentriebwerk steigt & hebt die Nase, Innentriebwerk taucht in den Scheitelpunkt) – bei Spieler **und** Gegnern, inkl. diagonal mitziehendem Energie-Binder und GPU-biegsamen Steuerseilen (`cableFlexMaterial`).
+   - **Verifiziert:** alle 10 Pods im Extrem-Slalom + Luftbremse + Schanzen + harter Landung → **kleinste Bodenfreiheit `+0,81 m`, `0` Boden-Durchdringungen**; alle 14 Strecken × 11 Pods × 45 s → **`0` Todesfälle/Abstürze, `0` NaN**; 256 WGSL-/GLSL-Builds mit **0 Warnungen**.
 
 ### Nächster sinnvoller Schritt
-`TODO.md` §1: KI-Pfadsuche durch Hindernisfelder (≈ 1 Stunde; Test: `tools/harness/run.sh game "s9:30"` → `deaths=[]`).
+`TODO.md` §1: Livery-Vorlagen & Startnummern im Hangar + Triebwerks-Hitzeflimmern (≈ 60–90 Min.).

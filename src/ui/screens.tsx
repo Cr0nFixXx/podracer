@@ -236,7 +236,7 @@ export function SettingsScreen({ profile, update, go }: { profile: Profile; upda
             <div className="flex flex-wrap gap-2 items-center">
               {(['low', 'medium', 'high', 'ultra'] as const).map(n => <Btn key={n} active={g.preset === n} onClick={() => preset(n)}>{{ low: 'Niedrig', medium: 'Mittel', high: 'Hoch', ultra: 'Ultra' }[n]}</Btn>)}
               {g.preset === 'custom' && <span className="text-xs text-cyan-300 uppercase tracking-widest ml-2">Benutzerdefiniert</span>}
-              <span className="ml-auto text-[11px] text-stone-400 uppercase tracking-widest">Renderer: WebGL 2 HDR-Pipeline · WebGPU {webgpu ? 'erkannt' : 'nicht verfügbar'}</span>
+              <span className="ml-auto text-[11px] text-stone-400 uppercase tracking-widest">Renderer: {g.backend === 'webgl' ? 'WebGL2 erzwungen' : webgpu ? 'WebGPU HDR-Pipeline' : 'WebGL2 Fallback'}</span>
             </div>
           </Panel>
           <Panel title="Auflösung & Geometrie">
@@ -265,7 +265,7 @@ export function SettingsScreen({ profile, update, go }: { profile: Profile; upda
             <Toggle label="Bloom" value={g.bloom} onChange={v => set('bloom', v)} />
             {g.bloom && <Slider label="Bloom-Stärke" value={g.bloomStrength ?? 0.5} min={0} max={1.5} step={0.05} onChange={v => update(p => ({ ...p, gfx: { ...p.gfx, bloomStrength: v } }))} fmt={v => Math.round(v * 100) + '%'} />}
             <Toggle label="Geschwindigkeits-Unschärfe" value={g.motionBlur} onChange={v => set('motionBlur', v)} />
-            <Toggle label="Kino-Shader (CA, Grain, Grading)" value={g.cinematic} onChange={v => set('cinematic', v)} />
+            <Toggle label="Kino-Shader (CA, Grading, Vignette)" value={g.cinematic} onChange={v => set('cinematic', v)} />
             <div className="text-[11px] uppercase tracking-widest text-stone-300 mt-2 mb-2">Kantenglättung</div>
             <div className="flex gap-2 mb-3">{(['none', 'fxaa', 'smaa'] as const).map(a => <Btn key={a} active={g.aa === a} onClick={() => set('aa', a)}>{a === 'none' ? 'Aus' : a.toUpperCase()}</Btn>)}</div>
             <Toggle label="FPS anzeigen" value={g.showFps} onChange={v => set('showFps', v)} />

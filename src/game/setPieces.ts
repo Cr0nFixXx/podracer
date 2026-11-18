@@ -2,15 +2,18 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { ThemeDef } from './data';
 import type { PodState } from './physics';
-import { gateDrop, gateWarn, nearestOnPath, rotorAngle, type Obstacle, type TrackData } from './trackBuilder';
+import { boulderState, bridgeSwing, bridgeWarn, gateDrop, gateWarn, nearestOnPath, rotorAngle, type Obstacle, type TrackData } from './trackBuilder';
 
 /**
- * Dynamic set pieces (visuals + state). Collision lives in physics.ts (collideSetPieces) and reads the same state:
- *  - rotor: rotating hazard-striped arms on a pylon, one wide and one narrow lane
- *  - gate:  gantry with three portcullis sections that drop in sequence (amber warning → red)
- *  - arch:  rock arch that collapses when the leader approaches (lap 2 on circuits); boulders become obstacles
+ * Dynamic set pieces (visuals + state). Collision & AI timing live in physics.ts and read the exact same state:
+ *  - rotor:   rotating hazard-striped blades on an armored hub pylon
+ *  - gate:    overhead gantry with three sequenced portcullis slabs (green → amber blink → red drop + slam FX)
+ *  - arch:    stratified rock arch that collapses into a navigable slalom when the leader arrives
+ *  - icefall: translucent glacier ice-bridge that fractures & drops crystalline monoliths (Ando Prime)
+ *  - boulder: canyon stone chute launching giant bouncing boulders across the road (with warning beacon)
+ *  - bridge:  twin side-pivoted swinging boom-bridge arms sweeping across outer lanes (leaving a bold center gap)
  */
-export interface SetPieceFx { type: 'dust' | 'collapse'; x: number; y: number; z: number; strength: number; }
+export interface SetPieceFx { type: 'dust' | 'collapse' | 'slam' | 'ice'; x: number; y: number; z: number; strength: number; }
 type Disp = { dispose: () => void }[];
 type Fn = (t: number, rt: number, pods: PodState[], dt: number, frozen: boolean, fx: SetPieceFx[]) => void;
 
@@ -28,63 +31,160 @@ const merged = (list: THREE.BufferGeometry[]) => { const g = mergeGeometries(lis
 export function buildSetPieces(td: TrackData, theme: ThemeDef, group: THREE.Group, disp: Disp, rockMat: THREE.Material) {
   const S = td.main.samples, N = S.length; const fns: Fn[] = [];
   if (!td.setPieces.length) return { update: (): SetPieceFx[] => [] };
-  const metal = new THREE.MeshStandardMaterial({ color: '#6c717b', metalness: 0.85, roughness: 0.35 });
-  const dark = new THREE.MeshStandardMaterial({ color: '#2a2d33', metalness: 0.7, roughness: 0.5 });
-  const tex = hazardTex(); const hazard = new THREE.MeshStandardMaterial({ map: tex, metalness: 0.3, roughness: 0.5 });
-  const glow = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.2) });
-  disp.push(metal, dark, tex, hazard, glow);
-  const RED = new THREE.Color('#ff2a18').multiplyScalar(1.4), AMBER = new THREE.Color('#ffb020').multiplyScalar(1.3), GREEN = new THREE.Color('#30ff60'), OFF = new THREE.Color('#201008');
+  const metal = new THREE.MeshStandardMaterial({ color: '#6c727c', metalness: 0.86, roughness: 0.33 });
+  const dark = new THREE.MeshStandardMaterial({ color: '#282c33', metalness: 0.74, roughness: 0.48 });
+  const tex = hazardTex(); const hazard = new THREE.MeshStandardMaterial({ map: tex, metalness: 0.32, roughness: 0.48 });
+  const glow = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.25) });
+  const iceMat = new THREE.MeshStandardMaterial({ color: '#b4e4ff', roughness: 0.18, metalness: 0.1, emissive: '#2c78b4', emissiveIntensity: 0.32, transparent: true, opacity: 0.88 });
+  disp.push(metal, dark, tex, hazard, glow, iceMat);
+  const RED = new THREE.Color('#ff2a18').multiplyScalar(1.35), AMBER = new THREE.Color('#ffb020').multiplyScalar(1.3), GREEN = new THREE.Color('#30ff60'), OFF = new THREE.Color('#201008');
 
   for (const sp of td.setPieces) {
     const s = S[sp.idx]; const yaw = Math.atan2(s.tx, s.tz);
     if (sp.type === 'rotor') {
       const root = new THREE.Group(); root.position.set(sp.x, sp.y, sp.z); group.add(root);
-      root.add(mesh(merged([new THREE.CylinderGeometry(2.8, 3.4, 0.8, 24).translate(0, 0.4, 0), new THREE.CylinderGeometry(1.5, 1.8, 7.5, 20).translate(0, 3.75, 0), new THREE.TorusGeometry(2.0, 0.25, 8, 24).rotateX(Math.PI / 2).translate(0, 0.9, 0)]), metal));
-      root.add(mesh(new THREE.SphereGeometry(0.5, 12, 8).translate(0, 7.8, 0), glow, false));
+      const pylonG = merged([
+        new THREE.CylinderGeometry(3.0, 3.6, 0.85, 24).translate(0, 0.42, 0),
+        new THREE.CylinderGeometry(1.5, 1.9, 8.0, 20).translate(0, 4.0, 0),
+        new THREE.TorusGeometry(2.1, 0.28, 8, 24).rotateX(Math.PI / 2).translate(0, 0.95, 0),
+        new THREE.TorusGeometry(1.75, 0.2, 8, 24).rotateX(Math.PI / 2).translate(0, 5.2, 0),
+      ]);
+      const capG = new THREE.SphereGeometry(0.55, 12, 8).translate(0, 8.3, 0);
+      disp.push(pylonG, capG);
+      root.add(mesh(pylonG, metal)); root.add(mesh(capG, glow, false));
       const rot = new THREE.Group(); root.add(rot);
-      rot.add(mesh(new THREE.CylinderGeometry(2.3, 2.3, 1.8, 20).translate(0, 2.0, 0), dark));
+      const hubG = new THREE.CylinderGeometry(2.4, 2.4, 1.9, 20).translate(0, 2.0, 0); disp.push(hubG);
+      rot.add(mesh(hubG, dark));
       const len = sp.armLen - 1.6;
       for (let k = 0; k < sp.arms; k++) {
         const arm = new THREE.Group(); arm.rotation.y = -(k / sp.arms) * Math.PI * 2; rot.add(arm);
-        arm.add(mesh(new THREE.BoxGeometry(len, 2.6, 1.4).translate(1.6 + len / 2, 1.9, 0), hazard));
-        arm.add(mesh(new THREE.BoxGeometry(1.2, 3.4, 1.9).translate(sp.armLen - 0.6, 1.9, 0), dark));
-        arm.add(mesh(new THREE.SphereGeometry(0.42, 10, 8).translate(sp.armLen - 0.6, 3.85, 0), glow, false));
+        const bg = new THREE.BoxGeometry(len, 2.5, 1.35).translate(1.6 + len / 2, 1.9, 0);
+        const tg = new THREE.BoxGeometry(1.3, 3.4, 1.95).translate(sp.armLen - 0.6, 1.9, 0);
+        const lg = new THREE.SphereGeometry(0.44, 10, 8).translate(sp.armLen - 0.6, 3.9, 0);
+        disp.push(bg, tg, lg);
+        arm.add(mesh(bg, hazard)); arm.add(mesh(tg, dark)); arm.add(mesh(lg, glow, false));
       }
       fns.push((_t, rt) => { rot.rotation.y = -rotorAngle(sp, rt); });
     } else if (sp.type === 'gate') {
       const root = new THREE.Group(); root.position.set(sp.x, sp.y, sp.z); root.rotation.y = yaw; group.add(root);
       const span = Math.max(s.wallL, s.wallR) + 1.8; const w3 = (2 * sp.hw) / 3;
       const frame: THREE.BufferGeometry[] = [];
-      for (const sd of [-1, 1]) { frame.push(new THREE.BoxGeometry(2.4, 23, 2.4).translate(sd * span, 11.5 - 1.5, 0), new THREE.BoxGeometry(3.6, 1.2, 3.6).translate(sd * span, -1.2, 0)); }
-      frame.push(new THREE.BoxGeometry(2 * span + 2.4, 1.6, 2.6).translate(0, 20.6, 0), new THREE.BoxGeometry(2 * span + 2.4, 0.8, 1.2).translate(0, 18.4, 0));
-      for (let k = 1; k < 3; k++) frame.push(new THREE.BoxGeometry(0.9, 12, 0.9).translate(-(-sp.hw + k * w3), 13.5, -1.2)); // guide rails between sections
-      root.add(mesh(merged(frame), metal));
-      const panels: THREE.Mesh[] = [], lamps: THREE.MeshBasicMaterial[] = [];
+      for (const sd of [-1, 1]) { frame.push(new THREE.BoxGeometry(2.4, 23, 2.6).translate(sd * span, 10, 0), new THREE.BoxGeometry(3.8, 1.3, 3.8).translate(sd * span, -1.2, 0)); }
+      frame.push(new THREE.BoxGeometry(2 * span + 2.6, 1.8, 2.8).translate(0, 20.6, 0), new THREE.BoxGeometry(2 * span + 2.6, 0.85, 1.3).translate(0, 18.4, 0));
+      for (let k = 1; k < 3; k++) frame.push(new THREE.BoxGeometry(0.9, 12, 0.9).translate(-(-sp.hw + k * w3), 13.5, -1.2));
+      const fg = merged(frame); disp.push(fg); root.add(mesh(fg, metal));
+      const panels: THREE.Mesh[] = [], lamps: THREE.MeshBasicMaterial[] = [], wasDown = [false, false, false];
       for (let k = 0; k < 3; k++) {
         const bars: THREE.BufferGeometry[] = []; const pw = w3 - 0.5;
         for (let x = -pw / 2; x <= pw / 2 + 0.01; x += 1.15) bars.push(new THREE.BoxGeometry(0.26, 9, 0.34).translate(x, 4.5, 0));
-        for (const y of [0.3, 3.2, 6.1, 8.8]) bars.push(new THREE.BoxGeometry(pw, 0.36, 0.46).translate(0, y, 0));
+        for (const y of [0.3, 3.2, 6.1, 8.8]) bars.push(new THREE.BoxGeometry(pw, 0.38, 0.48).translate(0, y, 0));
         for (let x = -pw / 2; x <= pw / 2 + 0.01; x += 1.15) bars.push(new THREE.ConeGeometry(0.22, 0.7, 6).rotateX(Math.PI).translate(x, -0.3, 0));
-        const p = mesh(merged(bars), dark); p.position.x = -(-sp.hw + (k + 0.5) * w3); root.add(p); panels.push(p);
+        const pg = merged(bars); disp.push(pg);
+        const p = mesh(pg, dark); p.position.x = -(-sp.hw + (k + 0.5) * w3); root.add(p); panels.push(p);
         const lm = new THREE.MeshBasicMaterial({ color: GREEN.clone() }); disp.push(lm); lamps.push(lm);
-        const lamp = mesh(new THREE.BoxGeometry(1.6, 0.7, 0.7), lm, false); lamp.position.set(p.position.x, 19.5, 1.5); root.add(lamp);
+        const lg = new THREE.BoxGeometry(1.8, 0.75, 0.75); disp.push(lg);
+        const lamp = mesh(lg, lm, false); lamp.position.set(p.position.x, 19.5, 1.5); root.add(lamp);
       }
-      fns.push((t, rt) => {
+      fns.push((t, rt, _pods, _dt, frozen, fx) => {
         for (let k = 0; k < 3; k++) {
           const dr = gateDrop(sp, k, rt); panels[k].position.y = 0.2 + (1 - dr) * 9.5;
           lamps[k].color.copy(dr > 0.02 ? RED : gateWarn(sp, k, rt) ? (Math.sin(t * 22) > 0 ? AMBER : OFF) : GREEN);
+          const down = dr > 0.96;
+          if (down && !wasDown[k] && !frozen && rt > 0.5) {
+            const lat = -sp.hw + (k + 0.5) * w3;
+            fx.push({ type: 'slam', x: sp.x + s.rx * lat, y: sp.y + 0.4, z: sp.z + s.rz * lat, strength: 0.9 });
+          }
+          wasDown[k] = down;
         }
       });
+    } else if (sp.type === 'boulder') {
+      // Sloped canyon rock-chute + warning beacon + giant bouncing craggy boulder rolling across the track!
+      const side = sp.lat; // +1 right, -1 left
+      const chute = new THREE.Group(); chute.position.set(s.x, s.y, s.z); chute.rotation.y = yaw; group.add(chute);
+      // In root local (+Z = tangent), world s.rx corresponds to local -X
+      const lx = -side * (sp.hw + 5.5);
+      const chuteG = merged([
+        new THREE.BoxGeometry(10, 0.8, 8.5).rotateZ(side * 0.48).translate(lx, 5.2, 0),
+        new THREE.BoxGeometry(10, 2.2, 0.7).rotateZ(side * 0.48).translate(lx, 6.1, -4.1),
+        new THREE.BoxGeometry(10, 2.2, 0.7).rotateZ(side * 0.48).translate(lx, 6.1, 4.1),
+        new THREE.CylinderGeometry(0.22, 0.32, 9.5, 8).translate(-side * (sp.hw + 1.8), 4.75, -4.8),
+      ]);
+      const lampMat = new THREE.MeshBasicMaterial({ color: GREEN.clone() });
+      const lampG = new THREE.SphereGeometry(0.65, 12, 8).translate(-side * (sp.hw + 1.8), 9.8, -4.8);
+      disp.push(chuteG, lampMat, lampG);
+      chute.add(mesh(chuteG, dark)); chute.add(mesh(lampG, lampMat, false));
+
+      // Sculpted craggy rolling boulder
+      const bGeo = new THREE.IcosahedronGeometry(sp.armLen, 3);
+      const bp = bGeo.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < bp.count; i++) {
+        const x = bp.getX(i), y = bp.getY(i), z = bp.getZ(i);
+        const k = 0.88 + h2(Math.round(x * 1.4), Math.round(y * 1.4 + z * 2.1)) * 0.16 + Math.sin(x * 1.3 + y * 1.1) * 0.08;
+        bp.setXYZ(i, x * k, y * k, z * k);
+      }
+      bGeo.computeVertexNormals(); disp.push(bGeo);
+      const rock = mesh(bGeo, rockMat, true); group.add(rock);
+      let prevBounce = false;
+      fns.push((t, rt, _pods, _dt, frozen, fx) => {
+        const bs = boulderState(sp, frozen ? 0 : rt);
+        rock.visible = bs.active || bs.warn;
+        const clLat = Math.max(-sp.hw, Math.min(sp.hw, bs.lat));
+        const gy = s.y - clLat * s.bank;
+        const bx = s.x + s.rx * bs.lat, bz = s.z + s.rz * bs.lat, by = gy + sp.armLen * 0.85 + bs.hop;
+        rock.position.set(bx, by, bz);
+        rock.rotation.set(bs.spin * 0.4, yaw, side * bs.spin);
+        lampMat.color.copy(bs.active ? RED : bs.warn ? (Math.sin(t * 20) > 0 ? AMBER : OFF) : GREEN);
+        if (bs.bounce && !prevBounce && !frozen && Math.abs(bs.lat) < sp.hw) {
+          fx.push({ type: 'dust', x: bx, y: gy + 0.5, z: bz, strength: 0.85 });
+        }
+        prevBounce = bs.bounce;
+      });
+    } else if (sp.type === 'bridge') {
+      // Twin side-mounted industrial swing-bridge boom barriers sweeping across outer lanes
+      const root = new THREE.Group(); root.position.set(sp.x, sp.y, sp.z); root.rotation.y = yaw; group.add(root);
+      const pivots: THREE.Group[] = [];
+      const lampMat = new THREE.MeshBasicMaterial({ color: GREEN.clone() }); disp.push(lampMat);
+      for (const sd of [-1, 1]) {
+        const px = -sd * (sp.hw + 1.4); // local X matching world side `sd`
+        const towerG = merged([
+          new THREE.CylinderGeometry(1.7, 2.2, 9.5, 16).translate(px, 4.2, 0),
+          new THREE.TorusGeometry(1.95, 0.25, 8, 20).rotateX(Math.PI / 2).translate(px, 3.6, 0),
+          new THREE.BoxGeometry(3.8, 1.2, 3.8).translate(px, -0.6, 0),
+        ]);
+        const lg = new THREE.SphereGeometry(0.6, 12, 8).translate(px, 9.4, 0);
+        disp.push(towerG, lg);
+        root.add(mesh(towerG, metal)); root.add(mesh(lg, lampMat, false));
+        const piv = new THREE.Group(); piv.position.set(px, 2.1, 0); root.add(piv);
+        const L = sp.armLen; const dir = sd; // extends inward toward X = 0
+        const boomG = new THREE.BoxGeometry(L, 2.4, 1.35).translate(dir * (L / 2 + 1.2), 0, 0);
+        const tipG = new THREE.BoxGeometry(1.1, 3.1, 1.8).translate(dir * (L + 1.2), 0, 0);
+        const tipL = new THREE.SphereGeometry(0.42, 10, 8).translate(dir * (L + 1.2), 1.85, 0);
+        disp.push(boomG, tipG, tipL);
+        piv.add(mesh(boomG, hazard)); piv.add(mesh(tipG, dark)); piv.add(mesh(tipL, lampMat, false));
+        pivots.push(piv);
+      }
+      fns.push((t, rt) => {
+        const sw = bridgeSwing(sp, rt); // 0 = swung forward out of road, 1 = perpendicular blocking outer lanes
+        pivots[0].rotation.y = (1 - sw) * (Math.PI * 0.48);
+        pivots[1].rotation.y = -(1 - sw) * (Math.PI * 0.48);
+        lampMat.color.copy(sw > 0.25 ? RED : bridgeWarn(sp, rt) || sw > 0.02 ? (Math.sin(t * 20) > 0 ? AMBER : OFF) : GREEN);
+      });
     } else {
-      // collapsing rock arch: 9 segments, the middle three fall
+      // Collapsing rock arch ('arch') OR fracturing glacier ice-bridge ('icefall'): 9 segments, middle 3 drop into a slalom!
+      const isIce = sp.type === 'icefall';
       const root = new THREE.Group(); root.position.set(s.x, s.y - 3, s.z); root.rotation.y = yaw; group.add(root);
-      const Ra = sp.hw + 8, tube = 4.5 + h2(sp.idx, 3) * 1.5, segs = 9; const pieces: THREE.Mesh[] = [];
+      const Ra = sp.hw + 8, tube = (isIce ? 4.0 : 4.5) + h2(sp.idx, 3) * 1.5, segs = 9; const pieces: THREE.Mesh[] = [];
       for (let k = 0; k < segs; k++) {
-        const g = new THREE.TorusGeometry(Ra, tube, 10, 8, Math.PI / segs); g.rotateZ((k * Math.PI) / segs);
+        const g = new THREE.TorusGeometry(Ra, tube, isIce ? 6 : 10, 8, Math.PI / segs); g.rotateZ((k * Math.PI) / segs);
         const p = g.attributes.position as THREE.BufferAttribute;
-        for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const nn = 0.85 + h2(Math.round(x * 0.7 + k), Math.round(y * 0.7 + z)) * 0.3; p.setXYZ(i, x, y * 1.18 + (nn - 1) * 2, z * nn * 1.45); }
+        for (let i = 0; i < p.count; i++) {
+          const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+          const nn = 0.85 + h2(Math.round(x * 0.7 + k), Math.round(y * 0.7 + z)) * 0.3;
+          p.setXYZ(i, x, y * 1.18 + (nn - 1) * 2, z * nn * (isIce ? 1.65 : 1.45));
+        }
         g.computeBoundingBox(); const c = g.boundingBox!.getCenter(new THREE.Vector3()); g.translate(-c.x, -c.y, -c.z); g.computeVertexNormals();
-        const m = mesh(g, rockMat); m.position.copy(c); root.add(m); pieces.push(m);
+        disp.push(g);
+        const m = mesh(g, isIce ? iceMat : rockMat); m.position.copy(c); root.add(m); pieces.push(m);
       }
       root.updateMatrixWorld(true);
       const falling = [3, 4, 5].map(k => pieces[k]);
@@ -95,8 +195,7 @@ export function buildSetPieces(td: TrackData, theme: ThemeDef, group: THREE.Grou
           if (!lead) return;
           let ahead = sp.idx - lead.idx; if (td.main.closed) { if (ahead < -N / 2) ahead += N; if (ahead > N / 2) ahead -= N; }
           if (!((td.main.closed ? lead.lap >= 1 : true) && ahead > 0 && ahead < 70)) return;
-          sp.state = 1; fx.push({ type: 'collapse', x: sp.x, y: sp.y + 20, z: sp.z, strength: 1 });
-          // staggered landing spots → a slalom, never a wall across the road
+          sp.state = 1; fx.push({ type: isIce ? 'ice' : 'collapse', x: sp.x, y: sp.y + 20, z: sp.z, strength: 1 });
           const targets: [number, number][] = [[-0.45, -14], [0.38, 4], [-0.02, 22]];
           falling.forEach((m, i) => {
             group.attach(m);

@@ -81,10 +81,13 @@ export function projUV(g: THREE.BufferGeometry, tile = TILE) {
   return g;
 }
 
-/** Rounded (bevelled) box – edges catch highlights, which reads as "machined". */
-export function rbox(w: number, h: number, d: number, r = 0.04, seg = 2) {
-  const rr = Math.max(0.002, Math.min(r, Math.min(w, h, d) * 0.45));
-  const g = new RoundedBoxGeometry(w, h, d, seg, rr);
+/** Rounded (bevelled) box – crisp BoxGeometry for sub-8cm micro-fins/louvres (25× fewer tris), bevelled for larger machined parts. */
+export function rbox(w: number, h: number, d: number, r = 0.04, seg = 1) {
+  const minDim = Math.min(w, h, d);
+  if (minDim < 0.085 || r < 0.014) return projUV(new THREE.BoxGeometry(w, h, d));
+  const rr = Math.max(0.004, Math.min(r, minDim * 0.45));
+  const s = Math.max(w, h, d) > 1.8 ? Math.min(2, seg) : 1;
+  const g = new RoundedBoxGeometry(w, h, d, s, rr);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', g.attributes.position); geo.setAttribute('normal', g.attributes.normal); geo.setIndex(g.index);
   return projUV(geo);
@@ -113,10 +116,10 @@ export function tube(points: THREE.Vector3[], r: number, segs = 24, radial = 8) 
 }
 export function extrude(pts: [number, number][], depth: number, bevel = 0.02) {
   const s = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y)));
-  const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 6 });
+  const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 1, curveSegments: 4 });
   g.translate(0, 0, -depth / 2);
-  const ng = g; ng.computeVertexNormals();
-  return projUV(ng);
+  g.computeVertexNormals();
+  return projUV(g);
 }
 
 export interface ProfilePt { r: number; z: number; hard?: boolean }
@@ -262,14 +265,15 @@ export function loftRim(outer: Section[], inner: Section[], seg: number) {
 }
 
 /** Twisted turbine blade along +Y (root at r0, tip at r1). */
-export function blade(r0: number, r1: number, chord: number, thick: number, twist0: number, twist1: number, segs = 5) {
+export function blade(r0: number, r1: number, chord: number, thick: number, twist0: number, twist1: number, segs = 3) {
+  const sN = Math.min(3, segs);
   const secs: Section[] = [];
-  for (let k = 0; k <= segs; k++) {
-    const f = k / segs; const c = chord * (1 - 0.25 * f);
+  for (let k = 0; k <= sN; k++) {
+    const f = k / sN; const c = chord * (1 - 0.25 * f);
     secs.push({ z: r0 + (r1 - r0) * f, w: c / 2, hT: thick / 2, hB: thick / 2, n: 5, rot: twist0 + (twist1 - twist0) * f });
   }
-  const g = loft(secs, 8, 0, [false, true]);
-  g.rotateX(-Math.PI / 2); // z(span) -> +y
+  const g = loft(secs, 6, 0, [false, true]);
+  g.rotateX(-Math.PI / 2);
   return g;
 }
 

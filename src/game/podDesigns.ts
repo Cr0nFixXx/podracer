@@ -230,3 +230,37 @@ export function podCollision(def: PodDef) {
   let halfW = 0; for (const c of circles) halfW = Math.max(halfW, Math.abs(c.x) + c.r);
   const out = { circles, halfW }; collCache.set(def.id, out); return out;
 }
+
+/** Exact 3D ground-clearance envelope in group-local space (accounts for body.position.z, cowling radius, rings & wings). */
+export interface PodEnvelope {
+  engL: { x: number; outerX: number; frontZ: number; backZ: number; minY: number };
+  engR: { x: number; outerX: number; frontZ: number; backZ: number; minY: number };
+  cockpit: { z: number; minY: number };
+}
+const envCache = new Map<string, PodEnvelope>();
+export function podEnvelope(def: PodDef): PodEnvelope {
+  const hit = envCache.get(def.id); if (hit) return hit;
+  const L = podLayout(def); const bz = -L.cockpit.z * 0.25;
+  const sideEnv = (sign: number) => {
+    const ms = L.engines.filter(e => (e.x < 0 ? -1 : 1) === sign);
+    let sx = 0, outerX = 0, frontZ = -1e9, backZ = 1e9, minY = 0;
+    for (const e of ms) {
+      const rBot = e.spec.R * (e.spec.style === 'ring' ? 1.36 : 1.12) + 0.1;
+      sx += e.x;
+      outerX = Math.max(outerX, Math.abs(e.x) + e.spec.R * (e.spec.style === 'blade' ? 2.1 : 1.1));
+      frontZ = Math.max(frontZ, e.z + bz + e.spec.L * 0.5);
+      backZ = Math.min(backZ, e.z + bz - e.spec.L * 0.5);
+      minY = Math.min(minY, e.y - rBot);
+    }
+    if (def.id === 'aurora') { outerX = Math.max(outerX, 4.45); minY = Math.min(minY, -0.62); }
+    return { x: sx / Math.max(1, ms.length), outerX: sign * outerX, frontZ, backZ, minY };
+  };
+  const ck = L.cockpit;
+  const out: PodEnvelope = {
+    engL: sideEnv(-1),
+    engR: sideEnv(1),
+    cockpit: { z: ck.z + bz, minY: ck.y - ck.hw * 0.68 - 0.14 },
+  };
+  envCache.set(def.id, out);
+  return out;
+}

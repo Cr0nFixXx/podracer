@@ -38,14 +38,19 @@ export default function PodPreview({ podId, colors, className, autoRotate = true
     const loop = () => {
       const t = (performance.now() - t0) / 1000;
       if (!st.drag && autoRotate) st.rot += 0.004;
-      if (st.pod) { st.pod.group.rotation.y = st.rot; st.pod.group.position.y = Math.sin(t * 2) * 0.15; st.pod.update(t, 0.4, 0, 0, 1, 1, 0); }
+      if (st.pod) {
+        const sw = Math.sin(t * 1.4) * 0.24;
+        st.pod.group.rotation.y = st.rot; st.pod.group.position.y = 0.45 + Math.sin(t * 2) * 0.12;
+        st.pod.setEngineMotion(sw, -sw, -sw * 0.08, sw * 0.08, 0);
+        st.pod.update(t, 0.4, 0, 0, 1, 1, 0);
+      }
       const def = PODS.find(p => p.id === st.podId) ?? PODS[0]; const dist = ((def.cable + def.engineLen) * 0.95 + 6) * st.zoom;
       cam.position.set(dist * 0.75, dist * 0.32, dist * 0.75); cam.lookAt(0, 0.3, 0);
       r.render(scene, cam);
     };
     r.init().then(() => {
       if (disposed) return;
-      const pm = new THREE.PMREMGenerator(r); const es = new THREE.Scene(); es.add(makeSky(THEMES.desert).mesh);
+      const pm = new THREE.PMREMGenerator(r); const es = new THREE.Scene(); es.add(makeSky(THEMES.desert, true).mesh);
       scene.environment = pm.fromScene(es, 0.02, 1, 20000).texture; pm.dispose();
       if (!disposed) r.setAnimationLoop(loop);
     }).catch(e => console.error('PodPreview renderer init failed', e));

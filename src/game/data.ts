@@ -227,7 +227,7 @@ export interface TrackDef {
   arches: number;
   difficulty: number; // 1..5
   hazards?: [number, number, number][]; // from, to, count – periodic geysers / vents
-  setPieces?: { rotor?: number[]; gate?: number[]; arch?: number[] }; // track fractions
+  setPieces?: { rotor?: number[]; gate?: number[]; arch?: number[]; boulder?: number[]; bridge?: number[]; icefall?: number[] }; // track fractions
 }
 
 export const TRACKS: TrackDef[] = [
@@ -242,7 +242,7 @@ export const TRACKS: TrackDef[] = [
     arches: 9,
   },
   {
-    id: 'frost', name: 'Frostspalt-Ring', planet: 'Ando Prime', theme: 'ice', type: 'circuit', difficulty: 3, setPieces: { rotor: [0.65] },
+    id: 'frost', name: 'Frostspalt-Ring', planet: 'Ando Prime', theme: 'ice', type: 'circuit', difficulty: 3, setPieces: { icefall: [0.47], rotor: [0.65] },
     desc: 'Rutschige Eispisten, Gletscherspalten und Eisdorn-Felder.',
     pts: [[0,0,0,34],[6,0,-6,30],[10,-2,-14,26],[13,-1,-20,24],[14,2,-16,22],[12,4,-8,26],[14,6,-2,28],[13,9,4,24],[10,9,8,30],[9,7,4,22],[7,8,0,24],[6,11,-6,30],[3,11,-10,36],[1,9,-6,24],[3,7,-2,22],[1,5,0,26],[-2,6,4,28],[-3,3,2,30],[-1.5,0.8,0,34]],
     canyons: [[0.1, 0.22], [0.42, 0.55], [0.74, 0.8]],
@@ -262,7 +262,7 @@ export const TRACKS: TrackDef[] = [
     arches: 10,
   },
   {
-    id: 'magma', name: 'Magma-Inferno', planet: 'Vulkanwelt', theme: 'lava', type: 'circuit', difficulty: 4, setPieces: { arch: [0.42] },
+    id: 'magma', name: 'Magma-Inferno', planet: 'Vulkanwelt', theme: 'lava', type: 'circuit', difficulty: 4, setPieces: { arch: [0.42], boulder: [0.71] },
     desc: 'Über Lavaseen und durch glühende Basaltschluchten. Ein Fehler – und du schmilzt.',
     pts: [[0,0,0,32],[5,1,4,30],[8,0,10,24],[10,-2,16,22],[13,-1,12,26],[13,2,6,22],[10,3,2,24],[9,5,-4,20],[11,7,0,24],[14,7,6,28],[15,10,10,22],[13,12,6,26],[10,11,0,30],[8,9,-4,22],[6,11,0,20],[3,12,6,28],[1,10,8,24],[2,7,4,22],[-1,5,2,26],[-2,2,0,30]],
     canyons: [[0.08, 0.2], [0.36, 0.48], [0.66, 0.74]],
@@ -273,7 +273,7 @@ export const TRACKS: TrackDef[] = [
     hazards: [[0.1, 0.9, 8]],
   },
   {
-    id: 'dunepass', name: 'Dünenpass-Sprint', planet: 'Tatooine', theme: 'mesa', type: 'sprint', difficulty: 2, setPieces: { arch: [0.5] },
+    id: 'dunepass', name: 'Dünenpass-Sprint', planet: 'Tatooine', theme: 'mesa', type: 'sprint', difficulty: 2, setPieces: { boulder: [0.2], arch: [0.5] },
     desc: 'Von den Hochplateaus hinab durch rote Tafelberge – Vollgas von Start bis Ziel.',
     pts: [[0,0,0,36],[5,0,-2,34],[9,2,-8,28],[11,5,-14,24],[10,8,-20,26],[12,11,-26,30],[16,11,-30,26],[18,8,-34,22],[21,7,-40,28],[24,9,-46,36],[25,13,-50,26],[22,15,-54,22],[23,18,-56,26],[27,19,-58,30],[31,17,-60,34],[34,18,-60,36]],
     canyons: [[0.12, 0.25], [0.45, 0.55], [0.7, 0.8]],
@@ -283,7 +283,7 @@ export const TRACKS: TrackDef[] = [
     arches: 10,
   },
   {
-    id: 'jungle', name: 'Dschungelfluss-Sprint', planet: 'Dschungelmond', theme: 'jungle', type: 'sprint', difficulty: 3, setPieces: { arch: [0.56] },
+    id: 'jungle', name: 'Dschungelfluss-Sprint', planet: 'Dschungelmond', theme: 'jungle', type: 'sprint', difficulty: 3, setPieces: { boulder: [0.23], arch: [0.56] },
     desc: 'Durch dichten Urwald, über Flussschluchten und an Wracks vorbei.',
     pts: [[0,0,0,32],[4,1,2,28],[6,4,6,24],[4,7,10,22],[6,10,8,24],[10,10,4,30],[12,7,0,24],[15,6,-4,22],[17,9,-8,26],[16,12,-6,22],[19,15,-2,24],[23,14,2,30],[25,11,0,26],[28,12,-2,28],[30,15,0,32]],
     canyons: [[0.15, 0.3], [0.5, 0.62]],
@@ -293,7 +293,7 @@ export const TRACKS: TrackDef[] = [
     arches: 6,
   },
   {
-    id: 'aquilaris', name: 'Aquilaris-Küstenlauf', planet: 'Aquilaris', theme: 'aquilaris', type: 'circuit', difficulty: 3, setPieces: { rotor: [0.15, 0.62] },
+    id: 'aquilaris', name: 'Aquilaris-Küstenlauf', planet: 'Aquilaris', theme: 'aquilaris', type: 'circuit', difficulty: 3, setPieces: { rotor: [0.15], bridge: [0.48], gate: [0.82] },
     desc: 'Schwebende Rennplattformen über dem Ozean: enge Kurven zwischen Felsinseln, Sprünge über Buchten und eine Abkürzung durch die Klippen.',
     pts: [[0,0,0,36],[6,0,2,32],[11,1,4,28],[15,3,6,24],[18,6,4,22],[19,10,0,26],[17,13,-4,24],[14,15,-2,28],[10,16,0,24],[6,15,2,30],[3,12,4,26],[1,8,2,28],[0,4,0,34]],
     canyons: [[0.2,0.34],[0.55,0.68]],
@@ -334,7 +334,7 @@ export const TRACKS: TrackDef[] = [
     hazards: [[0.08, 0.95, 10]],
   },
   {
-    id: 'mosespa', name: 'Mos-Espa-Arena', planet: 'Tatooine', theme: 'desert', type: 'circuit', difficulty: 3, setPieces: { gate: [0.44], rotor: [0.7] },
+    id: 'mosespa', name: 'Mos-Espa-Arena', planet: 'Tatooine', theme: 'desert', type: 'circuit', difficulty: 3, setPieces: { gate: [0.44], rotor: [0.7], bridge: [0.84] },
     desc: 'Stadion-Rundkurs vor den Toren von Mos Espa: lange Startgerade, Haarnadeln, drei Schluchten und eine Todesschanze.',
     pts: [[0,0,0,40],[7,0,0,38],[12,-1,4,30],[15,1,8,24],[14,4,6,22],[11,5,2,26],[10,8,0,24],[12,10,4,22],[16,11,10,28],[18,14,14,24],[15,16,10,22],[11,15,6,26],[8,13,2,24],[5,15,-2,22],[2,13,0,26],[0,10,2,30],[-2,7,4,24],[-1,3,2,32]],
     canyons: [[0.14, 0.26], [0.5, 0.6], [0.78, 0.88]],
@@ -344,7 +344,7 @@ export const TRACKS: TrackDef[] = [
     arches: 8,
   },
   {
-    id: 'howler', name: 'Heulerschlucht-Sprint', planet: 'Ando Prime', theme: 'ice', type: 'sprint', difficulty: 4, setPieces: { arch: [0.2, 0.55] },
+    id: 'howler', name: 'Heulerschlucht-Sprint', planet: 'Ando Prime', theme: 'ice', type: 'sprint', difficulty: 4, setPieces: { icefall: [0.2, 0.55] },
     desc: '80 Höhenmeter bergab durch drei vereiste Klammen – Eissäulen, zwei Abgrund-Schanzen, kaum Platz für Fehler.',
     pts: [[0,0,40,34],[5,1,34,30],[8,4,28,26],[7,8,22,24],[9,11,14,26],[13,12,8,24],[16,10,2,24],[19,11,-4,26],[21,14,-10,24],[19,17,-16,24],[21,20,-22,26],[25,21,-28,28],[29,19,-34,30],[33,20,-40,34]],
     canyons: [[0.05, 0.3], [0.38, 0.6], [0.68, 0.9]],
@@ -354,7 +354,7 @@ export const TRACKS: TrackDef[] = [
     arches: 10,
   },
   {
-    id: 'methane', name: 'Methan-Derby', planet: 'Malastare', theme: 'malastare', type: 'circuit', difficulty: 3, setPieces: { rotor: [0.55] },
+    id: 'methane', name: 'Methan-Derby', planet: 'Malastare', theme: 'malastare', type: 'circuit', difficulty: 3, setPieces: { bridge: [0.26], rotor: [0.55] },
     desc: 'Breite Highspeed-Bögen über Methan-Felder: Geysire brechen im Takt aus – Timing schlägt Mut.',
     pts: [[0,0,0,44],[8,0,2,40],[13,2,4,32],[14,6,2,28],[11,8,0,30],[8,7,-2,26],[5,9,0,28],[6,13,4,30],[10,15,6,34],[15,14,4,30],[18,11,2,28],[21,13,4,26],[20,17,6,30],[15,19,4,34],[8,19,2,36],[2,17,0,32],[-1,13,0,30],[-2,8,2,34],[-1,3,0,40]],
     canyons: [[0.2, 0.3], [0.62, 0.7]],

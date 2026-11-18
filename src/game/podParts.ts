@@ -66,12 +66,13 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
   pb.add('dark', lathe(prof([[rf * 0.6 * R, faceZ], [0.2 * R, faceZ]]), seg, 0));
   if (spec.spike) pb.add('chrome', lathe(prof([[0.22 * R, faceZ, 1], [0.2 * R, faceZ + L * 0.03], [0.12 * R, Z(1.0)], [0.015 * R, Z(1.0) + L * 0.26]]), segS, 0));
   else pb.add('chrome', lathe(prof([[0.22 * R, faceZ, 1], [0.21 * R, faceZ + L * 0.035], [0.14 * R, faceZ + L * 0.07], [0.0, faceZ + L * 0.085]]), segS, 0));
-  if (!split) pb.add('chrome', boltRing(rf * 0.985 * R, Math.round(seg * 0.6), 0.02 * R, Z(1.0) - 0.01));
-  if (style === 'heavy' || style === 'turbine') pb.add('hazard', torus(rf * 1.005 * R, 0.022 * R, 6, seg), M4.t(0, 0, Z(0.965)));
+  const detailHi = seg >= 24;
+  if (!split && detailHi) pb.add('chrome', boltRing(rf * 0.985 * R, Math.round(seg * 0.5), 0.02 * R, Z(1.0) - 0.01));
+  if (style === 'heavy' || style === 'turbine') pb.add('hazard', torus(rf * 1.005 * R, 0.022 * R, 5, seg), M4.t(0, 0, Z(0.965)));
 
   // fan (rotating) – twisted blades
-  const nb = spec.blades; const rMid = 0.52 * R;
-  const fan = radial(() => blade(0.21 * R, 0.83 * rf * R, (Math.PI * 2 * rMid / nb) * 1.25, 0.03 * R, 1.0, 0.38, 5), nb);
+  const nb = detailHi ? spec.blades : Math.max(8, Math.round(spec.blades * 0.65)); const rMid = 0.52 * R;
+  const fan = radial(() => blade(0.21 * R, 0.83 * rf * R, (Math.PI * 2 * rMid / nb) * 1.25, 0.03 * R, 1.0, 0.38, 3), nb);
   fan.computeBoundingSphere();
 
   // ---------------- exhaust nozzle ----------------
@@ -87,8 +88,8 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
   bandTs.forEach((tb, i) => {
     if (tb > bodyEnd - 0.04) return;
     const rb = bodyR(tb) * 0.955 * R;
-    pb.add(style === 'heavy' ? 'dark' : 'steel', torus(rb + 0.012 * R, (style === 'heavy' ? 0.045 : 0.032) * R, 8, seg), M4.t(0, 0, Z(tb)));
-    if (i % 2 === 0) pb.add('chrome', boltRing(rb + 0.035 * R, Math.round(seg * 0.5), 0.018 * R, Z(tb), true));
+    pb.add(style === 'heavy' ? 'dark' : 'steel', torus(rb + 0.012 * R, (style === 'heavy' ? 0.045 : 0.032) * R, 6, seg), M4.t(0, 0, Z(tb)));
+    if (detailHi && i % 2 === 0) pb.add('chrome', boltRing(rb + 0.035 * R, Math.round(seg * 0.45), 0.018 * R, Z(tb), true));
   });
 
   // ---------------- armour side plates (secondary paint) ----------------
@@ -98,14 +99,14 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
     const plate = prof([[r1, Z(a0), 1], [r1, Z(a1), 1], [r0, Z(a1), 1], [r0, Z(a0), 1], [r1, Z(a0), 1]]);
     const span = style === 'heavy' ? 1.1 : 0.8;
     for (const c of [Math.PI / 2, Math.PI * 1.5]) pb.add('hull', lathe(plate, Math.max(6, Math.round(seg * 0.2)), 3, c - span / 2, span));
-    // screws along the plates
-    for (const sd of [-1, 1]) for (let s = a0 + 0.03; s < a1 - 0.01; s += 0.06) for (const dy of [-0.3, 0.3]) {
+    if (detailHi) for (const sd of [-1, 1]) for (let s = a0 + 0.04; s < a1 - 0.01; s += 0.08) for (const dy of [-0.3, 0.3]) {
       pb.add('chrome', cyl(0.018 * R, 0.018 * R, 0.02 * R, 6), M4.trs(sd * (r1 + 0.005) * Math.cos(dy), r1 * Math.sin(dy), Z(s), 0, 0, Math.PI / 2));
     }
   }
 
   // ---------------- pipes & clamps ----------------
   const pipeSides = style === 'needle' ? [1] : [-1, 1];
+  const pipeSeg = Math.max(12, Math.round(seg * 0.55));
   for (const sd of pipeSides) for (const [ang, mat, rad] of [[0.62, 'copper', 0.036], [0.85, 'steel', 0.028]] as [number, MatKey, number][]) {
     const pp: THREE.Vector3[] = []; const tA = 0.16, tB = split ? 0.74 : 0.86;
     for (let k = 0; k <= 8; k++) {
@@ -114,8 +115,8 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
       const a = sd * ang;
       pp.push(new THREE.Vector3(Math.sin(a) * rr, Math.cos(a) * rr, Z(tt)));
     }
-    pb.add(mat, tube(pp, rad * R, 40, 8));
-    for (let k = 1; k < 8; k += 2) { const p = pp[k]; pb.add('dark', torus(rad * R * 1.5, rad * R * 0.45, 6, 12), M4.t(p.x, p.y, p.z)); }
+    pb.add(mat, tube(pp, rad * R, pipeSeg, 6));
+    if (detailHi) for (let k = 1; k < 8; k += 2) { const p = pp[k]; pb.add('dark', torus(rad * R * 1.5, rad * R * 0.45, 5, 10), M4.t(p.x, p.y, p.z)); }
   }
 
   // ---------------- louvre vents on the flanks ----------------

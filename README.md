@@ -24,37 +24,41 @@ npm run build    # erzeugt dist/index.html (alles inline, offline lauffähig)
 | Kamera wechseln | `C` | Y |
 | Pause | `Esc` / `P` | Start |
 
-Boost erhitzt die Triebwerke – rechtzeitig loslassen. **Hangar:** Pod mit der Maus drehen, Mausrad zoomt.
+Boost erhitzt die Triebwerke – rechtzeitig loslassen. **Hangar:** Pod mit der Maus drehen, Mausrad zoomt. Leuchtende blaue **Reparaturbuchten** mit Tesla-Spulen markieren schnelle Service-Abschnitte.
 
-## Strecken-Gefahren
+## Strecken-Gefahren & Set-Pieces
 
 | Gefahr | Verhalten |
 |---|---|
-| Leitplanken / Felswände | harter Aufprall, Schaden auf der getroffenen Seite; über den Planken weiches Energiefeld |
-| Rotoren, Fallgitter, Einsturz-Felsbögen | bewegliche Hindernisse (Lampen/Warnungen beachten) |
-| Geysire / Lava-Schlote | 1 s Warnring, dann Ausbruch (Schaden, Hitze, Auftrieb) |
-| Tunneldecken | Kopfstoß bei Sprüngen |
+| Markierte Hindernisse | Felsen, Säulen und Frachtblöcke mit Leuchtring am Boden und Warnbake auf der Spitze – mit klarem Abstand für Highspeed-Linien |
+| Leitplanken & Energiefeld | harter Aufprall an den Doppelplanken (Seiten-Schaden); darüber leuchtendes Plasma-Energiefeld mit Schockwellen-Aufblitzen bei Kontakt |
+| Rotoren & Schwenkbrücken | rotierende Warnbalken bzw. gegenläufige Brücken-Ausleger mit Signallampen und hörbarem Wummern |
+| Fallgitter | drei Torsektionen fallen der Reihe nach (Grün → Gelb blinkend → Rot mit Metallschlag) |
+| Rollende Felsen | Schluchtrinnen schleudern nach gelber Warnlampe springende Felsbrocken quer über die Piste |
+| Einsturz-Fels- & Eisbögen | brechen beim Anflug der Spitze und hinterlassen einen Slalom aus Fels- bzw. Gletscherblöcken |
+| Geysire / Lava-Schlote | Sinterkrater mit 1 s Warnring, dann Ausbruch (Schaden, Hitze, Auftrieb, Dampf-/Magmagrollen) |
+| Tunneldecken & Zero-G-Röhren | Kopfstoß bei hohen Sprüngen; Schwerelosigkeitsröhren auf Oovo IV |
 
 ## Inhalte
 
-**10 Podracer** (alle freigeschaltet, Tuning, Lackierung) · **14 Strecken: 8 Rundkurse, 6 Sprints** auf Tatooine, Ando Prime, Oovo IV, Malastare und weiteren Welten · bis zu 10 Gegner, 4 Schwierigkeitsstufen · 6 Kameras.
+**10 Podracer** (alle freigeschaltet, Tuning, Lackierung) · **14 Strecken: 8 Rundkurse, 6 Sprints** auf Tatooine, Ando Prime, Ökumenopolis, Vulkanwelt, Dschungelmond, Aquilaris, Oovo IV, Kristallschluchten und Malastare · bis zu 10 Gegner mit vorausschauender Korridor-KI, 4 Schwierigkeitsstufen · 6 Kameras.
 
-## Landschaft
+## Landschaft & Atmosphäre
 
-- **Offene Welten:** weite Ebenen, Halbschluchten mit Talblick, Gebirgsketten und Silhouetten am Horizont, Höhennebel in Tälern, **ziehende Wolkenschatten**.
-- **Boden:** Sand/Gras/Schnee wechselt mit **Kiesbanketten** an der Strecke, **Salzpfannen** (Tatooine), **gefrorenen Seen** (Ando Prime), **Sümpfen** (Malastare, Dschungel), **Lavakrusten mit glühenden Rissen**; Felsen zeigen Gesteinsschichten.
-- **Bewuchs:** Gras, Schilf, Farne, Blumen, Büsche, Dornsträucher, Steine, Kiesel, Eissplitter, Kristalle, leuchtende Pilze – im Wind wiegend, je Welt passend.
-- **Leben:** Vogelschwärme (Greifvögel, Möwen, Fledermäuse, leuchtende Motten), Bantha-Herden, Langhals-Riesen, Sandkriecher, Landgleiter, Himmelsverkehr, Patrouillenschiffe, Lastkähne.
-- **Landmarken:** Krayt-Drachen-Skelett, Feuchtfarm, Mos Espa, Raumschiffwracks, Forschungsstationen, Raffinerien, Vulkane mit Aschesäule, Steinkreis, Leuchtturm, Gefängnistürme u. v. m.
-- **Rauch ohne Partikel:** Rauch-, Dampf-, Asche- und Methansäulen über Schloten und Vulkanen, **Staubteufel** auf Tatooine, Schneeteufel auf Ando Prime.
-- Sand- und Schneeverwehungen an den Planken, Pfützen mit Regenringen, Zwillingssonnen über Tatooine.
+- **Offene Welten & Schluchten:** Barchan-Dünen und Kies-Wadis (Tatooine), Gletschergrate (Ando Prime), Karsthügel und Flussläufe (Dschungel/Malastare), glühende Lavarinnen (Vulkanwelt), Atolle und Felsnadeln (Aquilaris), dreistufige Horizont-Silhouetten, Talnebel und **ziehende Wolkenschatten**.
+- **Mehrschichtiger Boden & Detail-Normalmaps:** Sand/Gras/Schnee wechselt mit **Kiesbanketten**, **Salzpfannen**, **gefrorenen Seen**, **Sümpfen**, **Lavakrusten mit glühenden Rissen** und geschichtetem Fels (Schnee-, Moos- und Sandauflage auf flachen Felsabsätzen); jede Welt hat eigene Nah-/Mitteldistanz-Normalmaps (Windrippel, Sastrugi, Humus/Wurzeln, Pahoehoe-Lava, Kristallfacetten, Strandsand) sowie Uferschaum am Wasser.
+- **Wasser- & Lavafälle:** animierte Kaskaden an hohen Schluchtwänden (Dschungel, Aquilaris, Ando Prime) und glühende Magmafälle (Vulkanwelt) mit Gischt-/Glutbecken und aufsteigendem Dampf.
+- **Bewuchs mit LOD:** Gras, Schilf, Farne, Blumen, Agaven, bemooste Stämme, Büsche, Dornsträucher, Steine, Kiesel, Eissplitter, Kristalle, Leuchtpilze – im Wind wiegend, ferne Büsche mit nahtlosem Dither-LOD bis über 500 m.
+- **Reagierende Tierwelt & Verkehr:** Vogelschwärme (inkl. auf Felsen sitzender Schwärme, die bei vorbeirasenden Pods auffliegen), vor Pods fliehende Bantha-Herden, Langhals-Riesen, Sandkriecher, Landgleiter, Himmelsverkehr, Patrouillenschiffe und Lastkähne – weichen Landmarken aus und haben eigene Umgebungsgeräusche.
+- **Landmarken & Rauch:** Krayt-Drachen-Skelett, Feuchtfarm, Mos Espa, zerbrochene Raumschiffwracks, verbundene Forschungsstationen, Raffinerien mit Kugeltanks, Vulkane mit Lavastrom und Aschesäule, Stufentempel mit Feuerschalen, Steinkreis, Bohrinseln mit Helipad, gestreifte Leuchttürme, Gefängnistürme sowie wandernde Staub-, Schnee- und Methanteufel.
 
 ## Grafik-Einstellungen (Auswahl)
 
 | Schalter | Wirkung |
 |---|---|
+| Render-Skalierung | interne Auflösung (auf 4K/HiDPI bei ≤ 100 % automatisch für hohe FPS begrenzt, > 105 % natives UHD) |
 | WebGL2 erzwingen | statt WebGPU |
 | Static Batching | Streckengeometrie gebündelt (weniger Draw-Calls) – bei Grafikfehlern ausschalten |
-| Detail-Dichte | Menge an Bewuchs, Deko, Tieren |
-| Geometrie-Detail | auch Gelände-Feinheit nahe der Strecke |
-| Sichtweite | Geländegröße + Nebeldichte |
+| Ambient Occlusion (AO) | artefaktfreie Kontaktschatten an Kanten, Curbs, Klippenfüßen und Pods (bis 95 m) |
+| Screen Space Reflections | optionale Echtzeit-Spiegelungen auf nahen Metall-/Glanzflächen (in Ultra standardmäßig aus für maximale FPS) |
+| Detail-Dichte / Geometrie | Menge & Feinheit von Bewuchs, Sektor-Deko, Podracer-LODs und Gelände |

@@ -263,33 +263,40 @@ export function buildTrack(def: TrackDef): TrackData {
     s.wallL = s.openL ? s.hw + 30 : s.zeroG ? s.hw + 1 : s.hL > 0 ? s.hw + CANYON_OUTSET : s.hw - RAIL_INSET;
     s.wallR = s.openR ? s.hw + 30 : s.zeroG ? s.hw + 1 : s.hR > 0 ? s.hw + CANYON_OUTSET : s.hw - RAIL_INSET;
   }
-  // obstacles
+  // obstacles: ~55% fewer, well-spaced (>= 52 m apart) so high-speed lines stay fair, readable & flowing
   const obstacles: Obstacle[] = [];
   const startIdx = closed ? 30 : 45;
   const finishIdx = closed ? startIdx : N - 40;
-  const okSpot = (s: Sample) => !s.gap && s.ramp === 0 && !s.openL && !s.openR;
+  const okSpot = (s: Sample, i: number) => !s.gap && s.ramp === 0 && !s.openL && !s.openR && !samples[(i + 22) % N].gap && samples[(i + 18) % N].ramp === 0;
+  const idxDist = (a: number, b: number) => { const d = Math.abs(a - b); return closed ? Math.min(d, N - d) : d; };
   for (const [a, b, cnt] of def.obstacles) {
-    for (let c = 0; c < cnt; c++) {
+    const want = Math.max(2, Math.round(cnt * 0.45));
+    let placed = 0;
+    for (let tries = 0; tries < cnt * 5 && placed < want; tries++) {
       const idx = (Math.floor((a + (b - a) * rng()) * N) + N) % N;
-      const s = samples[idx]; if (!okSpot(s) || Math.abs(idx - startIdx) < 60) continue;
-      const r = 1.8 + rng() * 1.8; const lat = (rng() * 2 - 1) * (s.hw - r - 3);
-      const y = s.y - lat * s.bank;
+      const s = samples[idx];
+      if (!okSpot(s, idx) || idxDist(idx, startIdx) < 85 || (!closed && idxDist(idx, finishIdx) < 60)) continue;
+      if (obstacles.some(o => o.path === 0 && idxDist(o.idx, idx) < 26)) continue; // min 52 m spacing!
+      const r = 2.0 + rng() * 1.5;
+      const lat = (rng() * 2 - 1) * Math.max(2, s.hw - r - 4.5);
+      const e = Math.min(1, Math.abs(lat) / s.hw);
+      const y = s.y - lat * s.bank + (1 - e * e) * 0.2;
+      // Favor crisp tall pillars & hazard pods (2/3) plus beacon-marked boulders (1/3)
       obstacles.push({ path: 0, idx, lat, r, kind: Math.floor(rng() * 3), x: s.x + s.rx * lat, y, z: s.z + s.rz * lat });
+      placed++;
     }
   }
   for (let p = 1; p < paths.length; p++) {
     const ss = paths[p].samples;
-    for (let c = 0; c < 3; c++) {
-      const idx = Math.floor(ss.length * (0.3 + 0.2 * c)); const s = ss[idx]; const lat = (c % 2 ? 1 : -1) * 3.2;
-      obstacles.push({ path: p, idx, lat, r: 2, kind: 0, x: s.x + s.rx * lat, y: s.y, z: s.z + s.rz * lat });
-    }
+    const idx = Math.floor(ss.length * 0.52); const s = ss[idx]; const lat = 3.4;
+    obstacles.push({ path: p, idx, lat, r: 2.0, kind: 1, x: s.x + s.rx * lat, y: s.y + 0.15, z: s.z + s.rz * lat });
   }
   // hazards (geysers / vents) – also registered as kind-3 pseudo obstacles so the AI steers around them
   const hazards: Hazard[] = [];
   for (const [a, b, cnt] of def.hazards ?? []) {
     for (let c = 0; c < cnt; c++) {
       const idx = (Math.floor((a + (b - a) * rng()) * N) + N) % N; const s = samples[idx];
-      if (!okSpot(s) || Math.abs(idx - startIdx) < 80 || hazards.some(h => Math.abs(h.idx - idx) < 25)) continue;
+      if (!okSpot(s, idx) || Math.abs(idx - startIdx) < 80 || hazards.some(h => Math.abs(h.idx - idx) < 25)) continue;
       const lat = (rng() * 2 - 1) * s.hw * 0.55; const x = s.x + s.rx * lat, z = s.z + s.rz * lat, y = s.y - lat * s.bank;
       hazards.push({ idx, lat, r: 4.5, x, y, z, period: 4 + rng() * 3, phase: rng() * 10, duty: 0.3, state: 0 });
       obstacles.push({ path: 0, idx, lat, r: 4.5, kind: 3, x, y, z, hz: hazards.length - 1 });
@@ -299,18 +306,19 @@ export function buildTrack(def: TrackDef): TrackData {
   const setPieces: SetPiece[] = [];
   const cdist = (a: number, b: number) => { const d = Math.abs(a - b); return closed ? Math.min(d, N - d) : d; };
   const spOk = (i: number, type: string) => {
-    const s = samples[i]; if (!okSpot(s) || s.zeroG) return false;
+    const s = samples[i]; if (!okSpot(s, i) || s.zeroG) return false;
     if (closed ? cdist(i, startIdx) < 110 : (i < startIdx + 110 || i > finishIdx - 70)) return false;
-    for (let k = -30; k <= 30; k += 3) { const q = samples[((i + k) % N + N) % N]; if (q.gap || q.ramp > 0 || q.openL || q.openR || q.zeroG) return false; }
+    for (let k = -68; k <= 42; k += 3) { const q = samples[((i + k) % N + N) % N]; if (q.gap || q.ramp > 0 || q.openL || q.openR || q.zeroG) return false; }
     if (hazards.some(h => cdist(h.idx, i) < 50) || setPieces.some(o => cdist(o.idx, i) < 120)) return false;
     if (obstacles.some(o => o.path === 0 && o.kind < 3 && cdist(o.idx, i) < 45)) return false; // never stack a set piece onto an obstacle field
-    return type === 'arch' || Math.abs(s.curv) < 1 / 350;
+    return type === 'arch' || type === 'icefall' || type === 'boulder' || Math.abs(s.curv) < 1 / 350;
   };
-  for (const type of ['rotor', 'gate', 'arch'] as const) for (const f of def.setPieces?.[type] ?? []) {
+  for (const type of ['rotor', 'gate', 'arch', 'boulder', 'bridge', 'icefall'] as const) for (const f of def.setPieces?.[type] ?? []) {
     let best = -1, bs = 1e9; const c0 = Math.floor(f * N); const win = Math.floor(N * 0.08);
     for (let k = -win; k <= win; k += 3) {
       const i = closed ? ((c0 + k) % N + N) % N : c0 + k; if (i < 0 || i >= N || !spOk(i, type)) continue;
-      const sc = Math.abs(k) * 0.02 + Math.abs(samples[i].curv) * 2000 - (type === 'arch' && samples[i].hL > 0 && samples[i].hR > 0 ? 30 : 0);
+      const gorgeBonus = (type === 'arch' || type === 'icefall') && samples[i].hL > 0 && samples[i].hR > 0 ? 30 : type === 'boulder' && (samples[i].hL > 0 || samples[i].hR > 0) ? 24 : 0;
+      const sc = Math.abs(k) * 0.02 + Math.abs(samples[i].curv) * 2000 - gorgeBonus;
       if (sc < bs) { bs = sc; best = i; }
     }
     if (best < 0) continue;
@@ -320,8 +328,16 @@ export function buildTrack(def: TrackDef): TrackData {
       sp.lat = (rng() < 0.5 ? -1 : 1) * s.hw * 0.3; sp.armLen = Math.max(8, Math.min(17, s.hw * 0.42)); sp.arms = rng() < 0.5 ? 2 : 3;
       sp.speed = (0.75 + rng() * 0.5) * (rng() < 0.5 ? -1 : 1);
       sp.x = s.x + s.rx * sp.lat; sp.z = s.z + s.rz * sp.lat; sp.y = s.y - sp.lat * s.bank;
-      obstacles.push({ path: 0, idx: best, lat: sp.lat, r: 1.8, kind: 4, x: sp.x, y: sp.y, z: sp.z });
-      obstacles.push({ path: 0, idx: best, lat: sp.lat, r: sp.armLen + 1.5, kind: 3, x: sp.x, y: sp.y, z: sp.z });
+      obstacles.push({ path: 0, idx: best, lat: sp.lat, r: 1.9, kind: 4, x: sp.x, y: sp.y, z: sp.z });
+    } else if (type === 'boulder') {
+      // Launch from whichever side has a taller cliff wall (or random side)
+      sp.lat = s.hR > s.hL ? 1 : s.hL > s.hR ? -1 : (rng() < 0.5 ? 1 : -1); // +1 = rolls from right to left
+      sp.armLen = 3.2; // boulder radius
+      sp.period = 5.4 + rng() * 1.4;
+    } else if (type === 'bridge') {
+      // Twin side-pivoted drawbridge boom barriers leaving a central flight slot when closed
+      sp.armLen = s.hw * 0.68; // each boom spans 68% of half-width, leaving 32% central corridor
+      sp.period = 7.2 + rng() * 1.6;
     }
     setPieces.push(sp);
   }
@@ -409,24 +425,53 @@ export function frameAt(path: Path, idx: number, x: number, z: number): Frame {
   const bank = s.bank + (s2.bank - s.bank) * f;
   const hw = s.hw + (s2.hw - s.hw) * f;
   const clampedLat = Math.max(-hw, Math.min(hw, lat));
-  return { idx, lat, along, groundY: y + ramp - clampedLat * bank, gap: s.gap, zeroG: s.zeroG, hw, wallL: s.wallL + (s2.wallL - s.wallL) * f, wallR: s.wallR + (s2.wallR - s.wallR) * f, s };
+  const e = hw > 0.1 ? Math.abs(clampedLat) / hw : 0;
+  // Exact rendered road-surface elevation including camber crown, curb edge lip & displacement allowance
+  const crown = (1 - e * e) * 0.2 + (e > 0.88 ? ((e - 0.88) / 0.12) * 0.18 : 0) + 0.08;
+  return { idx, lat, along, groundY: y + ramp - clampedLat * bank + crown, gap: s.gap, zeroG: s.zeroG, hw, wallL: s.wallL + (s2.wallL - s.wallL) * f, wallR: s.wallR + (s2.wallR - s.wallR) * f, s };
+}
+
+/** Fast exact rendered road-surface elevation under any world point `(x, z)` (used for 5-point pod ground collision). */
+export function roadSurfaceAt(path: Path, guessIdx: number, x: number, z: number): { y: number; gap: boolean } {
+  const idx = nearestOnPath(path, x, z, guessIdx, 10, 10);
+  const fr = frameAt(path, idx, x, z);
+  return { y: fr.groundY, gap: fr.gap || Math.abs(fr.lat) > fr.hw + 2.5 };
 }
 
 // ---- set pieces ----
 export interface SpRock { x: number; y: number; z: number; vx: number; vy: number; vz: number; r: number; landed: boolean; hits: number; }
 export interface SetPiece {
-  type: 'rotor' | 'gate' | 'arch'; idx: number; x: number; y: number; z: number; hw: number;
+  type: 'rotor' | 'gate' | 'arch' | 'boulder' | 'bridge' | 'icefall';
+  idx: number; x: number; y: number; z: number; hw: number;
   lat: number; armLen: number; arms: number; speed: number; phase: number; period: number;
-  state: number; rocks: SpRock[]; // arch: 0 intact, 1 collapsing, 2 collapsed
+  state: number; rocks: SpRock[]; // arch/icefall: 0 intact, 1 collapsing, 2 collapsed
 }
 export function rotorAngle(sp: SetPiece, time: number) { return sp.phase + sp.speed * time; }
-function gatePhase(sp: SetPiece, k: number, time: number) { let ph = ((time + sp.phase) / sp.period - k / 3) % 1; if (ph < 0) ph += 1; return ph; }
+function cycPhase(time: number, phase: number, period: number, off = 0) { let ph = ((time + phase) / period - off) % 1; if (ph < 0) ph += 1; return ph; }
+const ss01 = (a: number, b: number, x: number) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 /** 0 = fully raised … 1 = fully lowered; one section at a time, 0.4 s drop, ~1.3 s closed */
 export function gateDrop(sp: SetPiece, k: number, time: number) {
-  const ph = gatePhase(sp, k, time); const ss = (a: number, b: number, x: number) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-  return ph < 0.06 ? ss(0, 0.06, ph) : ph < 0.26 ? 1 : ph < 0.32 ? 1 - ss(0.26, 0.32, ph) : 0;
+  const ph = cycPhase(time, sp.phase, sp.period, k / 3);
+  return ph < 0.06 ? ss01(0, 0.06, ph) : ph < 0.26 ? 1 : ph < 0.32 ? 1 - ss01(0.26, 0.32, ph) : 0;
 }
-export function gateWarn(sp: SetPiece, k: number, time: number) { return gatePhase(sp, k, time) > 0.86; }
+export function gateWarn(sp: SetPiece, k: number, time: number) { return cycPhase(time, sp.phase, sp.period, k / 3) > 0.86; }
+/** Rolling boulder across track: active during ph ∈ [0.16, 0.74], warn during [0.0, 0.16] */
+export function boulderState(sp: SetPiece, time: number) {
+  const ph = cycPhase(time, sp.phase, sp.period);
+  if (ph < 0.16) return { active: false, warn: true, lat: sp.lat * (sp.hw + 7), hop: 6, spin: 0, bounce: false };
+  if (ph > 0.74) return { active: false, warn: false, lat: -sp.lat * (sp.hw + 9), hop: -4, spin: 0, bounce: false };
+  const u = (ph - 0.16) / 0.58; // 0 = launch side, 1 = exit side
+  const lat = sp.lat * (sp.hw + 5 - u * (2 * sp.hw + 10));
+  const bPh = (u * 3) % 1;
+  const hop = (u < 0.1 ? (1 - u / 0.1) * 4.5 : 0) + Math.abs(Math.sin(u * Math.PI * 3)) * 2.4 * (1 - u * 0.35);
+  return { active: true, warn: false, lat, hop, spin: u * Math.PI * 7, bounce: bPh < 0.06 && u > 0.08 && u < 0.92 };
+}
+/** Twin counter-swinging bridge arms: 0 = swung open parallel to walls … 1 = swung across outer lanes */
+export function bridgeSwing(sp: SetPiece, time: number) {
+  const ph = cycPhase(time, sp.phase, sp.period);
+  return ph < 0.16 ? ss01(0, 0.16, ph) : ph < 0.44 ? 1 : ph < 0.6 ? 1 - ss01(0.44, 0.6, ph) : 0;
+}
+export function bridgeWarn(sp: SetPiece, time: number) { return cycPhase(time, sp.phase, sp.period) > 0.88; }
 function h1(i: number) { const s = Math.sin(i * 127.1 + 31.7) * 43758.5453; return s - Math.floor(s); }
 function vn1(x: number) { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return h1(i) + (h1(i + 1) - h1(i)) * u; }
 function fbm1(x: number) { return (vn1(x) * 0.5 + vn1(x * 2.03 + 5.2) * 0.25 + vn1(x * 4.1 + 1.7) * 0.125) / 0.875; }

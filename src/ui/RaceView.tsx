@@ -108,9 +108,9 @@ export default function RaceView({ profile, onExit, onBest }: Props) {
           {/* ===== messages ===== */}
           {h.sprint && <div className="absolute top-20 left-6 text-sm tracking-[0.3em]">{Math.round(h.progress * 100)}%</div>}
           {h.countdown > 0 && h.countdown <= 3.2 && (
-            <div className="absolute inset-0 flex items-center justify-center"><div className="text-[180px] font-black italic text-amber-300 drop-shadow-[0_0_40px_rgba(251,191,36,0.8)]">{Math.ceil(h.countdown)}</div></div>
+            <div className="absolute inset-0 flex items-center justify-center"><div className="text-[176px] font-black italic text-amber-300" style={{ textShadow: '0 0 32px rgba(251,191,36,0.75), 0 4px 0 #3b1806' }}>{Math.ceil(h.countdown)}</div></div>
           )}
-          {h.message && <div className="absolute top-[26%] w-full text-center text-5xl font-black italic tracking-[0.15em] text-amber-200 drop-shadow-[0_0_24px_rgba(251,191,36,0.7)]">{h.message}</div>}
+          {h.message && <div className="absolute top-[26%] w-full text-center text-5xl font-black italic tracking-[0.15em] text-amber-200" style={{ textShadow: '0 0 20px rgba(251,191,36,0.68), 0 3px 0 #3b1806' }}>{h.message}</div>}
           {h.wrongWay && <div className="absolute top-[40%] w-full text-center text-3xl font-black text-red-500 animate-pulse tracking-[0.3em]">⚠ FALSCHE RICHTUNG</div>}
           {h.zeroG && !h.wrongWay && <div className="absolute top-[18%] w-full text-center text-2xl font-black text-cyan-300 animate-pulse tracking-[0.4em]">⚠ SCHWERELOSIGKEIT</div>}
           {h.overheat && <div className="absolute top-[46%] w-full text-center text-xl font-black text-orange-400 animate-pulse tracking-[0.25em]">ÜBERHITZT</div>}
