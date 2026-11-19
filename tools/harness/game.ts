@@ -7,7 +7,7 @@ let g: Game | null = null; let cur = -1;
 (window as unknown as Record<string, unknown>).track = async (i: number, view: string) => {
   if (cur !== i) {
     g?.dispose(); cur = i;
-    const prof = defaultProfile(); prof.race.trackId = TRACKS[i].id; prof.race.opponents = 7; prof.gfx.texRes = 1024; if (location.search.includes('webgl')) prof.gfx.backend = 'webgl'; if (location.search.includes('csm')) prof.gfx.csm = true;
+    const prof = defaultProfile(); prof.race.trackId = TRACKS[i].id; prof.race.opponents = 7; prof.gfx.texRes = 1024; if (location.search.includes('webgl')) prof.gfx.backend = 'webgl'; if (location.search.includes('csm')) prof.gfx.csm = true; if (location.search.includes('ssr')) prof.gfx.ssr = true;
     { const qs = new URLSearchParams(location.search); if (qs.get('tod')) prof.race.timeOfDay = qs.get('tod') as never; if (qs.get('wx')) prof.race.weather = qs.get('wx') as never; if (qs.has('ultra')) Object.assign(prof.gfx, PRESETS.ultra, { preset: 'ultra', texRes: 1024, renderScale: 0.6 }); } prof.gfx.renderScale = 0.6; prof.gfx.shadows = 1;
     g = new Game(div, prof, { onHud: () => {}, onLoading: () => {}, onFinish: () => {}, onPause: () => {}, onReady: () => {} });
     const tLoad = performance.now(); await g.start(); (window as unknown as Record<string, unknown>).loadInfo = `load=${Math.round(performance.now() - tLoad)}ms ` + JSON.stringify(g.world.timings) + ' ' + JSON.stringify((g as unknown as { loadMs?: unknown }).loadMs ?? {}); g.paused = true; await new Promise(r => setTimeout(r, 400));
@@ -44,6 +44,13 @@ let g: Game | null = null; let cur = -1;
   } else if (view === 'm') { // relay tower close-up (mechProps)
     const tw = G.world.group.userData.mechTower as { x: number; y: number; z: number } | undefined;
     if (tw) { const a = G.td.main.samples[0]; void a; G.camera.position.set(tw.x + 17, tw.y + 9, tw.z + 14); G.camera.lookAt(tw.x, tw.y + 10, tw.z); }
+  } else if (view === 'x' || view === 'y' || view === 'z') { // shortcut exit: x = from inside the shortcut, y = main road just before the rejoin, z = just after it
+    const sc = G.td.paths[1];
+    if (sc) {
+      const M = G.td.main.samples, N = M.length, W = (k: number) => M[((Math.round(k) % N) + N) % N];
+      const S2 = sc.samples, a = view === 'x' ? S2[Math.max(0, S2.length - 45)] : W(sc.mainTo + (view === 'y' ? -32 : 4)), b = view === 'x' ? S2[S2.length - 8] : W(sc.mainTo + (view === 'y' ? 6 : 44));
+      G.camera.position.set(a.x, a.y + 4.2, a.z); G.camera.lookAt(b.x, b.y + 0.5, b.z);
+    }
   } else if (view === 's') { // look from above the road towards the sun (lens flare / god-ray / glare check)
     const S = G.td.main.samples, a = S[Math.floor(S.length * 0.2)];
     G.camera.position.set(a.x, a.y + 6, a.z); G.camera.lookAt(a.x + G.sunDir.x * 100, a.y + 6 + G.sunDir.y * 60, a.z + G.sunDir.z * 100);
@@ -56,6 +63,14 @@ let g: Game | null = null; let cur = -1;
   { const rt = new URLSearchParams(location.search).get('rt'); if (rt) { G.raceTime = +rt; G.applyEnv(0, true); } }
   G.updateVisuals(); G.updateLights(); G.world.update(G.clock + 5, G.camera.position);
   if (location.search.includes('flash')) { G.sky.uniforms.flash.value = 0.9; G.hemi.intensity = 1.75; }
+  if (location.search.includes('live')) { // live graphics switching: toggle everything that is switchable at runtime, render, toggle back
+    const g0 = G.profile.gfx; G.render(0.016); await new Promise(r => setTimeout(r, 300));
+    G.applyLiveGfx({ ...g0, bloom: !g0.bloom, ssr: !g0.ssr, ao: !g0.ao, godRays: !g0.godRays, aa: g0.aa === 'fxaa' ? 'smaa' : 'fxaa', shadows: g0.shadows ? 0 : 2, particles: 0.5, drawDistance: 0.8, motionBlur: !g0.motionBlur });
+    await new Promise(r => setTimeout(r, 1500)); G.render(0.016); await new Promise(r => setTimeout(r, 600));
+    G.applyLiveGfx({ ...g0, ssr: true, shadows: 2 }); await new Promise(r => setTimeout(r, 1500));
+    (window as unknown as Record<string, unknown>).coverInfo = 'live-switch ok';
+  }
+  if (location.search.includes('wetnow')) { G.wet = 1; G.wetTarget = 1; }
   for (let k = 0; k < 3; k++) { G.render(0.016); await new Promise(r => setTimeout(r, 900)); }
   return `${(window as unknown as Record<string, unknown>).loadInfo ?? ''} ${(window as unknown as Record<string, unknown>).coverInfo ?? ''} ${G.backend} ${TRACKS[i].id}/${view} calls=${G.renderer.info.render.calls} tris=${G.renderer.info.render.triangles}`;
 };

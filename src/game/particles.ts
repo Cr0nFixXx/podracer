@@ -133,15 +133,17 @@ export class Particles {
   setAmbientAmount(f: number) { if (this.ambient) this.ambient.count = Math.max(1, Math.round(this.ambN * Math.max(0, Math.min(1, f)))); }
 
   setAmbientFade(f: number) { this.ambFade.value = f; }
-  /** Shattered obstacle: tumbling chunks + dust burst + sparks. */
-  debris(p: THREE.Vector3, vel: THREE.Vector3, col: THREE.Color, size = 2) {
-    const n = Math.round((10 + size * 4) * Math.min(1.2, this.amount + 0.3));
+  /** Shattered obstacle: dust burst + sparks (the solid chunks come from DebrisPool). */
+  debris(p: THREE.Vector3, vel: THREE.Vector3, col: THREE.Color) { this.dust(p, vel, col, 10); this.sparks(p, UP_V, vel, 10); }
+  /** Session 15 – dust trail dragged behind a pod: low, widening puffs; denser, longer and larger with speed. */
+  trail(p: THREE.Vector3, vel: THREE.Vector3, col: THREE.Color, speed: number, alpha: number) {
+    const want = Math.min(1.6, 0.25 + speed * 0.009) * this.amount * this.rateScale;
+    const n = Math.floor(want) + (Math.random() < (want % 1) ? 1 : 0);
     for (let i = 0; i < n; i++) {
-      _v.set((Math.random() - 0.5) * 26, 3 + Math.random() * 13, (Math.random() - 0.5) * 26).addScaledVector(vel, 0.5);
-      _p.set(p.x + (Math.random() - 0.5) * size, p.y + 0.4 + Math.random() * size, p.z + (Math.random() - 0.5) * size);
-      this.alpha.spawn(_p, _v, 0.7 + Math.random() * 0.6, 0.35 + Math.random() * 0.5, 0.2, col, col, 0.95, 0.35, 30);
+      _v.set((Math.random() - 0.5) * 5, 0.5 + Math.random() * 1.7, (Math.random() - 0.5) * 5).addScaledVector(vel, 0.2);
+      _p.set(p.x + (Math.random() - 0.5) * 1.6, p.y, p.z + (Math.random() - 0.5) * 1.6);
+      this.alpha.spawn(_p, _v, 1.0 + Math.random() * 0.9, 0.9, 3.6 + speed * 0.03 + Math.random() * 2.2, col, col, alpha, 1.25, -0.5);
     }
-    this.dust(p, vel, col, 10); this.sparks(p, UP_V, vel, 10);
   }
 
   /** Rooster tail of fine spray thrown up from a wet road – taller and denser with speed. */
@@ -151,7 +153,7 @@ export class Particles {
     for (let i = 0; i < n; i++) {
       _v.set((Math.random() - 0.5) * 7, 1.6 + Math.random() * 3 + speed * 0.022, (Math.random() - 0.5) * 7).addScaledVector(vel, 0.32);
       _p.set(p.x + (Math.random() - 0.5) * 3.2, p.y, p.z + (Math.random() - 0.5) * 3.2);
-      this.alpha.spawn(_p, _v, 0.55 + Math.random() * 0.5, 0.9, 3.6 + speed * 0.028 + Math.random() * 2.5, C_SPRAY, C_SPRAY, 0.085 * alphaScale, 1.5, 5);
+      this.alpha.spawn(_p, _v, 0.55 + Math.random() * 0.5, 0.9, 3.6 + speed * 0.028 + Math.random() * 2.5, C_SPRAY, C_SPRAY, 0.115 * alphaScale, 1.5, 5);
     }
   }
   /** Tiny short-lived splash crown where a rain drop hits the road. */

@@ -146,10 +146,13 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     // ---- road deck (smooth camber + beveled outer curb shoulder) ----
     {
       const pos: number[] = [], uv: number[] = [], ind: number[] = [];
-      let vbase = 0; let sAcc = 0;
+      // Session 15 fix: v used to be `distance / tileLength(width)`. Wherever the road width changes, that divides the WHOLE distance
+      // travelled so far by a changing number → the texture smeared/compressed more and more the further along the track (very visible
+      // after the shortcut of the jungle sprint). v is now integrated segment by segment.
+      let vbase = 0; let vAcc = 0;
       for (let k = 0; k < idxs.length; k++) {
         const s = S[idxs[k]];
-        if (k > 0) { const pr = S[idxs[k - 1]]; sAcc += Math.hypot(s.x - pr.x, s.z - pr.z); }
+        if (k > 0) { const pr = S[idxs[k - 1]]; vAcc += Math.hypot(s.x - pr.x, s.z - pr.z) / Math.max(24, (s.hw + pr.hw) * 0.7); }
         for (let a = 0; a <= across; a++) {
           const f = a / across; const lat = -s.hw + f * 2 * s.hw;
           const e = Math.abs(f * 2 - 1);
@@ -157,7 +160,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
           const lip = e > lipStart ? 0.18 * (e - lipStart) / (1 - lipStart) : 0;
           const crown = (1 - e * e) * 0.2 + lip;
           pos.push(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + crown, s.z + s.rz * lat);
-          uv.push(f, sAcc / Math.max(24, s.hw * 1.4));
+          uv.push(f, vAcc);
         }
         if (k > 0 && !S[idxs[k]].gap && !S[idxs[k - 1]].gap) {
           const r0 = vbase - (across + 1), r1 = vbase;
@@ -317,8 +320,10 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   addArches(td, group, wallMat, disposables, rng, roadClear);
   const obstFx = addObstacles(td, group, theme, wallMat, disposables);
   progress(0.9, 'Platziere Streckendetails …'); await yield_();
-  const props = addProps(td, theme, group, gfx, heightAt, disposables, rng, roadClear, roadDispOff);
-  const mech = addMechProps(td, theme, group, disposables, heightAt, roadClear, waterY, gfx.detail);
+  // Session 15: objects are seated on the LOWEST ground point under their footprint (sampling only the centre left them floating on slopes)
+  const groundMin = (x: number, z: number, r: number) => Math.min(heightAt(x, z), heightAt(x + r, z), heightAt(x - r, z), heightAt(x, z + r), heightAt(x, z - r));
+  const props = addProps(td, theme, group, gfx, (x, z) => groundMin(x, z, 1.4), disposables, rng, roadClear, roadDispOff);
+  const mech = addMechProps(td, theme, group, disposables, (x, z) => groundMin(x, z, 2.8), roadClear, waterY, gfx.detail);
   const setPieces = buildSetPieces(td, theme, group, disposables, wallMat);
   const landRock = surfaceMaterial(wallTex, {
     strata: STRATA[theme.id], ledge: wallLedge, cloud: theme.clouds * 0.4,
@@ -591,7 +596,8 @@ function scatterDecor(
       const nn = near(x, z); const size = sMin + rng() * (sMax - sMin);
       if (nn.d < nn.s.hw + dMin * 0.5) continue;
       if (!opts.air && !roadClear(x, z, size * (opts.foot ?? 1.4), 2)) continue;
-      const gy = opts.air ? nn.s.y + opts.air * (0.5 + rng()) : heightAt(x, z);
+      let gy = opts.air ? nn.s.y + opts.air * (0.5 + rng()) : heightAt(x, z);
+      if (!opts.air) { const fr = Math.min(16, size * (opts.foot ?? 1.4) * 0.55); gy = Math.min(gy, heightAt(x + fr, z), heightAt(x - fr, z), heightAt(x, z + fr), heightAt(x, z - fr)); } // seat on the lowest point of the footprint
       if (opts.keepDry && !opts.air && gy < waterY + 0.3) continue;
       const y = gy + (opts.yOff ?? 0) * size;
       const sy = opts.scaleY ? opts.scaleY[0] + rng() * (opts.scaleY[1] - opts.scaleY[0]) : 1;

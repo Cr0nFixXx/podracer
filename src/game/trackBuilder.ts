@@ -31,7 +31,7 @@ export interface Sample {
 
 export interface Obstacle { path: number; idx: number; lat: number; r: number; kind: number; x: number; y: number; z: number; hz?: number; /** Session 14: small rocks & crates can be smashed at speed */ breakable?: boolean; broken?: boolean }
 /** Overhead structure across the main path (sponsor gantry, start portal): solid between y0 and y1 within ±half metres along the track. */
-export interface Overhead { idx: number; y0: number; y1: number; half: number } // kind 3 = AI keep-out only (hazard / rotor disc), kind 4 = set-piece solid (no generic visual)
+export interface Overhead { idx: number; y0: number; y1: number; half: number; /** half-elliptic arch (checkpoint gate): inner radius R, vertical squash sy – the ceiling height depends on the lateral position */ arch?: { R: number; sy: number } } // kind 3 = AI keep-out only (hazard / rotor disc), kind 4 = set-piece solid (no generic visual)
 /** Periodic eruption zone (methane geyser / lava vent). state: 0 idle, 0.5 warning, 1 erupting (set by Game). */
 export interface Hazard { idx: number; lat: number; r: number; x: number; y: number; z: number; period: number; phase: number; duty: number; state: number; }
 

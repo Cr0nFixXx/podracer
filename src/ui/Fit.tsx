@@ -1,36 +1,33 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 /**
- * Session 14 – responsive without scrollbars: the content is laid out at a virtual width (≥ `minW`), measured, and scaled so that it
- * always fits the available box in BOTH directions (down on small windows, up to ×2 on large screens). If height is the limit, the
- * virtual width grows so the layout uses the spare horizontal room instead of leaving bars. The box is a CSS container
- * (`@container`), so `@3xl:` / `@5xl:` variants inside respond to the virtual width, not to the physical viewport.
+ * Session 15 – ONE uniform UI scale for every screen: the window is mapped to a virtual canvas of at least `minW × minH`
+ * (1180 × 720) and scaled by `min(width / minW, height / minH)`. Text and controls therefore have the same size on every
+ * screen and grow with the window. Screens are designed to fit the 720 px virtual height (flex column, `flex-1` panels).
+ * Emergency only: if a screen is taller than the canvas it is shrunk until it fits – `data-fit-shrunk` is then "1"
+ * (the layout test fails on it), so no scrollbar can ever appear.
  */
-export function Fit({ children, minW = 1180, maxScale = 2, className = '' }: { children: ReactNode; minW?: number; maxScale?: number; className?: string }) {
+export function Fit({ children, minW = 1180, minH = 720, maxScale = 3, className = '' }: { children: ReactNode; minW?: number; minH?: number; maxScale?: number; className?: string }) {
   const outer = useRef<HTMLDivElement>(null), inner = useRef<HTMLDivElement>(null);
-  const [st, setSt] = useState({ w: minW, s: 1, top: 0 });
+  const [st, setSt] = useState({ w: minW, h: minH, s: 1, shrunk: false });
   useLayoutEffect(() => {
     const o = outer.current, n = inner.current; if (!o || !n) return;
     const fit = () => {
       const vw = o.clientWidth, vh = o.clientHeight; if (!vw || !vh) return;
-      const base = vw / vh < 0.8 ? Math.min(minW, 780) : minW; // portrait windows get the narrow (2-column) layout
-      let w = base, s = 1, h = 1;
-      for (let i = 0; i < 4; i++) {
-        n.style.width = w + 'px'; h = n.offsetHeight || 1;           // layout size – unaffected by the CSS transform
-        s = Math.min(maxScale, vw / w, vh / h);
-        const w2 = Math.max(base, Math.min(vw / s, base * 2.2));      // spare width → wider layout (never narrower: no oscillation)
-        if (w2 <= w * 1.015) break; w = w2;
-      }
-      const top = Math.max(0, (vh - h * s) / 2);
-      setSt(p => (Math.abs(p.w - w) < 0.5 && Math.abs(p.s - s) < 0.002 && Math.abs(p.top - top) < 0.5 ? p : { w, s, top }));
+      let s = Math.min(maxScale, vw / minW, vh / minH), w = vw / s, h = vh / s, shrunk = false;
+      n.style.width = w + 'px'; n.style.minHeight = h + 'px';
+      const need = n.scrollHeight;
+      if (need > h + 1.5) { s *= h / need; w = vw / s; h = vh / s; shrunk = true; }
+      setSt(p => (Math.abs(p.w - w) < 0.5 && Math.abs(p.h - h) < 0.5 && Math.abs(p.s - s) < 0.001 && p.shrunk === shrunk ? p : { w, h, s, shrunk }));
     };
     fit();
     const ro = new ResizeObserver(fit); ro.observe(o); ro.observe(n);
     return () => ro.disconnect();
-  }, [minW, maxScale]);
+  }, [minW, minH, maxScale]);
   return (
     <div ref={outer} className={`absolute inset-0 overflow-hidden ${className}`}>
-      <div ref={inner} className="@container absolute left-1/2" style={{ width: st.w, top: st.top, transform: `translateX(-50%) scale(${st.s})`, transformOrigin: 'top center' }}>{children}</div>
+      <div ref={inner} data-fit-scale={st.s.toFixed(4)} data-fit-shrunk={st.shrunk ? '1' : '0'} className="@container absolute left-0 top-0 flex flex-col"
+        style={{ width: st.w, minHeight: st.h, transform: `scale(${st.s})`, transformOrigin: 'top left' }}>{children}</div>
     </div>
   );
 }

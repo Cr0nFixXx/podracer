@@ -35,7 +35,7 @@ export function buildSetPieces(td: TrackData, theme: ThemeDef, group: THREE.Grou
   const dark = new THREE.MeshStandardMaterial({ color: '#282c33', metalness: 0.74, roughness: 0.48 });
   const tex = hazardTex(); const hazard = new THREE.MeshStandardMaterial({ map: tex, metalness: 0.32, roughness: 0.48 });
   const glow = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.25) });
-  const iceMat = new THREE.MeshStandardMaterial({ color: '#b4e4ff', roughness: 0.18, metalness: 0.1, emissive: '#2c78b4', emissiveIntensity: 0.32, transparent: true, opacity: 0.88 });
+  const iceMat = new THREE.MeshStandardMaterial({ color: '#b4e4ff', roughness: 0.18, metalness: 0.1, emissive: '#2c78b4', emissiveIntensity: 0.32 }); // opaque (the 88 % opacity made falling ice blocks look half see-through)
   disp.push(metal, dark, tex, hazard, glow, iceMat);
   const RED = new THREE.Color('#ff2a18').multiplyScalar(1.35), AMBER = new THREE.Color('#ffb020').multiplyScalar(1.3), GREEN = new THREE.Color('#30ff60'), OFF = new THREE.Color('#201008');
 
@@ -175,7 +175,12 @@ export function buildSetPieces(td: TrackData, theme: ThemeDef, group: THREE.Grou
       const root = new THREE.Group(); root.position.set(s.x, s.y - 3, s.z); root.rotation.y = yaw; group.add(root);
       const Ra = sp.hw + 8, tube = (isIce ? 4.0 : 4.5) + h2(sp.idx, 3) * 1.5, segs = 9; const pieces: THREE.Mesh[] = [];
       for (let k = 0; k < segs; k++) {
-        const g = new THREE.TorusGeometry(Ra, tube, isIce ? 6 : 10, 8, Math.PI / segs); g.rotateZ((k * Math.PI) / segs);
+        // Session 15: torus arc segments are open tubes – once a block broke out you could look straight through its ends. Both ends get caps.
+        const rs = isIce ? 6 : 10, arc = Math.PI / segs;
+        const tg = new THREE.TorusGeometry(Ra, tube, rs, 8, arc);
+        const cap = (ang: number, dir: number) => { const cg = new THREE.CircleGeometry(tube, rs); cg.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(-Math.sin(ang) * dir, Math.cos(ang) * dir, 0))); cg.translate(Math.cos(ang) * Ra, Math.sin(ang) * Ra, 0); return cg; };
+        const c0 = cap(0, -1), c1 = cap(arc, 1);
+        const g = mergeGeometries([tg, c0, c1])!; tg.dispose(); c0.dispose(); c1.dispose(); g.rotateZ((k * Math.PI) / segs);
         const p = g.attributes.position as THREE.BufferAttribute;
         for (let i = 0; i < p.count; i++) {
           const x = p.getX(i), y = p.getY(i), z = p.getZ(i);

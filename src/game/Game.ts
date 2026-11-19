@@ -3,6 +3,7 @@ import { resolveEnvironment, type EnvBuild, type EnvFx, type EnvTimeline } from 
 import { WEATHER } from './materials';
 import { generateTextures, hasTextureWorkers, textureStats } from './textures';
 import { makeBeams } from './lights';
+import { DebrisPool } from './debris';
 import { roadSurfaceAt } from './trackBuilder';
 import { normalizeKeys, type Action, type KeyMap } from './keymap';
 import { podEnvelope } from './podDesigns';
@@ -61,6 +62,7 @@ export class Game {
   beams: ReturnType<typeof makeBeams> | null = null; private tmpE = new THREE.Euler();
   private prevNd = 1e9; private closing = 0; private flybyT = 0;
   loadMs: Record<string, number> = {};
+  debris = new DebrisPool(); dustAmt = 1;
   /** Session 14: 0..1 how far the player is under a roof (rain, splashes and lens drops fade out); weather-effects quality 0 / 0.5 / 1 */
   cover = 0; wxQ = 1; envDirty = false;
   private shadowTexel = 0;
@@ -99,6 +101,7 @@ export class Game {
     this.baseGrip = theme.id === 'ice' ? 0.55 : theme.id === 'jungle' ? 0.85 : 1;
     this.gripMul = this.baseGrip * fx.grip;
     this.dustBase.set(theme.palette.ground[1]); this.dustCol.copy(this.dustBase);
+    this.dustAmt = theme.terrain === 'city' || theme.terrain === 'prison' ? 0.3 : theme.id === 'ice' ? 0.8 : 1; // little loose dust on metal decks
     this.barrierGlow.set(theme.barrierColor).multiplyScalar(1.25);
 
     // Load-time optimisation: texture workers start NOW and run in parallel with renderer init, track build and sky/PMREM setup
@@ -169,7 +172,7 @@ export class Game {
     this.particles.initAmbient(theme.ambient, build.wind, Math.max(1, build.ambMax / 0.45));
     this.wxQ = [0, 0.5, 1][gfx.weatherFx ?? 2] ?? 1; setPodLodScale(gfx.podDetail ?? 1);
     this.weather = new WeatherFx(fx, this.particles, this.scene, theme.sunAz * Math.PI / 180 + 1.1, build.bolt); this.weather.quality = this.wxQ;
-    this.scene.add(this.particles.group);
+    this.scene.add(this.particles.group); this.scene.add(this.debris.mesh);
 
     // pods (player = full hero detail; opponents = merged whole-pod + automatic 2-tier distance LOD!)
     this.loadMs.world = Math.round(performance.now() - tL0) - this.loadMs.init;
@@ -250,7 +253,7 @@ export class Game {
       const custom = e.isPlayer ? prof.custom[e.def.id] : undefined;
       const colors = custom ? custom.colors : (g > 10 ? [e.def.colors[1], e.def.colors[0], e.def.colors[2]] as [string, string, string] : e.def.colors);
       const geo = this.profile.gfx.geometry;
-      const vis = buildPodModel(e.def, colors, geo, this.profile.gfx.texRes, !e.isPlayer);
+      const vis = buildPodModel(e.def, colors, geo, this.profile.gfx.texRes, !e.isPlayer, g + 1);
       this.scene.add(vis.group);
       const eLat = Math.min(1, Math.abs(lat) / s.hw);
       const gY = s.y - lat * s.bank + (1 - eLat * eLat) * 0.2 + 0.08;
@@ -438,7 +441,7 @@ export class Game {
     this.updateCamera(dt);
     this.updateVisuals(dt);
     this.updateLights();
-    this.particles.update(dt, this.camera.position, this.clock);
+    this.particles.update(dt, this.camera.position, this.clock); this.debris.update(dt);
     this.world.update(this.clock, this.camera.position, this.pods);
     this.sky.uniforms.time.value = this.clock;
     this.weather.update(dt, this.clock, this.camera, this.state === 'countdown', v => this.audio.thunder(v), near => { if (near > 0.5) this.player.shake = Math.min(1, this.player.shake + (near - 0.5) * 0.9); });
@@ -536,7 +539,7 @@ export class Game {
           if (p.isPlayer || dist < 140) this.audio.hit(e.strength * (p.isPlayer ? 1 : 0.28));
         } else if (e.type === 'break') {
           if (e.ref) this.world.breakObstacle(e.ref);
-          if (dist < 420) this.particles.debris(this.tmpV, p.vel, this.tmpC.copy(this.dustBase).multiplyScalar(0.6), e.strength);
+          if (dist < 420) { this.tmpC.copy(this.dustBase).multiplyScalar(0.6); this.particles.debris(this.tmpV, p.vel, this.tmpC); this.debris.spawn(e.x, e.y, e.z, e.y, p.vel, this.tmpC, e.strength, 16); }
           if (p.isPlayer || dist < 130) this.audio.hit(34 * (p.isPlayer ? 1 : 0.4));
         } else if (e.type === 'land') { if (near) this.particles.dust(this.tmpV, p.vel, this.dustCol, 8); if (p.isPlayer) this.audio.hit(e.strength * 0.5); }
         else if (e.type === 'explode') { if (dist < 480) this.particles.explosion(this.tmpV); if (p.isPlayer) { this.audio.boom(); this.flash = 0.8; this.showMsg('TRIEBWERK ZERSTÖRT!', 2.5); } else if (near) this.audio.hit(40); }
@@ -580,13 +583,17 @@ export class Game {
         if ((hp < 20 || p.overheat) && (p.isPlayer || i < 2)) this.particles.fire(this.tmpV3, p.vel, rivalVis);
       }
       const sp = Math.hypot(p.vel.x, p.vel.z);
-      if (p.grounded && sp > 42 && p.pos.y - p.groundY < HOVER + 1.2) {
-        // Keep rival dust very subtle (0.28×) and strictly omitted within 24 m ahead so leader never blinds player!
+      // Session 15: every pod drags a dust trail from under both engines (spray on a wet road). Denser and longer with speed;
+      // rivals closer than 24 m ahead of the camera keep only a hint so the view stays clear.
+      if (p.grounded && sp > 16 && p.pos.y - p.groundY < HOVER + 2.2 && (p.isPlayer || dist < 260)) {
         const wet = this.envBuild.rainRoad && this.wet > 0.3 && this.wxQ > 0 && !(this.td.paths[p.path].samples[p.idx]?.roof > 0); // dry under roofs
-        this.tmpV.set(p.pos.x - Math.sin(p.yaw) * 2.5, p.groundY + 0.15, p.pos.z - Math.cos(p.yaw) * 2.5);
-        if (wet) { if (p.isPlayer) this.particles.spray(this.tmpV, p.vel, sp, this.wet); else if (dist > 24 && dist < 160) this.particles.spray(this.tmpV, p.vel, sp, this.wet * 0.55); }
-        else if (p.isPlayer) this.particles.dust(this.tmpV, p.vel, this.dustCol, 1, 0.75);
-        else if (dist > 24 && dist < 80) this.particles.dust(this.tmpV, p.vel, this.dustCol, 1, 0.25);
+        const envP = podEnvelope(p.def), cyD = Math.cos(p.yaw), syD = Math.sin(p.yaw);
+        const near = !p.isPlayer && dist < 24 ? 0.3 : 1, aD = (p.isPlayer ? 0.1 : 0.13) * near * this.dustAmt;
+        for (const e of [envP.engL, envP.engR]) {
+          const lz = e.backZ - 1.2; this.tmpV.set(p.pos.x + e.x * cyD + lz * syD, p.groundY + 0.25, p.pos.z - e.x * syD + lz * cyD);
+          if (wet) this.particles.spray(this.tmpV, p.vel, sp, this.wet * (p.isPlayer ? 0.7 : 0.8) * near);
+          else this.particles.trail(this.tmpV, p.vel, this.dustCol, sp, aD);
+        }
       }
       // Slide plume: the rear steps out and throws ground material (or spray) sideways + a few skid sparks
       if (p.sliding && (p.isPlayer || (dist > 24 && dist < 120))) {
@@ -605,15 +612,30 @@ export class Game {
     }
   }
 
-  /** Graphics settings that can change while the race is running (pause menu). Everything else needs a restart of the race. */
-  static readonly LIVE_GFX: (keyof GfxSettings)[] = ['fov', 'showFps', 'renderScale', 'lodBias', 'podDetail', 'weatherFx', 'preset'];
+  /** Graphics settings that take effect while the race is running (pause menu). The rest needs a restart of the race:
+   *  texture resolution, geometry/detail density, tessellation, parallax, shader detail, bump mapping, batching, backend,
+   *  anisotropy, cascaded shadows, volumetrics – they are baked into geometry or compiled materials. */
+  static readonly LIVE_GFX: (keyof GfxSettings)[] = ['fov', 'showFps', 'renderScale', 'lodBias', 'podDetail', 'weatherFx', 'preset',
+    'bloom', 'bloomStrength', 'ao', 'ssr', 'godRays', 'motionBlur', 'cinematic', 'aa', 'lensFx', 'shadows', 'particles', 'drawDistance'];
+  private static readonly POST_KEYS: (keyof GfxSettings)[] = ['bloom', 'bloomStrength', 'ao', 'ssr', 'godRays', 'motionBlur', 'cinematic', 'aa', 'lensFx', 'weatherFx'];
   applyLiveGfx(g: GfxSettings, volume?: number) {
     const prev = this.profile.gfx; this.profile = { ...this.profile, gfx: g, volume: volume ?? this.profile.volume };
     if (volume !== undefined) this.audio?.setVolume(volume);
-    if (!this.renderer || !this.world || !this.weather) return;
+    if (!this.renderer || !this.world || !this.weather || !this.post) return;
     if (g.renderScale !== prev.renderScale) this.resize();
     this.world.setLodBias(g.lodBias ?? 1); setPodLodScale(g.podDetail ?? 1);
-    this.wxQ = [0, 0.5, 1][g.weatherFx ?? 2] ?? 1; this.weather.quality = this.wxQ; this.envDirty = true;
+    this.wxQ = [0, 0.5, 1][g.weatherFx ?? 2] ?? 1; this.weather.quality = this.wxQ; this.envDirty = true; // also re-applies fog density (draw distance)
+    if (g.particles !== prev.particles) this.particles.amount = g.particles;
+    if (g.shadows !== prev.shadows && !this.csm) { // sun shadows on/off + resolution (cascaded shadows stay as built)
+      const on = g.shadows > 0, ms = [0, 1024, 1536, 2048][g.shadows] ?? 1536;
+      this.renderer.shadowMap.enabled = on; this.sun.castShadow = on;
+      if (ms) { this.sun.shadow.mapSize.set(ms, ms); this.shadowTexel = 192 / ms; this.sun.shadow.map?.dispose(); (this.sun.shadow as unknown as { map: unknown }).map = null; }
+    }
+    if (Game.POST_KEYS.some(k => g[k] !== prev[k])) { // rebuild the post-processing chain with the new options
+      const old = this.post;
+      this.post = new PostFX(this.renderer, this.scene, this.camera, g, { rain: (g.weatherFx ?? 2) > 0 ? this.envBuild.maxRain : 0, flare: this.envBuild.flare });
+      old.dispose(); void this.post.warmup(this.renderer);
+    }
   }
 
   /** Sun / moon direction: sky, fog scattering, shadow basis, second sun of the desert worlds. */

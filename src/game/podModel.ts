@@ -180,7 +180,30 @@ let sharedOppFarHull: THREE.MeshStandardMaterial | null = null;
 function getOppGlow() { return sharedOppGlow ?? (sharedOppGlow = new THREE.MeshBasicMaterial({ vertexColors: true })); }
 function getOppFarHull() { return sharedOppFarHull ?? (sharedOppFarHull = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.48, roughness: 0.34 })); }
 
-export function buildPodModel(def: PodDef, colors: [string, string, string], quality = 2, texRes = 1024, isOpponent = false): PodVisual {
+// ---------- Session 15: start-number board behind the cockpit (one shared atlas texture + material for all pods) ----------
+let numAtlas: THREE.CanvasTexture | null = null, numMat: THREE.MeshStandardMaterial | null = null;
+function numberPlate(L: PodLayout, num: number) {
+  if (!numAtlas) {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 512; const c = cv.getContext('2d')!;
+    c.fillStyle = '#15171c'; c.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 15; i++) {
+      const x = (i % 4) * 128, y = Math.floor(i / 4) * 128;
+      c.fillStyle = '#f2efe6'; c.fillRect(x + 6, y + 6, 116, 116); c.strokeStyle = '#15171c'; c.lineWidth = 7; c.strokeRect(x + 12, y + 12, 104, 104);
+      c.fillStyle = '#15171c'; c.font = 'bold 84px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(i + 1), x + 64, y + 70);
+    }
+    numAtlas = new THREE.CanvasTexture(cv); numAtlas.colorSpace = THREE.SRGBColorSpace; numAtlas.anisotropy = 4;
+    numMat = new THREE.MeshStandardMaterial({ map: numAtlas, emissiveMap: numAtlas, emissive: '#ffffff', emissiveIntensity: 0.22, roughness: 0.55, metalness: 0.1 });
+  }
+  const cell = ((num - 1) % 15 + 15) % 15, u0 = (cell % 4) / 4, v0 = 1 - (Math.floor(cell / 4) + 1) / 4;
+  const mk = (flip: boolean) => { const g = new THREE.PlaneGeometry(0.86, 0.86); const uv = g.attributes.uv as THREE.BufferAttribute; for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) * 0.25, v0 + uv.getY(i) * 0.25); if (flip) g.rotateY(Math.PI); g.translate(0, 0, flip ? -0.022 : 0.022); return g; };
+  const post = new THREE.BoxGeometry(0.07, 0.6, 0.07); { const uv = post.attributes.uv as THREE.BufferAttribute; for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.88, 0.12); } post.translate(0, -0.7, 0);
+  const frame = new THREE.BoxGeometry(0.94, 0.94, 0.03); { const uv = frame.attributes.uv as THREE.BufferAttribute; for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.88, 0.12); }
+  const g = mergeGeometries([mk(false), mk(true), post, frame], false)!;
+  const m = new THREE.Mesh(g, numMat!); m.position.set(0, L.cockpit.y + 1.75, L.cockpit.z - 1.55); m.rotation.x = -0.12; m.castShadow = false;
+  return m;
+}
+
+export function buildPodModel(def: PodDef, colors: [string, string, string], quality = 2, texRes = 1024, isOpponent = false, num?: number): PodVisual {
   const seg = isOpponent ? (quality >= 3 ? 18 : 14) : (quality >= 3 ? 40 : quality === 2 ? 28 : 20);
   const texSize = texRes >= 2048 && !isOpponent ? 2048 : 1024;
   const L = podLayout(def);
@@ -305,6 +328,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     farGrp.add(new THREE.Mesh(far.dark, shared.dark));
     farGrp.add(new THREE.Mesh(fgGeo, oppGlow));
 
+    nearGrp.add(numberPlate(L, num ?? 1));
     const setDistance = (d: number, forceAll = false) => {
       if (forceAll) { nearGrp.visible = true; farGrp.visible = true; return; }
       const useNear = d < 48 * podLodScale;
@@ -443,6 +467,8 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     if (binderU?.uLift) binderU.uLift.value.set(binderSwap ? yR : yL, binderSwap ? yL : yR);
   };
 
+  let boostK = 0, flapT = 0;
+  body.add(numberPlate(L, num ?? 1));
   const update = (t: number, throttle: number, boost: number, airbrake: number, dmgL: number, dmgR: number, heat: number) => {
     podSharedTime.value = t;
     const fl = 0.35 + throttle * 0.75 + boost * 0.8;
@@ -463,7 +489,11 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     // Session 13: on a badly damaged pod the air-brake flaps rattle loose in the airstream
     // (dmgL / dmgR are HEALTH fractions: 1 = intact – the first version read them as damage and rattled on every healthy pod)
     const dmgF = Math.max(0, 0.45 - Math.min(dmgL, dmgR)) / 0.45;
-    for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (airbrake * 1.05 + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
+    // Session 15: the engine cowl flaps open while boosting (cooling / afterburner) and close again – smoothed, with a little flutter
+    const dtF = Math.max(0, Math.min(0.1, t - flapT)); flapT = t;
+    boostK += (boost - boostK) * Math.min(1, dtF * (boost > boostK ? 9 : 4));
+    const open = boostK * (0.5 + 0.035 * Math.sin(t * 43));
+    for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (Math.max(airbrake * 1.05, open) + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
     const uL = hullL.userData.u as HullU, uR = hullR.userData.u as HullU;
     uL.uScorch.value = Math.min(1, (1 - dmgL) * 1.1 + Math.max(0, heat - 0.75) * 0.8); uL.uHeat.value = heat; uL.uWear.value = 0.28 + (1 - dmgL) * 0.35;
     uR.uScorch.value = Math.min(1, (1 - dmgR) * 1.1 + Math.max(0, heat - 0.75) * 0.8); uR.uHeat.value = heat; uR.uWear.value = 0.28 + (1 - dmgR) * 0.35;

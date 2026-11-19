@@ -59,7 +59,9 @@ export class PostFX {
       const mrtNode = mrt({
         output,
         normal: vec4(packNormalToRGB(normalView), opaqueAlpha),
-        metalrough: vec4(metalness, roughness, float(0.0), opaqueAlpha),
+        // .r = REFLECTIVITY, not plain metalness: SSRNode discards pixels with 0 here, which removed every reflection from puddles,
+        // wet roads and ice (all non-metals). Smooth dielectrics (roughness < 0.3) now reflect too.
+        metalrough: vec4(max(metalness, ssInv(0.3, 0.1, roughness).mul(0.7)), roughness, float(0.0), opaqueAlpha),
       });
       const keepOpaque = new THREE.BlendMode(THREE.NormalBlending);
       mrtNode.setBlendMode('normal', keepOpaque);
@@ -87,10 +89,10 @@ export class PostFX {
       const s = ssr(sceneColor, depthNode, normal, { metalnessNode: mrNode.r, roughnessNode: mrNode.g, camera });
       s.resolutionScale = 0.35;
       s.quality.value = 0.1;
-      s.maxDistance.value = 22;
+      s.maxDistance.value = 42;
       s.thickness.value = 2.0;
       s.maxLuminance.value = 2.4;
-      s.intensity.value = 0.5;
+      s.intensity.value = 0.85;
       s.screenEdgeFade.value = 0.28;
       s.screenEdgeFadeBlack = true;
       s.blurQuality = 1;
@@ -105,7 +107,7 @@ export class PostFX {
         const mr = mrNode.sample(screenUV);
         const r = ssrTex.sample(screenUV);
         const fade = ssInv(110.0, 35.0, vz).mul(ssInv(0.38, 0.14, mr.g)).mul(smoothstep(0.08, 0.25, mr.r)).mul(step(d, 0.9998));
-        const w = clamp(r.a.mul(fade).mul(0.55), 0.0, 0.55);
+        const w = clamp(r.a.mul(fade).mul(0.8), 0.0, 0.8);
         const safeR = clamp(r.rgb, vec3(0.0), vec3(2.2));
         return vec4(b.add(safeR.mul(w)), 1.0);
       })();

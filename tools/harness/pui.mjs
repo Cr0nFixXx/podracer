@@ -20,19 +20,24 @@ const audit = p => p.evaluate(() => {
   return r;
 });
 for (const [w, h] of sizes) {
+  const scales = [];
   const p = await b.newPage(); await p.setViewport({ width: w, height: h });
   p.on('pageerror', e => { bad++; console.log('[pageerror]', e.message.slice(0, 200)); });
   await p.goto('file://' + dist); await p.waitForFunction(() => document.body.textContent.includes('Rennen starten'), { timeout: 120000 });
   for (const [name, btn] of [['menu', null], ['setup', 'Rennen starten'], ['garage', 'Hangar & Tuning'], ['settings', 'Einstellungen']]) {
     if (btn) { await click(p, btn); await sleep(900); }
-    const issues = await audit(p); if (issues.length) bad++;
-    console.log(`${w}x${h} ${name.padEnd(8)} ${issues.length ? 'FAIL ' + issues.slice(0, 3).join(' | ') : 'ok'}`);
+    const issues = await audit(p);
+    const fitI = await p.evaluate(() => { const e = document.querySelector('[data-fit-scale]'); return e ? [e.dataset.fitScale, e.dataset.fitShrunk, Math.round(e.scrollHeight), Math.round(parseFloat(e.style.minHeight))] : null; });
+    if (fitI) { scales.push(fitI[0]); if (fitI[1] === '1') issues.push(`content too tall for the canvas (${fitI[2]} > ${fitI[3]} px) – emergency shrink active`); }
+    if (issues.length) bad++;
+    console.log(`${w}x${h} ${name.padEnd(8)} scale ${fitI ? fitI[0] : '-'} content ${fitI ? fitI[2] + '/' + fitI[3] : '-'} ${issues.length ? 'FAIL ' + issues.slice(0, 3).join(' | ') : 'ok'}`);
     if ((w === 1280 || w === 800 || w === 1024) && name !== 'menu') shots.push([`${w}x${h} ${name}`, 'data:image/jpeg;base64,' + Buffer.from(await p.screenshot({ type: 'jpeg', quality: 70 })).toString('base64'), w, h]);
-    if (name === 'settings') { await click(p, 'Steuerung'); await sleep(500); const i2 = await audit(p); if (i2.length) bad++; console.log(`${w}x${h} keys     ${i2.length ? 'FAIL ' + i2.slice(0, 3).join(' | ') : 'ok'}`); }
+    if (name === 'settings') { await click(p, 'Steuerung'); await sleep(500); const i2 = await audit(p); const f2 = await p.evaluate(() => { const e = document.querySelector('[data-fit-scale]'); return [e.dataset.fitScale, e.dataset.fitShrunk]; }); scales.push(f2[0]); if (f2[1] === '1') i2.push('emergency shrink'); if (i2.length) bad++; console.log(`${w}x${h} keys     ${i2.length ? 'FAIL ' + i2.slice(0, 3).join(' | ') : 'ok'}`); }
     if (btn) { await click(p, 'Zurück'); await sleep(500); }
   }
   // planet filter
   if (w === 1280) { await click(p, 'Rennen starten'); await sleep(600); const before = await p.evaluate(() => document.body.textContent.includes('Neon-Spirale')); await p.select('select[aria-label="Planet"]', 'Tatooine'); await sleep(400); const after = await p.evaluate(() => document.body.textContent.includes('Neon-Spirale')); console.log('planet filter: Neon-Spirale listed before/after "Tatooine":', before, after, before && !after ? 'ok' : 'FAIL'); if (!(before && !after)) bad++; }
+  const uni = new Set(scales).size === 1; console.log(`${w}x${h} uniform UI scale across screens: ${uni ? 'ok (' + scales[0] + ')' : 'FAIL ' + [...new Set(scales)].join(', ')}`); if (!uni) bad++;
   await p.close();
 }
 const g = await b.newPage(); await g.setViewport({ width: 1500, height: 1000 });

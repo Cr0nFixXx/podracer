@@ -63,10 +63,10 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   // Session 14 – knife-edge control: once rolled, the pod's axes are rotated. Lift/dive keys now turn it (pulling "up" turns towards
   // the pod's top = the side it rolled to), the steering keys move it up/down. Blended with the roll amount, so it eases in.
   const k0 = Math.abs(Math.sin((p.rollCtl ?? 0) * (Math.PI / 2))), g0 = (p.rollCtl ?? 0) >= 0 ? 1 : -1;
-  const steerMix = inp.steer * (1 - k0) + (inp.pitch ?? 0) * g0 * k0;
+  const steerMix = inp.steer * (1 - k0) + (inp.pitch ?? 0) * g0 * k0 * 1.25;
   const pitchMix = (inp.pitch ?? 0) * (1 - k0) - inp.steer * g0 * k0;
   const target = Math.max(-1, Math.min(1, steerMix));
-  const rate = Math.sign(target) !== Math.sign(p.steer) && Math.abs(p.steer) > 0.05 ? 9 : target === 0 ? 7 : 4.5;
+  const rate = (Math.sign(target) !== Math.sign(p.steer) && Math.abs(p.steer) > 0.05 ? 9 : target === 0 ? 7 : 4.5) * (1 + 0.8 * k0);
   p.steer += Math.max(-rate * dt, Math.min(rate * dt, target - p.steer));
   // Manual attitude controls (only act while their key is held; both ease back to neutral on release)
   const pIn = frozen ? 0 : Math.max(-1, Math.min(1, pitchMix)), rIn = frozen ? 0 : Math.max(-1, Math.min(1, inp.roll ?? 0));
@@ -84,7 +84,9 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   // are held on the ground: lateral grip fades to 8.5 % (the pod keeps drifting on its momentum), the yaw boost is moderate
   // (×1.2–1.47 instead of ×1.7–2.4), a slip-angle limiter prevents spins, and grip returns smoothly over ~0.45 s after release.
   const wantSlide = p.airbraking && Math.abs(p.steer) > 0.2 && p.grounded && !frozen;
-  const sk = p.slideK = Math.max(0, Math.min(1, (p.slideK ?? 0) + (wantSlide ? dt * 3.2 : -dt * 2.2)));
+  // Session 15: more drift – grip fades to 3.5 %, returns over ~0.7 s, the pod may hang out to ~50° slip. Rivals slide at 45 % strength.
+  const skRaw = p.slideK = Math.max(0, Math.min(1, (p.slideK ?? 0) + (wantSlide ? dt * 3.2 : -dt * 1.4)));
+  const sk = p.ai && !p.isPlayer ? skRaw * 0.45 : skRaw;
   const sliding = sk > 0.25;
   if (wantSlide) p.slideT = Math.min(2.2, (p.slideT ?? 0) + dt);
   else { if ((p.slideT ?? 0) > 0.45 && inp.throttle > 0.5 && !inp.airbrake && p.grounded) vf += Math.min(7, p.slideT! * 4.2); if (!inp.airbrake || !p.grounded) p.slideT = 0; }
@@ -104,10 +106,10 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   const sp = Math.abs(vf);
   const lowF = Math.min(1, sp / 22);
   const highF = 1 - 0.32 * Math.min(1, sp / P.vmax);
-  let omega = p.steer * P.turn * lowF * highF * (1 + (P.abTurn - 1) * 0.45 * sk) * (p.grounded ? 1 : 0.55) * (1 - 0.4 * knife);
+  let omega = p.steer * P.turn * lowF * highF * (1 + (P.abTurn - 1) * 0.45 * sk) * (p.grounded ? 1 : 0.55) * (1 + 0.45 * knife); // Session 15: lift/dive steer with MORE authority on knife-edge (was -40 %)
   if (sk > 0 && p.steer * vr < 0) { // steering deeper into the slide: fade the yaw input beyond ~35° slip (no spin-outs)
     const slip = Math.atan2(Math.abs(vr), Math.max(8, vf));
-    if (slip > 0.6) omega *= Math.max(0.15, 1 - (slip - 0.6) / 0.45);
+    if (slip > 0.88) omega *= Math.max(0.15, 1 - (slip - 0.88) / 0.45);
   }
   omega += (p.hpR - p.hpL) / 100 * 0.25 * lowF;
   if (p.zeroG) omega *= 1.4;
@@ -126,11 +128,11 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
       if (ratio > 1) vf -= (vf - vmaxE) * 1.2 * dt;
     }
     if (inp.brake > 0) { if (vf > 0) vf = Math.max(0, vf - 55 * inp.brake * dt); else vf = Math.max(-18, vf - 14 * inp.brake * dt); }
-    if (p.airbraking) vf = Math.max(10, vf - P.abDecel * (1 - 0.7 * sk) * dt);
+    if (p.airbraking) vf = Math.max(10, vf - P.abDecel * (1 - 0.8 * sk) * dt);
   } else vf *= Math.exp(-3 * dt);
   vf *= Math.exp(-(inp.throttle > 0 ? 0.04 : 0.28) * dt);
   const attGrip = (p.bankGrip ?? 1) * (pc < 0 ? 1 - 0.14 * pc : 1 - 0.2 * pc);
-  vr *= Math.exp(-P.grip * gripMul * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.085 * sk) * (p.grounded ? 1 : 0.15));
+  vr *= Math.exp(-P.grip * gripMul * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.035 * sk) * (p.grounded ? 1 : 0.15));
   const fx2 = Math.sin(p.yaw), fz2 = Math.cos(p.yaw), rx2 = -fz2, rz2 = fx2;
   p.vel.x = fx2 * vf + rx2 * vr; p.vel.z = fz2 * vf + rz2 * vr;
 
@@ -275,9 +277,15 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
       let di = p.idx - oh.idx; if (td.main.closed) { if (di > Nm / 2) di -= Nm; else if (di < -Nm / 2) di += Nm; }
       if (Math.abs(di) > 5) continue;
       const s0 = td.main.samples[oh.idx], along = (p.pos.x - s0.x) * s0.tx + (p.pos.z - s0.z) * s0.tz;
-      if (Math.abs(along) > oh.half + 2.4 || p.pos.y + ext <= oh.y0 || p.pos.y - ext >= oh.y1) continue;
-      const below = p.pos.y < (oh.y0 + oh.y1) * 0.5, hitY = below ? oh.y0 : oh.y1;
-      if (below) { p.pos.y = oh.y0 - ext; if (p.vel.y > -5) p.vel.y = -5; } else { p.pos.y = oh.y1 + ext; if (p.vel.y < 4) p.vel.y = 4; }
+      if (Math.abs(along) > oh.half + 2.4) continue;
+      let y0 = oh.y0, y1 = oh.y1;
+      if (oh.arch) { // checkpoint arch: the ceiling follows the half ellipse – low near the road edges, high over the centre
+        const lat = (p.pos.x - s0.x) * s0.rx + (p.pos.z - s0.z) * s0.rz, Ri = oh.arch.R - 1.7;
+        y0 = s0.y + oh.arch.sy * Math.sqrt(Math.max(0, Ri * Ri - lat * lat)); y1 = y0 + 3.6;
+      }
+      if (p.pos.y + ext <= y0 || p.pos.y - ext >= y1) continue;
+      const below = p.pos.y < (y0 + y1) * 0.5, hitY = below ? y0 : y1;
+      if (below) { p.pos.y = y0 - ext; if (p.vel.y > -5) p.vel.y = -5; } else { p.pos.y = y1 + ext; if (p.vel.y < 4) p.vel.y = 4; }
       const wc = p as unknown as { wCd?: number };
       if (p.invuln <= 0 && !(wc.wCd! > 0)) {
         wc.wCd = 0.5; const spd = Math.hypot(p.vel.x, p.vel.z), dmg = Math.min(18, 5 + spd * 0.07) * P.sturdy;
@@ -840,7 +848,7 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
       const h = p.pos.y - (p.groundY + HOVER);
       if (ai.dive) { if (h < 4) { ai.dive = false; ai.diveT = time + 6; } }
       else if (p.air < 0.1) ai.diveRoll = Math.random();               // decided once per take-off: most jumps are simply flown out
-      else if (ai.skill > 0.62 && (ai.diveRoll ?? 1) < 0.3 && p.air > 0.9 && h > 9 && p.vel.y < -2 && time > (ai.diveT ?? 0)) ai.dive = true;
+      else if (ai.skill > 0.62 && (ai.diveRoll ?? 1) < 0.22 && p.air > 0.9 && h > 9 && p.vel.y < -2 && time > (ai.diveT ?? 0)) ai.dive = true;
       if (ai.dive) pitchIn = -Math.min(0.6, 0.25 + 0.3 * ai.skill);
     }
   } else if ((ai.dive ? ((ai.dive = false), (ai.diveT = time + 6), false) : false) || (ai.skill > 0.55 && speed > 45 && !p.zeroG)) {

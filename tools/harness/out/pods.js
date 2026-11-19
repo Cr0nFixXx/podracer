@@ -74010,7 +74010,61 @@ function getOppGlow() {
 function getOppFarHull() {
   return sharedOppFarHull ?? (sharedOppFarHull = new MeshStandardMaterial({ vertexColors: true, metalness: 0.48, roughness: 0.34 }));
 }
-function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = false) {
+var numAtlas = null;
+var numMat = null;
+function numberPlate(L, num) {
+  if (!numAtlas) {
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = 512;
+    const c = cv.getContext("2d");
+    c.fillStyle = "#15171c";
+    c.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 15; i++) {
+      const x = i % 4 * 128, y = Math.floor(i / 4) * 128;
+      c.fillStyle = "#f2efe6";
+      c.fillRect(x + 6, y + 6, 116, 116);
+      c.strokeStyle = "#15171c";
+      c.lineWidth = 7;
+      c.strokeRect(x + 12, y + 12, 104, 104);
+      c.fillStyle = "#15171c";
+      c.font = "bold 84px sans-serif";
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      c.fillText(String(i + 1), x + 64, y + 70);
+    }
+    numAtlas = new CanvasTexture(cv);
+    numAtlas.colorSpace = SRGBColorSpace;
+    numAtlas.anisotropy = 4;
+    numMat = new MeshStandardMaterial({ map: numAtlas, emissiveMap: numAtlas, emissive: "#ffffff", emissiveIntensity: 0.22, roughness: 0.55, metalness: 0.1 });
+  }
+  const cell = ((num - 1) % 15 + 15) % 15, u0 = cell % 4 / 4, v0 = 1 - (Math.floor(cell / 4) + 1) / 4;
+  const mk = (flip) => {
+    const g2 = new PlaneGeometry(0.86, 0.86);
+    const uv3 = g2.attributes.uv;
+    for (let i = 0; i < uv3.count; i++) uv3.setXY(i, u0 + uv3.getX(i) * 0.25, v0 + uv3.getY(i) * 0.25);
+    if (flip) g2.rotateY(Math.PI);
+    g2.translate(0, 0, flip ? -0.022 : 0.022);
+    return g2;
+  };
+  const post = new BoxGeometry(0.07, 0.6, 0.07);
+  {
+    const uv3 = post.attributes.uv;
+    for (let i = 0; i < uv3.count; i++) uv3.setXY(i, 0.88, 0.12);
+  }
+  post.translate(0, -0.7, 0);
+  const frame = new BoxGeometry(0.94, 0.94, 0.03);
+  {
+    const uv3 = frame.attributes.uv;
+    for (let i = 0; i < uv3.count; i++) uv3.setXY(i, 0.88, 0.12);
+  }
+  const g = mergeGeometries([mk(false), mk(true), post, frame], false);
+  const m = new Mesh(g, numMat);
+  m.position.set(0, L.cockpit.y + 1.75, L.cockpit.z - 1.55);
+  m.rotation.x = -0.12;
+  m.castShadow = false;
+  return m;
+}
+function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = false, num) {
   const seg = isOpponent ? quality >= 3 ? 18 : 14 : quality >= 3 ? 40 : quality === 2 ? 28 : 20;
   const texSize = texRes >= 2048 && !isOpponent ? 2048 : 1024;
   const L = podLayout(def);
@@ -74172,6 +74226,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     farGrp.add(fhM);
     farGrp.add(new Mesh(far.dark, shared.dark));
     farGrp.add(new Mesh(fgGeo, oppGlow));
+    nearGrp.add(numberPlate(L, num ?? 1));
     const setDistance = (d, forceAll = false) => {
       if (forceAll) {
         nearGrp.visible = true;
@@ -74393,6 +74448,8 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     cabLift.value.set(yL, yR);
     if (binderU?.uLift) binderU.uLift.value.set(binderSwap ? yR : yL, binderSwap ? yL : yR);
   };
+  let boostK = 0, flapT = 0;
+  body.add(numberPlate(L, num ?? 1));
   const update = (t, throttle, boost, airbrake, dmgL, dmgR, heat) => {
     podSharedTime.value = t;
     const fl = 0.35 + throttle * 0.75 + boost * 0.8;
@@ -74416,7 +74473,11 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     const fanAng = t * (16 + throttle * 42);
     for (let i = 0; i < fans.length; i++) fans[i].rotation.z = fanAng + i * 0.7;
     const dmgF = Math.max(0, 0.45 - Math.min(dmgL, dmgR)) / 0.45;
-    for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (airbrake * 1.05 + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
+    const dtF = Math.max(0, Math.min(0.1, t - flapT));
+    flapT = t;
+    boostK += (boost - boostK) * Math.min(1, dtF * (boost > boostK ? 9 : 4));
+    const open = boostK * (0.5 + 0.035 * Math.sin(t * 43));
+    for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (Math.max(airbrake * 1.05, open) + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
     const uL = hullL.userData.u, uR = hullR.userData.u;
     uL.uScorch.value = Math.min(1, (1 - dmgL) * 1.1 + Math.max(0, heat - 0.75) * 0.8);
     uL.uHeat.value = heat;

@@ -214,7 +214,7 @@ export function surfaceMaterial(set: TexSet, o: SurfaceOpts = {}) {
   // ---- roughness with distance specular anti-aliasing (kills wet/ice/metal horizon strobing) ----
   let rough: N = normSample.a.mul(materialRoughness);
   if (o.ledge && o.ledge.amount > 0) rough = mix(rough, float(o.ledge.rough ?? 0.8), ledgeM);
-  if (wetAmt > 0) rough = mix(rough.mul(oneMinus(wetU.mul(0.35 * wetAmt))), float(0.11), puddle);
+  if (wetAmt > 0) rough = mix(rough.mul(oneMinus(wetU.mul(0.5 * wetAmt))), float(0.07), puddle); // glossier wet road + mirror puddles
   if (snowAmt > 0) rough = mix(rough, float(0.65), snowM);
   rough = mix(rough, max(rough, float(0.36)), smoothstep(48.0, 220.0, dist));
   mat.roughnessNode = clamp(rough, 0.11, 1.0);

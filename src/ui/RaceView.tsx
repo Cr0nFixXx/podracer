@@ -186,9 +186,9 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
 
       {paused && !results && (
         <div className="absolute inset-0 z-30 bg-black/70 backdrop-blur-sm">
-          <Fit minW={showGfx ? 1180 : 760} maxScale={1.4}>
+          <Fit>
             {!showGfx ? (
-              <div className="flex flex-col gap-3 w-72 text-center mx-auto py-16">
+              <div className="flex flex-col gap-3 w-72 text-center m-auto py-10">
                 <div className="font-display text-4xl text-amber-200 tracking-[0.4em] mb-6">PAUSE</div>
                 <Btn big onClick={() => gameRef.current?.setPaused(false)}>Weiter</Btn>
                 <Btn big onClick={() => { gameRef.current?.cycleCamera(); }}>Kamera wechseln</Btn>
@@ -198,14 +198,14 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
                 {needRestart && <div className="text-[11px] text-amber-300 mt-2">Geänderte Grafik-Einstellungen wirken erst nach „Neustart".</div>}
               </div>
             ) : (
-              <div className="p-6 max-w-[1300px] mx-auto">
+              <div className="flex-1 flex flex-col min-h-0 w-full p-6 max-w-[1720px] mx-auto">
                 <div className="flex items-center justify-between mb-4 gap-4">
                   <h2 className="font-display text-2xl text-amber-200 tracking-[0.3em]">GRAFIK</h2>
-                  <div className="text-[11px] text-stone-300 flex-1">Sofort wirksam: Sichtfeld, Render-Skalierung, LOD-Distanz, Gegner-Pod-Detail, Wetter-Effekte, FPS-Anzeige, Lautstärke. Alles andere nach Neustart des Rennens.</div>
+                  <div className="text-[11px] text-stone-300 flex-1">Sofort wirksam: alle Effekte, Schatten, Kantenglättung, Partikel, Sichtweite, LOD, Render-Skalierung, Sichtfeld, Lautstärke. Neustart nötig: Texturen, Geometrie/Detaildichte, Tessellation, Material-Optionen, Kaskaden-Schatten, Volumetrie, Renderer.</div>
                   {needRestart && <Btn onClick={restart}>↻ Übernehmen &amp; neu starten</Btn>}
                   <Btn onClick={() => setShowGfx(false)}>‹ Zurück</Btn>
                 </div>
-                <div className="grid grid-cols-1 @5xl:grid-cols-3 gap-5"><GfxPanels profile={profile} update={update} /></div>
+                <div className="grid grid-cols-3 gap-4 content-start"><GfxPanels profile={profile} update={update} /></div>
               </div>
             )}
           </Fit>
@@ -214,7 +214,7 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
 
       {results && (
         <div className="absolute inset-0 z-30 bg-black/70 backdrop-blur-md">
-          <Fit minW={860} maxScale={1.4}><div className="w-full max-w-3xl mx-auto p-6">
+          <Fit><div className="w-full max-w-3xl m-auto p-6">
             <div className="font-display text-amber-400/80 tracking-[0.5em] text-xs text-center">{track.name.toUpperCase()}</div>
             <div className="font-display text-5xl text-center text-amber-200 tracking-[0.3em] mb-8">ERGEBNIS</div>
             <div className="bg-black/50 border border-amber-500/25 clip-corner">

@@ -37,7 +37,7 @@ export function MainMenu({ profile, go }: { profile: Profile; go: (s: string) =>
     <div className="relative w-full h-full overflow-hidden">
       <Background />
       <Fit>
-      <div className="relative z-10 flex h-[680px]">
+      <div className="relative z-10 flex flex-1 min-h-0">
       <div className="flex flex-col justify-center pl-24 w-1/2">
         <div className="font-display text-amber-400/80 tracking-[0.6em] text-xs mb-3">OUTER RIM CHAMPIONSHIP</div>
         <h1 className="font-display text-6xl @3xl:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-orange-600 leading-none drop-shadow-[0_0_40px_rgba(251,146,60,0.35)]">PODRACER</h1>
@@ -49,8 +49,8 @@ export function MainMenu({ profile, go }: { profile: Profile; go: (s: string) =>
         </div>
         <div className="mt-12 text-stone-400 text-xs tracking-widest uppercase">Aktueller Pod: <span className="text-amber-300">{pod.name}</span></div>
       </div>
-      <div className="relative w-1/2 h-full">
-        <PodPreview podId={profile.podId} colors={profile.custom[profile.podId].colors} className="w-full h-full" />
+      <div className="relative w-1/2">
+        <PodPreview podId={profile.podId} colors={profile.custom[profile.podId].colors} className="absolute inset-0" />
       </div>
       </div>
       </Fit>
@@ -99,12 +99,12 @@ export function RaceSetup({ profile, update, go, start }: { profile: Profile; up
     <div className="relative w-full h-full overflow-hidden">
       <Background dim={0.7} />
       <Fit>
-      <div className="relative z-10 p-6 @3xl:p-10 max-w-[1500px] mx-auto">
-        <div className="flex items-center justify-between mb-6">
+      <div className="relative z-10 flex-1 flex flex-col min-h-0 w-full p-6 max-w-[1720px] mx-auto">
+        <div className="flex items-center justify-between mb-4 shrink-0">
           <h2 className="font-display text-3xl text-amber-200 tracking-[0.3em]">RENNEN</h2>
           <Btn onClick={() => go('menu')}>‹ Zurück</Btn>
         </div>
-        <div className="grid grid-cols-1 @5xl:grid-cols-[360px_1fr_340px] gap-5">
+        <div className="grid grid-cols-[330px_1fr_330px] gap-4 flex-1 min-h-0">
           <Panel title="Strecken">
             <div className="flex gap-2 mb-4">{(['all', 'circuit', 'sprint'] as const).map(f => <Btn key={f} active={filter === f} onClick={() => setFilter(f)}>{f === 'all' ? 'Alle' : f === 'circuit' ? 'Rundkurs' : 'Sprint'}</Btn>)}</div>
             <select value={planet} onChange={e => setPlanet(e.target.value)} aria-label="Planet" className="w-full bg-black/60 border border-stone-600 text-amber-100 p-2 mb-3 text-sm">
@@ -113,19 +113,17 @@ export function RaceSetup({ profile, update, go, start }: { profile: Profile; up
             </select>
             <div className="flex flex-col gap-1">
               {TRACKS.filter(t => (filter === 'all' || t.type === filter) && (planet === 'all' || t.planet === planet)).map(t => (
-                <button key={t.id} onClick={() => set('trackId', t.id)} title={t.planet} className={`text-left px-3 py-1.5 border transition flex items-center gap-2 ${t.id === r.trackId ? 'border-amber-300 bg-amber-400/15' : 'border-stone-700 bg-black/30 hover:border-amber-500/60'}`}>
-                  <span className={`w-1.5 h-5 shrink-0 ${t.type === 'circuit' ? 'bg-cyan-400' : 'bg-rose-400'}`} title={t.type === 'circuit' ? 'Rundkurs' : 'Sprint'} />
-                  <span className="flex-1 min-w-0">
-                    <span className="block font-display text-amber-100 tracking-wider text-sm truncate">{t.name}</span>
-                    <span className="block text-[10px] text-stone-400 leading-tight truncate">{t.planet} · {t.type === 'circuit' ? 'Rundkurs' : 'Sprint'}</span>
-                  </span>
-                  <span className="text-amber-400 text-[11px] shrink-0">{'◆'.repeat(t.difficulty)}<span className="text-stone-700">{'◆'.repeat(5 - t.difficulty)}</span></span>
+                <button key={t.id} onClick={() => set('trackId', t.id)} title={`${t.planet} · ${t.type === 'circuit' ? 'Rundkurs' : 'Sprint'}`} className={`text-left px-2.5 py-[3px] border transition flex items-center gap-2 ${t.id === r.trackId ? 'border-amber-300 bg-amber-400/15' : 'border-stone-700 bg-black/30 hover:border-amber-500/60'}`}>
+                  <span className={`w-1.5 h-4 shrink-0 ${t.type === 'circuit' ? 'bg-cyan-400' : 'bg-rose-400'}`} />
+                  <span className="font-display text-amber-100 tracking-wider text-[13px] truncate flex-1 min-w-0">{t.name}</span>
+                  <span className="text-[9px] text-stone-400 uppercase tracking-wider truncate max-w-[84px]">{t.planet}</span>
+                  <span className="text-amber-400 text-[10px] shrink-0">{'◆'.repeat(t.difficulty)}<span className="text-stone-700">{'◆'.repeat(5 - t.difficulty)}</span></span>
                 </button>
               ))}
             </div>
           </Panel>
           <Panel title={track.name}>
-            <div className="relative aspect-[1.3] w-full rounded overflow-hidden" style={{ background: `radial-gradient(ellipse at 30% 20%, ${theme.skyHorizon}33, ${theme.skyTop}22 60%, #000a)` }}>
+            <div className="relative h-[330px] w-full rounded overflow-hidden" style={{ background: `radial-gradient(ellipse at 30% 20%, ${theme.skyHorizon}33, ${theme.skyTop}22 60%, #000a)` }}>
               <TrackMap id={track.id} className="w-full h-full" />
               <div className="absolute top-3 left-3 text-[10px] uppercase tracking-widest text-stone-300 bg-black/50 px-2 py-1">● Start {track.type === 'sprint' && <span className="text-green-400 ml-2">● Ziel</span>} <span className="text-amber-300 ml-2">┅ Abkürzung</span> <span className="text-red-400 ml-2">▬ Sprung</span></div>
             </div>
@@ -188,16 +186,16 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
     <div className="relative w-full h-full overflow-hidden">
       <Background dim={0.75} />
       <Fit>
-      <div className="relative z-10 p-6 @3xl:p-10 max-w-[1600px] mx-auto">
-        <div className="flex items-center justify-between mb-6">
+      <div className="relative z-10 flex-1 flex flex-col min-h-0 w-full p-6 max-w-[1720px] mx-auto">
+        <div className="flex items-center justify-between mb-4 shrink-0">
           <h2 className="font-display text-3xl text-amber-200 tracking-[0.3em]">HANGAR</h2>
           <div className="flex gap-2"><Btn active={profile.podId === sel} onClick={() => update(p => ({ ...p, podId: sel }))}>{profile.podId === sel ? '✓ Ausgewählt' : 'Diesen Pod fahren'}</Btn><Btn onClick={() => go('menu')}>‹ Zurück</Btn></div>
         </div>
-        <div className="grid grid-cols-1 @7xl:grid-cols-[240px_1fr_320px] gap-5">
+        <div className="grid grid-cols-[230px_1fr_320px] gap-4 flex-1 min-h-0">
           <Panel title="Podracer">
             <div className="flex flex-col gap-1.5">
               {PODS.map(p => (
-                <button key={p.id} onClick={() => setSel(p.id)} className={`text-left px-3 py-2 border transition flex items-center gap-3 ${p.id === sel ? 'border-amber-300 bg-amber-400/15' : 'border-stone-800 bg-black/30 hover:border-amber-500/50'}`}>
+                <button key={p.id} onClick={() => setSel(p.id)} className={`text-left px-3 py-1 border transition flex items-center gap-3 ${p.id === sel ? 'border-amber-300 bg-amber-400/15' : 'border-stone-800 bg-black/30 hover:border-amber-500/50'}`}>
                   <span className="w-3 h-3 rounded-full" style={{ background: profile.custom[p.id].colors[0], boxShadow: `0 0 8px ${p.colors[2]}` }} />
                   <span className="flex-1"><span className="block font-display text-sm text-amber-100">{p.name}</span><span className="block text-[10px] text-stone-400">{PILOTS.find(x => x.id === p.pilotId)!.name}</span></span>
                   {profile.podId === p.id && <span className="text-amber-300 text-xs">●</span>}
@@ -205,8 +203,8 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
               ))}
             </div>
           </Panel>
-          <div className="flex flex-col gap-5">
-            <div className="relative h-[350px] border border-amber-500/20 bg-black/40 clip-corner overflow-hidden">
+          <div className="flex flex-col gap-4 min-h-0">
+            <div className="relative flex-1 min-h-[210px] border border-amber-500/20 bg-black/40 clip-corner overflow-hidden">
               <PodPreview podId={sel} colors={custom.colors} className="absolute inset-0" />
               <div className="absolute top-4 left-5 pointer-events-none">
                 <div className="font-display text-3xl text-amber-100">{pod.name}</div>
@@ -258,7 +256,7 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
                 <Btn onClick={() => setCustom({ ...custom, tuning: Object.fromEntries(STAT_KEYS.map(k => [k, 5])) as Record<StatKey, number> })}>Alles Max</Btn>
                 <Btn onClick={() => setCustom({ ...custom, tuning: Object.fromEntries(STAT_KEYS.map(k => [k, 0])) as Record<StatKey, number> })}>Zurücksetzen</Btn>
               </div>
-              <p className="text-[11px] text-stone-500 mt-3">Alle Teile freigeschaltet. Jede Stufe verbessert den Wert um 5 %.</p>
+              <p className="text-[11px] text-stone-500 mt-2">Alle Teile freigeschaltet. Jede Stufe verbessert den Wert um 5 %.</p>
             </Panel>
           </div>
         </div>
@@ -274,14 +272,14 @@ export function SettingsScreen({ profile, update, go }: { profile: Profile; upda
     <div className="relative w-full h-full overflow-hidden">
       <Background dim={0.8} />
       <Fit>
-      <div className="relative z-10 p-6 @3xl:p-10 max-w-[1300px] mx-auto">
-        <div className="flex items-center justify-between mb-6">
+      <div className="relative z-10 flex-1 flex flex-col min-h-0 w-full p-6 max-w-[1720px] mx-auto">
+        <div className="flex items-center justify-between mb-4 shrink-0">
           <h2 className="font-display text-3xl text-amber-200 tracking-[0.3em]">EINSTELLUNGEN</h2>
           <div className="flex gap-2"><Btn active={tab === 'gfx'} onClick={() => setTab('gfx')}>Grafik &amp; Ton</Btn><Btn active={tab === 'keys'} onClick={() => setTab('keys')}>Steuerung</Btn><Btn onClick={() => go('menu')}>‹ Zurück</Btn></div>
         </div>
-        <div className="grid grid-cols-1 @5xl:grid-cols-3 gap-5">
+        <div className="grid grid-cols-3 gap-4 content-start">
           {tab === 'gfx' && <GfxPanels profile={profile} update={update} />}
-          {tab === 'keys' && <Panel title="Steuerung" className="@5xl:col-span-3">
+          {tab === 'keys' && <Panel title="Steuerung" className="col-span-3">
             <KeyBindings profile={profile} update={update} />
             <p className="text-[11px] text-stone-500 mt-3">Gamepad: RT Schub · LT Bremse · Linker Stick lenken · Rechter Stick: ←/→ Rolle, ↑ Neigen, ↓ Anheben · A Boost · B/LB/RB Luftbremse/Slide · X Reparatur · Y Ansicht</p>
           </Panel>}

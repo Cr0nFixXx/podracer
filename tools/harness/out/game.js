@@ -21477,24 +21477,24 @@ var init_three_core = __esm({
         const P2 = new Vector3();
         const B2 = new Vector3();
         const T2 = new Vector3();
-        const N2 = new Vector3();
+        const N3 = new Vector3();
         for (let i = 0; i <= tubularSegments; ++i) {
           const u = i / tubularSegments * p * Math.PI * 2;
           calculatePositionOnCurve(u, p, q, radius, P1);
           calculatePositionOnCurve(u + 0.01, p, q, radius, P2);
           T2.subVectors(P2, P1);
-          N2.addVectors(P2, P1);
-          B2.crossVectors(T2, N2);
-          N2.crossVectors(B2, T2);
+          N3.addVectors(P2, P1);
+          B2.crossVectors(T2, N3);
+          N3.crossVectors(B2, T2);
           B2.normalize();
-          N2.normalize();
+          N3.normalize();
           for (let j = 0; j <= radialSegments; ++j) {
             const v = j / radialSegments * Math.PI * 2;
             const cx = -tube3 * Math.cos(v);
             const cy = tube3 * Math.sin(v);
-            vertex.x = P1.x + (cx * N2.x + cy * B2.x);
-            vertex.y = P1.y + (cx * N2.y + cy * B2.y);
-            vertex.z = P1.z + (cx * N2.z + cy * B2.z);
+            vertex.x = P1.x + (cx * N3.x + cy * B2.x);
+            vertex.y = P1.y + (cx * N3.y + cy * B2.y);
+            vertex.z = P1.z + (cx * N3.z + cy * B2.z);
             vertices.push(vertex.x, vertex.y, vertex.z);
             normal2.subVectors(vertex, P1).normalize();
             normals.push(normal2.x, normal2.y, normal2.z);
@@ -21589,15 +21589,15 @@ var init_three_core = __esm({
         }
         function generateSegment(i) {
           P = path.getPointAt(i / tubularSegments, P);
-          const N2 = frames.normals[i];
+          const N3 = frames.normals[i];
           const B2 = frames.binormals[i];
           for (let j = 0; j <= radialSegments; j++) {
             const v = j / radialSegments * Math.PI * 2;
             const sin14 = Math.sin(v);
             const cos7 = -Math.cos(v);
-            normal2.x = cos7 * N2.x + sin14 * B2.x;
-            normal2.y = cos7 * N2.y + sin14 * B2.y;
-            normal2.z = cos7 * N2.z + sin14 * B2.z;
+            normal2.x = cos7 * N3.x + sin14 * B2.x;
+            normal2.y = cos7 * N3.y + sin14 * B2.y;
+            normal2.z = cos7 * N3.z + sin14 * B2.z;
             normal2.normalize();
             normals.push(normal2.x, normal2.y, normal2.z);
             vertex.x = P.x + radius * normal2.x;
@@ -33621,7 +33621,7 @@ function blur(src, size, r) {
   return out;
 }
 function computeTexture(kind, palette, size, seed, emissiveColor) {
-  const N2 = new TileNoise(seed);
+  const N3 = new TileNoise(seed);
   const cols = palette.map(hexToRgb);
   const H = new Float32Array(size * size);
   const R = new Float32Array(size * size);
@@ -33639,18 +33639,18 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
       const i = y * size + x;
       let h = 0, r = 0.8, t = 0, e = 0;
       let direct = null;
-      const grain = N2.noise(u * gPer, v * gPer, gPer);
-      const fine = N2.noise(u * fPer, v * fPer, fPer);
+      const grain = N3.noise(u * gPer, v * gPer, gPer);
+      const fine = N3.noise(u * fPer, v * fPer, fPer);
       switch (kind) {
         case "sand": {
-          const f = N2.fbm(u, v, 4, 6);
-          const warp = N2.fbm(u, v, 3, 4) * 3.8;
+          const f = N3.fbm(u, v, 4, 6);
+          const warp = N3.fbm(u, v, 3, 4) * 3.8;
           const ripBig = aeolianWave(u * 24 + v * 5 + warp);
-          const ripFine = aeolianWave(u * 76 + v * 14 + warp * 2.1 + N2.fbm(u, v, 12, 2) * 1.8);
+          const ripFine = aeolianWave(u * 76 + v * 14 + warp * 2.1 + N3.fbm(u, v, 12, 2) * 1.8);
           const cross6 = aeolianWave(v * 38 - u * 8 + warp * 1.2) * (1 - ripBig) * 0.45;
-          N2.worley(u, v, 56, w);
+          N3.worley(u, v, 56, w);
           const peb = (1 - sstep(0.06, 0.24, w[0])) * (w[2] > 0.8 ? 1 : 0);
-          const damp2 = sstep(0.56, 0.72, N2.fbm(u + 0.2, v, 2, 4));
+          const damp2 = sstep(0.56, 0.72, N3.fbm(u + 0.2, v, 2, 4));
           h = f * 0.42 + ripBig * 0.3 + ripFine * 0.1 + cross6 * 0.08 + peb * 0.34 + grain * 0.05;
           t = f * 0.62 + ripBig * 0.26 + ripFine * 0.08 + grain * 0.1 - damp2 * 0.24 - peb * 0.24;
           r = 0.93 - ripBig * 0.05 - grain * 0.08 - damp2 * 0.14;
@@ -33659,40 +33659,40 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
         case "rock":
         case "basalt": {
           if (kind === "basalt") {
-            const bwx = (N2.fbm(u + 0.31, v + 0.17, 4, 3) - 0.5) * 0.15, bwy = (N2.fbm(u + 0.63, v + 0.49, 5, 3) - 0.5) * 0.12;
-            N2.worley(u + bwx, v + bwy, 8, w);
+            const bwx = (N3.fbm(u + 0.31, v + 0.17, 4, 3) - 0.5) * 0.15, bwy = (N3.fbm(u + 0.63, v + 0.49, 5, 3) - 0.5) * 0.12;
+            N3.worley(u + bwx, v + bwy, 8, w);
             const edge = w[1] - w[0];
             const colTop = sstep(0.025, 0.11, edge);
             const bevel = sstep(0.015, 0.055, edge) * (1 - sstep(0.055, 0.12, edge));
-            const ropy = Math.sin((u * 18 + v * 12 + N2.fbm(u, v, 6, 3) * 4.5) * Math.PI * 2) * 0.5 + 0.5;
-            N2.worley(u, v, 68, w22);
+            const ropy = Math.sin((u * 18 + v * 12 + N3.fbm(u, v, 6, 3) * 4.5) * Math.PI * 2) * 0.5 + 0.5;
+            N3.worley(u, v, 68, w22);
             const pore = (1 - sstep(0.04, 0.16, w22[0])) * (w22[2] > 0.74 ? 1 : 0);
-            const magmaMask = sstep(0.46, 0.7, N2.fbm(u, v, 4, 3)) * (0.55 + 0.45 * sstep(0.3, 0.7, N2.fbm(u + 0.5, v + 0.2, 9, 2)));
+            const magmaMask = sstep(0.46, 0.7, N3.fbm(u, v, 4, 3)) * (0.55 + 0.45 * sstep(0.3, 0.7, N3.fbm(u + 0.5, v + 0.2, 9, 2)));
             const glow = (1 - sstep(0, 0.04, edge)) * magmaMask;
             const emberRim = (1 - sstep(0.02, 0.075, edge)) * magmaMask * 0.35;
-            h = colTop * (0.52 + w[2] * 0.34) + ropy * 0.07 * (1 - w[3] * 0.5) + N2.fbm(u, v, 16, 4) * 0.1 - pore * 0.14 - glow * 0.3 + grain * 0.04;
-            t = 0.22 + w[2] * 0.34 + N2.fbm(u, v, 8, 4) * 0.28 + bevel * 0.14 + ropy * 0.08 - (1 - colTop) * 0.32 - pore * 0.15;
+            h = colTop * (0.52 + w[2] * 0.34) + ropy * 0.07 * (1 - w[3] * 0.5) + N3.fbm(u, v, 16, 4) * 0.1 - pore * 0.14 - glow * 0.3 + grain * 0.04;
+            t = 0.22 + w[2] * 0.34 + N3.fbm(u, v, 8, 4) * 0.28 + bevel * 0.14 + ropy * 0.08 - (1 - colTop) * 0.32 - pore * 0.15;
             r = 0.76 + grain * 0.14 + pore * 0.12 - bevel * 0.14 - ropy * 0.08;
-            e = glow * (0.65 + 0.35 * N2.fbm(u, v, 12, 3)) + emberRim;
+            e = glow * (0.65 + 0.35 * N3.fbm(u, v, 12, 3)) + emberRim;
             break;
           }
-          const warpS = N2.fbm(u, v, 3, 4) * 2.8 + N2.ridged(u, v, 6, 3) * 0.55;
+          const warpS = N3.fbm(u, v, 3, 4) * 2.8 + N3.ridged(u, v, 6, 3) * 0.55;
           const bandPos = v * 20 + warpS;
           const band = Math.floor(bandPos);
           const bf = bandPos - band;
-          const bandId = N2.h(band & 255, 17);
+          const bandId = N3.h(band & 255, 17);
           const subLedge = Math.sin(bf * Math.PI * 6) * 0.04;
           const ledge = sstep(0, 0.11, bf) * (1 - sstep(0.84, 1, bf)) + subLedge;
-          const rd = N2.ridged(u, v, 4, 6);
-          const varnish = sstep(0.42, 0.78, N2.noise2(u, v, 56, 2) * 0.7 + N2.noise2(u, v, 128, 4) * 0.3) * N2.fbm(u, v, 4, 3);
-          const jw = (N2.fbm(u + 0.37, v + 0.11, 5, 3) - 0.5) * 0.16, jw2 = (N2.fbm(u + 0.71, v + 0.53, 7, 3) - 0.5) * 0.12;
-          const weak = sstep(0.4, 0.7, N2.fbm(u + 0.9, v + 0.4, 3, 3));
-          N2.worley(u + jw, v + jw2, 6, w);
+          const rd = N3.ridged(u, v, 4, 6);
+          const varnish = sstep(0.42, 0.78, N3.noise2(u, v, 56, 2) * 0.7 + N3.noise2(u, v, 128, 4) * 0.3) * N3.fbm(u, v, 4, 3);
+          const jw = (N3.fbm(u + 0.37, v + 0.11, 5, 3) - 0.5) * 0.16, jw2 = (N3.fbm(u + 0.71, v + 0.53, 7, 3) - 0.5) * 0.12;
+          const weak = sstep(0.4, 0.7, N3.fbm(u + 0.9, v + 0.4, 3, 3));
+          N3.worley(u + jw, v + jw2, 6, w);
           const crack = (1 - sstep(0, 0.03, w[1] - w[0])) * (0.3 + 0.7 * weak);
-          N2.worley(u + jw2 * 0.6, v + jw * 0.6, 17, w22);
+          N3.worley(u + jw2 * 0.6, v + jw * 0.6, 17, w22);
           const joint = (1 - sstep(0, 0.022, w22[1] - w22[0])) * 0.4 * weak;
-          const lam = Math.sin((bandPos * 7 + N2.fbm(u, v, 9, 2) * 2.2) * Math.PI * 2) * 0.5 + 0.5;
-          N2.worley(u, v, 44, w32);
+          const lam = Math.sin((bandPos * 7 + N3.fbm(u, v, 9, 2) * 2.2) * Math.PI * 2) * 0.5 + 0.5;
+          N3.worley(u, v, 44, w32);
           const pit = (1 - sstep(0.05, 0.2, w32[0])) * (w32[2] > 0.66 ? 1 : 0) * (1 - weak * 0.5);
           const blockTilt = (w[2] - 0.5) * 0.1 + (w22[2] - 0.5) * 0.04;
           h = rd * 0.34 + ledge * 0.3 + bandId * 0.13 + blockTilt + lam * 0.05 - crack * 0.26 - joint * 0.1 - pit * 0.16 - varnish * 0.07 + fine * 0.08 + grain * 0.035;
@@ -33706,9 +33706,9 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
             const cells = 8;
             const gx = u * cells % 1, gy = v * cells % 1;
             const seam2 = Math.min(gx, 1 - gx, gy, 1 - gy);
-            const pid = N2.h(Math.floor(u * cells), Math.floor(v * cells));
-            const f2 = N2.fbm(u, v, 8, 4);
-            const scratch = N2.noise2(u, v, 384, 4) > 0.83 ? 1 : 0;
+            const pid = N3.h(Math.floor(u * cells), Math.floor(v * cells));
+            const f2 = N3.fbm(u, v, 8, 4);
+            const scratch = N3.noise2(u, v, 384, 4) > 0.83 ? 1 : 0;
             const inGrate = Math.abs(u - 0.5) < 0.08 && Math.abs(u - 0.5) > 0.012;
             const grateSlot = inGrate && v * 96 % 1 < 0.42 && u * 64 % 1 < 0.65 ? 1 : 0;
             const rivet = Math.hypot(gx - 0.08, gy - 0.08) < 0.02 || Math.hypot(gx - 0.92, gy - 0.08) < 0.02 || Math.hypot(gx - 0.08, gy - 0.92) < 0.02 || Math.hypot(gx - 0.92, gy - 0.92) < 0.02 ? 1 : 0;
@@ -33738,16 +33738,16 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
             }
             break;
           }
-          N2.worley(u, v, 6, w);
+          N3.worley(u, v, 6, w);
           const edge = w[1] - w[0];
           const seam = 1 - sstep(0, 0.048, edge);
           const rib = 1 - sstep(0, 0.035, Math.abs(v * 8 % 1 - 0.5));
-          const f = N2.fbm(u, v, 8, 4);
+          const f = N3.fbm(u, v, 8, 4);
           const core = sstep(0.32, 0, w[0]) * (w[2] > 0.52 ? 1 : 0.25) * (1 - rib * 0.8);
           h = 0.52 + sstep(0.02, 0.1, edge) * 0.28 + rib * 0.16 - seam * 0.4 + f * 0.06 + w[2] * 0.08;
           t = 0.28 + w[2] * 0.3 + f * 0.2 + rib * 0.12 - seam * 0.24;
           r = 0.36 + f * 0.2 + seam * 0.32 - rib * 0.1;
-          e = core * 0.85 * (0.6 + 0.4 * N2.fbm(u, v, 12, 3));
+          e = core * 0.85 * (0.6 + 0.4 * N3.fbm(u, v, 12, 3));
           break;
         }
         case "road":
@@ -33756,28 +33756,28 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
         case "cityRoad":
         case "ice": {
           const edge = Math.min(u, 1 - u);
-          const f = N2.fbm(u, v, 3, 6);
-          const streak = N2.noise2(u, v, 160, 4) * 0.55 + N2.noise2(u, v, 320, 8) * 0.45;
-          const lineShift = (N2.noise2(u, v, 1, 2) - 0.5) * 0.2;
+          const f = N3.fbm(u, v, 3, 6);
+          const streak = N3.noise2(u, v, 160, 4) * 0.55 + N3.noise2(u, v, 320, 8) * 0.45;
+          const lineShift = (N3.noise2(u, v, 1, 2) - 0.5) * 0.2;
           const centerLine = u - 0.5 - lineShift;
           const racing = Math.exp(-Math.pow(centerLine / 0.18, 2)) * 0.65 + (Math.exp(-Math.pow((centerLine - 0.085) / 0.045, 2)) + Math.exp(-Math.pow((centerLine + 0.085) / 0.045, 2))) * 0.5;
-          const scorch = sstep(0.6, 0.75, N2.fbm(u, v, 5, 4));
-          N2.worley(u, v, 72, w);
+          const scorch = sstep(0.6, 0.75, N3.fbm(u, v, 5, 4));
+          N3.worley(u, v, 72, w);
           const peb = (1 - sstep(0.06, 0.28, w[0])) * (w[2] > 0.66 ? 1 : 0);
-          N2.worley(u, v, 11, w22);
-          const crack = (1 - sstep(0, 0.02, w22[1] - w22[0])) * sstep(0.42, 0.58, N2.fbm(u, v, 4, 3));
-          N2.worley(u, v, 28, w32);
+          N3.worley(u, v, 11, w22);
+          const crack = (1 - sstep(0, 0.02, w22[1] - w22[0])) * sstep(0.42, 0.58, N3.fbm(u, v, 4, 3));
+          N3.worley(u, v, 28, w32);
           const microCrack = (1 - sstep(0, 0.018, w32[1] - w32[0])) * sstep(0.52, 0.68, f) * 0.45;
           h = 0.5 + f * 0.22 + streak * 0.11 + peb * 0.24 - crack * 0.36 - microCrack * 0.18 + grain * 0.045;
           t = 0.36 + f * 0.44 + streak * 0.18 - racing * 0.22 - scorch * 0.26 - crack * 0.24 - microCrack * 0.12 + (w[3] - 0.5) * peb * 0.18;
           r = 0.84 - racing * 0.16 - streak * 0.07 + crack * 0.1;
           if (kind === "mud") {
             const rut = Math.exp(-Math.pow((u - 0.32 - lineShift * 0.6) / 0.065, 2)) + Math.exp(-Math.pow((u - 0.68 - lineShift * 0.6) / 0.065, 2));
-            N2.worley(u, v, 26, w32);
+            N3.worley(u, v, 26, w32);
             const cobble = (1 - sstep(0.08, 0.32, w32[0])) * (w32[2] > 0.78 ? 1 : 0) * (1 - rut * 0.5);
-            const pud = sstep(0.56, 0.63, N2.fbm(u, v, 4, 4) + rut * 0.12 - edge * 0.1);
-            const wetRim = sstep(0.48, 0.56, N2.fbm(u, v, 4, 4) + rut * 0.12) * (1 - pud);
-            const edgeMoss = sstep(0.18, 0.04, edge) * sstep(0.4, 0.62, N2.fbm(u, v, 8, 3));
+            const pud = sstep(0.56, 0.63, N3.fbm(u, v, 4, 4) + rut * 0.12 - edge * 0.1);
+            const wetRim = sstep(0.48, 0.56, N3.fbm(u, v, 4, 4) + rut * 0.12) * (1 - pud);
+            const edgeMoss = sstep(0.18, 0.04, edge) * sstep(0.4, 0.62, N3.fbm(u, v, 8, 3));
             h = h - rut * 0.14 + cobble * 0.32;
             h = h * (1 - pud) + 0.2 * pud;
             t = t - rut * 0.12 - wetRim * 0.18 - pud * 0.32 + cobble * 0.15;
@@ -33788,13 +33788,13 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
             }
           }
           if (kind === "ice") {
-            N2.worley(u, v, 7, w);
+            N3.worley(u, v, 7, w);
             const ic = 1 - sstep(0, 0.022, w[1] - w[0]);
-            N2.worley(u, v, 20, w32);
+            N3.worley(u, v, 20, w32);
             const ic2 = (1 - sstep(0, 0.018, w32[1] - w32[0])) * 0.55;
-            const skate = sstep(0.76, 0.9, N2.noise2(u, v, 240, 3)) * 0.5;
+            const skate = sstep(0.76, 0.9, N3.noise2(u, v, 240, 3)) * 0.5;
             const bub = (1 - sstep(0, 0.075, w22[0])) * (w22[2] > 0.82 ? 1 : 0);
-            const frost = sstep(0.18, 0.035, edge) * (0.65 + 0.35 * f) + sstep(0.62, 0.76, N2.fbm(u, v, 6, 3)) * 0.55;
+            const frost = sstep(0.18, 0.035, edge) * (0.65 + 0.35 * f) + sstep(0.62, 0.76, N3.fbm(u, v, 6, 3)) * 0.55;
             h = 0.6 + f * 0.14 - ic * 0.32 - ic2 * 0.12 - skate * 0.08 + bub * 0.08 + frost * 0.18;
             t = 0.32 + (w[2] - 0.5) * 0.14 + f * 0.32 + ic * 0.4 + ic2 * 0.22 + skate * 0.18 + bub * 0.25 + frost * 0.42 - racing * 0.16;
             r = 0.055 + f * 0.1 + ic * 0.32 + skate * 0.14 + frost * 0.52;
@@ -33802,7 +33802,7 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
           if (kind === "cityRoad") {
             const gx = u * 8 % 1, gy = v * 8 % 1;
             const seam = Math.min(gx, 1 - gx, gy, 1 - gy);
-            const pid = N2.h(Math.floor(u * 8), Math.floor(v * 8));
+            const pid = N3.h(Math.floor(u * 8), Math.floor(v * 8));
             const drain = edge > 0.052 && edge < 0.072 && v * 64 % 1 < 0.45 ? 1 : 0;
             h = 0.52 + f * 0.08 + sstep(0, 0.012, seam) * 0.18 - (seam < 4e-3 ? 0.22 : 0) - drain * 0.3 + grain * 0.04;
             t = 0.28 + f * 0.28 + pid * 0.16 - racing * 0.16 + streak * 0.1 - drain * 0.3;
@@ -33827,7 +33827,7 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
             }
           }
           if (kind === "road") {
-            N2.worley(u, v, 5, w22);
+            N3.worley(u, v, 5, w22);
             const patch = w22[2] > 0.74 && edge > 0.09;
             if (patch) {
               t -= 0.12;
@@ -33844,15 +33844,15 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
             t -= joint * 0.32;
             h -= joint * 0.3;
             r += joint * 0.12;
-            const oil = sstep(0.67, 0.8, N2.fbm(u + 0.31, v, 6, 3)) * Math.min(1, racing);
+            const oil = sstep(0.67, 0.8, N3.fbm(u + 0.31, v, 6, 3)) * Math.min(1, racing);
             t -= oil * 0.22;
             r -= oil * 0.28;
-            const driftSand = sstep(0.22, 0.055, edge) * sstep(0.38, 0.64, N2.fbm(u, v, 5, 4));
+            const driftSand = sstep(0.22, 0.055, edge) * sstep(0.38, 0.64, N3.fbm(u, v, 5, 4));
             const sRip = aeolianWave(v * 44 + u * 8 + f * 2) * driftSand;
             t += driftSand * 0.22 + sRip * 0.06;
             h += driftSand * 0.08 + sRip * 0.05;
             r += driftSand * 0.1;
-            const paintWear = sstep(0.32, 0.62, N2.fbm(u, v, 18, 3));
+            const paintWear = sstep(0.32, 0.62, N3.fbm(u, v, 18, 3));
             if (Math.abs(u - 0.5) < 5e-3 && v * 10 % 1 < 0.52 && paintWear > 0.25) {
               const pw = 0.68 + 0.24 * paintWear;
               direct = [0.88 * pw, 0.82 * pw, 0.7 * pw];
@@ -33861,9 +33861,9 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
             }
           }
           if (kind === "lavaRoad") {
-            N2.worley(u, v, 7, w);
+            N3.worley(u, v, 7, w);
             const ed = w[1] - w[0];
-            const mask = sstep(0.36, 0.54, N2.fbm(u, v, 3, 3)) * (edge > 0.065 ? 1 : 0);
+            const mask = sstep(0.36, 0.54, N3.fbm(u, v, 3, 3)) * (edge > 0.065 ? 1 : 0);
             const lavaVein = (1 - sstep(0, 0.028, ed)) * mask;
             const crustRim = sstep(0.015, 0.045, ed) * (1 - sstep(0.045, 0.09, ed)) * mask;
             e = lavaVein * (0.72 + 0.28 * f);
@@ -33875,7 +33875,7 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
           t -= dirt * 0.14;
           r += dirt * 0.07;
           if (kind !== "cityRoad" && kind !== "mud" && edge > 0.044 && edge < 0.052) {
-            const wearL = 0.62 + 0.34 * N2.fbm(u, v, 24, 3);
+            const wearL = 0.62 + 0.34 * N3.fbm(u, v, 24, 3);
             if (wearL > 0.7) {
               direct = [0.84 * wearL, 0.81 * wearL, 0.74 * wearL];
               r = 0.52;
@@ -33888,7 +33888,7 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
             const kerbB = kind === "lavaRoad" ? [0.18, 0.15, 0.13] : KERB_WHITE;
             const base = stripe ? kerbA : kerbB;
             const blockSeam = 1 - sstep(0, 0.04, Math.min(v * 16 % 1, 1 - v * 16 % 1));
-            const wear = (0.72 + N2.fbm(u, v, 32, 3) * 0.34) * (1 - blockSeam * 0.45);
+            const wear = (0.72 + N3.fbm(u, v, 32, 3) * 0.34) * (1 - blockSeam * 0.45);
             const ridge = Math.sin(v * 64 % 1 * Math.PI) * 0.16;
             const bevelK = 1 - sstep(0.026, 0.036, edge);
             direct = [base[0] * wear, base[1] * wear, base[2] * wear];
@@ -33902,10 +33902,10 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
           break;
         }
         case "snow": {
-          const f = N2.fbm(u, v, 3, 6);
-          const warp = N2.fbm(u, v, 4, 3) * 2.2;
+          const f = N3.fbm(u, v, 3, 6);
+          const warp = N3.fbm(u, v, 4, 3) * 2.2;
           const sast1 = aeolianWave(v * 14 + u * 3 + warp);
-          const sast2 = N2.noise2(u, v, 18, 56) * 0.55 + N2.noise2(u, v, 36, 112) * 0.45;
+          const sast2 = N3.noise2(u, v, 18, 56) * 0.55 + N3.noise2(u, v, 36, 112) * 0.45;
           const crust = sstep(0.55, 0.78, sast1 * 0.6 + f * 0.4);
           h = f * 0.46 + sast1 * 0.3 + sast2 * 0.18 + grain * 0.06;
           t = 0.48 + f * 0.28 + sast1 * 0.22 + crust * 0.12;
@@ -33913,13 +33913,13 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
           break;
         }
         case "jungle": {
-          const f = N2.fbm(u, v, 4, 6);
-          const roots = Math.pow(N2.ridged(u, v, 7, 4), 2.4);
-          N2.worley(u, v, 38, w);
+          const f = N3.fbm(u, v, 4, 6);
+          const roots = Math.pow(N3.ridged(u, v, 7, 4), 2.4);
+          N3.worley(u, v, 38, w);
           const leaf = (1 - sstep(0, 0.44, w[0])) * (w[2] > 0.42 ? 1 : 0);
-          const blades2 = N2.noise2(u, v, 256, 32) * 0.5 + N2.noise2(u, v, 512, 64) * 0.5;
-          const moss = sstep(0.42, 0.66, N2.fbm(u + 0.4, v, 6, 4));
-          N2.worley(u, v, 18, w22);
+          const blades2 = N3.noise2(u, v, 256, 32) * 0.5 + N3.noise2(u, v, 512, 64) * 0.5;
+          const moss = sstep(0.42, 0.66, N3.fbm(u + 0.4, v, 6, 4));
+          N3.worley(u, v, 18, w22);
           const stone2 = (1 - sstep(0.08, 0.32, w22[0])) * (w22[2] > 0.88 ? 1 : 0);
           h = f * 0.32 + blades2 * 0.2 + moss * 0.14 + leaf * 0.2 + roots * 0.26 + stone2 * 0.42 + grain * 0.04;
           t = f * 0.42 + blades2 * 0.22 + moss * 0.32 + leaf * (w[3] - 0.5) * 0.36 - (1 - moss) * 0.08;
@@ -33937,13 +33937,13 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
           break;
         }
         case "gravel": {
-          N2.worley(u, v, 24, w);
+          N3.worley(u, v, 24, w);
           const p0 = (1 - sstep(0.04, 0.38, w[0])) * (w[2] > 0.45 ? 1 : 0);
-          N2.worley(u, v, 52, w22);
+          N3.worley(u, v, 52, w22);
           const p1 = 1 - sstep(0.02, 0.44, w22[0]);
-          N2.worley(u, v, 112, w32);
+          N3.worley(u, v, 112, w32);
           const p2 = 1 - sstep(0, 0.46, w32[0]);
-          const f = N2.fbm(u, v, 8, 4);
+          const f = N3.fbm(u, v, 8, 4);
           const cob = p0 * (0.68 + w[2] * 0.32), med = p1 * (0.55 + w22[2] * 0.45) * 0.78, sml = p2 * (0.5 + w32[2] * 0.5) * 0.48;
           const top = Math.max(cob, med, sml);
           h = top + f * 0.1 + grain * 0.04;
@@ -33953,15 +33953,15 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
           break;
         }
         case "cracked": {
-          N2.worley(u, v, 9, w);
+          N3.worley(u, v, 9, w);
           const edge = w[1] - w[0];
           const crack = 1 - sstep(0, 0.032, edge);
           const curlRim = sstep(0.022, 0.065, edge) * (1 - sstep(0.065, 0.16, edge));
-          N2.worley(u, v, 25, w22);
+          N3.worley(u, v, 25, w22);
           const e2 = w22[1] - w22[0];
           const fineC = 1 - sstep(0, 0.024, e2);
-          const f = N2.fbm(u, v, 6, 5);
-          const crystalCrust = sstep(0.55, 0.8, N2.fbm(u, v, 20, 3));
+          const f = N3.fbm(u, v, 6, 5);
+          const crystalCrust = sstep(0.55, 0.8, N3.fbm(u, v, 20, 3));
           h = 0.54 + sstep(0, 0.22, edge) * 0.16 + curlRim * 0.15 - crack * 0.48 - fineC * 0.16 + f * 0.08 + crystalCrust * 0.04 + grain * 0.03;
           t = 0.5 + w[2] * 0.24 + curlRim * 0.18 + crystalCrust * 0.12 + f * 0.22 - crack * 0.48 - fineC * 0.18;
           r = 0.68 + f * 0.14 + crack * 0.22 - crystalCrust * 0.08;
@@ -33973,9 +33973,9 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
           const gx = u * cells % 1, gy = v * cells % 1;
           const seam = Math.min(gx, 1 - gx, gy, 1 - gy);
           const ix = Math.floor(u * cells), iy = Math.floor(v * cells);
-          const pid = N2.h(ix, iy), pid2 = N2.h(ix + 37, iy + 19);
-          const f = N2.fbm(u, v, 8, 4);
-          const brush = N2.noise2(u, v, 512, 4);
+          const pid = N3.h(ix, iy), pid2 = N3.h(ix + 37, iy + 19);
+          const f = N3.fbm(u, v, 8, 4);
+          const brush = N3.noise2(u, v, 512, 4);
           const scratch = brush > 0.84 ? 1 : 0;
           const grime = sstep(0.055, 0, seam) * 0.62 + sstep(0.54, 0.76, f) * 0.38;
           const louver = pid2 > 0.76 && gx > 0.18 && gx < 0.82 && gy > 0.22 && gy < 0.78 ? Math.sin(gy * Math.PI * 22) * 0.5 + 0.5 : 0;
@@ -33991,10 +33991,10 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
           break;
         }
         case "crystal": {
-          N2.worley(u, v, 8, w);
-          N2.worley(u, v, 19, w22);
+          N3.worley(u, v, 8, w);
+          N3.worley(u, v, 19, w22);
           const facet = w[2];
-          const f = N2.fbm(u, v, 4, 4);
+          const f = N3.fbm(u, v, 4, 4);
           const edgeC = 1 - sstep(0, 0.038, w[1] - w[0]);
           const subEdge = (1 - sstep(0, 0.025, w22[1] - w22[0])) * 0.45;
           const ang = w[3] * Math.PI;
@@ -34041,7 +34041,7 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
     const cav = clamp01(0.5 + (H[i] - Hb[i]) * 3.8 + (H[i] - Hb2[i]) * 1.4);
     const ao = 0.56 + 0.44 * Math.min(1, cav * 1.28);
     const coolCav = kind === "snow" || kind === "ice" ? (1 - ao) * 0.22 : 0;
-    const tint = 0.91 + 0.18 * N2.noise(x / size * 6, y / size * 6, 6);
+    const tint = 0.91 + 0.18 * N3.noise(x / size * 6, y / size * 6, 6);
     map[i * 4] = Math.min(255, C[i * 3] * (ao - coolCav * 0.5) * tint * 255);
     map[i * 4 + 1] = Math.min(255, C[i * 3 + 1] * ao * (0.45 + tint * 0.55) * 255);
     map[i * 4 + 2] = Math.min(255, C[i * 3 + 2] * Math.min(1.06, ao + coolCav) * 255);
@@ -34435,14 +34435,14 @@ async function runTextures(specs, aniso) {
 function macroTexture() {
   if (macroTex) return macroTex;
   const s = 256;
-  const N2 = new TileNoise(4242);
+  const N3 = new TileNoise(4242);
   const d = new Uint8Array(s * s * 4);
   for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
     const u = x / s, v = y / s;
     const i = (y * s + x) * 4;
-    d[i] = N2.fbm(u, v, 4, 5) * 255;
-    d[i + 1] = N2.fbm(u + 0.37, v + 0.71, 2, 4) * 255;
-    d[i + 2] = N2.ridged(u, v, 3, 4) * 255;
+    d[i] = N3.fbm(u, v, 4, 5) * 255;
+    d[i + 1] = N3.fbm(u + 0.37, v + 0.71, 2, 4) * 255;
+    d[i + 2] = N3.ridged(u, v, 3, 4) * 255;
     d[i + 3] = 255;
   }
   macroTex = toTex(d, s, false, 4);
@@ -34500,7 +34500,7 @@ function detailNormalTexture(kind) {
   if (hit) return hit;
   const S = 512;
   const seedMap = { grit: 777, dunes: 1301, sastrugi: 2113, humus: 3049, lava: 4211, crystal: 5381, beach: 6421 };
-  const N2 = new TileNoise(seedMap[kind]);
+  const N3 = new TileNoise(seedMap[kind]);
   const w = [0, 0, 0, 0];
   const H = new Float32Array(S * S), A = new Float32Array(S * S);
   for (let y = 0; y < S; y++) {
@@ -34511,69 +34511,69 @@ function detailNormalTexture(kind) {
       let h = 0.5, a = 0.5;
       switch (kind) {
         case "dunes": {
-          const wp = N2.fbm(u, v, 4, 3) * 1.9;
+          const wp = N3.fbm(u, v, 4, 3) * 1.9;
           const r1 = aeolianWave(u * 14 + v * 4 + wp);
           const r2 = aeolianWave(u * 38 - v * 6 + wp * 1.7);
-          const g2 = N2.fbm(u, v, 32, 3);
-          N2.worley(u, v, 48, w);
+          const g2 = N3.fbm(u, v, 32, 3);
+          N3.worley(u, v, 48, w);
           const peb = (1 - sstep(0.05, 0.22, w[0])) * (w[2] > 0.86 ? 1 : 0);
           h = r1 * 0.52 + r2 * 0.2 + g2 * 0.16 + peb * 0.25;
           a = clamp01(0.46 + r1 * 0.24 + (g2 - 0.5) * 0.25 - peb * 0.22);
           break;
         }
         case "sastrugi": {
-          const wp = N2.fbm(u, v, 3, 4) * 2.3;
+          const wp = N3.fbm(u, v, 3, 4) * 2.3;
           const flute = aeolianWave(v * 11 + u * 2 + wp);
-          const streak = N2.noise2(u, v, 14, 64) * 0.6 + N2.noise2(u, v, 32, 128) * 0.4;
-          const ridge = Math.pow(N2.ridged(u, v, 8, 3), 1.6);
-          const spark = N2.noise(u * 128, v * 128, 128) > 0.92 ? 0.18 : 0;
+          const streak = N3.noise2(u, v, 14, 64) * 0.6 + N3.noise2(u, v, 32, 128) * 0.4;
+          const ridge = Math.pow(N3.ridged(u, v, 8, 3), 1.6);
+          const spark = N3.noise(u * 128, v * 128, 128) > 0.92 ? 0.18 : 0;
           h = flute * 0.48 + streak * 0.28 + ridge * 0.24;
           a = clamp01(0.45 + flute * 0.22 + (streak - 0.5) * 0.2 + spark);
           break;
         }
         case "humus": {
-          const roots = Math.pow(N2.ridged(u, v, 9, 4), 2.2);
-          N2.worley(u, v, 34, w);
+          const roots = Math.pow(N3.ridged(u, v, 9, 4), 2.2);
+          N3.worley(u, v, 34, w);
           const clod = 1 - sstep(0.05, 0.42, w[0]);
-          const f = N2.fbm(u, v, 18, 4);
+          const f = N3.fbm(u, v, 18, 4);
           h = roots * 0.42 + clod * (0.3 + w[2] * 0.3) * 0.38 + f * 0.28;
           a = clamp01(0.48 + (f - 0.5) * 0.4 + (w[3] - 0.5) * 0.35 * clod - roots * 0.12);
           break;
         }
         case "lava": {
-          const wp = N2.fbm(u, v, 4, 4) * 3.4;
+          const wp = N3.fbm(u, v, 4, 4) * 3.4;
           const rope = Math.pow(Math.sin((u * 12 + v * 5 + wp) * Math.PI * 2) * 0.5 + 0.5, 1.4);
-          N2.worley(u, v, 44, w);
+          N3.worley(u, v, 44, w);
           const ves = (1 - sstep(0.04, 0.24, w[0])) * (w[2] > 0.65 ? 1 : 0);
           const cr = 1 - sstep(0, 0.03, w[1] - w[0]);
-          h = rope * 0.58 + N2.fbm(u, v, 16, 3) * 0.26 - ves * 0.28 - cr * 0.2;
+          h = rope * 0.58 + N3.fbm(u, v, 16, 3) * 0.26 - ves * 0.28 - cr * 0.2;
           a = clamp01(0.46 + rope * 0.24 - ves * 0.22 - cr * 0.18);
           break;
         }
         case "crystal": {
-          N2.worley(u, v, 18, w);
+          N3.worley(u, v, 18, w);
           const ed = 1 - sstep(0, 0.045, w[1] - w[0]);
           const stepH = Math.floor(w[2] * 6) / 6;
-          const f = N2.fbm(u, v, 24, 3);
+          const f = N3.fbm(u, v, 24, 3);
           h = stepH * 0.65 - ed * 0.38 + f * 0.15;
           a = clamp01(0.44 + stepH * 0.34 + ed * 0.14);
           break;
         }
         case "beach": {
-          const wp = N2.fbm(u, v, 3, 3) * 1.6;
+          const wp = N3.fbm(u, v, 3, 3) * 1.6;
           const swash = Math.sin((u * 10 + v * 10 + wp) * Math.PI * 2) * 0.5 + 0.5;
-          N2.worley(u, v, 52, w);
+          N3.worley(u, v, 52, w);
           const shell = (1 - sstep(0.04, 0.2, w[0])) * (w[2] > 0.85 ? 1 : 0);
-          const f = N2.fbm(u, v, 24, 3);
+          const f = N3.fbm(u, v, 24, 3);
           h = swash * 0.46 + f * 0.3 + shell * 0.28;
           a = clamp01(0.48 + swash * 0.16 + shell * 0.32 + (f - 0.5) * 0.22);
           break;
         }
         default: {
-          N2.worley(u, v, 40, w);
+          N3.worley(u, v, 40, w);
           const peb = 1 - sstep(0, 0.45, w[0]);
           const cr = (1 - sstep(0, 0.025, w[1] - w[0])) * 0.3;
-          const f = N2.fbm(u, v, 16, 4);
+          const f = N3.fbm(u, v, 16, 4);
           h = peb * (0.45 + w[2] * 0.55) * 0.68 + f * 0.32 - cr;
           a = clamp01(0.5 + (w[2] - 0.5) * 0.55 * peb + (f - 0.5) * 0.45 - (1 - peb) * 0.08 - cr * 0.25);
         }
@@ -53187,20 +53187,20 @@ var radicalInverse_VdC = /* @__PURE__ */ Fn(([bits_immutable]) => {
   bits.assign(bits.bitAnd(uint(16711935)).shiftLeft(uint(8)).bitOr(bits.bitAnd(uint(4278255360)).shiftRight(uint(8))));
   return float(bits).mul(23283064365386963e-26);
 });
-var hammersley = /* @__PURE__ */ Fn(([i, N2]) => {
-  return vec2(float(i).div(float(N2)), radicalInverse_VdC(i));
+var hammersley = /* @__PURE__ */ Fn(([i, N3]) => {
+  return vec2(float(i).div(float(N3)), radicalInverse_VdC(i));
 });
 var ggxConvolution = /* @__PURE__ */ Fn(({ roughness: roughness3, lodBias, envMap, direction, GGX_SAMPLES: GGX_SAMPLES2 }) => {
-  const N2 = vec3(direction).toVar();
+  const N3 = vec3(direction).toVar();
   const prefilteredColor = vec3(0).toVar();
   If(roughness3.lessThan(1e-3), () => {
-    prefilteredColor.assign(envMap.sample(N2).level(0).rgb);
+    prefilteredColor.assign(envMap.sample(N3).level(0).rgb);
   }).Else(() => {
     const alpha = roughness3.mul(roughness3).toConst();
     const alpha2 = alpha.mul(alpha).toConst();
-    const up = select(abs(N2.z).lessThan(0.999), vec3(0, 0, 1), vec3(1, 0, 0));
-    const tangent = normalize2(cross(up, N2)).toVar();
-    const bitangent = cross(N2, tangent).toVar();
+    const up = select(abs(N3.z).lessThan(0.999), vec3(0, 0, 1), vec3(1, 0, 0));
+    const tangent = normalize2(cross(up, N3)).toVar();
+    const bitangent = cross(N3, tangent).toVar();
     const totalWeight = float(0).toVar();
     Loop({ start: uint(0), end: GGX_SAMPLES2 }, ({ i }) => {
       const Xi = hammersley(i, GGX_SAMPLES2);
@@ -53209,7 +53209,7 @@ var ggxConvolution = /* @__PURE__ */ Fn(({ roughness: roughness3, lodBias, envMa
       If(NdotL.greaterThan(0), () => {
         const phi = Xi.y.mul(2 * Math.PI).toConst();
         const sinTheta = alpha.mul(2).mul(sqrt(Xi.x.mul(Xi.x.oneMinus()))).mul(invQ).toConst();
-        const L = N2.mul(NdotL).add(tangent.mul(cos(phi)).add(bitangent.mul(sin(phi))).mul(sinTheta)).toConst();
+        const L = N3.mul(NdotL).add(tangent.mul(cos(phi)).add(bitangent.mul(sin(phi))).mul(sinTheta)).toConst();
         const d = alpha2.mul(invQ);
         const lod = max(log22(d).add(lodBias), 0);
         prefilteredColor.addAssign(envMap.sample(L).level(lod).rgb.mul(NdotL));
@@ -53221,7 +53221,7 @@ var ggxConvolution = /* @__PURE__ */ Fn(({ roughness: roughness3, lodBias, envMa
   return vec4(prefilteredColor, 1);
 });
 var ggxIntegration = /* @__PURE__ */ Fn(({ roughness: roughness3, sourceLod, sourceSize, envMap, direction }) => {
-  const N2 = vec3(direction).toVar();
+  const N3 = vec3(direction).toVar();
   const alpha = roughness3.mul(roughness3).toConst();
   const alpha2 = alpha.mul(alpha).toConst();
   const texelSize = float(2).div(float(sourceSize)).toConst();
@@ -53233,7 +53233,7 @@ var ggxIntegration = /* @__PURE__ */ Fn(({ roughness: roughness3, sourceLod, sou
         const uv9 = vec2(x, y).add(0.5).mul(texelSize).sub(1).toConst();
         const texelDirection = select(face.equal(0), vec3(1, uv9), select(face.equal(1), vec3(uv9.x, 1, uv9.y), vec3(uv9, 1))).toVar();
         const invDistance = inverseSqrt(dot(uv9, uv9).add(1)).toConst();
-        const NdotL = dot(N2, texelDirection).toVar();
+        const NdotL = dot(N3, texelDirection).toVar();
         texelDirection.mulAssign(select(NdotL.lessThan(0), -1, 1));
         NdotL.assign(abs(NdotL).mul(invDistance));
         const d = alpha2.add(1).add(alpha2.sub(1).mul(NdotL));
@@ -55793,11 +55793,11 @@ var Schlick_to_F0 = /* @__PURE__ */ Fn(({ f, f90, dotVH }) => {
   const x5 = x.mul(x2, x2).clamp(0, 0.9999);
   return f.sub(vec3(f90).mul(x5)).div(x5.oneMinus());
 }, { f: "vec3", f90: "float", dotVH: "float", return: "vec3" });
-var LTC_Uv = /* @__PURE__ */ Fn(({ N: N2, V: V2, roughness: roughness3 }) => {
+var LTC_Uv = /* @__PURE__ */ Fn(({ N: N3, V: V2, roughness: roughness3 }) => {
   const LUT_SIZE = 64;
   const LUT_SCALE = (LUT_SIZE - 1) / LUT_SIZE;
   const LUT_BIAS = 0.5 / LUT_SIZE;
-  const dotNV = N2.dot(V2).saturate();
+  const dotNV = N3.dot(V2).saturate();
   const uv9 = vec2(roughness3, dotNV.oneMinus().sqrt());
   uv9.assign(uv9.mul(LUT_SCALE).add(LUT_BIAS));
   return uv9;
@@ -55815,15 +55815,15 @@ var LTC_EdgeVectorFormFactor = /* @__PURE__ */ Fn(({ v1, v2 }) => {
   const theta_sintheta = x.greaterThan(0).select(v, max(x.mul(x).oneMinus(), 1e-7).inverseSqrt().mul(0.5).sub(v));
   return v1.cross(v2).mul(theta_sintheta);
 }, { v1: "vec3", v2: "vec3", return: "vec3" });
-var LTC_Evaluate = /* @__PURE__ */ Fn(({ N: N2, V: V2, P, mInv, p0, p1, p2, p3 }) => {
+var LTC_Evaluate = /* @__PURE__ */ Fn(({ N: N3, V: V2, P, mInv, p0, p1, p2, p3 }) => {
   const v1 = p1.sub(p0).toVar();
   const v2 = p3.sub(p0).toVar();
   const lightNormal = v1.cross(v2);
   const result = vec3().toVar();
   If(lightNormal.dot(P.sub(p0)).greaterThanEqual(0), () => {
-    const T1 = V2.sub(N2.mul(V2.dot(N2))).normalize();
-    const T2 = N2.cross(T1).negate();
-    const mat = mInv.mul(mat3(T1, T2, N2).transpose()).toVar();
+    const T1 = V2.sub(N3.mul(V2.dot(N3))).normalize();
+    const T2 = N3.cross(T1).negate();
+    const mat = mInv.mul(mat3(T1, T2, N3).transpose()).toVar();
     const coords0 = mat.mul(p0.sub(P)).normalize().toVar();
     const coords1 = mat.mul(p1.sub(P)).normalize().toVar();
     const coords2 = mat.mul(p2.sub(P)).normalize().toVar();
@@ -57377,9 +57377,9 @@ var BRDF_BlinnPhong = /* @__PURE__ */ Fn(({ lightDirection }) => {
   const dotNH = normalView.dot(halfDir).clamp();
   const dotVH = positionViewDirection.dot(halfDir).clamp();
   const F = F_Schlick({ f0: specularColor, f90: 1, dotVH });
-  const G = G_BlinnPhong_Implicit();
+  const G2 = G_BlinnPhong_Implicit();
   const D = D_BlinnPhong({ dotNH });
-  return F.mul(G).mul(D);
+  return F.mul(G2).mul(D);
 });
 var PhongLightingModel = class extends BasicLightingModel {
   /**
@@ -57847,10 +57847,10 @@ var PhysicalLightingModel = class extends LightingModel {
     const p1 = lightPosition2.sub(halfWidth).sub(halfHeight);
     const p2 = lightPosition2.sub(halfWidth).add(halfHeight);
     const p3 = lightPosition2.add(halfWidth).add(halfHeight);
-    const N2 = normalView;
+    const N3 = normalView;
     const V2 = positionViewDirection;
     const P = positionView.toVar();
-    const uv9 = LTC_Uv({ N: N2, V: V2, roughness });
+    const uv9 = LTC_Uv({ N: N3, V: V2, roughness });
     const t1 = ltc_1.sample(uv9).toVar();
     const t2 = ltc_2.sample(uv9).toVar();
     const mInv = mat3(
@@ -57859,8 +57859,8 @@ var PhysicalLightingModel = class extends LightingModel {
       vec3(t1.z, 0, t1.w)
     ).toVar();
     const fresnel = specularColorBlended.mul(t2.x).add(specularF90.sub(specularColorBlended).mul(t2.y)).toVar();
-    reflectedLight.directSpecular.addAssign(lightColor.mul(fresnel).mul(LTC_Evaluate({ N: N2, V: V2, P, mInv, p0, p1, p2, p3 })));
-    reflectedLight.directDiffuse.addAssign(lightColor.mul(diffuseContribution).mul(LTC_Evaluate({ N: N2, V: V2, P, mInv: mat3(1, 0, 0, 0, 1, 0, 0, 0, 1), p0, p1, p2, p3 })));
+    reflectedLight.directSpecular.addAssign(lightColor.mul(fresnel).mul(LTC_Evaluate({ N: N3, V: V2, P, mInv, p0, p1, p2, p3 })));
+    reflectedLight.directDiffuse.addAssign(lightColor.mul(diffuseContribution).mul(LTC_Evaluate({ N: N3, V: V2, P, mInv: mat3(1, 0, 0, 0, 1, 0, 0, 0, 1), p0, p1, p2, p3 })));
     if (this.clearcoat === true) {
       const Ncc = clearcoatNormalView;
       const uvClearcoat = LTC_Uv({ N: Ncc, V: V2, roughness: clearcoatRoughness });
@@ -87478,7 +87478,7 @@ function surfaceMaterial(set, o = {}) {
   }
   let rough = normSample.a.mul(materialRoughness2);
   if (o.ledge && o.ledge.amount > 0) rough = mix3(rough, float3(o.ledge.rough ?? 0.8), ledgeM);
-  if (wetAmt > 0) rough = mix3(rough.mul(oneMinus3(wetU.mul(0.35 * wetAmt))), float3(0.11), puddle);
+  if (wetAmt > 0) rough = mix3(rough.mul(oneMinus3(wetU.mul(0.5 * wetAmt))), float3(0.07), puddle);
   if (snowAmt > 0) rough = mix3(rough, float3(0.65), snowM);
   rough = mix3(rough, max3(rough, float3(0.36)), smoothstep4(48, 220, dist));
   mat.roughnessNode = clamp4(rough, 0.11, 1);
@@ -87513,6 +87513,106 @@ function makeBeams(count) {
   return { mesh: mesh2, strength };
 }
 
+// ../../src/game/debris.ts
+init_three_module();
+var N2 = 72;
+var G = 32;
+var DebrisPool = class {
+  mesh;
+  p = new Float32Array(N2 * 3);
+  v = new Float32Array(N2 * 3);
+  ax = new Float32Array(N2 * 3);
+  life = new Float32Array(N2);
+  size = new Float32Array(N2);
+  gy = new Float32Array(N2);
+  ang = new Float32Array(N2);
+  head = 0;
+  active = 0;
+  m = new Matrix4();
+  q = new Quaternion();
+  a = new Vector3();
+  s = new Vector3();
+  pos = new Vector3();
+  c = new Color();
+  constructor() {
+    const geo = new IcosahedronGeometry(1, 0);
+    geo.scale(1, 0.7, 0.85);
+    const mat = new MeshStandardMaterial({ color: "#ffffff", roughness: 0.88, metalness: 0.05, flatShading: true });
+    this.mesh = new InstancedMesh(geo, mat, N2);
+    this.mesh.frustumCulled = false;
+    this.mesh.castShadow = false;
+    this.mesh.receiveShadow = true;
+    this.mesh.instanceMatrix.setUsage(DynamicDrawUsage);
+    this.m.makeScale(0, 0, 0);
+    for (let i = 0; i < N2; i++) {
+      this.mesh.setMatrixAt(i, this.m);
+      this.mesh.setColorAt(i, this.c.set("#888888"));
+    }
+    this.mesh.visible = false;
+  }
+  /** `groundY` = height the chunks bounce on; `size` = obstacle radius. */
+  spawn(x, y, z, groundY, vel, col, size, count) {
+    for (let k = 0; k < count; k++) {
+      const i = this.head;
+      this.head = (this.head + 1) % N2;
+      const j = i * 3;
+      this.p[j] = x + (Math.random() - 0.5) * size;
+      this.p[j + 1] = y + 0.3 + Math.random() * size;
+      this.p[j + 2] = z + (Math.random() - 0.5) * size;
+      this.v[j] = vel.x * 0.45 + (Math.random() - 0.5) * 22;
+      this.v[j + 1] = 4 + Math.random() * 12;
+      this.v[j + 2] = vel.z * 0.45 + (Math.random() - 0.5) * 22;
+      this.a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+      this.ax[j] = this.a.x;
+      this.ax[j + 1] = this.a.y;
+      this.ax[j + 2] = this.a.z;
+      this.life[i] = 1.6 + Math.random() * 1.6;
+      this.size[i] = (0.18 + Math.random() * 0.34) * Math.min(1.6, 0.6 + size * 0.25);
+      this.gy[i] = groundY;
+      this.ang[i] = Math.random() * 6;
+      this.c.copy(col).multiplyScalar(0.75 + Math.random() * 0.5);
+      this.mesh.setColorAt(i, this.c);
+    }
+    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    this.mesh.visible = true;
+    this.active = N2;
+  }
+  update(dt) {
+    if (!this.active || dt <= 0) return;
+    let alive = 0;
+    for (let i = 0; i < N2; i++) {
+      if (this.life[i] <= 0) continue;
+      const j = i * 3;
+      this.life[i] -= dt;
+      this.v[j + 1] -= G * dt;
+      this.p[j] += this.v[j] * dt;
+      this.p[j + 1] += this.v[j + 1] * dt;
+      this.p[j + 2] += this.v[j + 2] * dt;
+      this.ang[i] += dt * 7;
+      const floor5 = this.gy[i] + this.size[i] * 0.5;
+      if (this.p[j + 1] < floor5) {
+        this.p[j + 1] = floor5;
+        this.v[j + 1] = Math.abs(this.v[j + 1]) * 0.32;
+        this.v[j] *= 0.6;
+        this.v[j + 2] *= 0.6;
+      }
+      const sc = this.life[i] <= 0 ? 0 : this.size[i] * Math.min(1, this.life[i] / 0.45);
+      this.m.compose(this.pos.set(this.p[j], this.p[j + 1], this.p[j + 2]), this.q.setFromAxisAngle(this.a.set(this.ax[j], this.ax[j + 1], this.ax[j + 2]), this.ang[i]), this.s.setScalar(sc));
+      this.mesh.setMatrixAt(i, this.m);
+      if (sc > 0) alive++;
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
+    if (!alive) {
+      this.active = 0;
+      this.mesh.visible = false;
+    }
+  }
+  dispose() {
+    this.mesh.geometry.dispose();
+    this.mesh.material.dispose();
+  }
+};
+
 // ../../src/game/trackBuilder.ts
 init_three_module();
 var DS = 2;
@@ -87541,16 +87641,16 @@ function hashStr(s) {
 function controlPoints(def) {
   return def.pts.map(([x, z, y, w]) => ({ x: x * 100, z: z * 100, y, w: w * WIDTH_SCALE }));
 }
-function findStraight(S, N2, at, closed, taken, need) {
+function findStraight(S, N3, at, closed, taken, need) {
   const ang = (i) => {
-    const a = S[((i - 3) % N2 + N2) % N2], b = S[(i % N2 + N2) % N2], c = S[((i + 3) % N2 + N2) % N2];
+    const a = S[((i - 3) % N3 + N3) % N3], b = S[(i % N3 + N3) % N3], c = S[((i + 3) % N3 + N3) % N3];
     const ax = b.x - a.x, az = b.z - a.z, bx = c.x - b.x, bz = c.z - b.z;
     return Math.abs(Math.atan2(ax * bz - az * bx, ax * bx + az * bz));
   };
-  let best = Math.floor(at * N2), bs = 1e9;
-  for (let k = -Math.floor(N2 * 0.12); k <= Math.floor(N2 * 0.12); k += 4) {
-    const i0 = Math.floor(at * N2) + k;
-    if (!closed && (i0 < 120 || i0 + need > N2 - 60)) continue;
+  let best = Math.floor(at * N3), bs = 1e9;
+  for (let k = -Math.floor(N3 * 0.12); k <= Math.floor(N3 * 0.12); k += 4) {
+    const i0 = Math.floor(at * N3) + k;
+    if (!closed && (i0 < 120 || i0 + need > N3 - 60)) continue;
     if (taken.some((t) => Math.abs(t - i0) < need + 60)) continue;
     let sc = 0;
     for (let j = -20; j < need; j += 3) sc += ang(i0 + j);
@@ -87560,7 +87660,7 @@ function findStraight(S, N2, at, closed, taken, need) {
       best = i0;
     }
   }
-  return (best % N2 + N2) % N2;
+  return (best % N3 + N3) % N3;
 }
 function finalizeSamples(S, closed, banked = false) {
   const n = S.length;
@@ -87619,11 +87719,11 @@ function buildTrack(def) {
   const closed = def.type === "circuit";
   const curve = new CatmullRomCurve3(pts.map((p) => new Vector3(p.x, p.y, p.z)), closed, "centripetal");
   let length12 = curve.getLength();
-  const N2 = Math.round(length12 / DS);
+  const N3 = Math.round(length12 / DS);
   const samples = [];
   const nP = pts.length;
-  for (let i = 0; i < N2; i++) {
-    const u = closed ? i / N2 : i / (N2 - 1);
+  for (let i = 0; i < N3; i++) {
+    const u = closed ? i / N3 : i / (N3 - 1);
     const p = curve.getPointAt(u);
     const fi = u * (closed ? nP : nP - 1);
     const i0 = Math.floor(fi) % nP, i1 = (i0 + 1) % nP, f = fi - Math.floor(fi);
@@ -87632,11 +87732,11 @@ function buildTrack(def) {
   }
   for (let pass3 = 0; pass3 < 4; pass3++) {
     const xs = samples.map((q) => q.x), zs = samples.map((q) => q.z), ws = samples.map((q) => q.hw);
-    for (let i = 0; i < N2; i++) {
-      if (!closed && (i < 8 || i > N2 - 9)) continue;
+    for (let i = 0; i < N3; i++) {
+      if (!closed && (i < 8 || i > N3 - 9)) continue;
       let sx = 0, sz = 0, sw = 0, c = 0;
       for (let k = -7; k <= 7; k++) {
-        const j = closed ? (i + k + N2) % N2 : i + k;
+        const j = closed ? (i + k + N3) % N3 : i + k;
         const w = 8 - Math.abs(k);
         sx += xs[j] * w;
         sz += zs[j] * w;
@@ -87651,20 +87751,20 @@ function buildTrack(def) {
   {
     const pts2 = [];
     const wArr = [];
-    for (let i = 0; i < N2; i += 3) {
+    for (let i = 0; i < N3; i += 3) {
       pts2.push(new Vector3(samples[i].x, samples[i].y, samples[i].z));
       wArr.push(samples[i].hw);
     }
-    if (!closed && (N2 - 1) % 3 !== 0) {
-      pts2.push(new Vector3(samples[N2 - 1].x, samples[N2 - 1].y, samples[N2 - 1].z));
-      wArr.push(samples[N2 - 1].hw);
+    if (!closed && (N3 - 1) % 3 !== 0) {
+      pts2.push(new Vector3(samples[N3 - 1].x, samples[N3 - 1].y, samples[N3 - 1].z));
+      wArr.push(samples[N3 - 1].hw);
     }
     const c2 = new CatmullRomCurve3(pts2, closed, "centripetal");
     const m = pts2.length;
     const L2 = c2.getLength();
     length12 = L2;
-    for (let i = 0; i < N2; i++) {
-      const u = closed ? i / N2 : i / (N2 - 1);
+    for (let i = 0; i < N3; i++) {
+      const u = closed ? i / N3 : i / (N3 - 1);
       const p = c2.getPointAt(u);
       const fi = u * (closed ? m : m - 1);
       const i0 = Math.min(m - 1, Math.floor(fi)) % m;
@@ -87674,64 +87774,64 @@ function buildTrack(def) {
       samples[i].y = p.y;
       samples[i].z = p.z;
       samples[i].hw = wArr[i0] + (wArr[i1] - wArr[i0]) * f;
-      samples[i].s = i * (L2 / N2);
+      samples[i].s = i * (L2 / N3);
     }
   }
   for (let pass3 = 0; pass3 < 3; pass3++) {
     const ys = samples.map((s) => s.y);
-    for (let i = 0; i < N2; i++) {
+    for (let i = 0; i < N3; i++) {
       let s = 0, c = 0;
       for (let k = -6; k <= 6; k++) {
         let j = i + k;
-        if (closed) j = (j + N2) % N2;
-        else if (j < 0 || j >= N2) continue;
+        if (closed) j = (j + N3) % N3;
+        else if (j < 0 || j >= N3) continue;
         s += ys[j];
         c++;
       }
       samples[i].y = s / c;
     }
   }
-  if (def.theme === "oovo") for (const [a, b] of def.canyons.slice(0, 2)) for (let i = Math.floor(a * N2); i < Math.floor(b * N2); i++) samples[(i + N2) % N2].zeroG = true;
-  for (const [a, b] of def.canyons) for (let i = Math.floor(a * N2); i < Math.floor(b * N2); i++) samples[(i + N2) % N2].canyon = true;
+  if (def.theme === "oovo") for (const [a, b] of def.canyons.slice(0, 2)) for (let i = Math.floor(a * N3); i < Math.floor(b * N3); i++) samples[(i + N3) % N3].zeroG = true;
+  for (const [a, b] of def.canyons) for (let i = Math.floor(a * N3); i < Math.floor(b * N3); i++) samples[(i + N3) % N3].canyon = true;
   const rngC = mulberry32(hashStr(def.id + "|cliff"));
-  const canyonModes = def.canyons.map(([a, b], ci) => ({ a: Math.floor(a * N2), b: Math.floor(b * N2), mode: def.theme === "oovo" && ci < 2 ? 3 : (() => {
+  const canyonModes = def.canyons.map(([a, b], ci) => ({ a: Math.floor(a * N3), b: Math.floor(b * N3), mode: def.theme === "oovo" && ci < 2 ? 3 : (() => {
     const r = rngC();
     return r < 0.4 ? 0 : r < 0.7 ? 1 : 2;
   })() }));
   const taken = [];
   const rampSpans = [];
   for (const r of def.ramps) {
-    const i0 = findStraight(samples, N2, r.at, closed, taken, Math.round((r.len + r.gap + 80) / DS));
+    const i0 = findStraight(samples, N3, r.at, closed, taken, Math.round((r.len + r.gap + 80) / DS));
     taken.push(i0);
     const nr = Math.round(r.len / DS), ng = Math.round(r.gap / DS);
     for (let k = 0; k < nr; k++) {
       const t = (k + 1) / nr;
-      samples[(i0 + k) % N2].ramp = r.h * Math.pow(t, 1.7);
+      samples[(i0 + k) % N3].ramp = r.h * Math.pow(t, 1.7);
     }
     for (let k = 0; k < ng; k++) {
-      const sm = samples[(i0 + nr + k) % N2];
+      const sm = samples[(i0 + nr + k) % N3];
       sm.gap = true;
     }
     rampSpans.push([i0, nr + ng]);
   }
   {
     const rh = mulberry32(hashStr(def.id + "|hills"));
-    const flat2 = new Float32Array(N2).fill(1);
+    const flat2 = new Float32Array(N3).fill(1);
     const damp2 = (c, half, fade) => {
       for (let k = -half - fade; k <= half + fade; k++) {
         let j = c + k;
-        if (closed) j = (j % N2 + N2) % N2;
-        else if (j < 0 || j >= N2) continue;
+        if (closed) j = (j % N3 + N3) % N3;
+        else if (j < 0 || j >= N3) continue;
         const m = Math.abs(k) <= half ? 0 : (Math.abs(k) - half) / fade;
         flat2[j] = Math.min(flat2[j], m * m * (3 - 2 * m));
       }
     };
     damp2(closed ? 30 : 45, 60, 110);
-    if (!closed) damp2(N2 - 30, 50, 110);
+    if (!closed) damp2(N3 - 30, 50, 110);
     for (const [i0, len] of rampSpans) damp2(i0 + Math.round(len / 2), Math.round(len / 2) + 50, 100);
-    for (let i = 0; i < N2; i++) if (samples[i].zeroG && (i === 0 || !samples[i - 1].zeroG || i % 40 === 0)) damp2(i, 40, 100);
+    for (let i = 0; i < N3; i++) if (samples[i].zeroG && (i === 0 || !samples[i - 1].zeroG || i % 40 === 0)) damp2(i, 40, 100);
     const cell = 48, grid = /* @__PURE__ */ new Map();
-    for (let i = 0; i < N2; i += 4) {
+    for (let i = 0; i < N3; i += 4) {
       const key = Math.floor(samples[i].x / cell) + "," + Math.floor(samples[i].z / cell);
       let l = grid.get(key);
       if (!l) {
@@ -87740,14 +87840,14 @@ function buildTrack(def) {
       }
       l.push(i);
     }
-    for (let i = 0; i < N2; i += 4) {
+    for (let i = 0; i < N3; i += 4) {
       const a = samples[i], cx = Math.floor(a.x / cell), cz = Math.floor(a.z / cell);
       let near = false;
       for (let gx = cx - 1; gx <= cx + 1 && !near; gx++) for (let gz = cz - 1; gz <= cz + 1 && !near; gz++) {
         const l = grid.get(gx + "," + gz);
         if (!l) continue;
         for (const j of l) {
-          const di = Math.abs(i - j), dIdx = closed ? Math.min(di, N2 - di) : di;
+          const di = Math.abs(i - j), dIdx = closed ? Math.min(di, N3 - di) : di;
           if (dIdx < 110) continue;
           const b = samples[j];
           if (Math.hypot(a.x - b.x, a.z - b.z) < a.hw + b.hw + 14) {
@@ -87759,13 +87859,13 @@ function buildTrack(def) {
       if (near) damp2(i, 6, 110);
     }
     const TAU2 = Math.PI * 2, k1 = 2 + Math.floor(rh() * 2), k2 = 5 + Math.floor(rh() * 3), p1 = rh() * TAU2, p2 = rh() * TAU2;
-    for (let i = 0; i < N2; i++) {
-      const u = i / N2 * TAU2;
+    for (let i = 0; i < N3; i++) {
+      const u = i / N3 * TAU2;
       samples[i].y = samples[i].y * 1.2 + (15 * Math.sin(u * k1 + p1) + 6.5 * Math.sin(u * k2 + p2)) * flat2[i];
     }
   }
   finalizeSamples(samples, closed, true);
-  const main = { id: 0, samples, closed, length: length12, mainFrom: 0, mainTo: N2 - 1, side: 0 };
+  const main = { id: 0, samples, closed, length: length12, mainFrom: 0, mainTo: N3 - 1, side: 0 };
   const paths = [main];
   const cpFrac = (ci) => {
     const p = pts[ci];
@@ -87777,17 +87877,17 @@ function buildTrack(def) {
         bi = i;
       }
     });
-    return bi / N2;
+    return bi / N3;
   };
   for (const ci of def.shortcuts) {
-    const found = findShortcut(samples, N2, cpFrac(ci), closed);
+    const found = findShortcut(samples, N3, cpFrac(ci), closed);
     if (!found) continue;
     const [ia, ib] = found;
-    const A = samples[ia % N2], B2 = samples[ib % N2];
+    const A = samples[ia % N3], B2 = samples[ib % N3];
     const side = (B2.x - A.x) * A.rx + (B2.z - A.z) * A.rz > 0 ? 1 : -1;
     const scHw = SC_HW;
     const P = (i, extra) => {
-      const s = samples[(i % N2 + N2) % N2];
+      const s = samples[(i % N3 + N3) % N3];
       const off = side * (s.hw - scHw * 0.9 + extra);
       return new Vector3(s.x + s.rx * off, s.y + 0.3, s.z + s.rz * off);
     };
@@ -87828,7 +87928,7 @@ function buildTrack(def) {
       return Math.sqrt(bd);
     };
     for (let k = -30; k <= ib - ia + 30; k++) {
-      const s = samples[((ia + k) % N2 + N2) % N2];
+      const s = samples[((ia + k) % N3 + N3) % N3];
       if (k > 40 && k < ib - ia - 40) continue;
       const ex = s.x + s.rx * side * s.hw, ez = s.z + s.rz * side * s.hw;
       if (nearest(ss, ex, ez) < scHw + 4) {
@@ -87840,7 +87940,7 @@ function buildTrack(def) {
     }
     const nearMain = [];
     for (let k = ia - 60; k <= ib + 60; k++) {
-      if (closed || k >= 0 && k < N2) nearMain.push(samples[(k % N2 + N2) % N2]);
+      if (closed || k >= 0 && k < N3) nearMain.push(samples[(k % N3 + N3) % N3]);
     }
     for (const s of ss) {
       const ex = s.x - s.rx * side * s.hw, ez = s.z - s.rz * side * s.hw;
@@ -87858,7 +87958,7 @@ function buildTrack(def) {
     const len = cm.b - cm.a;
     if (cm.mode === 3) continue;
     for (let k = 0; k < len; k++) {
-      const s = samples[((cm.a + k) % N2 + N2) % N2];
+      const s = samples[((cm.a + k) % N3 + N3) % N3];
       if (!s.canyon || s.zeroG) continue;
       const tp0 = Math.max(0, Math.min(1, k / 25, (len - 1 - k) / 25));
       const tp = tp0 * tp0 * (3 - 2 * tp0);
@@ -87881,17 +87981,17 @@ function buildTrack(def) {
   }
   const obstacles = [];
   const startIdx = closed ? 30 : 45;
-  const finishIdx = closed ? startIdx : N2 - 40;
-  const okSpot = (s, i) => !s.gap && s.ramp === 0 && !s.openL && !s.openR && !samples[(i + 22) % N2].gap && samples[(i + 18) % N2].ramp === 0;
+  const finishIdx = closed ? startIdx : N3 - 40;
+  const okSpot = (s, i) => !s.gap && s.ramp === 0 && !s.openL && !s.openR && !samples[(i + 22) % N3].gap && samples[(i + 18) % N3].ramp === 0;
   const idxDist = (a, b) => {
     const d = Math.abs(a - b);
-    return closed ? Math.min(d, N2 - d) : d;
+    return closed ? Math.min(d, N3 - d) : d;
   };
   for (const [a, b, cnt] of def.obstacles) {
     const want = Math.max(2, Math.round(cnt * 0.45));
     let placed = 0;
     for (let tries = 0; tries < cnt * 5 && placed < want; tries++) {
-      const idx = (Math.floor((a + (b - a) * rng2()) * N2) + N2) % N2;
+      const idx = (Math.floor((a + (b - a) * rng2()) * N3) + N3) % N3;
       const s = samples[idx];
       if (!okSpot(s, idx) || idxDist(idx, startIdx) < 85 || !closed && idxDist(idx, finishIdx) < 60) continue;
       if (obstacles.some((o) => o.path === 0 && idxDist(o.idx, idx) < 26)) continue;
@@ -87913,7 +88013,7 @@ function buildTrack(def) {
   const hazards = [];
   for (const [a, b, cnt] of def.hazards ?? []) {
     for (let c = 0; c < cnt; c++) {
-      const idx = (Math.floor((a + (b - a) * rng2()) * N2) + N2) % N2;
+      const idx = (Math.floor((a + (b - a) * rng2()) * N3) + N3) % N3;
       const s = samples[idx];
       if (!okSpot(s, idx) || Math.abs(idx - startIdx) < 80 || hazards.some((h) => Math.abs(h.idx - idx) < 25)) continue;
       const lat = (rng2() * 2 - 1) * s.hw * 0.55;
@@ -87925,14 +88025,14 @@ function buildTrack(def) {
   const setPieces = [];
   const cdist = (a, b) => {
     const d = Math.abs(a - b);
-    return closed ? Math.min(d, N2 - d) : d;
+    return closed ? Math.min(d, N3 - d) : d;
   };
   const spOk = (i, type) => {
     const s = samples[i];
     if (!okSpot(s, i) || s.zeroG) return false;
     if (closed ? cdist(i, startIdx) < 110 : i < startIdx + 110 || i > finishIdx - 70) return false;
     for (let k = -68; k <= 42; k += 3) {
-      const q = samples[((i + k) % N2 + N2) % N2];
+      const q = samples[((i + k) % N3 + N3) % N3];
       if (q.gap || q.ramp > 0 || q.openL || q.openR || q.zeroG) return false;
     }
     if (hazards.some((h) => cdist(h.idx, i) < 50) || setPieces.some((o) => cdist(o.idx, i) < 120)) return false;
@@ -87941,11 +88041,11 @@ function buildTrack(def) {
   };
   for (const type of ["rotor", "gate", "arch", "boulder", "bridge", "icefall"]) for (const f of def.setPieces?.[type] ?? []) {
     let best = -1, bs = 1e9;
-    const c0 = Math.floor(f * N2);
-    const win = Math.floor(N2 * 0.08);
+    const c0 = Math.floor(f * N3);
+    const win = Math.floor(N3 * 0.08);
     for (let k = -win; k <= win; k += 3) {
-      const i = closed ? ((c0 + k) % N2 + N2) % N2 : c0 + k;
-      if (i < 0 || i >= N2 || !spOk(i, type)) continue;
+      const i = closed ? ((c0 + k) % N3 + N3) % N3 : c0 + k;
+      if (i < 0 || i >= N3 || !spOk(i, type)) continue;
       const gorgeBonus = (type === "arch" || type === "icefall") && samples[i].hL > 0 && samples[i].hR > 0 ? 30 : type === "boulder" && (samples[i].hL > 0 || samples[i].hR > 0) ? 24 : 0;
       const sc = Math.abs(k) * 0.02 + Math.abs(samples[i].curv) * 2e3 - gorgeBonus;
       if (sc < bs) {
@@ -87998,43 +88098,43 @@ function buildTrack(def) {
     bounds.maxY = Math.max(bounds.maxY, s.y);
   }
   for (const o of obstacles) if (o.kind === 2 || o.kind === 0 && o.r < 2.9) o.breakable = true;
-  return { def, paths, main, N: N2, startIdx, finishIdx, obstacles, obstaclesByPath, hazards, setPieces, arches, bounds, overheads: [] };
+  return { def, paths, main, N: N3, startIdx, finishIdx, obstacles, obstaclesByPath, hazards, setPieces, arches, bounds, overheads: [] };
 }
-function findShortcut(S, N2, fa, closed) {
+function findShortcut(S, N3, fa, closed) {
   let best = null, bestScore = 60;
-  const c = Math.floor(fa * N2);
+  const c = Math.floor(fa * N3);
   for (let ia = c - 120; ia <= c + 120; ia += 6) {
     if (!closed && ia < 80) continue;
     for (let len = 110; len <= 360; len += 10) {
       const ib = ia + len;
-      if (!closed && ib > N2 - 80) continue;
-      if (closed && len > N2 / 3) continue;
-      const A = S[(ia + N2) % N2], B2 = S[(ib + N2) % N2];
+      if (!closed && ib > N3 - 80) continue;
+      if (closed && len > N3 / 3) continue;
+      const A = S[(ia + N3) % N3], B2 = S[(ib + N3) % N3];
       const chord = Math.hypot(B2.x - A.x, B2.z - A.z);
       if (chord < 120) continue;
       const score = len * DS - chord;
       if (score <= bestScore) continue;
       let bad = false;
       for (let k = -20; k <= len + 20 && !bad; k += 4) {
-        const s = S[((ia + k) % N2 + N2) % N2];
+        const s = S[((ia + k) % N3 + N3) % N3];
         if (s.gap || s.ramp > 0) bad = true;
       }
       if (bad) continue;
       const side = (B2.x - A.x) * A.rx + (B2.z - A.z) * A.rz > 0 ? 1 : -1;
       const P = (i) => {
-        const s = S[(i % N2 + N2) % N2];
+        const s = S[(i % N3 + N3) % N3];
         const off = side * (s.hw - SC_HW * 0.9 + 18);
         return [s.x + s.rx * off, s.z + s.rz * off];
       };
       const p0 = P(ia + 14), p1 = P(ib - 14);
       for (let t = 0; t <= 1 && !bad; t += 0.08) {
         const x = p0[0] + (p1[0] - p0[0]) * t, z = p0[1] + (p1[1] - p0[1]) * t;
-        const ea = ((ia + 14) % N2 + N2) % N2, eb = ((ib - 14) % N2 + N2) % N2;
+        const ea = ((ia + 14) % N3 + N3) % N3, eb = ((ib - 14) % N3 + N3) % N3;
         const cd = (a, b) => {
           const d = Math.abs(a - b);
-          return closed ? Math.min(d, N2 - d) : d;
+          return closed ? Math.min(d, N3 - d) : d;
         };
-        for (let j = 0; j < N2; j += 3) {
+        for (let j = 0; j < N3; j += 3) {
           if (cd(j, ea) < 30 || cd(j, eb) < 30) continue;
           const s = S[j];
           if (Math.hypot(s.x - x, s.z - z) < s.hw + SC_HW + 15 + Math.sin(t * Math.PI) * 12) {
@@ -88045,7 +88145,7 @@ function findShortcut(S, N2, fa, closed) {
       }
       if (bad) continue;
       bestScore = score;
-      best = [(ia + N2) % N2, (ia + N2) % N2 + len];
+      best = [(ia + N3) % N3, (ia + N3) % N3 + len];
     }
   }
   return best;
@@ -90432,7 +90532,7 @@ var DIFFICULTIES = [
 var PRESETS = {
   low: { renderScale: 0.75, shadows: 0, texRes: 512, parallax: false, ao: false, bloom: false, godRays: false, ssr: false, motionBlur: false, cinematic: false, particles: 0.35, detail: 0.4, geometry: 1, aa: "none", drawDistance: 0.6, anisotropy: 4, shaderDetail: 0, bumpMapping: true, tessellation: 0, csm: false, lensFx: false, lodBias: 0.6, podDetail: 0.6, weatherFx: 1, volumetrics: 0 },
   medium: { renderScale: 1, shadows: 1, texRes: 1024, parallax: false, ao: false, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 0.6, detail: 0.7, geometry: 2, aa: "fxaa", drawDistance: 0.8, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 0, csm: false, lensFx: true, lodBias: 0.8, podDetail: 0.8, weatherFx: 1, volumetrics: 1 },
-  high: { renderScale: 1, shadows: 2, texRes: 1024, parallax: true, ao: false, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 1, detail: 1, geometry: 2, aa: "smaa", drawDistance: 1, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 1, csm: false, lensFx: true, lodBias: 1, podDetail: 1, weatherFx: 2, volumetrics: 2 },
+  high: { renderScale: 1, shadows: 2, texRes: 1024, parallax: true, ao: false, bloom: true, godRays: true, ssr: true, motionBlur: true, cinematic: true, particles: 1, detail: 1, geometry: 2, aa: "smaa", drawDistance: 1, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 1, csm: false, lensFx: true, lodBias: 1, podDetail: 1, weatherFx: 2, volumetrics: 2 },
   // Session 14: "Ultra" = every option at its maximum (only field of view and bloom strength stay as chosen)
   ultra: { renderScale: 1.5, shadows: 3, texRes: 2048, parallax: true, ao: true, bloom: true, godRays: true, ssr: true, motionBlur: true, cinematic: true, particles: 1.5, detail: 1.6, geometry: 3, aa: "smaa", drawDistance: 1.5, anisotropy: 16, shaderDetail: 2, bumpMapping: true, tessellation: 2, csm: true, lensFx: true, lodBias: 2, podDetail: 3, weatherFx: 2, volumetrics: 2 }
 };
@@ -90487,7 +90587,7 @@ function faceOncoming(s) {
 }
 function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) {
   const S = td.main.samples;
-  const N2 = S.length;
+  const N3 = S.length;
   const det2 = gfx.detail;
   const anim = [];
   const emitters = [];
@@ -90499,7 +90599,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
   const sideOK = (s, side) => !s.gap && s.ramp === 0 && !(side > 0 ? s.openR : s.openL) && !((side > 0 ? s.hR : s.hL) > 0);
   const nearStart = (i) => {
     const d = Math.abs(i - td.startIdx);
-    return Math.min(d, N2 - d) < 70 || !td.main.closed && Math.abs(i - td.finishIdx) < 70;
+    return Math.min(d, N3 - d) < 70 || !td.main.closed && Math.abs(i - td.finishIdx) < 70;
   };
   const inst = (geo, mat, mats, shadow2 = true, colors) => {
     if (!mats.length) {
@@ -90546,7 +90646,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
     disp.push(mat, tex);
     const boards = [], backs = [], posts = [];
     let lastI = -100;
-    for (let i = 0; i < N2; i += 4) {
+    for (let i = 0; i < N3; i += 4) {
       const s = S[i];
       if (Math.abs(s.curv) < 1 / 160 || i - lastI < 22 || nearStart(i)) continue;
       const side = s.curv > 0 ? -1 : 1;
@@ -90586,7 +90686,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
     const mat = new MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: "#ffffff", emissiveIntensity: 0.42, roughness: 0.55, side: DoubleSide });
     disp.push(mat, tex);
     const boards = [], posts2 = [];
-    for (let i = 250, n = 1; i < N2; i += 250, n++) {
+    for (let i = 250, n = 1; i < N3; i += 250, n++) {
       const s = S[i];
       const side = n % 2 ? 1 : -1;
       if (!sideOK(s, side)) continue;
@@ -90635,7 +90735,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
     const mat = new MeshStandardMaterial({ map: padTex, emissiveMap: padTex, emissive: "#58e2ff", emissiveIntensity: 1.05, roughness: 0.32, metalness: 0.5 });
     disp.push(mat, padTex);
     const pads = [], coils = [], coilRings = [];
-    for (let i = 400; i < N2; i += 700) {
+    for (let i = 400; i < N3; i += 700) {
       const s = S[i];
       if (s.gap || s.ramp > 0 || s.zeroG) continue;
       const yaw = yawOf(s);
@@ -90664,7 +90764,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
   {
     const poles = [], heads = [];
     const step8 = Math.round(170 / 2 / Math.max(0.5, det2));
-    for (let i = 0, k = 0; i < N2; i += step8, k++) {
+    for (let i = 0, k = 0; i < N3; i += step8, k++) {
       const s = S[i];
       const side = k % 2 ? 1 : -1;
       if (!sideOK(s, side)) continue;
@@ -90740,7 +90840,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
     const poleG = new CylinderGeometry(0.08, 0.11, 11, 6).translate(0, 5.5, 0);
     const flagMats = [], poles = [], colors = [];
     const palette = ["#d8432f", "#e8b830", "#2f7ad8", "#f2ece0", theme.barrierColor, "#30b070"];
-    for (let i = 0; i < N2; i += 16) {
+    for (let i = 0; i < N3; i += 16) {
       const s = S[i];
       if (Math.abs(s.curv) > 1 / 400 || nearStart(i)) continue;
       if (rng2() > 0.55 * det2) continue;
@@ -90762,14 +90862,15 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
     const ringMat = new MeshBasicMaterial({ color: barrier2.clone().multiplyScalar(1.45), transparent: true, opacity: 0.85, side: DoubleSide });
     disp.push(ringMat);
     const frames = [], rings = [], feet = [];
-    const count = Math.round(N2 * 2 / 650);
+    const count = Math.round(N3 * 2 / 650);
     for (let g2 = 0; g2 < count; g2++) {
-      const i = Math.floor((g2 + 0.5) / count * N2);
+      const i = Math.floor((g2 + 0.5) / count * N3);
       const s = S[i];
       if (s.gap || s.ramp > 0 || nearStart(i) || s.openL || s.openR) continue;
       const R = s.hw + 5;
       if (![-1, 1].every((sd) => clear(s.x + s.rx * sd * R, s.z + s.rz * sd * R, 2.6, -0.5))) continue;
       const m = new Matrix4().compose(new Vector3(s.x, s.y, s.z), new Quaternion().setFromAxisAngle(UP, yawOf(s)), new Vector3(1, 0.82, 1));
+      (td.overheads ??= []).push({ idx: i, y0: 0, y1: 0, half: 1.3, arch: { R, sy: 0.82 } });
       frames.push(new TorusGeometry(R, 1.15, 14, 72, Math.PI).applyMatrix4(m));
       rings.push(new TorusGeometry(R - 1.65, 0.26, 8, 96, Math.PI).applyMatrix4(m));
       for (let k = 1; k < 12; k++) {
@@ -90819,9 +90920,9 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
     disp.push(mat, tex);
     const pos = [], uv9 = [], ind = [];
     let v = 0;
-    const count = Math.floor(N2 / 42 * det2);
+    const count = Math.floor(N3 / 42 * det2);
     for (let d = 0; d < count; d++) {
-      const i0 = Math.floor(rng2() * N2);
+      const i0 = Math.floor(rng2() * N3);
       const len = 7 + Math.floor(rng2() * 14);
       const width = 2.6 + rng2() * 3.2;
       const s0 = S[i0];
@@ -90829,12 +90930,12 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
       const drift = (rng2() - 0.5) * 0.4;
       let ok = true;
       for (let k = 0; k <= len; k++) {
-        const s = S[(i0 + k) % N2];
-        if (s.gap || s.ramp > 0 || !td.main.closed && i0 + k >= N2) ok = false;
+        const s = S[(i0 + k) % N3];
+        if (s.gap || s.ramp > 0 || !td.main.closed && i0 + k >= N3) ok = false;
       }
       if (!ok) continue;
       for (let k = 0; k <= len; k++) {
-        const s = S[(i0 + k) % N2];
+        const s = S[(i0 + k) % N3];
         const lat = lat0 + drift * k;
         for (const sd of [-0.5, 0.5]) {
           const l = lat + sd * width;
@@ -90861,7 +90962,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
   {
     const crates = [], barrels = [], cc = [], bc = [];
     const crateCols = ["#8a6a44", "#6d7480", "#a8462e", "#c79a3a"], barrelCols = ["#b8342a", "#3a6ab8", "#c8a030", "#4a4a4a"];
-    for (let i = 0; i < N2; i += 9) {
+    for (let i = 0; i < N3; i += 9) {
       if (rng2() > 0.22 * det2) continue;
       const s = S[i];
       const side = rng2() > 0.5 ? 1 : -1;
@@ -90974,9 +91075,9 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
     const mats = [];
     const cols = [];
     const base = new Color(theme.palette.wall[1]);
-    const count = Math.floor(N2 * 0.9 * det2);
+    const count = Math.floor(N3 * 0.9 * det2);
     for (let c = 0; c < count; c++) {
-      const s = S[Math.floor(rng2() * N2)];
+      const s = S[Math.floor(rng2() * N3)];
       const side = rng2() > 0.5 ? 1 : -1;
       if (!sideOK(s, side)) continue;
       const off = s.hw + 1 + Math.pow(rng2(), 2) * 35;
@@ -90996,7 +91097,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
     const cc = [];
     const decks = [];
     const awnings = [];
-    for (let i = 1; i < N2; i++) {
+    for (let i = 1; i < N3; i++) {
       if (!(S[i].ramp > 0 && S[i - 1].ramp === 0)) continue;
       const s = S[i];
       for (const side of [-1, 1]) {
@@ -91034,7 +91135,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
   }
   const scatterFar = (count, dMin, dMax, r, fn) => {
     for (let c = 0; c < count * det2; c++) {
-      const s = S[Math.floor(rng2() * N2)];
+      const s = S[Math.floor(rng2() * N3)];
       const side = rng2() > 0.5 ? 1 : -1;
       const off = s.hw + dMin + rng2() * (dMax - dMin);
       const x = s.x + s.rx * side * off, z = s.z + s.rz * side * off;
@@ -91046,7 +91147,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
     const vap = [], huts = [];
     scatterFar(75, 25, 360, 2, (x, y, z) => vap.push(mtx(x, y, z, rng2() * 6, 1, 0.8 + rng2() * 0.65, 1)));
     for (let c = 0; c < 9; c++) {
-      const s = S[Math.floor(rng2() * N2)];
+      const s = S[Math.floor(rng2() * N3)];
       const side = rng2() > 0.5 ? 1 : -1;
       const cx = s.x + s.rx * side * (s.hw + 58 + rng2() * 85), cz = s.z + s.rz * side * (s.hw + 58 + rng2() * 85);
       for (let k = 0; k < 5; k++) {
@@ -91098,7 +91199,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
     const words = ["BOONTA EVE", "PODRACE LIVE", "HYPERSPEED", "NEON CUP", "WATTO PARTS", "GALACTIC GP", "GRAND PRIX", "OUTER RIM"];
     const hues = ["#ff3ad0", "#3ad8ff", "#ffb43a", "#7aff5a"];
     for (let b2 = 0; b2 < 14 * det2; b2++) {
-      const s = S[Math.floor(rng2() * N2)];
+      const s = S[Math.floor(rng2() * N3)];
       const side = rng2() > 0.5 ? 1 : -1;
       const off = s.hw + 25 + rng2() * 60;
       const x = s.x + s.rx * side * off, z = s.z + s.rz * side * off;
@@ -91283,7 +91384,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
     const signMat = new MeshBasicMaterial({ map: signTex, side: DoubleSide });
     disp.push(signMat, signTex);
     const signs = [];
-    for (let i = 1; i < N2; i++) {
+    for (let i = 1; i < N3; i++) {
       if (S[i].zeroG && !S[i - 1].zeroG) {
         const s = S[i];
         signs.push(new Matrix4().compose(new Vector3(s.x, s.y + 12, s.z), faceOncoming(s), new Vector3(1, 1, 1)));
@@ -91293,7 +91394,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
   }
   if (theme.id === "lava") {
     for (let c = 0; c < 30; c++) {
-      const s = S[Math.floor(rng2() * N2)];
+      const s = S[Math.floor(rng2() * N3)];
       const side = rng2() > 0.5 ? 1 : -1;
       const off = s.hw + 20 + rng2() * 150;
       const x = s.x + s.rx * side * off, z = s.z + s.rz * side * off;
@@ -91303,7 +91404,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
   }
   if (theme.id === "ice" || theme.id === "jungle" || theme.id === "malastare") {
     for (let c = 0; c < 16; c++) {
-      const s = S[Math.floor(rng2() * N2)];
+      const s = S[Math.floor(rng2() * N3)];
       const side = rng2() > 0.5 ? 1 : -1;
       const off = s.hw + 15 + rng2() * 100;
       const x = s.x + s.rx * side * off, z = s.z + s.rz * side * off;
@@ -91337,7 +91438,7 @@ function strut(ax, ay, az, bx, by, bz, w) {
   return g2;
 }
 function addMechProps(td, theme, group, disp, heightAt, roadClear, waterY, detail) {
-  const S = td.main.samples, N2 = td.N;
+  const S = td.main.samples, N3 = td.N;
   const metal = new MeshStandardMaterial({ color: "#59606c", metalness: 0.86, roughness: 0.36 });
   const dark = new MeshStandardMaterial({ color: "#23272e", metalness: 0.8, roughness: 0.48 });
   const glow = new MeshBasicMaterial({ color: new Color(theme.barrierColor).multiplyScalar(1.55) });
@@ -91365,7 +91466,7 @@ function addMechProps(td, theme, group, disp, heightAt, roadClear, waterY, detai
   const ringGeo = merge(rg);
   const towers = [];
   const step8 = Math.max(60, Math.round(280 / DS / Math.max(0.5, Math.min(1.3, detail))));
-  for (let i = 60, n = 0; i < N2 - 40; i += step8, n++) {
+  for (let i = 60, n = 0; i < N3 - 40; i += step8, n++) {
     const s = S[i];
     if (s.gap || s.zeroG || s.roof > 0 || s.ramp > 0) continue;
     let side = n % 2 ? 1 : -1;
@@ -91415,7 +91516,7 @@ function addMechProps(td, theme, group, disp, heightAt, roadClear, waterY, detai
     }
     if (towers.length) rIM.instanceMatrix.needsUpdate = true;
     for (let i = 0; i < nDr; i++) {
-      const f = ((i / nDr * N2 - t * 9 + N2 * 4) % N2 + N2) % N2, i0 = Math.floor(f), s = S[i0], s2 = S[(i0 + 1) % N2], w = f - i0;
+      const f = ((i / nDr * N3 - t * 9 + N3 * 4) % N3 + N3) % N3, i0 = Math.floor(f), s = S[i0], s2 = S[(i0 + 1) % N3], w = f - i0;
       const side = i % 2 ? 1 : -1, lat = side * (s.hw + 7.5);
       const hide = s.gap || s.zeroG || s.roof > 0 || (side > 0 ? s.hR : s.hL) > 0;
       const x = s.x + (s2.x - s.x) * w + s.rx * lat, z = s.z + (s2.z - s.z) * w + s.rz * lat, y = s.y + (s2.y - s.y) * w + 12.5 + Math.sin(t * 1.3 + i * 2.1) * 1.1;
@@ -91463,7 +91564,7 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
   };
   const yawQ = (s) => new Quaternion().setFromAxisAngle(UP3, Math.atan2(s.tx, s.tz));
   const M3 = (x, y, z, q, sx = 1, sy = 1, sz = 1) => new Matrix4().compose(new Vector3(x, y, z), q, new Vector3(sx, sy, sz));
-  const S = td.main.samples, N2 = S.length;
+  const S = td.main.samples, N3 = S.length;
   const railTex = canvasTex2(512, 128, (c) => {
     const g2 = c.createLinearGradient(0, 0, 0, 128);
     g2.addColorStop(0, "#dce0e6");
@@ -91693,7 +91794,7 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
   inst(new BoxGeometry(0.26, 0.28, 1.7), postMat, sconceFrames, false);
   if (theme.terrain !== "prison") {
     const cabGeos = [], beaconMats = [];
-    for (let i = 30; i < N2 - 30; i += 28) {
+    for (let i = 30; i < N3 - 30; i += 28) {
       const s = S[i];
       if (s.gap || s.ramp > 0 || s.hL < 18 || s.hR < 18 || rng2() > 0.55 * o.detail) continue;
       const hCab = 15 + rng2() * Math.min(10, Math.min(s.hL, s.hR) - 16);
@@ -91778,7 +91879,7 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
     const prof2 = [0, 0.07, 0.14, 0.15, 0.1, 0];
     const PL = prof2.length;
     let i = 0;
-    while (i < N2) {
+    while (i < N3) {
       const c0 = S[i].curv;
       if (Math.abs(c0) < 1 / 230 || S[i].gap || S[i].ramp > 0) {
         i++;
@@ -91786,7 +91887,7 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
       }
       const side = c0 > 0 ? 1 : -1;
       let j = i;
-      while (j < N2 && Math.abs(S[j].curv) > 1 / 300 && Math.sign(S[j].curv) === side && !S[j].gap && S[j].ramp === 0) j++;
+      while (j < N3 && Math.abs(S[j].curv) > 1 / 300 && Math.sign(S[j].curv) === side && !S[j].gap && S[j].ramp === 0) j++;
       if (j - i >= 12) {
         let along = 0;
         for (let k = i; k < j; k++) {
@@ -91817,8 +91918,8 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
     for (let g2 = 0; g2 < 11; g2++) {
       const row = Math.floor(g2 / 3), col = g2 % 3;
       let idx = td.startIdx - 6 - row * 9;
-      idx = td.main.closed ? (idx % N2 + N2) % N2 : Math.max(0, idx);
-      const front = S[Math.min(N2 - 1, idx + 2)], s = S[idx];
+      idx = td.main.closed ? (idx % N3 + N3) % N3 : Math.max(0, idx);
+      const front = S[Math.min(N3 - 1, idx + 2)], s = S[idx];
       const lat = (col - 1) * s.hw * 0.55;
       marks.push(M3(front.x + front.rx * lat, surf(front, lat) + 0.055 + dOff, front.z + front.rz * lat, yawQ(front), 7.2, 1, 0.45));
       gridLeds.push(M3(front.x + front.rx * lat, surf(front, lat) + 0.095 + dOff, front.z + front.rz * lat, yawQ(front), 2.2, 1, 0.18));
@@ -91842,7 +91943,7 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
     const mats = [];
     const e = new Euler();
     const q = new Quaternion();
-    for (let i = 0; i < N2; i += 3) {
+    for (let i = 0; i < N3; i += 3) {
       const s = S[i];
       if (s.gap) continue;
       for (const side of [-1, 1]) {
@@ -91858,11 +91959,11 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
   }
   {
     const cols = [], braces = [], crossBeams = [], reds = [], greens = [], lips = [], masts = [], mastLamps = [];
-    for (let i = 1; i < N2; i++) {
+    for (let i = 1; i < N3; i++) {
       const s = S[i], pv = S[i - 1];
       if (s.ramp > 0 && pv.ramp === 0) {
         let j = i;
-        while (j < N2 && S[j].ramp > 0) j++;
+        while (j < N3 && S[j].ramp > 0) j++;
         for (let k = i; k < j; k += 3) {
           const r = S[k];
           if (r.ramp < 1.2) continue;
@@ -91916,7 +92017,7 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
     const poles = [], heads = [], tallies = [];
     for (const c of o.tvCams) {
       let bi = 0, bd = 1e12;
-      for (let i = 0; i < N2; i += 4) {
+      for (let i = 0; i < N3; i += 4) {
         const d = (S[i].x - c.x) ** 2 + (S[i].z - c.z) ** 2;
         if (d < bd) {
           bd = d;
@@ -91967,11 +92068,11 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
     disp.push(bannerTex, bannerMat);
     const truss = [], banners = [], lamps = [];
     let last = -1e9;
-    for (let i = 60; i < N2 - 60; i += 10) {
+    for (let i = 60; i < N3 - 60; i += 10) {
       if (i - last < 280) continue;
       let ok = true;
       for (let k = -20; k <= 20 && ok; k += 2) {
-        const q = S[(i + k + N2) % N2];
+        const q = S[(i + k + N3) % N3];
         if (Math.abs(q.curv) > 1 / 700 || q.canyon || q.gap || q.ramp > 0 || q.openL || q.openR) ok = false;
       }
       if (!ok || Math.abs(i - td.startIdx) < 90 || td.setPieces.some((sp) => Math.abs(sp.idx - i) < 70)) continue;
@@ -92275,12 +92376,12 @@ function ringSurface(radial2, rings, pos, capTop, capBottom) {
   g2.setAttribute("uv", new BufferAttribute(UV, 2));
   g2.setIndex(idx);
   g2.computeVertexNormals();
-  const N2 = g2.attributes.normal;
+  const N3 = g2.attributes.normal;
   for (let j = 0; j < rings; j++) {
     const a = j * cols, b = a + radial2;
-    const x = N2.getX(a) + N2.getX(b), y = N2.getY(a) + N2.getY(b), z = N2.getZ(a) + N2.getZ(b), l = Math.hypot(x, y, z) || 1;
-    N2.setXYZ(a, x / l, y / l, z / l);
-    N2.setXYZ(b, x / l, y / l, z / l);
+    const x = N3.getX(a) + N3.getX(b), y = N3.getY(a) + N3.getY(b), z = N3.getZ(a) + N3.getZ(b), l = Math.hypot(x, y, z) || 1;
+    N3.setXYZ(a, x / l, y / l, z / l);
+    N3.setXYZ(b, x / l, y / l, z / l);
   }
   return g2;
 }
@@ -92714,15 +92815,15 @@ function makeTerrainField(td, theme) {
     return d - s.hw;
   };
   const b = td.bounds;
-  const RM = 3400, G = 64;
+  const RM = 3400, G2 = 64;
   const gx0 = b.minX - RM, gz0 = b.minZ - RM;
-  const gnx = Math.ceil((b.maxX - b.minX + 2 * RM) / G) + 2, gnz = Math.ceil((b.maxZ - b.minZ + 2 * RM) / G) + 2;
+  const gnx = Math.ceil((b.maxX - b.minX + 2 * RM) / G2) + 2, gnz = Math.ceil((b.maxZ - b.minZ + 2 * RM) / G2) + 2;
   const reg = new Float32Array(gnx * gnz);
   const sig2 = 2 * 240 * 240, cut2 = 720 * 720;
   const regS = [];
   for (const p of td.paths) for (let i = 0; i < p.samples.length; i += 10) regS.push(p.samples[i]);
   for (let j = 0; j < gnz; j++) for (let i = 0; i < gnx; i++) {
-    const x = gx0 + i * G, z = gz0 + j * G;
+    const x = gx0 + i * G2, z = gz0 + j * G2;
     let sw = 0.02, sy = 0.02 * avgY;
     for (const s of regS) {
       const dx = s.x - x, dz = s.z - z;
@@ -92735,7 +92836,7 @@ function makeTerrainField(td, theme) {
     reg[j * gnx + i] = sy / sw;
   }
   const regAt = (x, z) => {
-    const fx = Math.max(0, Math.min(gnx - 1.001, (x - gx0) / G)), fz = Math.max(0, Math.min(gnz - 1.001, (z - gz0) / G));
+    const fx = Math.max(0, Math.min(gnx - 1.001, (x - gx0) / G2)), fz = Math.max(0, Math.min(gnz - 1.001, (z - gz0) / G2));
     const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, k = j * gnx + i;
     return (reg[k] * (1 - u) + reg[k + 1] * u) * (1 - v) + (reg[k + gnx] * (1 - u) + reg[k + gnx + 1] * u) * v;
   };
@@ -93073,7 +93174,7 @@ var merged = (list) => {
   return g2;
 };
 function buildSetPieces(td, theme, group, disp, rockMat) {
-  const S = td.main.samples, N2 = S.length;
+  const S = td.main.samples, N3 = S.length;
   const fns = [];
   if (!td.setPieces.length) return { update: () => [] };
   const metal = new MeshStandardMaterial({ color: "#6c727c", metalness: 0.86, roughness: 0.33 });
@@ -93081,7 +93182,7 @@ function buildSetPieces(td, theme, group, disp, rockMat) {
   const tex = hazardTex();
   const hazard = new MeshStandardMaterial({ map: tex, metalness: 0.32, roughness: 0.48 });
   const glow = new MeshBasicMaterial({ color: new Color(theme.barrierColor).multiplyScalar(1.25) });
-  const iceMat = new MeshStandardMaterial({ color: "#b4e4ff", roughness: 0.18, metalness: 0.1, emissive: "#2c78b4", emissiveIntensity: 0.32, transparent: true, opacity: 0.88 });
+  const iceMat = new MeshStandardMaterial({ color: "#b4e4ff", roughness: 0.18, metalness: 0.1, emissive: "#2c78b4", emissiveIntensity: 0.32 });
   disp.push(metal, dark, tex, hazard, glow, iceMat);
   const RED = new Color("#ff2a18").multiplyScalar(1.35), AMBER = new Color("#ffb020").multiplyScalar(1.3), GREEN = new Color("#30ff60"), OFF = new Color("#201008");
   for (const sp of td.setPieces) {
@@ -93265,7 +93366,19 @@ function buildSetPieces(td, theme, group, disp, rockMat) {
       const Ra = sp.hw + 8, tube3 = (isIce ? 4 : 4.5) + h25(sp.idx, 3) * 1.5, segs = 9;
       const pieces = [];
       for (let k = 0; k < segs; k++) {
-        const g2 = new TorusGeometry(Ra, tube3, isIce ? 6 : 10, 8, Math.PI / segs);
+        const rs = isIce ? 6 : 10, arc = Math.PI / segs;
+        const tg = new TorusGeometry(Ra, tube3, rs, 8, arc);
+        const cap = (ang, dir) => {
+          const cg = new CircleGeometry(tube3, rs);
+          cg.applyQuaternion(new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), new Vector3(-Math.sin(ang) * dir, Math.cos(ang) * dir, 0)));
+          cg.translate(Math.cos(ang) * Ra, Math.sin(ang) * Ra, 0);
+          return cg;
+        };
+        const c0 = cap(0, -1), c1 = cap(arc, 1);
+        const g2 = mergeGeometries([tg, c0, c1]);
+        tg.dispose();
+        c0.dispose();
+        c1.dispose();
         g2.rotateZ(k * Math.PI / segs);
         const p = g2.attributes.position;
         for (let i = 0; i < p.count; i++) {
@@ -93294,8 +93407,8 @@ function buildSetPieces(td, theme, group, disp, rockMat) {
           if (!lead) return;
           let ahead = sp.idx - lead.idx;
           if (td.main.closed) {
-            if (ahead < -N2 / 2) ahead += N2;
-            if (ahead > N2 / 2) ahead -= N2;
+            if (ahead < -N3 / 2) ahead += N3;
+            if (ahead > N3 / 2) ahead -= N3;
           }
           if (!((td.main.closed ? lead.lap >= 1 : true) && ahead > 0 && ahead < 70)) return;
           sp.state = 1;
@@ -93410,7 +93523,7 @@ function projectUV(g2, tile) {
   g2.setAttribute("uv", new BufferAttribute(uv9, 2));
 }
 function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smokes = []) {
-  const S = td.main.samples, N2 = S.length;
+  const S = td.main.samples, N3 = S.length;
   const std = (c, r, m, e, ei = 0) => {
     const mt = new MeshStandardMaterial({ color: c, roughness: r, metalness: m, emissive: e ?? "#000000", emissiveIntensity: ei });
     disp.push(mt);
@@ -93484,7 +93597,7 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
   const placed = [];
   const spot = (minD, maxD, r) => {
     for (let t = 0; t < 80; t++) {
-      const s = S[Math.floor(rng2() * N2)];
+      const s = S[Math.floor(rng2() * N3)];
       const side = rng2() < 0.5 ? -1 : 1;
       const dd = minD + rng2() * (maxD - minD);
       const x = s.x + s.rx * side * (s.hw + dd), z = s.z + s.rz * side * (s.hw + dd);
@@ -94150,8 +94263,8 @@ function buildGroundCover(td, theme, gfx, field, waterY, rng2, group, disp) {
     void cam;
   }, count: 0, ms: 0 };
   const CELL2 = 260, PAD = CELL2 * 0.72;
-  const S = td.main.samples, N2 = S.length;
-  const km = N2 * 2 / 1e3;
+  const S = td.main.samples, N3 = S.length;
+  const km = N3 * 2 / 1e3;
   const det2 = Math.min(1.15, gfx.detail);
   const up = new Vector3(0, 1, 0), nrm = new Vector3(), q = new Quaternion(), qy = new Quaternion(), pos = new Vector3(), scl = new Vector3();
   const cov = { y: 0, edge: 0, gx: 0, gz: 0 };
@@ -94168,7 +94281,7 @@ function buildGroundCover(td, theme, gfx, field, waterY, rng2, group, disp) {
     let placed = 0, guard = 0;
     const minEdge = t.dMin * 0.7 + 0.4, slope2 = t.slope * t.slope;
     while (placed < want && guard++ < want * 3) {
-      const s = S[Math.floor(rng2() * N2)];
+      const s = S[Math.floor(rng2() * N3)];
       const side = rng2() < 0.5 ? -1 : 1;
       const e = t.dMin + (t.dMax - t.dMin) * Math.pow(rng2(), t.bias ?? 1.6);
       const cx = s.x + s.rx * side * (s.hw + e) + s.tx * (rng2() - 0.5) * 10, cz = s.z + s.rz * side * (s.hw + e) + s.tz * (rng2() - 0.5) * 10;
@@ -94250,10 +94363,10 @@ var KINDS = {
 };
 var SEG2 = 12;
 function buildSmoke(srcs, theme, td, field, group, disp, rng2, waterY) {
-  const S = td.main.samples, N2 = S.length;
+  const S = td.main.samples, N3 = S.length;
   const spot = (minD, maxD, clear) => {
     for (let t = 0; t < 40; t++) {
-      const s = S[Math.floor(rng2() * N2)];
+      const s = S[Math.floor(rng2() * N3)];
       const side = rng2() < 0.5 ? -1 : 1;
       const d = minD + rng2() * (maxD - minD);
       const x = s.x + s.rx * side * (s.hw + d), z = s.z + s.rz * side * (s.hw + d);
@@ -94565,10 +94678,10 @@ function buildLife(td, theme, field, waterY, rng2, group, disp, detail, landmark
     out.crawler = Math.max(0, 1 - cMin / 450);
   };
   if (!cfg) return { update, nearAudio, count: 0 };
-  const S = td.main.samples, N2 = S.length;
+  const S = td.main.samples, N3 = S.length;
   const b = td.bounds;
   const cx0 = (b.minX + b.maxX) / 2, cz0 = (b.minZ + b.maxZ) / 2;
-  const avgY = S.reduce((a, s) => a + s.y, 0) / N2;
+  const avgY = S.reduce((a, s) => a + s.y, 0) / N3;
   const span = Math.max(b.maxX - b.minX, b.maxZ - b.minZ);
   const tm = new Matrix4(), tq = new Quaternion(), te = new Euler(0, 0, 0, "YXZ"), tv = new Vector3(), ts = new Vector3();
   const setM = (im, i, x, y, z, yaw, pitch, roll, s, sx = s) => {
@@ -94601,7 +94714,7 @@ function buildLife(td, theme, field, waterY, rng2, group, disp, detail, landmark
   };
   const openCircle = (minD, maxD, R, clear, landPad = 18) => {
     for (let t = 0; t < 80; t++) {
-      const s = S[Math.floor(rng2() * N2)];
+      const s = S[Math.floor(rng2() * N3)];
       const side = rng2() < 0.5 ? -1 : 1;
       const d = minD + rng2() * (maxD - minD);
       const x = s.x + s.rx * side * (s.hw + d + R), z = s.z + s.rz * side * (s.hw + d + R);
@@ -94630,7 +94743,7 @@ function buildLife(td, theme, field, waterY, rng2, group, disp, detail, landmark
     const nFlocks = Math.max(2, Math.round((B2.flocks + 1) * detail));
     for (let f = 0; f < nFlocks; f++) {
       const canPerch = !B2.glow && f >= nFlocks - 2;
-      const s = S[Math.floor(rng2() * N2)];
+      const s = S[Math.floor(rng2() * N3)];
       const side = rng2() < 0.5 ? -1 : 1;
       const d = canPerch ? 14 + rng2() * 48 : 30 + rng2() * 380;
       const x = s.x + s.rx * side * (s.hw + d), z = s.z + s.rz * side * (s.hw + d);
@@ -94749,19 +94862,19 @@ function buildLife(td, theme, field, waterY, rng2, group, disp, detail, landmark
     }
   }
   if (cfg.giants) {
-    const G = [];
+    const G2 = [];
     for (let k = 0; k < Math.max(1, Math.round(cfg.giants.n * detail)); k++) {
       const r = 70 + rng2() * 140;
       const c = openCircle(220, 880, r + 20, 40, 28);
       if (c) {
-        G.push({ cx: c.x, cz: c.z, r, a: rng2() * 6.28, w: (0.9 + rng2() * 0.5) / r * (rng2() < 0.5 ? -1 : 1), y: 0, s: 0.9 + rng2() * 0.4, spotIdx: herdSpots.length });
+        G2.push({ cx: c.x, cz: c.z, r, a: rng2() * 6.28, w: (0.9 + rng2() * 0.5) / r * (rng2() < 0.5 ? -1 : 1), y: 0, s: 0.9 + rng2() * 0.4, spotIdx: herdSpots.length });
         herdSpots.push({ x: c.x, z: c.z });
       }
     }
-    if (G.length) {
-      const im = inst(giant(rgb2(cfg.giants.skin)), lifeMat("walker", { speed: 1.1, hip: 6.5, amp: 0.9, neckBase: 8 }), G.length, true);
+    if (G2.length) {
+      const im = inst(giant(rgb2(cfg.giants.skin)), lifeMat("walker", { speed: 1.1, hip: 6.5, amp: 0.9, neckBase: 8 }), G2.length, true);
       ups.push((_t, dt) => {
-        G.forEach((g2, i) => {
+        G2.forEach((g2, i) => {
           g2.a += g2.w * dt;
           const [x, z] = pushFromLandmarks(g2.cx + Math.cos(g2.a) * g2.r, g2.cz + Math.sin(g2.a) * g2.r, 16);
           herdSpots[g2.spotIdx].x = x;
@@ -94772,7 +94885,7 @@ function buildLife(td, theme, field, waterY, rng2, group, disp, detail, landmark
         });
         im.instanceMatrix.needsUpdate = true;
       });
-      count += G.length;
+      count += G2.length;
     }
   }
   const ground = (n, model, mat, R, v, hover, minD, maxD, shadow2, every, trackSpots) => {
@@ -94818,7 +94931,7 @@ function buildLife(td, theme, field, waterY, rng2, group, disp, detail, landmark
   if (cfg.barges && waterY > -1e8) {
     const L = [];
     for (let k = 0; k < cfg.barges; k++) {
-      const s = S[Math.floor(rng2() * N2)];
+      const s = S[Math.floor(rng2() * N3)];
       const side = rng2() < 0.5 ? -1 : 1;
       const d = 80 + rng2() * 500;
       const r = 60 + rng2() * 200;
@@ -94867,7 +94980,7 @@ function addWaterfalls(td, theme, group, disp, rng2, smokes, rockMat) {
   if (id !== "jungle" && id !== "lava" && id !== "aquilaris" && id !== "ice") return [];
   const isLava = id === "lava";
   const isIce = id === "ice";
-  const S = td.main.samples, N2 = S.length;
+  const S = td.main.samples, N3 = S.length;
   const spots = [];
   const ribbons = [];
   const pools = [];
@@ -94875,7 +94988,7 @@ function addWaterfalls(td, theme, group, disp, rng2, smokes, rockMat) {
   const minSpacing = isLava ? 65 : isIce ? 95 : 60;
   const minCliff = isLava ? 20 : 21;
   let lastIdx = -999;
-  for (let i = 35; i < N2 - 35; i += 5) {
+  for (let i = 35; i < N3 - 35; i += 5) {
     if (i - lastIdx < minSpacing) continue;
     const s = S[i];
     if (s.gap || s.ramp > 0 || s.zeroG) continue;
@@ -94886,7 +94999,7 @@ function addWaterfalls(td, theme, group, disp, rng2, smokes, rockMat) {
       if (h0 < minCliff || (sd > 0 ? s.openR : s.openL)) continue;
       let ok = true;
       for (let k = -6; k <= 6 && ok; k += 3) {
-        const q = S[(i + k + N2) % N2];
+        const q = S[(i + k + N3) % N3];
         if ((sd > 0 ? q.hR : q.hL) < minCliff * 0.8 || q.gap) ok = false;
       }
       if (ok) {
@@ -95211,12 +95324,12 @@ async function buildWorld(td, theme, gfx, progress) {
     {
       const pos = [], uv9 = [], ind = [];
       let vbase = 0;
-      let sAcc = 0;
+      let vAcc = 0;
       for (let k = 0; k < idxs.length; k++) {
         const s = S2[idxs[k]];
         if (k > 0) {
           const pr = S2[idxs[k - 1]];
-          sAcc += Math.hypot(s.x - pr.x, s.z - pr.z);
+          vAcc += Math.hypot(s.x - pr.x, s.z - pr.z) / Math.max(24, (s.hw + pr.hw) * 0.7);
         }
         for (let a = 0; a <= across; a++) {
           const f = a / across;
@@ -95226,7 +95339,7 @@ async function buildWorld(td, theme, gfx, progress) {
           const lip = e > lipStart ? 0.18 * (e - lipStart) / (1 - lipStart) : 0;
           const crown = (1 - e * e) * 0.2 + lip;
           pos.push(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + crown, s.z + s.rz * lat);
-          uv9.push(f, sAcc / Math.max(24, s.hw * 1.4));
+          uv9.push(f, vAcc);
         }
         if (k > 0 && !S2[idxs[k]].gap && !S2[idxs[k - 1]].gap) {
           const r0 = vbase - (across + 1), r1 = vbase;
@@ -95416,8 +95529,9 @@ async function buildWorld(td, theme, gfx, progress) {
   const obstFx = addObstacles(td, group, theme, wallMat, disposables);
   progress(0.9, "Platziere Streckendetails \u2026");
   await yield_();
-  const props = addProps(td, theme, group, gfx, heightAt, disposables, rng2, roadClear, roadDispOff);
-  const mech = addMechProps(td, theme, group, disposables, heightAt, roadClear, waterY, gfx.detail);
+  const groundMin = (x, z, r) => Math.min(heightAt(x, z), heightAt(x + r, z), heightAt(x - r, z), heightAt(x, z + r), heightAt(x, z - r));
+  const props = addProps(td, theme, group, gfx, (x, z) => groundMin(x, z, 1.4), disposables, rng2, roadClear, roadDispOff);
+  const mech = addMechProps(td, theme, group, disposables, (x, z) => groundMin(x, z, 2.8), roadClear, waterY, gfx.detail);
   const setPieces = buildSetPieces(td, theme, group, disposables, wallMat);
   const landRock = surfaceMaterial(wallTex, {
     strata: STRATA[theme.id],
@@ -95805,7 +95919,11 @@ function scatterDecor(theme, group, td, heightAt, near, gfx, disp, rng2, wallTex
       const size = sMin + rng2() * (sMax - sMin);
       if (nn.d < nn.s.hw + dMin * 0.5) continue;
       if (!opts.air && !roadClear(x, z, size * (opts.foot ?? 1.4), 2)) continue;
-      const gy = opts.air ? nn.s.y + opts.air * (0.5 + rng2()) : heightAt(x, z);
+      let gy = opts.air ? nn.s.y + opts.air * (0.5 + rng2()) : heightAt(x, z);
+      if (!opts.air) {
+        const fr = Math.min(16, size * (opts.foot ?? 1.4) * 0.55);
+        gy = Math.min(gy, heightAt(x + fr, z), heightAt(x - fr, z), heightAt(x, z + fr), heightAt(x, z - fr));
+      }
       if (opts.keepDry && !opts.air && gy < waterY + 0.3) continue;
       const y = gy + (opts.yOff ?? 0) * size;
       const sy = opts.scaleY ? opts.scaleY[0] + rng2() * (opts.scaleY[1] - opts.scaleY[0]) : 1;
@@ -96671,7 +96789,7 @@ function hullTextures(size = 1024) {
   if (hit) return hit;
   const S = size, k = S / 1024;
   const rnd = mulberry(9137);
-  const N2 = new TNoise(4711);
+  const N3 = new TNoise(4711);
   const canv = () => {
     const c = document.createElement("canvas");
     c.width = c.height = S;
@@ -96952,11 +97070,11 @@ function hullTextures(size = 1024) {
     const ao = 0.58 + 0.42 * Math.min(1, cav * 1.8);
     const xm = (x - 1 + S) % S, xp = (x + 1) % S, ym = (y - 1 + S) % S * S, yp = (y + 1) % S * S;
     const grad = Math.hypot(hS[y * S + xp] - hS[y * S + xm], hS[yp + x] - hS[ym + x]);
-    const n1 = N2.fbm(u, v, 8, 5), n2 = N2.fbm(u + 0.37, v + 0.11, 24, 3);
+    const n1 = N3.fbm(u, v, 8, 5), n2 = N3.fbm(u + 0.37, v + 0.11, 24, 3);
     const edge = Math.min(1, grad * 9) * (cav > 0.5 ? 1 : 0.25);
     let wear = edge * (0.35 + 1.1 * n1) + wr[i] * 0.85 + Math.max(0, n2 - 0.7) * 2.2;
     wear = Math.max(0, Math.min(1, wear));
-    const streak = N2.n2(u, v, 96, 6) * N2.n2(u + 0.5, v, 24, 3);
+    const streak = N3.n2(u, v, 96, 6) * N3.n2(u + 0.5, v, 24, 3);
     const grime = Math.max(0, Math.min(1, (1 - cav) * 1.1 + Math.max(0, streak - 0.35) * 0.9 + (n1 - 0.5) * 0.4));
     const rough = Math.max(0, Math.min(1, 0.45 + (n2 - 0.5) * 0.45 + (1 - cav) * 0.25 - wr[i] * 0.2));
     mask[i * 4] = ao * 255;
@@ -97625,7 +97743,61 @@ function getOppGlow() {
 function getOppFarHull() {
   return sharedOppFarHull ?? (sharedOppFarHull = new MeshStandardMaterial({ vertexColors: true, metalness: 0.48, roughness: 0.34 }));
 }
-function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = false) {
+var numAtlas = null;
+var numMat = null;
+function numberPlate(L, num) {
+  if (!numAtlas) {
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = 512;
+    const c = cv.getContext("2d");
+    c.fillStyle = "#15171c";
+    c.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 15; i++) {
+      const x = i % 4 * 128, y = Math.floor(i / 4) * 128;
+      c.fillStyle = "#f2efe6";
+      c.fillRect(x + 6, y + 6, 116, 116);
+      c.strokeStyle = "#15171c";
+      c.lineWidth = 7;
+      c.strokeRect(x + 12, y + 12, 104, 104);
+      c.fillStyle = "#15171c";
+      c.font = "bold 84px sans-serif";
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      c.fillText(String(i + 1), x + 64, y + 70);
+    }
+    numAtlas = new CanvasTexture(cv);
+    numAtlas.colorSpace = SRGBColorSpace;
+    numAtlas.anisotropy = 4;
+    numMat = new MeshStandardMaterial({ map: numAtlas, emissiveMap: numAtlas, emissive: "#ffffff", emissiveIntensity: 0.22, roughness: 0.55, metalness: 0.1 });
+  }
+  const cell = ((num - 1) % 15 + 15) % 15, u0 = cell % 4 / 4, v0 = 1 - (Math.floor(cell / 4) + 1) / 4;
+  const mk = (flip) => {
+    const g3 = new PlaneGeometry(0.86, 0.86);
+    const uv9 = g3.attributes.uv;
+    for (let i = 0; i < uv9.count; i++) uv9.setXY(i, u0 + uv9.getX(i) * 0.25, v0 + uv9.getY(i) * 0.25);
+    if (flip) g3.rotateY(Math.PI);
+    g3.translate(0, 0, flip ? -0.022 : 0.022);
+    return g3;
+  };
+  const post = new BoxGeometry(0.07, 0.6, 0.07);
+  {
+    const uv9 = post.attributes.uv;
+    for (let i = 0; i < uv9.count; i++) uv9.setXY(i, 0.88, 0.12);
+  }
+  post.translate(0, -0.7, 0);
+  const frame = new BoxGeometry(0.94, 0.94, 0.03);
+  {
+    const uv9 = frame.attributes.uv;
+    for (let i = 0; i < uv9.count; i++) uv9.setXY(i, 0.88, 0.12);
+  }
+  const g2 = mergeGeometries([mk(false), mk(true), post, frame], false);
+  const m = new Mesh(g2, numMat);
+  m.position.set(0, L.cockpit.y + 1.75, L.cockpit.z - 1.55);
+  m.rotation.x = -0.12;
+  m.castShadow = false;
+  return m;
+}
+function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = false, num) {
   const seg = isOpponent ? quality >= 3 ? 18 : 14 : quality >= 3 ? 40 : quality === 2 ? 28 : 20;
   const texSize = texRes >= 2048 && !isOpponent ? 2048 : 1024;
   const L = podLayout(def);
@@ -97787,6 +97959,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     farGrp.add(fhM);
     farGrp.add(new Mesh(far.dark, shared.dark));
     farGrp.add(new Mesh(fgGeo, oppGlow));
+    nearGrp.add(numberPlate(L, num ?? 1));
     const setDistance = (d, forceAll = false) => {
       if (forceAll) {
         nearGrp.visible = true;
@@ -98008,6 +98181,8 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     cabLift.value.set(yL, yR);
     if (binderU?.uLift) binderU.uLift.value.set(binderSwap ? yR : yL, binderSwap ? yL : yR);
   };
+  let boostK = 0, flapT = 0;
+  body.add(numberPlate(L, num ?? 1));
   const update = (t, throttle, boost, airbrake, dmgL, dmgR, heat) => {
     podSharedTime.value = t;
     const fl = 0.35 + throttle * 0.75 + boost * 0.8;
@@ -98031,7 +98206,11 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     const fanAng = t * (16 + throttle * 42);
     for (let i = 0; i < fans.length; i++) fans[i].rotation.z = fanAng + i * 0.7;
     const dmgF = Math.max(0, 0.45 - Math.min(dmgL, dmgR)) / 0.45;
-    for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (airbrake * 1.05 + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
+    const dtF = Math.max(0, Math.min(0.1, t - flapT));
+    flapT = t;
+    boostK += (boost - boostK) * Math.min(1, dtF * (boost > boostK ? 9 : 4));
+    const open2 = boostK * (0.5 + 0.035 * Math.sin(t * 43));
+    for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (Math.max(airbrake * 1.05, open2) + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
     const uL = hullL.userData.u, uR = hullR.userData.u;
     uL.uScorch.value = Math.min(1, (1 - dmgL) * 1.1 + Math.max(0, heat - 0.75) * 0.8);
     uL.uHeat.value = heat;
@@ -98245,16 +98424,20 @@ var Particles = class {
   setAmbientFade(f) {
     this.ambFade.value = f;
   }
-  /** Shattered obstacle: tumbling chunks + dust burst + sparks. */
-  debris(p, vel, col, size = 2) {
-    const n = Math.round((10 + size * 4) * Math.min(1.2, this.amount + 0.3));
-    for (let i = 0; i < n; i++) {
-      _v.set((Math.random() - 0.5) * 26, 3 + Math.random() * 13, (Math.random() - 0.5) * 26).addScaledVector(vel, 0.5);
-      _p.set(p.x + (Math.random() - 0.5) * size, p.y + 0.4 + Math.random() * size, p.z + (Math.random() - 0.5) * size);
-      this.alpha.spawn(_p, _v, 0.7 + Math.random() * 0.6, 0.35 + Math.random() * 0.5, 0.2, col, col, 0.95, 0.35, 30);
-    }
+  /** Shattered obstacle: dust burst + sparks (the solid chunks come from DebrisPool). */
+  debris(p, vel, col) {
     this.dust(p, vel, col, 10);
     this.sparks(p, UP_V, vel, 10);
+  }
+  /** Session 15 – dust trail dragged behind a pod: low, widening puffs; denser, longer and larger with speed. */
+  trail(p, vel, col, speed, alpha) {
+    const want = Math.min(1.6, 0.25 + speed * 9e-3) * this.amount * this.rateScale;
+    const n = Math.floor(want) + (Math.random() < want % 1 ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      _v.set((Math.random() - 0.5) * 5, 0.5 + Math.random() * 1.7, (Math.random() - 0.5) * 5).addScaledVector(vel, 0.2);
+      _p.set(p.x + (Math.random() - 0.5) * 1.6, p.y, p.z + (Math.random() - 0.5) * 1.6);
+      this.alpha.spawn(_p, _v, 1 + Math.random() * 0.9, 0.9, 3.6 + speed * 0.03 + Math.random() * 2.2, col, col, alpha, 1.25, -0.5);
+    }
   }
   /** Rooster tail of fine spray thrown up from a wet road – taller and denser with speed. */
   spray(p, vel, speed, alphaScale = 1) {
@@ -98263,7 +98446,7 @@ var Particles = class {
     for (let i = 0; i < n; i++) {
       _v.set((Math.random() - 0.5) * 7, 1.6 + Math.random() * 3 + speed * 0.022, (Math.random() - 0.5) * 7).addScaledVector(vel, 0.32);
       _p.set(p.x + (Math.random() - 0.5) * 3.2, p.y, p.z + (Math.random() - 0.5) * 3.2);
-      this.alpha.spawn(_p, _v, 0.55 + Math.random() * 0.5, 0.9, 3.6 + speed * 0.028 + Math.random() * 2.5, C_SPRAY, C_SPRAY, 0.085 * alphaScale, 1.5, 5);
+      this.alpha.spawn(_p, _v, 0.55 + Math.random() * 0.5, 0.9, 3.6 + speed * 0.028 + Math.random() * 2.5, C_SPRAY, C_SPRAY, 0.115 * alphaScale, 1.5, 5);
     }
   }
   /** Tiny short-lived splash crown where a rain drop hits the road. */
@@ -98798,25 +98981,25 @@ var ggxReflectionStruct = struct({
   f0: "vec3"
   // Fresnel reflectance at normal incidence
 });
-var ggxReflectionSampleWithReflectance = Fn(([N2, V2, roughness3, f0, f90, Xi]) => {
+var ggxReflectionSampleWithReflectance = Fn(([N3, V2, roughness3, f0, f90, Xi]) => {
   const a = roughness3.mul(roughness3).max(1e-3).toVar();
   const ax = a.toVar();
   const ay = a.toVar();
-  const up = N2.z.abs().lessThan(0.999).select(vec3(0, 0, 1), vec3(1, 0, 0));
-  const T2 = cross(up, N2).normalize().toVar();
-  const B2 = cross(N2, T2).normalize().toVar();
-  const Vlocal = vec3(dot(T2, V2), dot(B2, V2), dot(N2, V2)).toVar();
+  const up = N3.z.abs().lessThan(0.999).select(vec3(0, 0, 1), vec3(1, 0, 0));
+  const T2 = cross(up, N3).normalize().toVar();
+  const B2 = cross(N3, T2).normalize().toVar();
+  const Vlocal = vec3(dot(T2, V2), dot(B2, V2), dot(N3, V2)).toVar();
   const Hlocal = SampleGGXVNDF(Vlocal, ax, ay, Xi.x, Xi.y).toVar();
   If(Hlocal.z.lessThan(0), () => {
     Hlocal.assign(Hlocal.negate());
   });
-  const h = normalize2(T2.mul(Hlocal.x).add(B2.mul(Hlocal.y)).add(N2.mul(Hlocal.z))).toVar();
+  const h = normalize2(T2.mul(Hlocal.x).add(B2.mul(Hlocal.y)).add(N3.mul(Hlocal.z))).toVar();
   const viewReflectDir = reflect(V2.negate(), h).normalize().toVar();
   const L = viewReflectDir.toVar();
   const H = normalize2(V2.add(L)).toVar();
-  const NdotV = max(float(0), dot(N2, V2)).toVar();
-  const NdotL = max(float(0), dot(N2, L)).toVar();
-  const NdotH = max(float(0), dot(N2, H)).toVar();
+  const NdotV = max(float(0), dot(N3, V2)).toVar();
+  const NdotL = max(float(0), dot(N3, L)).toVar();
+  const NdotH = max(float(0), dot(N3, H)).toVar();
   const VdotH = max(float(0), dot(V2, H)).toVar();
   const fresnelWeight = F_Schlick2(f0, VdotH, f90).toVar();
   const pdf = GGXVNDFPdf(NdotH, NdotV, ax).toVar();
@@ -98829,7 +99012,7 @@ var ggxReflectionSampleWithReflectance = Fn(([N2, V2, roughness3, f0, f90, Xi]) 
   const glossyWeight = fresnelWeight.mul(GeometryTerm(NdotL, NdotV, ax)).mul(kB.mul(NdotV).add(tB)).div(float(2).mul(NdotV).max(1e-4)).toVar();
   return ggxReflectionStruct(viewReflectDir, glossyWeight, pdf, NdotV, ax, f90, f0);
 });
-var ggxReflectionSample = (N2, V2, roughness3, metalness3, albedo, Xi, f0 = null, f90 = 1) => ggxReflectionSampleWithReflectance(N2, V2, roughness3, f0 ?? mix(vec3(0.04), albedo, metalness3), float(f90), Xi);
+var ggxReflectionSample = (N3, V2, roughness3, metalness3, albedo, Xi, f0 = null, f90 = 1) => ggxReflectionSampleWithReflectance(N3, V2, roughness3, f0 ?? mix(vec3(0.04), albedo, metalness3), float(f90), Xi);
 var equirectUvToDir = Fn(([uvIn]) => {
   const phi = uvIn.x.mul(Math.PI * 2).sub(Math.PI);
   const lat = uvIn.y.sub(0.5).mul(Math.PI);
@@ -99131,13 +99314,13 @@ var ImportanceSampledEnvironment = class {
   sampleEnvironmentBRDF({
     cameraWorldMatrix: cameraWorldMatrix2,
     viewReflectDir,
-    N: N2,
+    N: N3,
     V: V2,
     alpha,
     f0,
     f90 = float(1)
   }) {
-    const worldNormal = cameraWorldMatrix2.mul(vec4(N2, 0)).xyz.normalize().toVar();
+    const worldNormal = cameraWorldMatrix2.mul(vec4(N3, 0)).xyz.normalize().toVar();
     const worldV = cameraWorldMatrix2.mul(vec4(V2, 0)).xyz.normalize().toVar();
     const NdotV = max(float(0), dot(worldNormal, worldV)).toVar();
     const L1 = cameraWorldMatrix2.mul(vec4(viewReflectDir, float(0))).xyz.normalize().toVar();
@@ -99170,7 +99353,7 @@ var ImportanceSampledEnvironment = class {
   sampleEnvironmentMIS({
     cameraWorldMatrix: cameraWorldMatrix2,
     viewReflectDir,
-    N: N2,
+    N: N3,
     V: V2,
     alpha,
     f0,
@@ -99184,7 +99367,7 @@ var ImportanceSampledEnvironment = class {
     const envW = this._size.x;
     const envH = this._size.y;
     const envMapIntensity = this.intensity;
-    const worldNormal = cameraWorldMatrix2.mul(vec4(N2, 0)).xyz.normalize().toVar();
+    const worldNormal = cameraWorldMatrix2.mul(vec4(N3, 0)).xyz.normalize().toVar();
     const worldV = cameraWorldMatrix2.mul(vec4(V2, 0)).xyz.normalize().toVar();
     const NdotV = max(float(0), dot(worldNormal, worldV)).toVar();
     const L1 = cameraWorldMatrix2.mul(vec4(viewReflectDir, float(0))).xyz.normalize().toVar();
@@ -100463,7 +100646,9 @@ var PostFX = class {
       const mrtNode = mrt2({
         output: output2,
         normal: vec44(packNormalToRGB2(normalView5), opaqueAlpha),
-        metalrough: vec44(metalness2, roughness2, float10(0), opaqueAlpha)
+        // .r = REFLECTIVITY, not plain metalness: SSRNode discards pixels with 0 here, which removed every reflection from puddles,
+        // wet roads and ice (all non-metals). Smooth dielectrics (roughness < 0.3) now reflect too.
+        metalrough: vec44(max9(metalness2, ssInv7(0.3, 0.1, roughness2).mul(0.7)), roughness2, float10(0), opaqueAlpha)
       });
       const keepOpaque = new BlendMode(NormalBlending);
       mrtNode.setBlendMode("normal", keepOpaque);
@@ -100486,10 +100671,10 @@ var PostFX = class {
       const s = ssr(sceneColor, depthNode, normal2, { metalnessNode: mrNode.r, roughnessNode: mrNode.g, camera });
       s.resolutionScale = 0.35;
       s.quality.value = 0.1;
-      s.maxDistance.value = 22;
+      s.maxDistance.value = 42;
       s.thickness.value = 2;
       s.maxLuminance.value = 2.4;
-      s.intensity.value = 0.5;
+      s.intensity.value = 0.85;
       s.screenEdgeFade.value = 0.28;
       s.screenEdgeFadeBlack = true;
       s.blurQuality = 1;
@@ -100503,7 +100688,7 @@ var PostFX = class {
         const mr = mrNode.sample(screenUV2);
         const r = ssrTex.sample(screenUV2);
         const fade = ssInv7(110, 35, vz).mul(ssInv7(0.38, 0.14, mr.g)).mul(smoothstep13(0.08, 0.25, mr.r)).mul(step6(d, 0.9998));
-        const w = clamp13(r.a.mul(fade).mul(0.55), 0, 0.55);
+        const w = clamp13(r.a.mul(fade).mul(0.8), 0, 0.8);
         const safeR = clamp13(r.rgb, vec314(0), vec314(2.2));
         return vec44(b.add(safeR.mul(w)), 1);
       })();
@@ -100774,10 +100959,10 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
     if (pc2.wCd) pc2.wCd = Math.max(0, pc2.wCd - dt);
   }
   const k0 = Math.abs(Math.sin((p.rollCtl ?? 0) * (Math.PI / 2))), g0 = (p.rollCtl ?? 0) >= 0 ? 1 : -1;
-  const steerMix = inp.steer * (1 - k0) + (inp.pitch ?? 0) * g0 * k0;
+  const steerMix = inp.steer * (1 - k0) + (inp.pitch ?? 0) * g0 * k0 * 1.25;
   const pitchMix = (inp.pitch ?? 0) * (1 - k0) - inp.steer * g0 * k0;
   const target = Math.max(-1, Math.min(1, steerMix));
-  const rate = Math.sign(target) !== Math.sign(p.steer) && Math.abs(p.steer) > 0.05 ? 9 : target === 0 ? 7 : 4.5;
+  const rate = (Math.sign(target) !== Math.sign(p.steer) && Math.abs(p.steer) > 0.05 ? 9 : target === 0 ? 7 : 4.5) * (1 + 0.8 * k0);
   p.steer += Math.max(-rate * dt, Math.min(rate * dt, target - p.steer));
   const pIn = frozen ? 0 : Math.max(-1, Math.min(1, pitchMix)), rIn = frozen ? 0 : Math.max(-1, Math.min(1, inp.roll ?? 0));
   const pc = p.pitchCtl = (p.pitchCtl ?? 0) + (pIn - (p.pitchCtl ?? 0)) * Math.min(1, dt * 6.5);
@@ -100791,7 +100976,8 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
   const hp = (p.hpL + p.hpR) / 200;
   p.airbraking = inp.airbrake && vf > 15;
   const wantSlide = p.airbraking && Math.abs(p.steer) > 0.2 && p.grounded && !frozen;
-  const sk = p.slideK = Math.max(0, Math.min(1, (p.slideK ?? 0) + (wantSlide ? dt * 3.2 : -dt * 2.2)));
+  const skRaw = p.slideK = Math.max(0, Math.min(1, (p.slideK ?? 0) + (wantSlide ? dt * 3.2 : -dt * 1.4)));
+  const sk = p.ai && !p.isPlayer ? skRaw * 0.45 : skRaw;
   const sliding = sk > 0.25;
   if (wantSlide) p.slideT = Math.min(2.2, (p.slideT ?? 0) + dt);
   else {
@@ -100821,10 +101007,10 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
   const sp = Math.abs(vf);
   const lowF = Math.min(1, sp / 22);
   const highF = 1 - 0.32 * Math.min(1, sp / P.vmax);
-  let omega = p.steer * P.turn * lowF * highF * (1 + (P.abTurn - 1) * 0.45 * sk) * (p.grounded ? 1 : 0.55) * (1 - 0.4 * knife);
+  let omega = p.steer * P.turn * lowF * highF * (1 + (P.abTurn - 1) * 0.45 * sk) * (p.grounded ? 1 : 0.55) * (1 + 0.45 * knife);
   if (sk > 0 && p.steer * vr < 0) {
     const slip = Math.atan2(Math.abs(vr), Math.max(8, vf));
-    if (slip > 0.6) omega *= Math.max(0.15, 1 - (slip - 0.6) / 0.45);
+    if (slip > 0.88) omega *= Math.max(0.15, 1 - (slip - 0.88) / 0.45);
   }
   omega += (p.hpR - p.hpL) / 100 * 0.25 * lowF;
   if (p.zeroG) omega *= 1.4;
@@ -100844,11 +101030,11 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
       if (vf > 0) vf = Math.max(0, vf - 55 * inp.brake * dt);
       else vf = Math.max(-18, vf - 14 * inp.brake * dt);
     }
-    if (p.airbraking) vf = Math.max(10, vf - P.abDecel * (1 - 0.7 * sk) * dt);
+    if (p.airbraking) vf = Math.max(10, vf - P.abDecel * (1 - 0.8 * sk) * dt);
   } else vf *= Math.exp(-3 * dt);
   vf *= Math.exp(-(inp.throttle > 0 ? 0.04 : 0.28) * dt);
   const attGrip = (p.bankGrip ?? 1) * (pc < 0 ? 1 - 0.14 * pc : 1 - 0.2 * pc);
-  vr *= Math.exp(-P.grip * gripMul * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.085 * sk) * (p.grounded ? 1 : 0.15));
+  vr *= Math.exp(-P.grip * gripMul * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.035 * sk) * (p.grounded ? 1 : 0.15));
   const fx2 = Math.sin(p.yaw), fz2 = Math.cos(p.yaw), rx2 = -fz2, rz2 = fx2;
   p.vel.x = fx2 * vf + rx2 * vr;
   p.vel.z = fz2 * vf + rz2 * vr;
@@ -101041,13 +101227,20 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
       }
       if (Math.abs(di) > 5) continue;
       const s0 = td.main.samples[oh.idx], along = (p.pos.x - s0.x) * s0.tx + (p.pos.z - s0.z) * s0.tz;
-      if (Math.abs(along) > oh.half + 2.4 || p.pos.y + ext <= oh.y0 || p.pos.y - ext >= oh.y1) continue;
-      const below = p.pos.y < (oh.y0 + oh.y1) * 0.5, hitY = below ? oh.y0 : oh.y1;
+      if (Math.abs(along) > oh.half + 2.4) continue;
+      let y0 = oh.y0, y1 = oh.y1;
+      if (oh.arch) {
+        const lat = (p.pos.x - s0.x) * s0.rx + (p.pos.z - s0.z) * s0.rz, Ri = oh.arch.R - 1.7;
+        y0 = s0.y + oh.arch.sy * Math.sqrt(Math.max(0, Ri * Ri - lat * lat));
+        y1 = y0 + 3.6;
+      }
+      if (p.pos.y + ext <= y0 || p.pos.y - ext >= y1) continue;
+      const below = p.pos.y < (y0 + y1) * 0.5, hitY = below ? y0 : y1;
       if (below) {
-        p.pos.y = oh.y0 - ext;
+        p.pos.y = y0 - ext;
         if (p.vel.y > -5) p.vel.y = -5;
       } else {
-        p.pos.y = oh.y1 + ext;
+        p.pos.y = y1 + ext;
         if (p.vel.y < 4) p.vel.y = 4;
       }
       const wc = p;
@@ -101071,30 +101264,30 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
     for (const o of list) if (o.kind !== 3 && !o.broken) collideObstacle(p, o, P.sturdy);
   }
   if (td.setPieces.length) collideSetPieces(p, td, time11, P.sturdy);
-  const N2 = td.N;
+  const N3 = td.N;
   let mainIdx = p.idx;
   if (p.path > 0) {
     const pa = td.paths[p.path];
     mainIdx = Math.round(pa.mainFrom + p.idx / (pa.samples.length - 1) * (pa.mainTo - pa.mainFrom));
-    mainIdx = (mainIdx % N2 + N2) % N2;
+    mainIdx = (mainIdx % N3 + N3) % N3;
   }
   if (td.main.closed) {
-    const rel = ((mainIdx - td.startIdx) % N2 + N2) % N2;
+    const rel = ((mainIdx - td.startIdx) % N3 + N3) % N3;
     const d = rel - p.rel;
-    if (d < -N2 / 2) {
+    if (d < -N3 / 2) {
       if (p.passedMid) {
         p.lap++;
         p.passedMid = false;
         if (p.lap > 0) p.lapTimes.push(time11 - p.lapStart);
         p.lapStart = time11;
       }
-    } else if (d > N2 / 2) {
+    } else if (d > N3 / 2) {
       p.lap--;
       p.passedMid = true;
     }
-    if (rel > N2 * 0.45 && rel < N2 * 0.9) p.passedMid = true;
+    if (rel > N3 * 0.45 && rel < N3 * 0.9) p.passedMid = true;
     p.rel = rel;
-    p.prog = p.lap * N2 + rel;
+    p.prog = p.lap * N3 + rel;
   } else {
     p.rel = mainIdx - td.startIdx;
     p.prog = p.rel;
@@ -101747,7 +101940,7 @@ function aiInputs(p, td, pods, time11, player) {
           ai.diveT = time11 + 6;
         }
       } else if (p.air < 0.1) ai.diveRoll = Math.random();
-      else if (ai.skill > 0.62 && (ai.diveRoll ?? 1) < 0.3 && p.air > 0.9 && h > 9 && p.vel.y < -2 && time11 > (ai.diveT ?? 0)) ai.dive = true;
+      else if (ai.skill > 0.62 && (ai.diveRoll ?? 1) < 0.22 && p.air > 0.9 && h > 9 && p.vel.y < -2 && time11 > (ai.diveT ?? 0)) ai.dive = true;
       if (ai.dive) pitchIn = -Math.min(0.6, 0.25 + 0.3 * ai.skill);
     }
   } else if ((ai.dive ? (ai.dive = false, ai.diveT = time11 + 6, false) : false) || ai.skill > 0.55 && speed > 45 && !p.zeroG) {
@@ -101876,7 +102069,7 @@ var ZERO = new Vector3();
 var UP4 = new Vector3(0, 1, 0);
 var C_ICE = new Color("#d8f2ff");
 var CAMERA_NAMES = ["Verfolger", "Verfolger (fern)", "Cockpit", "Motorhaube", "TV-Kamera", "Kino-Orbit"];
-var Game = class {
+var Game = class _Game {
   container;
   profile;
   cb;
@@ -101924,6 +102117,8 @@ var Game = class {
   closing = 0;
   flybyT = 0;
   loadMs = {};
+  debris = new DebrisPool();
+  dustAmt = 1;
   /** Session 14: 0..1 how far the player is under a roof (rain, splashes and lens drops fade out); weather-effects quality 0 / 0.5 / 1 */
   cover = 0;
   wxQ = 1;
@@ -101999,6 +102194,7 @@ var Game = class {
     this.gripMul = this.baseGrip * fx.grip;
     this.dustBase.set(theme.palette.ground[1]);
     this.dustCol.copy(this.dustBase);
+    this.dustAmt = theme.terrain === "city" || theme.terrain === "prison" ? 0.3 : theme.id === "ice" ? 0.8 : 1;
     this.barrierGlow.set(theme.barrierColor).multiplyScalar(1.25);
     if (hasTextureWorkers()) void generateTextures(worldTextureSpecs(theme, gfx), gfx.anisotropy ?? 8).catch(() => {
     });
@@ -102093,6 +102289,7 @@ var Game = class {
     this.weather = new WeatherFx(fx, this.particles, this.scene, theme.sunAz * Math.PI / 180 + 1.1, build.bolt);
     this.weather.quality = this.wxQ;
     this.scene.add(this.particles.group);
+    this.scene.add(this.debris.mesh);
     this.loadMs.world = Math.round(performance.now() - tL0) - this.loadMs.init;
     this.cb.onLoading(0.92, "Montiere Podracer \u2026");
     await new Promise((res2) => setTimeout(res2, 0));
@@ -102166,18 +102363,18 @@ var Game = class {
     const order = list.slice(1);
     order.splice(playerGrid, 0, list[0]);
     const S = this.td.main.samples;
-    const N2 = this.td.N;
+    const N3 = this.td.N;
     order.forEach((e, g2) => {
       const row = Math.floor(g2 / 3), col = g2 % 3;
       let idx = this.td.startIdx - 6 - row * 9;
-      idx = this.td.main.closed ? (idx % N2 + N2) % N2 : Math.max(0, idx);
+      idx = this.td.main.closed ? (idx % N3 + N3) % N3 : Math.max(0, idx);
       const s = S[idx];
       const lat = (col - 1) * s.hw * 0.55;
       const pilot = PILOTS.find((p) => p.id === e.def.pilotId) ?? PILOTS[0];
       const custom = e.isPlayer ? prof2.custom[e.def.id] : void 0;
       const colors = custom ? custom.colors : g2 > 10 ? [e.def.colors[1], e.def.colors[0], e.def.colors[2]] : e.def.colors;
       const geo = this.profile.gfx.geometry;
-      const vis = buildPodModel(e.def, colors, geo, this.profile.gfx.texRes, !e.isPlayer);
+      const vis = buildPodModel(e.def, colors, geo, this.profile.gfx.texRes, !e.isPlayer, g2 + 1);
       this.scene.add(vis.group);
       const eLat = Math.min(1, Math.abs(lat) / s.hw);
       const gY = s.y - lat * s.bank + (1 - eLat * eLat) * 0.2 + 0.08;
@@ -102239,11 +102436,11 @@ var Game = class {
         ai: e.isPlayer ? null : { skill, speedF: diff.speed * (0.93 + 0.09 * pilot.skill), lineOff: Math.random() * 2 - 1, takeShortcut: Math.random() < skill * 0.75, boostUntil: 0, repairMode: false, noiseT: Math.random() * 100, rubber: 1 },
         place: g2 + 1
       };
-      const rel = ((idx - this.td.startIdx) % N2 + N2) % N2;
+      const rel = ((idx - this.td.startIdx) % N3 + N3) % N3;
       if (this.td.main.closed) {
         pod.rel = rel;
-        pod.lap = rel > N2 / 2 ? -1 : 0;
-        pod.prog = pod.lap * N2 + rel;
+        pod.lap = rel > N3 / 2 ? -1 : 0;
+        pod.prog = pod.lap * N3 + rel;
       } else {
         pod.rel = idx - this.td.startIdx;
         pod.prog = pod.rel;
@@ -102474,6 +102671,7 @@ var Game = class {
     this.updateVisuals(dt);
     this.updateLights();
     this.particles.update(dt, this.camera.position, this.clock);
+    this.debris.update(dt);
     this.world.update(this.clock, this.camera.position, this.pods);
     this.sky.uniforms.time.value = this.clock;
     this.weather.update(dt, this.clock, this.camera, this.state === "countdown", (v) => this.audio.thunder(v), (near) => {
@@ -102611,7 +102809,11 @@ var Game = class {
           if (p.isPlayer || dist < 140) this.audio.hit(e.strength * (p.isPlayer ? 1 : 0.28));
         } else if (e.type === "break") {
           if (e.ref) this.world.breakObstacle(e.ref);
-          if (dist < 420) this.particles.debris(this.tmpV, p.vel, this.tmpC.copy(this.dustBase).multiplyScalar(0.6), e.strength);
+          if (dist < 420) {
+            this.tmpC.copy(this.dustBase).multiplyScalar(0.6);
+            this.particles.debris(this.tmpV, p.vel, this.tmpC);
+            this.debris.spawn(e.x, e.y, e.z, e.y, p.vel, this.tmpC, e.strength, 16);
+          }
           if (p.isPlayer || dist < 130) this.audio.hit(34 * (p.isPlayer ? 1 : 0.4));
         } else if (e.type === "land") {
           if (near) this.particles.dust(this.tmpV, p.vel, this.dustCol, 8);
@@ -102661,14 +102863,16 @@ var Game = class {
         if ((hp < 20 || p.overheat) && (p.isPlayer || i < 2)) this.particles.fire(this.tmpV3, p.vel, rivalVis);
       }
       const sp = Math.hypot(p.vel.x, p.vel.z);
-      if (p.grounded && sp > 42 && p.pos.y - p.groundY < HOVER + 1.2) {
+      if (p.grounded && sp > 16 && p.pos.y - p.groundY < HOVER + 2.2 && (p.isPlayer || dist < 260)) {
         const wet = this.envBuild.rainRoad && this.wet > 0.3 && this.wxQ > 0 && !(this.td.paths[p.path].samples[p.idx]?.roof > 0);
-        this.tmpV.set(p.pos.x - Math.sin(p.yaw) * 2.5, p.groundY + 0.15, p.pos.z - Math.cos(p.yaw) * 2.5);
-        if (wet) {
-          if (p.isPlayer) this.particles.spray(this.tmpV, p.vel, sp, this.wet);
-          else if (dist > 24 && dist < 160) this.particles.spray(this.tmpV, p.vel, sp, this.wet * 0.55);
-        } else if (p.isPlayer) this.particles.dust(this.tmpV, p.vel, this.dustCol, 1, 0.75);
-        else if (dist > 24 && dist < 80) this.particles.dust(this.tmpV, p.vel, this.dustCol, 1, 0.25);
+        const envP = podEnvelope(p.def), cyD = Math.cos(p.yaw), syD = Math.sin(p.yaw);
+        const near2 = !p.isPlayer && dist < 24 ? 0.3 : 1, aD = (p.isPlayer ? 0.1 : 0.13) * near2 * this.dustAmt;
+        for (const e of [envP.engL, envP.engR]) {
+          const lz = e.backZ - 1.2;
+          this.tmpV.set(p.pos.x + e.x * cyD + lz * syD, p.groundY + 0.25, p.pos.z - e.x * syD + lz * cyD);
+          if (wet) this.particles.spray(this.tmpV, p.vel, sp, this.wet * (p.isPlayer ? 0.7 : 0.8) * near2);
+          else this.particles.trail(this.tmpV, p.vel, this.dustCol, sp, aD);
+        }
       }
       if (p.sliding && (p.isPlayer || dist > 24 && dist < 120)) {
         this.particles.dust(this.tmpV.set(p.pos.x - Math.sin(p.yaw) * 3, p.groundY + 0.2, p.pos.z - Math.cos(p.yaw) * 3), p.vel, this.dustCol, 2, p.isPlayer ? 1.6 : 0.6);
@@ -102685,19 +102889,60 @@ var Game = class {
       }
     }
   }
-  /** Graphics settings that can change while the race is running (pause menu). Everything else needs a restart of the race. */
-  static LIVE_GFX = ["fov", "showFps", "renderScale", "lodBias", "podDetail", "weatherFx", "preset"];
+  /** Graphics settings that take effect while the race is running (pause menu). The rest needs a restart of the race:
+   *  texture resolution, geometry/detail density, tessellation, parallax, shader detail, bump mapping, batching, backend,
+   *  anisotropy, cascaded shadows, volumetrics – they are baked into geometry or compiled materials. */
+  static LIVE_GFX = [
+    "fov",
+    "showFps",
+    "renderScale",
+    "lodBias",
+    "podDetail",
+    "weatherFx",
+    "preset",
+    "bloom",
+    "bloomStrength",
+    "ao",
+    "ssr",
+    "godRays",
+    "motionBlur",
+    "cinematic",
+    "aa",
+    "lensFx",
+    "shadows",
+    "particles",
+    "drawDistance"
+  ];
+  static POST_KEYS = ["bloom", "bloomStrength", "ao", "ssr", "godRays", "motionBlur", "cinematic", "aa", "lensFx", "weatherFx"];
   applyLiveGfx(g2, volume) {
     const prev = this.profile.gfx;
     this.profile = { ...this.profile, gfx: g2, volume: volume ?? this.profile.volume };
     if (volume !== void 0) this.audio?.setVolume(volume);
-    if (!this.renderer || !this.world || !this.weather) return;
+    if (!this.renderer || !this.world || !this.weather || !this.post) return;
     if (g2.renderScale !== prev.renderScale) this.resize();
     this.world.setLodBias(g2.lodBias ?? 1);
     setPodLodScale(g2.podDetail ?? 1);
     this.wxQ = [0, 0.5, 1][g2.weatherFx ?? 2] ?? 1;
     this.weather.quality = this.wxQ;
     this.envDirty = true;
+    if (g2.particles !== prev.particles) this.particles.amount = g2.particles;
+    if (g2.shadows !== prev.shadows && !this.csm) {
+      const on = g2.shadows > 0, ms = [0, 1024, 1536, 2048][g2.shadows] ?? 1536;
+      this.renderer.shadowMap.enabled = on;
+      this.sun.castShadow = on;
+      if (ms) {
+        this.sun.shadow.mapSize.set(ms, ms);
+        this.shadowTexel = 192 / ms;
+        this.sun.shadow.map?.dispose();
+        this.sun.shadow.map = null;
+      }
+    }
+    if (_Game.POST_KEYS.some((k) => g2[k] !== prev[k])) {
+      const old = this.post;
+      this.post = new PostFX(this.renderer, this.scene, this.camera, g2, { rain: (g2.weatherFx ?? 2) > 0 ? this.envBuild.maxRain : 0, flare: this.envBuild.flare });
+      old.dispose();
+      void this.post.warmup(this.renderer);
+    }
   }
   /** Sun / moon direction: sky, fog scattering, shadow basis, second sun of the desert worlds. */
   setSunDir(x, y, z) {
@@ -103128,6 +103373,7 @@ window.track = async (i, view) => {
     prof2.gfx.texRes = 1024;
     if (location.search.includes("webgl")) prof2.gfx.backend = "webgl";
     if (location.search.includes("csm")) prof2.gfx.csm = true;
+    if (location.search.includes("ssr")) prof2.gfx.ssr = true;
     {
       const qs = new URLSearchParams(location.search);
       if (qs.get("tod")) prof2.race.timeOfDay = qs.get("tod");
@@ -103148,12 +103394,12 @@ window.track = async (i, view) => {
     g.paused = true;
     await new Promise((r) => setTimeout(r, 400));
   }
-  const G = g;
-  G.paused = true;
+  const G2 = g;
+  G2.paused = true;
   if (view === "b") {
-    const S = G.td.main.samples, N2 = S.length;
+    const S = G2.td.main.samples, N3 = S.length;
     let best = 0, bc = 0;
-    for (let k = 0; k < N2; k += 3) {
+    for (let k = 0; k < N3; k += 3) {
       const c = Math.abs(S[k].curv);
       if (c > bc && !S[k].gap && S[k].ramp === 0 && !S[k].canyon) {
         bc = c;
@@ -103161,26 +103407,26 @@ window.track = async (i, view) => {
       }
     }
     const side = Math.sign(S[best].curv);
-    const a = S[(best - 12 + N2) % N2], b = S[(best + 3) % N2];
-    G.camera.position.set(a.x + a.rx * side * (a.hw - 7), a.y + 3, a.z + a.rz * side * (a.hw - 7));
-    G.camera.lookAt(b.x + b.rx * side * (b.hw - 3), b.y + 0.4, b.z + b.rz * side * (b.hw - 3));
+    const a = S[(best - 12 + N3) % N3], b = S[(best + 3) % N3];
+    G2.camera.position.set(a.x + a.rx * side * (a.hw - 7), a.y + 3, a.z + a.rz * side * (a.hw - 7));
+    G2.camera.lookAt(b.x + b.rx * side * (b.hw - 3), b.y + 0.4, b.z + b.rz * side * (b.hw - 3));
   } else if (view === "c") {
-    const S = G.td.main.samples, N2 = S.length;
-    let k = S.findIndex((s, j) => j > N2 * 0.1 && s.canyon);
-    if (k < 0) k = Math.floor(N2 * 0.3);
-    const a = S[k], b = S[(k + 14) % N2];
-    G.camera.position.set(a.x + a.rx * (a.hw - 5), a.y + 2.4, a.z + a.rz * (a.hw - 5));
-    G.camera.lookAt(b.x + b.rx * (b.hw + 2), b.y + 1.2, b.z + b.rz * (b.hw + 2));
+    const S = G2.td.main.samples, N3 = S.length;
+    let k = S.findIndex((s, j) => j > N3 * 0.1 && s.canyon);
+    if (k < 0) k = Math.floor(N3 * 0.3);
+    const a = S[k], b = S[(k + 14) % N3];
+    G2.camera.position.set(a.x + a.rx * (a.hw - 5), a.y + 2.4, a.z + a.rz * (a.hw - 5));
+    G2.camera.lookAt(b.x + b.rx * (b.hw + 2), b.y + 1.2, b.z + b.rz * (b.hw + 2));
   } else if (view === "g") {
-    const S = G.td.main.samples, N2 = S.length;
-    const a = S[Math.floor(N2 * 0.45)];
+    const S = G2.td.main.samples, N3 = S.length;
+    const a = S[Math.floor(N3 * 0.45)];
     const sd = 1;
-    G.camera.position.set(a.x + a.rx * sd * (a.hw + 5), a.y + 2.2, a.z + a.rz * sd * (a.hw + 5));
-    G.camera.lookAt(a.x + a.rx * sd * (a.hw + 60) + a.tx * 40, a.y - 2, a.z + a.rz * sd * (a.hw + 60) + a.tz * 40);
+    G2.camera.position.set(a.x + a.rx * sd * (a.hw + 5), a.y + 2.2, a.z + a.rz * sd * (a.hw + 5));
+    G2.camera.lookAt(a.x + a.rx * sd * (a.hw + 60) + a.tx * 40, a.y - 2, a.z + a.rz * sd * (a.hw + 60) + a.tz * 40);
   } else if (view === "h") {
     let found = null;
     let n = 0, inst = 0;
-    G.scene.traverse((o) => {
+    G2.scene.traverse((o) => {
       const im = o;
       if (im.isInstancedMesh && im.material.alphaTestNode) {
         n++;
@@ -103193,84 +103439,108 @@ window.track = async (i, view) => {
       const m = new Matrix4();
       found.getMatrixAt(0, m);
       const p = new Vector3().setFromMatrixPosition(m);
-      G.camera.position.set(p.x + 4, p.y + 1.6, p.z + 4);
-      G.camera.lookAt(p.x, p.y + 0.3, p.z);
+      G2.camera.position.set(p.x + 4, p.y + 1.6, p.z + 4);
+      G2.camera.lookAt(p.x, p.y + 0.3, p.z);
     }
   } else if (view === "l") {
     let best = null;
-    G.scene.traverse((o) => {
+    G2.scene.traverse((o) => {
       const im = o;
       if (im.isInstancedMesh && im.geometry.attributes.aAnim && im.castShadow && (!best || im.geometry.boundingSphere.radius > best.geometry.boundingSphere.radius)) best = im;
     });
     if (best) {
-      G.world.update(G.clock + 5, G.camera.position);
+      G2.world.update(G2.clock + 5, G2.camera.position);
       const m = new Matrix4();
       best.getMatrixAt(0, m);
       const p = new Vector3().setFromMatrixPosition(m);
       const r = best.geometry.boundingSphere.radius;
-      G.camera.position.set(p.x + r * 2.2, p.y + r * 0.9, p.z + r * 2.2);
-      G.camera.lookAt(p.x, p.y + r * 0.4, p.z);
+      G2.camera.position.set(p.x + r * 2.2, p.y + r * 0.9, p.z + r * 2.2);
+      G2.camera.lookAt(p.x, p.y + r * 0.4, p.z);
     }
   } else if (view === "e") {
-    const S = G.td.main.samples, N2 = S.length;
-    const a = S[Math.floor(N2 * 0.3)];
-    G.camera.position.set(a.x - a.tx * 30, a.y + 34, a.z - a.tz * 30);
-    G.camera.lookAt(a.x + a.tx * 600, a.y + 10, a.z + a.tz * 600);
-  } else if (view.startsWith("d") && G.td.setPieces.length) {
-    const sp = G.td.setPieces[Math.min(G.td.setPieces.length - 1, Number(view.slice(1)) || 0)];
-    const s = G.td.main.samples[sp.idx];
-    G.world.setPieces.update(G.clock, 2.4, G.pods, 0.016, false);
-    G.camera.position.set(sp.x - s.tx * 48 + s.rx * 6, sp.y + 8, sp.z - s.tz * 48 + s.rz * 6);
-    G.camera.lookAt(sp.x, sp.y + 4, sp.z);
+    const S = G2.td.main.samples, N3 = S.length;
+    const a = S[Math.floor(N3 * 0.3)];
+    G2.camera.position.set(a.x - a.tx * 30, a.y + 34, a.z - a.tz * 30);
+    G2.camera.lookAt(a.x + a.tx * 600, a.y + 10, a.z + a.tz * 600);
+  } else if (view.startsWith("d") && G2.td.setPieces.length) {
+    const sp = G2.td.setPieces[Math.min(G2.td.setPieces.length - 1, Number(view.slice(1)) || 0)];
+    const s = G2.td.main.samples[sp.idx];
+    G2.world.setPieces.update(G2.clock, 2.4, G2.pods, 0.016, false);
+    G2.camera.position.set(sp.x - s.tx * 48 + s.rx * 6, sp.y + 8, sp.z - s.tz * 48 + s.rz * 6);
+    G2.camera.lookAt(sp.x, sp.y + 4, sp.z);
   } else if (view === "m") {
-    const tw = G.world.group.userData.mechTower;
+    const tw = G2.world.group.userData.mechTower;
     if (tw) {
-      const a = G.td.main.samples[0];
+      const a = G2.td.main.samples[0];
       void a;
-      G.camera.position.set(tw.x + 17, tw.y + 9, tw.z + 14);
-      G.camera.lookAt(tw.x, tw.y + 10, tw.z);
+      G2.camera.position.set(tw.x + 17, tw.y + 9, tw.z + 14);
+      G2.camera.lookAt(tw.x, tw.y + 10, tw.z);
+    }
+  } else if (view === "x" || view === "y" || view === "z") {
+    const sc = G2.td.paths[1];
+    if (sc) {
+      const M3 = G2.td.main.samples, N3 = M3.length, W2 = (k) => M3[(Math.round(k) % N3 + N3) % N3];
+      const S2 = sc.samples, a = view === "x" ? S2[Math.max(0, S2.length - 45)] : W2(sc.mainTo + (view === "y" ? -32 : 4)), b = view === "x" ? S2[S2.length - 8] : W2(sc.mainTo + (view === "y" ? 6 : 44));
+      G2.camera.position.set(a.x, a.y + 4.2, a.z);
+      G2.camera.lookAt(b.x, b.y + 0.5, b.z);
     }
   } else if (view === "s") {
-    const S = G.td.main.samples, a = S[Math.floor(S.length * 0.2)];
-    G.camera.position.set(a.x, a.y + 6, a.z);
-    G.camera.lookAt(a.x + G.sunDir.x * 100, a.y + 6 + G.sunDir.y * 60, a.z + G.sunDir.z * 100);
+    const S = G2.td.main.samples, a = S[Math.floor(S.length * 0.2)];
+    G2.camera.position.set(a.x, a.y + 6, a.z);
+    G2.camera.lookAt(a.x + G2.sunDir.x * 100, a.y + 6 + G2.sunDir.y * 60, a.z + G2.sunDir.z * 100);
   } else if (view === "r") {
-    G.state = "race";
-    G.keys.add("KeyW");
+    G2.state = "race";
+    G2.keys.add("KeyW");
     for (let k = 0; k < 170; k++) {
-      G.update(1 / 60);
-      if (k % 3 === 0) G.updateVisuals();
+      G2.update(1 / 60);
+      if (k % 3 === 0) G2.updateVisuals();
     }
-    G.updateCamera(0.5);
+    G2.updateCamera(0.5);
   } else {
-    G.updateCamera(0.5);
+    G2.updateCamera(0.5);
   }
-  G.camera.fov = 70;
-  G.camera.updateProjectionMatrix();
-  G.sky.mesh.position.copy(G.camera.position);
-  const fwd = G.camera.getWorldDirection(new Vector3());
-  const t = G.camera.position.clone().addScaledVector(fwd, 50);
-  G.sun.target.position.copy(t);
-  G.sun.position.copy(t).addScaledVector(G.sunDir, 400);
+  G2.camera.fov = 70;
+  G2.camera.updateProjectionMatrix();
+  G2.sky.mesh.position.copy(G2.camera.position);
+  const fwd = G2.camera.getWorldDirection(new Vector3());
+  const t = G2.camera.position.clone().addScaledVector(fwd, 50);
+  G2.sun.target.position.copy(t);
+  G2.sun.position.copy(t).addScaledVector(G2.sunDir, 400);
   {
     const rt = new URLSearchParams(location.search).get("rt");
     if (rt) {
-      G.raceTime = +rt;
-      G.applyEnv(0, true);
+      G2.raceTime = +rt;
+      G2.applyEnv(0, true);
     }
   }
-  G.updateVisuals();
-  G.updateLights();
-  G.world.update(G.clock + 5, G.camera.position);
+  G2.updateVisuals();
+  G2.updateLights();
+  G2.world.update(G2.clock + 5, G2.camera.position);
   if (location.search.includes("flash")) {
-    G.sky.uniforms.flash.value = 0.9;
-    G.hemi.intensity = 1.75;
+    G2.sky.uniforms.flash.value = 0.9;
+    G2.hemi.intensity = 1.75;
+  }
+  if (location.search.includes("live")) {
+    const g0 = G2.profile.gfx;
+    G2.render(0.016);
+    await new Promise((r) => setTimeout(r, 300));
+    G2.applyLiveGfx({ ...g0, bloom: !g0.bloom, ssr: !g0.ssr, ao: !g0.ao, godRays: !g0.godRays, aa: g0.aa === "fxaa" ? "smaa" : "fxaa", shadows: g0.shadows ? 0 : 2, particles: 0.5, drawDistance: 0.8, motionBlur: !g0.motionBlur });
+    await new Promise((r) => setTimeout(r, 1500));
+    G2.render(0.016);
+    await new Promise((r) => setTimeout(r, 600));
+    G2.applyLiveGfx({ ...g0, ssr: true, shadows: 2 });
+    await new Promise((r) => setTimeout(r, 1500));
+    window.coverInfo = "live-switch ok";
+  }
+  if (location.search.includes("wetnow")) {
+    G2.wet = 1;
+    G2.wetTarget = 1;
   }
   for (let k = 0; k < 3; k++) {
-    G.render(0.016);
+    G2.render(0.016);
     await new Promise((r) => setTimeout(r, 900));
   }
-  return `${window.loadInfo ?? ""} ${window.coverInfo ?? ""} ${G.backend} ${TRACKS[i].id}/${view} calls=${G.renderer.info.render.calls} tris=${G.renderer.info.render.triangles}`;
+  return `${window.loadInfo ?? ""} ${window.coverInfo ?? ""} ${G2.backend} ${TRACKS[i].id}/${view} calls=${G2.renderer.info.render.calls} tris=${G2.renderer.info.render.triangles}`;
 };
 window.sim = async (i, secs) => {
   if (cur !== i) {
@@ -103292,41 +103562,41 @@ window.sim = async (i, secs) => {
     await g.start();
     await new Promise((r) => setTimeout(r, 300));
   }
-  const G = g;
-  G.paused = true;
-  G.state = "race";
+  const G2 = g;
+  G2.paused = true;
+  G2.state = "race";
   let walls = 0, obst = 0, deaths = 0, maxPen = 0, nan = 0, geyser = 0;
-  const hp0 = G.pods.map((p) => p.hpL + p.hpR);
+  const hp0 = G2.pods.map((p) => p.hpL + p.hpR);
   const deathAt = [];
-  const wasDead = G.pods.map(() => false);
+  const wasDead = G2.pods.map(() => false);
   for (let k = 0; k < secs * 60; k++) {
-    G.update(1 / 60);
-    for (const p of G.pods) {
+    G2.update(1 / 60);
+    for (const p of G2.pods) {
       if (!isFinite(p.pos.x) || !isFinite(p.pos.z) || !isFinite(p.pos.y)) nan++;
-      const di = G.pods.indexOf(p);
+      const di = G2.pods.indexOf(p);
       if (p.dead > 0 && !wasDead[di]) deathAt.push(`${p.path}:${p.idx}${p.hpL <= 0 || p.hpR <= 0 ? "X" : "F"}`);
       wasDead[di] = p.dead > 0;
       if (p.dead > 0 && p.dead > 2.5) deaths++;
       if (p.isPlayer || p.dead > 0) continue;
-      const path = G.td.paths[p.path];
+      const path = G2.td.paths[p.path];
       const s = path.samples[p.idx];
       const lat = (p.pos.x - s.x) * s.rx + (p.pos.z - s.z) * s.rz;
       if (!s.gap) maxPen = Math.max(maxPen, Math.abs(lat) - (lat > 0 ? s.wallR : s.wallL));
     }
-    for (const h of G.td.hazards) if (h.state >= 1) geyser++;
+    for (const h of G2.td.hazards) if (h.state >= 1) geyser++;
   }
-  for (const p of G.pods) {
+  for (const p of G2.pods) {
     void p;
   }
-  const prog = G.pods.filter((p) => !p.isPlayer).map((p) => p.prog);
-  const dmg = G.pods.map((p, j) => Math.round(hp0[j] - (p.hpL + p.hpR)));
+  const prog = G2.pods.filter((p) => !p.isPlayer).map((p) => p.prog);
+  const dmg = G2.pods.map((p, j) => Math.round(hp0[j] - (p.hpL + p.hpR)));
   void walls;
   void obst;
-  const SS = G.td.main.samples;
+  const SS = G2.td.main.samples;
   const ramps = [];
   for (let k = 1; k < SS.length; k++) if (SS[k].ramp > 0 && SS[k - 1].ramp === 0) ramps.push(k);
-  window.dbg = `deaths=[${deathAt.join(" ")}] ramps=[${ramps.join(",")}] hz=[${G.td.hazards.map((h) => h.idx).join(",")}] sp=[${G.td.setPieces.map((q) => q.type[0] + q.idx).join(",")}] N=${SS.length}`;
-  return `${TRACKS[i].id}: ${secs}s avgProg=${Math.round(prog.reduce((a, b) => a + b, 0) / prog.length)} minProg=${Math.min(...prog)} deaths~${deaths} NaN=${nan} centreBeyondWall=${maxPen.toFixed(2)}m hazards=${G.td.hazards.length} eruptFrames=${geyser} setPieces=[${G.td.setPieces.map((sp) => sp.type + ":" + sp.state).join(" ")}] obstacles=${G.td.obstacles.length} dmg=[${dmg.join(",")}] ${window.dbg}`;
+  window.dbg = `deaths=[${deathAt.join(" ")}] ramps=[${ramps.join(",")}] hz=[${G2.td.hazards.map((h) => h.idx).join(",")}] sp=[${G2.td.setPieces.map((q) => q.type[0] + q.idx).join(",")}] N=${SS.length}`;
+  return `${TRACKS[i].id}: ${secs}s avgProg=${Math.round(prog.reduce((a, b) => a + b, 0) / prog.length)} minProg=${Math.min(...prog)} deaths~${deaths} NaN=${nan} centreBeyondWall=${maxPen.toFixed(2)}m hazards=${G2.td.hazards.length} eruptFrames=${geyser} setPieces=[${G2.td.setPieces.map((sp) => sp.type + ":" + sp.state).join(" ")}] obstacles=${G2.td.obstacles.length} dmg=[${dmg.join(",")}] ${window.dbg}`;
 };
 window.audioTest = async () => {
   const { AudioFX: AudioFX2 } = await Promise.resolve().then(() => (init_audio(), audio_exports));
