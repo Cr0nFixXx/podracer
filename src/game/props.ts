@@ -235,7 +235,7 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
     const count = Math.round(N * 2 / 650);
     for (let g = 0; g < count; g++) {
       const i = Math.floor((g + 0.5) / count * N); const s = S[i];
-      if (s.gap || s.ramp > 0 || nearStart(i) || s.openL || s.openR) continue;
+      if (s.gap || s.ramp > 0 || nearStart(i) || s.openL || s.openR || s.roof > 0 || s.zeroG) continue;
       const R = s.hw + 5;
       if (![-1, 1].every(sd => clear(s.x + s.rx * sd * R, s.z + s.rz * sd * R, 2.6, -0.5))) continue;
       const m = new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y, s.z), new THREE.Quaternion().setFromAxisAngle(UP, yawOf(s)), new THREE.Vector3(1, 0.82, 1)); // taller arch: clears pods flying high / on knife-edge

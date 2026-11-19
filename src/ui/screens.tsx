@@ -1,6 +1,6 @@
 import { Fit } from './Fit';
 import { GfxPanels } from './GfxPanels';
-import { KeyBindings } from './KeyBindings';
+import { KeyBindings, PadBindings } from './KeyBindings';
 import { sanitizeEnv, timeOptionsFor, weatherOptionsFor, type TimeOfDay, type WeatherKind } from '../game/environment';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, STAT_LABELS, THEMES, TRACKS, type StatKey } from '../game/data';
@@ -281,7 +281,7 @@ export function SettingsScreen({ profile, update, go }: { profile: Profile; upda
           {tab === 'gfx' && <GfxPanels profile={profile} update={update} />}
           {tab === 'keys' && <Panel title="Steuerung" className="col-span-3">
             <KeyBindings profile={profile} update={update} />
-            <p className="text-[11px] text-stone-500 mt-3">Gamepad: RT Schub · LT Bremse · Linker Stick lenken · Rechter Stick: ←/→ Rolle, ↑ Neigen, ↓ Anheben · A Boost · B/LB/RB Luftbremse/Slide · X Reparatur · Y Ansicht</p>
+            <PadBindings profile={profile} update={update} />
           </Panel>}
         </div>
       </div>

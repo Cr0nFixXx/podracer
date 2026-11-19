@@ -1,7 +1,7 @@
 import { PODS, STAT_KEYS, type StatKey } from './data';
 
 import type { TimeOfDay, WeatherKind } from './environment';
-import { defaultKeys, normalizeKeys, type KeyMap } from './keymap';
+import { defaultKeys, defaultPad, normalizeKeys, normalizePad, type KeyMap, type PadMap } from './keymap';
 
 export interface GfxSettings {
   preset: 'low' | 'medium' | 'high' | 'ultra' | 'custom';
@@ -70,6 +70,7 @@ export interface Profile {
   volume: number;
   best: Record<string, number>;
   keys?: KeyMap; // rebindable keyboard controls (keymap.ts)
+  pad?: PadMap;  // rebindable gamepad controls
 }
 
 const KEY = 'podracer-profile-v1';
@@ -77,7 +78,7 @@ const KEY = 'podracer-profile-v1';
 export function defaultProfile(): Profile {
   const custom: Record<string, PodCustom> = {};
   for (const p of PODS) custom[p.id] = { colors: [...p.colors] as [string, string, string], tuning: Object.fromEntries(STAT_KEYS.map(k => [k, 0])) as Record<StatKey, number> };
-  return { podId: PODS[0].id, custom, race: { trackId: 'boonta', laps: 3, opponents: 7, difficulty: 1, camera: 0, timeOfDay: 'auto', weather: 'auto' }, gfx: defaultGfx(), volume: 0.6, best: {}, keys: defaultKeys() };
+  return { podId: PODS[0].id, custom, race: { trackId: 'boonta', laps: 3, opponents: 7, difficulty: 1, camera: 0, timeOfDay: 'auto', weather: 'auto' }, gfx: defaultGfx(), volume: 0.6, best: {}, keys: defaultKeys(), pad: defaultPad() };
 }
 
 export function loadProfile(): Profile {
@@ -86,7 +87,7 @@ export function loadProfile(): Profile {
     const raw = localStorage.getItem(KEY);
     if (!raw) return d;
     const p = JSON.parse(raw) as Partial<Profile>;
-    return { ...d, ...p, custom: { ...d.custom, ...(p.custom || {}) }, race: { ...d.race, ...(p.race || {}) }, gfx: { ...d.gfx, ...(p.gfx || {}) }, best: { ...(p.best || {}) }, keys: normalizeKeys(p.keys) };
+    return { ...d, ...p, custom: { ...d.custom, ...(p.custom || {}) }, race: { ...d.race, ...(p.race || {}) }, gfx: { ...d.gfx, ...(p.gfx || {}) }, best: { ...(p.best || {}) }, keys: normalizeKeys(p.keys), pad: normalizePad(p.pad) };
   } catch { return d; }
 }
 export function saveProfile(p: Profile) { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* ignore */ } }

@@ -31,7 +31,7 @@ export interface Sample {
 
 export interface Obstacle { path: number; idx: number; lat: number; r: number; kind: number; x: number; y: number; z: number; hz?: number; /** Session 14: small rocks & crates can be smashed at speed */ breakable?: boolean; broken?: boolean }
 /** Overhead structure across the main path (sponsor gantry, start portal): solid between y0 and y1 within ±half metres along the track. */
-export interface Overhead { idx: number; y0: number; y1: number; half: number; /** half-elliptic arch (checkpoint gate): inner radius R, vertical squash sy – the ceiling height depends on the lateral position */ arch?: { R: number; sy: number } } // kind 3 = AI keep-out only (hazard / rotor disc), kind 4 = set-piece solid (no generic visual)
+export interface Overhead { idx: number; y0: number; y1: number; half: number; /** half-elliptic arch (checkpoint gate): inner radius R, vertical squash sy – the ceiling height depends on the lateral position */ arch?: { R: number; sy: number; /** tube radius towards the inside (default 1.7) */ inner?: number; /** base height relative to the road (default 0) */ yOff?: number; /** vertical thickness (default 3.6) */ thick?: number; /** set-piece index: after its collapse only the two stumps (|lat| > R/2) remain solid */ sp?: number } } // kind 3 = AI keep-out only (hazard / rotor disc), kind 4 = set-piece solid (no generic visual)
 /** Periodic eruption zone (methane geyser / lava vent). state: 0 idle, 0.5 warning, 1 erupting (set by Game). */
 export interface Hazard { idx: number; lat: number; r: number; x: number; y: number; z: number; period: number; phase: number; duty: number; state: number; }
 
@@ -394,6 +394,30 @@ export function buildTrack(def: TrackDef): TrackData {
     bounds.minX = Math.min(bounds.minX, s.x); bounds.maxX = Math.max(bounds.maxX, s.x);
     bounds.minZ = Math.min(bounds.minZ, s.z); bounds.maxZ = Math.max(bounds.maxZ, s.z);
     bounds.minY = Math.min(bounds.minY, s.y); bounds.maxY = Math.max(bounds.maxY, s.y);
+  }
+  // Session 16: roofed tunnel passages on the main path (120–240 m each). Sci-fi / ice worlds get four, the others two. Preferred where
+  // cliffs stand on both sides (a roofed gorge); never at the grid, ramps, gaps, zero-G tubes, shortcut junctions, set pieces or geysers.
+  if (!(globalThis as { NO_TUNNELS?: boolean }).NO_TUNNELS) {
+    const rt = mulberry32(hashStr(def.id + '|tunnels'));
+    const want = ({ aquilaris: 4, oovo: 3, ice: 4, malastare: 4 } as Record<string, number>)[def.theme] ?? 2;
+    const W = (i: number) => samples[((i % N) + N) % N];
+    const near = (i: number, j: number, d: number) => { let k = Math.abs(i - j); if (closed) k = Math.min(k, N - k); return k < d; };
+    const cands: { i: number; len: number; score: number }[] = [];
+    for (let i = 40; i < N - 280; i += 12) {
+      const len = 60 + Math.floor(rt() * 60), mid = i + len / 2;
+      if (near(mid, startIdx, 110 + len / 2) || (!closed && near(mid, finishIdx, 90 + len / 2))) continue;
+      let ok = true, walls = 0;
+      for (let k = -14; k <= len + 14 && ok; k += 2) { const q = W(i + k); if (q.gap || q.ramp > 0 || q.zeroG || q.openL || q.openR || q.link >= 0 || q.roof > 0) ok = false; else if (q.hL > 0 && q.hR > 0) walls++; }
+      if (!ok || setPieces.some(sp => near(sp.idx, mid, 70 + len / 2)) || hazards.some(h => near(h.idx, mid, 10 + len / 2))) continue;
+      cands.push({ i, len, score: walls / (len / 2) + rt() * 0.6 });
+    }
+    cands.sort((a, b) => b.score - a.score);
+    const taken: { i: number; len: number }[] = [];
+    for (const c of cands) {
+      if (taken.length >= want) break;
+      if (taken.some(t => near(t.i + t.len / 2, c.i + c.len / 2, 150 + (t.len + c.len) / 2))) continue;
+      taken.push(c); for (let k = 0; k <= c.len; k++) samples[c.i + k].roof = 13;
+    }
   }
   for (const o of obstacles) if (o.kind === 2 || (o.kind === 0 && o.r < 2.9)) o.breakable = true; // crates + small rocks
   return { def, paths, main, N, startIdx, finishIdx, obstacles, obstaclesByPath, hazards, setPieces, arches, bounds, overheads: [] };

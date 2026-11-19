@@ -201,7 +201,7 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
               <div className="flex-1 flex flex-col min-h-0 w-full p-6 max-w-[1720px] mx-auto">
                 <div className="flex items-center justify-between mb-4 gap-4">
                   <h2 className="font-display text-2xl text-amber-200 tracking-[0.3em]">GRAFIK</h2>
-                  <div className="text-[11px] text-stone-300 flex-1">Sofort wirksam: alle Effekte, Schatten, Kantenglättung, Partikel, Sichtweite, LOD, Render-Skalierung, Sichtfeld, Lautstärke. Neustart nötig: Texturen, Geometrie/Detaildichte, Tessellation, Material-Optionen, Spiegelungen (SSR), Kaskaden-Schatten, Volumetrie, Renderer.</div>
+                  <div className="text-[11px] text-stone-300 flex-1">Sofort wirksam: alle Effekte, Schatten, Kantenglättung, Textur-Filter, Volumetrie, Partikel, Sichtweite, LOD, Render-Skalierung, Sichtfeld, Lautstärke. Neustart nötig: Texturauflösung, Geometrie/Detaildichte, Tessellation, Material-Optionen, Spiegelungen (SSR), Kaskaden-Schatten, Renderer.</div>
                   {needRestart && <Btn onClick={restart}>↻ Übernehmen &amp; neu starten</Btn>}
                   <Btn onClick={() => setShowGfx(false)}>‹ Zurück</Btn>
                 </div>

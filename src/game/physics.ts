@@ -27,7 +27,7 @@ export interface PodState {
   place: number;
 }
 
-export interface AIState { dive?: boolean; diveT?: number; diveRoll?: number; stuck?: number; lastT?: number; prevLat?: number; skill: number; speedF: number; lineOff: number; takeShortcut: boolean; boostUntil: number; repairMode: boolean; noiseT: number; rubber: number; }
+export interface AIState { /** grid lane held for the first seconds (start discipline) */ gridLat?: number; dive?: boolean; diveT?: number; diveRoll?: number; stuck?: number; lastT?: number; prevLat?: number; skill: number; speedF: number; lineOff: number; takeShortcut: boolean; boostUntil: number; repairMode: boolean; noiseT: number; rubber: number; }
 
 export const GRAVITY = 34;
 /** Generous repulsor hover altitude + hard per-engine/cockpit floor gap so no pod part EVER clips into the road! */
@@ -106,33 +106,33 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   const sp = Math.abs(vf);
   const lowF = Math.min(1, sp / 22);
   const highF = 1 - 0.32 * Math.min(1, sp / P.vmax);
-  let omega = p.steer * P.turn * lowF * highF * (1 + (P.abTurn - 1) * 0.45 * sk) * (p.grounded ? 1 : 0.55) * (1 + 0.45 * knife); // Session 15: lift/dive steer with MORE authority on knife-edge (was -40 %)
+  let omega = p.steer * P.turn * lowF * highF * (1 + ((P.abTurn - 1) * 0.45 + 0.6) * sk) * (p.grounded ? 1 : 0.55) * (1 + 0.45 * knife); // Session 15: lift/dive steer with MORE authority on knife-edge (was -40 %)
   if (sk > 0 && p.steer * vr < 0) { // steering deeper into the slide: fade the yaw input beyond ~35° slip (no spin-outs)
     const slip = Math.atan2(Math.abs(vr), Math.max(8, vf));
-    if (slip > 0.88) omega *= Math.max(0.15, 1 - (slip - 0.88) / 0.45);
+    if (slip > 1.05) omega *= Math.max(0.12, 1 - (slip - 1.05) / 0.4); // Session 16: the rear may swing out to ~60°
   }
   omega += (p.hpR - p.hpL) / 100 * 0.25 * lowF;
-  if (p.zeroG) omega *= 1.4;
+  if (p.zeroG) omega *= 1.75;
   if (frozen) omega = 0;
-  p.yawRate += (omega - p.yawRate) * Math.min(1, dt * 9);
+  p.yawRate += (omega - p.yawRate) * Math.min(1, dt * (9 - 5.2 * sk)); // in a slide the yaw builds up and carries (soft, pendulum-like) instead of snapping
   p.yaw -= p.yawRate * dt;
 
   // thrust
-  let vmaxE = P.vmax * (0.72 + 0.28 * hp) * (p.boosting ? 1.32 : 1) * (p.repairing ? 0.55 : 1);
+  let vmaxE = P.vmax * (0.72 + 0.28 * hp) * (p.boosting ? 1.32 : 1) * (p.repairing ? 0.55 : 1) * (p.zeroG ? 1.28 : 1); // Session 16: zero-G = no drag → faster
   if (p.isPlayer === false && p.ai) vmaxE *= p.ai.speedF * p.ai.rubber;
   if (!frozen) {
     if (inp.throttle > 0) {
       const ratio = Math.max(0, vf) / vmaxE;
-      const a = P.accel * (p.boosting ? 1.7 : 1) * Math.max(0, 1 - ratio * ratio) * inp.throttle * (p.grounded ? 1 : 0.5);
+      const a = P.accel * (p.boosting ? 1.7 : 1) * Math.max(0, 1 - ratio * ratio) * inp.throttle * (p.grounded ? 1 : p.zeroG ? 1.35 : 0.5);
       vf += a * dt;
       if (ratio > 1) vf -= (vf - vmaxE) * 1.2 * dt;
     }
     if (inp.brake > 0) { if (vf > 0) vf = Math.max(0, vf - 55 * inp.brake * dt); else vf = Math.max(-18, vf - 14 * inp.brake * dt); }
     if (p.airbraking) vf = Math.max(10, vf - P.abDecel * (1 - 0.8 * sk) * dt);
   } else vf *= Math.exp(-3 * dt);
-  vf *= Math.exp(-(inp.throttle > 0 ? 0.04 : 0.28) * dt);
+  vf *= Math.exp(-(p.zeroG ? (inp.throttle > 0 ? 0 : 0.05) : inp.throttle > 0 ? 0.04 : 0.28) * dt);
   const attGrip = (p.bankGrip ?? 1) * (pc < 0 ? 1 - 0.14 * pc : 1 - 0.2 * pc);
-  vr *= Math.exp(-P.grip * gripMul * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.035 * sk) * (p.grounded ? 1 : 0.15));
+  vr *= Math.exp(-P.grip * gripMul * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.035 * sk) * (p.grounded ? 1 : p.zeroG ? 0.34 : 0.15)); // zero-G: the pod floats sideways, but stays steerable
   const fx2 = Math.sin(p.yaw), fz2 = Math.cos(p.yaw), rx2 = -fz2, rz2 = fx2;
   p.vel.x = fx2 * vf + rx2 * vr; p.vel.z = fz2 * vf + rz2 * vr;
 
@@ -175,8 +175,12 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   let landImpulse = 0;
   p.zeroG = fr.zeroG && !fr.gap;
   if (p.zeroG) {
-    const tubeY = fr.groundY + 7;
-    p.vel.y += ((tubeY - p.pos.y) * 3.2 - p.vel.y * 1.2) * dt;
+    // Session 16 – real weightlessness: no spring that glues the pod to the tube axis. It drifts freely (weak centring, little damping),
+    // lift/dive are vertical thrusters, momentum carries. Shortly before the tube ends it is guided down to hover height (soft landing).
+    let exit = false; const nS = path.samples.length;
+    for (let k = 6; k <= 26 && !exit; k += 5) { const j = path.closed ? (p.idx + k) % nS : Math.min(nS - 1, p.idx + k); if (!path.samples[j].zeroG) exit = true; }
+    const tubeY = fr.groundY + (exit ? HOVER + 0.8 : 7), kC = exit ? 3.2 : 0.5, dC = exit ? 2.2 : 0.45;
+    p.vel.y += ((tubeY - p.pos.y) * kC - p.vel.y * dC + pc * 30) * dt;
     p.grounded = false;
   } else if (!gap && p.pos.y <= targetY + 1.05) {
     const k = 155, c = 22;
@@ -275,13 +279,14 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
     const Nm = td.N, ext = 1.5 + knife * halfSpan;
     for (const oh of td.overheads) {
       let di = p.idx - oh.idx; if (td.main.closed) { if (di > Nm / 2) di -= Nm; else if (di < -Nm / 2) di += Nm; }
-      if (Math.abs(di) > 5) continue;
+      if (Math.abs(di) > 5 + oh.half / DS) continue;
       const s0 = td.main.samples[oh.idx], along = (p.pos.x - s0.x) * s0.tx + (p.pos.z - s0.z) * s0.tz;
       if (Math.abs(along) > oh.half + 2.4) continue;
       let y0 = oh.y0, y1 = oh.y1;
-      if (oh.arch) { // checkpoint arch: the ceiling follows the half ellipse – low near the road edges, high over the centre
-        const lat = (p.pos.x - s0.x) * s0.rx + (p.pos.z - s0.z) * s0.rz, Ri = oh.arch.R - 1.7;
-        y0 = s0.y + oh.arch.sy * Math.sqrt(Math.max(0, Ri * Ri - lat * lat)); y1 = y0 + 3.6;
+      if (oh.arch) { // arch (checkpoint gate, rock arch, set-piece arch): the ceiling follows the half ellipse – low near the road edges, high over the centre
+        const A = oh.arch, lat = (p.pos.x - s0.x) * s0.rx + (p.pos.z - s0.z) * s0.rz, Ri = A.R - (A.inner ?? 1.7);
+        if (A.sp !== undefined && td.setPieces[A.sp] && td.setPieces[A.sp].state >= 1 && Math.abs(lat) < A.R * 0.5) continue; // collapsed: the middle is gone
+        y0 = s0.y + (A.yOff ?? 0) + A.sy * Math.sqrt(Math.max(0, Ri * Ri - lat * lat)); y1 = y0 + (A.thick ?? 3.6);
       }
       if (p.pos.y + ext <= y0 || p.pos.y - ext >= y1) continue;
       const below = p.pos.y < (y0 + y1) * 0.5, hitY = below ? y0 : y1;
@@ -352,7 +357,8 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   // At yaw = 0: forward = (0, +1), right = (-1, 0), and local x = -2.5 maps to world (-2.5, 0) = RIGHT side of the pod!
   // And Three.js rotation.z = +roll maps (x, 0, 0) -> (x*cos, x*sin, 0): so roll > 0 dips x < 0 (RIGHT/inner) and lifts x > 0 (LEFT/outer)!
   // Steering no longer tilts the pod (engines heave instead): only a hint of lean, the road bank and the manual 90° roll remain
-  const rawRoll = p.steer * 0.07 + vr * 0.004 + p.steer * 0.12 * sk + (p.grounded ? Math.atan(S.bank) * 0.92 : 0);
+  const zg = p.zeroG ? 1 : 0; // weightless: the pod banks freely into turns and slowly tumbles
+  const rawRoll = p.steer * (0.07 + 0.34 * zg) + zg * Math.sin(time * 0.6 + p.id * 1.3) * 0.13 + vr * 0.004 + p.steer * 0.12 * sk + (p.grounded ? Math.atan(S.bank) * 0.92 : 0);
   const targetRoll = Math.max(-0.5, Math.min(0.5, rawRoll));
   p.rollBase = (p.rollBase ?? 0) + (targetRoll - (p.rollBase ?? 0)) * Math.min(1, dt * 7);
   p.roll = p.rollBase * (1 - knife) + rollA;
@@ -360,7 +366,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
 
   const hs = Math.max(12, Math.hypot(p.vel.x, p.vel.z));
   const flightPitch = -Math.atan2(p.vel.y, hs) * 0.72;
-  const targetPitch = Math.max(-0.42, Math.min(0.42, (p.grounded ? -roadSlope * 0.92 : flightPitch) + (p.boosting ? -0.045 : 0) + (p.airbraking ? 0.065 : 0))) - pc * (p.grounded ? 0.2 : 0.34);
+  const targetPitch = Math.max(-0.42, Math.min(0.42, (p.grounded ? -roadSlope * 0.92 : flightPitch) + (p.boosting ? -0.045 : 0) + (p.airbraking ? 0.065 : 0))) - pc * (p.grounded ? 0.2 : 0.34) + zg * Math.sin(time * 0.47 + p.id * 2.1) * 0.06;
   p.pitch += (targetPitch - p.pitch) * Math.min(1, dt * 8);
 
   // Dynamic independent vertical heave & pitch of the two turbine assemblies when steering!
@@ -377,8 +383,9 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   // Asymmetric travel: outer turbine climbs prominently (+0.92 m), inner turbine tucks crisply (-0.50 m) into the apex
   const driveA = -turn, driveB = turn;
   // Pure vertical travel: the outer turbine lifts as a whole (+1.1 m), the inner one settles slightly (-0.22 m) – no engine pitch/roll
-  const tgtA = (driveA >= 0 ? driveA * 1.1 : driveA * 0.22) + oscA + boostLift + sagA;
-  const tgtB = (driveB >= 0 ? driveB * 1.1 : driveB * 0.22) + oscB + boostLift + sagB;
+  const flA = zg * Math.sin(time * 1.1 + p.id) * 0.42, flB = zg * Math.sin(time * 0.9 + p.id + 2.4) * 0.42; // engines bob independently in zero-G
+  const tgtA = (driveA >= 0 ? driveA * 1.1 : driveA * 0.22) + oscA + boostLift + sagA + flA;
+  const tgtB = (driveB >= 0 ? driveB * 1.1 : driveB * 0.22) + oscB + boostLift + sagB + flB;
 
   let yA = p.engYL ?? 0, yB = p.engYR ?? 0, vA = p.engVL ?? 0, vB = p.engVR ?? 0;
   if (landImpulse > 0) { const j = -Math.min(5.2, landImpulse * 0.18); vA += j; vB += j; }
@@ -701,12 +708,17 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
     }
   }
 
+  // Session 16 – start discipline: for the first seconds every rival holds its own grid lane and only then merges onto the racing line
+  // (they used to dive for the ideal line at once and drove into each other). A pod right behind another one lifts instead of ramming it.
+  if (ai.gridLat !== undefined && time < 7.5) { const h = Math.max(0, Math.min(1, (7 - time) / 3)); idealLat = idealLat * (1 - h) + ai.gridLat * h; }
+  let startBlock = false;
   // Rival pods: gentle overtaking repulsion (and optional aggressive ramming on open road)
   let ramTarget: number | null = null;
   for (const q of pods) {
     if (q === p || q.dead > 0 || q.path !== p.path) continue;
     const ah = aheadOf(q.idx);
-    if (ah > 0 && ah < 16) obs.push({ ahead: Math.max(2, ah), lat: q.lat, r: P.width * 1.85 + 1.2, weight: 0.32 });
+    if (ah > 0 && ah < 16 && !(time < 4.5 && ai.gridLat !== undefined)) obs.push({ ahead: Math.max(2, ah), lat: q.lat, r: P.width * 1.85 + 1.2, weight: 0.32 }); // (on the grid nobody swerves – they hold their lanes)
+    if (time < 7.5 && ai.gridLat !== undefined && ah > 0 && ah < 9 && Math.abs(q.lat - p.lat) < P.width * 1.9 && Math.hypot(p.vel.x, p.vel.z) > Math.hypot(q.vel.x, q.vel.z) - 1) startBlock = true;
     if (q === player && Math.abs(ah) < 4 && !obs.length && p.pilot.aggression > 0.75 && Math.sin(time * 0.7 + ai.noiseT) > 0.6) ramTarget = q.lat;
   }
   if (ramTarget !== null && !enteringShortcut) idealLat = ramTarget;
@@ -824,6 +836,7 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
   if (speed > vTarget + 4) throttle = 0;
   if (speed > vTarget + 14) airbrake = true;
   if (speed > vTarget + 40) brake = 0.6;
+  if (startBlock) throttle = Math.min(throttle, 0.3);
 
   let boost = false;
   if (!denseField && time < ai.boostUntil && p.heat < 0.6 + ai.skill * 0.3) boost = true;

@@ -180,15 +180,15 @@ function floorPowerOfTwo(value) {
 }
 function setQuaternionFromProperEuler(q, a, b, c, order) {
   const cos7 = Math.cos;
-  const sin14 = Math.sin;
+  const sin15 = Math.sin;
   const c2 = cos7(b / 2);
-  const s2 = sin14(b / 2);
+  const s2 = sin15(b / 2);
   const c13 = cos7((a + c) / 2);
-  const s13 = sin14((a + c) / 2);
+  const s13 = sin15((a + c) / 2);
   const c1_3 = cos7((a - c) / 2);
-  const s1_3 = sin14((a - c) / 2);
+  const s1_3 = sin15((a - c) / 2);
   const c3_1 = cos7((c - a) / 2);
-  const s3_1 = sin14((c - a) / 2);
+  const s3_1 = sin15((c - a) / 2);
   switch (order) {
     case "XYX":
       q.set(c2 * s13, s2 * c1_3, s2 * s1_3, c2 * c13);
@@ -485,11 +485,11 @@ function getArrayKey(array2) {
   if (array2.byteOffset === 0 && array2.byteLength === array2.buffer.byteLength) return array2.buffer._uuid;
   return array2.buffer._uuid + ":" + array2.byteOffset + ":" + array2.byteLength;
 }
-function transformVertex(vertexPosition, mvPosition, center, scale3, sin14, cos7) {
+function transformVertex(vertexPosition, mvPosition, center, scale3, sin15, cos7) {
   _alignedPosition.subVectors(vertexPosition, center).addScalar(0.5).multiply(scale3);
-  if (sin14 !== void 0) {
-    _rotatedPosition.x = cos7 * _alignedPosition.x - sin14 * _alignedPosition.y;
-    _rotatedPosition.y = sin14 * _alignedPosition.x + cos7 * _alignedPosition.y;
+  if (sin15 !== void 0) {
+    _rotatedPosition.x = cos7 * _alignedPosition.x - sin15 * _alignedPosition.y;
+    _rotatedPosition.y = sin15 * _alignedPosition.x + cos7 * _alignedPosition.y;
   } else {
     _rotatedPosition.copy(_alignedPosition);
   }
@@ -516,7 +516,7 @@ function checkIntersection$1(object, material, raycaster, ray, pA, pB, pC, point
     object
   };
 }
-function checkGeometryIntersection(object, material, raycaster, ray, uv9, uv1, normal2, a, b, c) {
+function checkGeometryIntersection(object, material, raycaster, ray, uv10, uv1, normal2, a, b, c) {
   object.getVertexPosition(a, _vA);
   object.getVertexPosition(b, _vB);
   object.getVertexPosition(c, _vC);
@@ -524,8 +524,8 @@ function checkGeometryIntersection(object, material, raycaster, ray, uv9, uv1, n
   if (intersection) {
     const barycoord = new Vector3();
     Triangle.getBarycoord(_intersectionPoint, _vA, _vB, _vC, barycoord);
-    if (uv9) {
-      intersection.uv = Triangle.getInterpolatedAttribute(uv9, a, b, c, barycoord, new Vector2());
+    if (uv10) {
+      intersection.uv = Triangle.getInterpolatedAttribute(uv10, a, b, c, barycoord, new Vector2());
     }
     if (uv1) {
       intersection.uv1 = Triangle.getInterpolatedAttribute(uv1, a, b, c, barycoord, new Vector2());
@@ -2791,9 +2791,9 @@ var init_three_core = __esm({
        * @param {number} index - The index into the attribute.
        * @return {Vector2} A reference to this vector.
        */
-      fromBufferAttribute(attribute7, index) {
-        this.x = attribute7.getX(index);
-        this.y = attribute7.getY(index);
+      fromBufferAttribute(attribute8, index) {
+        this.x = attribute8.getX(index);
+        this.y = attribute8.getY(index);
         return this;
       }
       /**
@@ -2860,20 +2860,20 @@ var init_three_core = __esm({
         let x0 = src0[srcOffset0 + 0], y0 = src0[srcOffset0 + 1], z0 = src0[srcOffset0 + 2], w02 = src0[srcOffset0 + 3];
         let x1 = src1[srcOffset1 + 0], y1 = src1[srcOffset1 + 1], z1 = src1[srcOffset1 + 2], w12 = src1[srcOffset1 + 3];
         if (w02 !== w12 || x0 !== x1 || y0 !== y1 || z0 !== z1) {
-          let dot9 = x0 * x1 + y0 * y1 + z0 * z1 + w02 * w12;
-          if (dot9 < 0) {
+          let dot10 = x0 * x1 + y0 * y1 + z0 * z1 + w02 * w12;
+          if (dot10 < 0) {
             x1 = -x1;
             y1 = -y1;
             z1 = -z1;
             w12 = -w12;
-            dot9 = -dot9;
+            dot10 = -dot10;
           }
           let s = 1 - t;
-          if (dot9 < 0.9995) {
-            const theta = Math.acos(dot9);
-            const sin14 = Math.sin(theta);
-            s = Math.sin(s * theta) / sin14;
-            t = Math.sin(t * theta) / sin14;
+          if (dot10 < 0.9995) {
+            const theta = Math.acos(dot10);
+            const sin15 = Math.sin(theta);
+            s = Math.sin(s * theta) / sin15;
+            t = Math.sin(t * theta) / sin15;
             x0 = x0 * s + x1 * t;
             y0 = y0 * s + y1 * t;
             z0 = z0 * s + z1 * t;
@@ -3025,13 +3025,13 @@ var init_three_core = __esm({
       setFromEuler(euler, update = true) {
         const x = euler._x, y = euler._y, z = euler._z, order = euler._order;
         const cos7 = Math.cos;
-        const sin14 = Math.sin;
+        const sin15 = Math.sin;
         const c1 = cos7(x / 2);
         const c2 = cos7(y / 2);
         const c3 = cos7(z / 2);
-        const s1 = sin14(x / 2);
-        const s2 = sin14(y / 2);
-        const s3 = sin14(z / 2);
+        const s1 = sin15(x / 2);
+        const s2 = sin15(y / 2);
+        const s3 = sin15(z / 2);
         switch (order) {
           case "XYZ":
             this._x = s1 * c2 * c3 + c1 * s2 * s3;
@@ -3175,10 +3175,10 @@ var init_three_core = __esm({
        * @param {number} step - The angular step in radians.
        * @return {Quaternion} A reference to this quaternion.
        */
-      rotateTowards(q, step8) {
+      rotateTowards(q, step9) {
         const angle = this.angleTo(q);
         if (angle === 0) return this;
-        const t = Math.min(1, step8 / angle);
+        const t = Math.min(1, step9 / angle);
         this.slerp(q, t);
         return this;
       }
@@ -3310,20 +3310,20 @@ var init_three_core = __esm({
        */
       slerp(qb, t) {
         let x = qb._x, y = qb._y, z = qb._z, w = qb._w;
-        let dot9 = this.dot(qb);
-        if (dot9 < 0) {
+        let dot10 = this.dot(qb);
+        if (dot10 < 0) {
           x = -x;
           y = -y;
           z = -z;
           w = -w;
-          dot9 = -dot9;
+          dot10 = -dot10;
         }
         let s = 1 - t;
-        if (dot9 < 0.9995) {
-          const theta = Math.acos(dot9);
-          const sin14 = Math.sin(theta);
-          s = Math.sin(s * theta) / sin14;
-          t = Math.sin(t * theta) / sin14;
+        if (dot10 < 0.9995) {
+          const theta = Math.acos(dot10);
+          const sin15 = Math.sin(theta);
+          s = Math.sin(s * theta) / sin15;
+          t = Math.sin(t * theta) / sin15;
           this._x = this._x * s + x * t;
           this._y = this._y * s + y * t;
           this._z = this._z * s + z * t;
@@ -3414,11 +3414,11 @@ var init_three_core = __esm({
        * @param {number} index - The index into the attribute.
        * @return {Quaternion} A reference to this quaternion.
        */
-      fromBufferAttribute(attribute7, index) {
-        this._x = attribute7.getX(index);
-        this._y = attribute7.getY(index);
-        this._z = attribute7.getZ(index);
-        this._w = attribute7.getW(index);
+      fromBufferAttribute(attribute8, index) {
+        this._x = attribute8.getX(index);
+        this._y = attribute8.getY(index);
+        this._z = attribute8.getZ(index);
+        this._w = attribute8.getW(index);
         this._onChangeCallback();
         return this;
       }
@@ -4312,10 +4312,10 @@ var init_three_core = __esm({
        * @param {number} index - The index into the attribute.
        * @return {Vector3} A reference to this vector.
        */
-      fromBufferAttribute(attribute7, index) {
-        this.x = attribute7.getX(index);
-        this.y = attribute7.getY(index);
-        this.z = attribute7.getZ(index);
+      fromBufferAttribute(attribute8, index) {
+        this.x = attribute8.getX(index);
+        this.y = attribute8.getY(index);
+        this.z = attribute8.getZ(index);
         return this;
       }
       /**
@@ -5283,47 +5283,47 @@ var init_three_core = __esm({
        * @param {Vector2} uv - The uv vector.
        * @return {Vector2} The transformed uv vector.
        */
-      transformUv(uv9) {
-        if (this.mapping !== UVMapping) return uv9;
-        uv9.applyMatrix3(this.matrix);
-        if (uv9.x < 0 || uv9.x > 1) {
+      transformUv(uv10) {
+        if (this.mapping !== UVMapping) return uv10;
+        uv10.applyMatrix3(this.matrix);
+        if (uv10.x < 0 || uv10.x > 1) {
           switch (this.wrapS) {
             case RepeatWrapping:
-              uv9.x = uv9.x - Math.floor(uv9.x);
+              uv10.x = uv10.x - Math.floor(uv10.x);
               break;
             case ClampToEdgeWrapping:
-              uv9.x = uv9.x < 0 ? 0 : 1;
+              uv10.x = uv10.x < 0 ? 0 : 1;
               break;
             case MirroredRepeatWrapping:
-              if (Math.abs(Math.floor(uv9.x) % 2) === 1) {
-                uv9.x = Math.ceil(uv9.x) - uv9.x;
+              if (Math.abs(Math.floor(uv10.x) % 2) === 1) {
+                uv10.x = Math.ceil(uv10.x) - uv10.x;
               } else {
-                uv9.x = uv9.x - Math.floor(uv9.x);
+                uv10.x = uv10.x - Math.floor(uv10.x);
               }
               break;
           }
         }
-        if (uv9.y < 0 || uv9.y > 1) {
+        if (uv10.y < 0 || uv10.y > 1) {
           switch (this.wrapT) {
             case RepeatWrapping:
-              uv9.y = uv9.y - Math.floor(uv9.y);
+              uv10.y = uv10.y - Math.floor(uv10.y);
               break;
             case ClampToEdgeWrapping:
-              uv9.y = uv9.y < 0 ? 0 : 1;
+              uv10.y = uv10.y < 0 ? 0 : 1;
               break;
             case MirroredRepeatWrapping:
-              if (Math.abs(Math.floor(uv9.y) % 2) === 1) {
-                uv9.y = Math.ceil(uv9.y) - uv9.y;
+              if (Math.abs(Math.floor(uv10.y) % 2) === 1) {
+                uv10.y = Math.ceil(uv10.y) - uv10.y;
               } else {
-                uv9.y = uv9.y - Math.floor(uv9.y);
+                uv10.y = uv10.y - Math.floor(uv10.y);
               }
               break;
           }
         }
         if (this.flipY) {
-          uv9.y = 1 - uv9.y;
+          uv10.y = 1 - uv10.y;
         }
-        return uv9;
+        return uv10;
       }
       /**
        * Setting this property to `true` indicates the engine the texture
@@ -6062,11 +6062,11 @@ var init_three_core = __esm({
        * @param {number} index - The index into the attribute.
        * @return {Vector4} A reference to this vector.
        */
-      fromBufferAttribute(attribute7, index) {
-        this.x = attribute7.getX(index);
-        this.y = attribute7.getY(index);
-        this.z = attribute7.getZ(index);
-        this.w = attribute7.getW(index);
+      fromBufferAttribute(attribute8, index) {
+        this.x = attribute8.getX(index);
+        this.y = attribute8.getY(index);
+        this.z = attribute8.getZ(index);
+        this.w = attribute8.getW(index);
         return this;
       }
       /**
@@ -9895,10 +9895,10 @@ var init_three_core = __esm({
        * @param {number} index - The index into the attribute.
        * @return {Color} A reference to this color.
        */
-      fromBufferAttribute(attribute7, index) {
-        this.r = attribute7.getX(index);
-        this.g = attribute7.getY(index);
-        this.b = attribute7.getZ(index);
+      fromBufferAttribute(attribute8, index) {
+        this.r = attribute8.getX(index);
+        this.g = attribute8.getY(index);
+        this.b = attribute8.getZ(index);
         return this;
       }
       /**
@@ -10235,10 +10235,10 @@ var init_three_core = __esm({
        * @param {number} i2 - The attribute index representing the third corner of the triangle.
        * @return {Triangle} A reference to this triangle.
        */
-      setFromAttributeAndIndices(attribute7, i0, i1, i2) {
-        this.a.fromBufferAttribute(attribute7, i0);
-        this.b.fromBufferAttribute(attribute7, i1);
-        this.c.fromBufferAttribute(attribute7, i2);
+      setFromAttributeAndIndices(attribute8, i0, i1, i2) {
+        this.a.fromBufferAttribute(attribute8, i0);
+        this.b.fromBufferAttribute(attribute8, i1);
+        this.c.fromBufferAttribute(attribute8, i2);
         return this;
       }
       /**
@@ -10459,10 +10459,10 @@ var init_three_core = __esm({
        * @param {BufferAttribute} attribute - A buffer attribute holding 3D position data.
        * @return {Box3} A reference to this bounding box.
        */
-      setFromBufferAttribute(attribute7) {
+      setFromBufferAttribute(attribute8) {
         this.makeEmpty();
-        for (let i = 0, il = attribute7.count; i < il; i++) {
-          this.expandByPoint(_vector$b.fromBufferAttribute(attribute7, i));
+        for (let i = 0, il = attribute8.count; i < il; i++) {
+          this.expandByPoint(_vector$b.fromBufferAttribute(attribute8, i));
         }
         return this;
       }
@@ -11066,11 +11066,11 @@ var init_three_core = __esm({
        * @param {number} index2 - The source index into the given buffer attribute.
        * @return {BufferAttribute} A reference to this instance.
        */
-      copyAt(index1, attribute7, index2) {
+      copyAt(index1, attribute8, index2) {
         index1 *= this.itemSize;
-        index2 *= attribute7.itemSize;
+        index2 *= attribute8.itemSize;
         for (let i = 0, l = this.itemSize; i < l; i++) {
-          this.array[index1 + i] = attribute7.array[index2 + i];
+          this.array[index1 + i] = attribute8.array[index2 + i];
         }
         return this;
       }
@@ -11951,8 +11951,8 @@ var init_three_core = __esm({
        * @param {BufferAttribute|InterleavedBufferAttribute} attribute - The attribute to set.
        * @return {BufferGeometry} A reference to this instance.
        */
-      setAttribute(name, attribute7) {
-        this.attributes[name] = attribute7;
+      setAttribute(name, attribute8) {
+        this.attributes[name] = attribute8;
         return this;
       }
       /**
@@ -12447,15 +12447,15 @@ var init_three_core = __esm({
        * @return {BufferGeometry} The non-indexed version of this indexed geometry.
        */
       toNonIndexed() {
-        function convertBufferAttribute(attribute7, indices2) {
-          const array2 = attribute7.array;
-          const itemSize = attribute7.itemSize;
-          const normalized = attribute7.normalized;
+        function convertBufferAttribute(attribute8, indices2) {
+          const array2 = attribute8.array;
+          const itemSize = attribute8.itemSize;
+          const normalized = attribute8.normalized;
           const array22 = new array2.constructor(indices2.length * itemSize);
           let index = 0, index2 = 0;
           for (let i = 0, l = indices2.length; i < l; i++) {
-            if (attribute7.isInterleavedBufferAttribute) {
-              index = indices2[i] * attribute7.data.stride + attribute7.offset;
+            if (attribute8.isInterleavedBufferAttribute) {
+              index = indices2[i] * attribute8.data.stride + attribute8.offset;
             } else {
               index = indices2[i] * itemSize;
             }
@@ -12473,8 +12473,8 @@ var init_three_core = __esm({
         const indices = this.index.array;
         const attributes = this.attributes;
         for (const name in attributes) {
-          const attribute7 = attributes[name];
-          const newAttribute = convertBufferAttribute(attribute7, indices);
+          const attribute8 = attributes[name];
+          const newAttribute = convertBufferAttribute(attribute8, indices);
           geometry2.setAttribute(name, newAttribute);
         }
         const morphAttributes = this.morphAttributes;
@@ -12482,8 +12482,8 @@ var init_three_core = __esm({
           const morphArray = [];
           const morphAttribute = morphAttributes[name];
           for (let i = 0, il = morphAttribute.length; i < il; i++) {
-            const attribute7 = morphAttribute[i];
-            const newAttribute = convertBufferAttribute(attribute7, indices);
+            const attribute8 = morphAttribute[i];
+            const newAttribute = convertBufferAttribute(attribute8, indices);
             morphArray.push(newAttribute);
           }
           geometry2.morphAttributes[name] = morphArray;
@@ -12530,8 +12530,8 @@ var init_three_core = __esm({
         }
         const attributes = this.attributes;
         for (const key in attributes) {
-          const attribute7 = attributes[key];
-          data.data.attributes[key] = attribute7.toJSON(data.data);
+          const attribute8 = attributes[key];
+          data.data.attributes[key] = attribute8.toJSON(data.data);
         }
         const morphAttributes = {};
         let hasMorphAttributes = false;
@@ -12539,8 +12539,8 @@ var init_three_core = __esm({
           const attributeArray2 = this.morphAttributes[key];
           const array2 = [];
           for (let i = 0, il = attributeArray2.length; i < il; i++) {
-            const attribute7 = attributeArray2[i];
-            array2.push(attribute7.toJSON(data.data));
+            const attribute8 = attributeArray2[i];
+            array2.push(attribute8.toJSON(data.data));
           }
           if (array2.length > 0) {
             morphAttributes[key] = array2;
@@ -12590,8 +12590,8 @@ var init_three_core = __esm({
         }
         const attributes = source.attributes;
         for (const name in attributes) {
-          const attribute7 = attributes[name];
-          this.setAttribute(name, attribute7.clone(data));
+          const attribute8 = attributes[name];
+          this.setAttribute(name, attribute8.clone(data));
         }
         const morphAttributes = source.morphAttributes;
         for (const name in morphAttributes) {
@@ -14117,21 +14117,21 @@ var init_three_core = __esm({
           _worldScale.multiplyScalar(-_mvPosition.z);
         }
         const rotation = this.material.rotation;
-        let sin14, cos7;
+        let sin15, cos7;
         if (rotation !== 0) {
           cos7 = Math.cos(rotation);
-          sin14 = Math.sin(rotation);
+          sin15 = Math.sin(rotation);
         }
         const center = this.center;
-        transformVertex(_vA$1.set(-0.5, -0.5, 0), _mvPosition, center, _worldScale, sin14, cos7);
-        transformVertex(_vB$1.set(0.5, -0.5, 0), _mvPosition, center, _worldScale, sin14, cos7);
-        transformVertex(_vC$1.set(0.5, 0.5, 0), _mvPosition, center, _worldScale, sin14, cos7);
+        transformVertex(_vA$1.set(-0.5, -0.5, 0), _mvPosition, center, _worldScale, sin15, cos7);
+        transformVertex(_vB$1.set(0.5, -0.5, 0), _mvPosition, center, _worldScale, sin15, cos7);
+        transformVertex(_vC$1.set(0.5, 0.5, 0), _mvPosition, center, _worldScale, sin15, cos7);
         _uvA.set(0, 0);
         _uvB.set(1, 0);
         _uvC.set(1, 1);
         let intersect2 = raycaster.ray.intersectTriangle(_vA$1, _vB$1, _vC$1, false, _intersectPoint);
         if (intersect2 === null) {
-          transformVertex(_vB$1.set(-0.5, 0.5, 0), _mvPosition, center, _worldScale, sin14, cos7);
+          transformVertex(_vB$1.set(-0.5, 0.5, 0), _mvPosition, center, _worldScale, sin15, cos7);
           _uvB.set(0, 1);
           intersect2 = raycaster.ray.intersectTriangle(_vA$1, _vC$1, _vB$1, false, _intersectPoint);
           if (intersect2 === null) {
@@ -14977,7 +14977,7 @@ var init_three_core = __esm({
         const material = this.material;
         const index = geometry.index;
         const position = geometry.attributes.position;
-        const uv9 = geometry.attributes.uv;
+        const uv10 = geometry.attributes.uv;
         const uv1 = geometry.attributes.uv1;
         const normal2 = geometry.attributes.normal;
         const groups = geometry.groups;
@@ -14993,7 +14993,7 @@ var init_three_core = __esm({
                 const a = index.getX(j);
                 const b = index.getX(j + 1);
                 const c = index.getX(j + 2);
-                intersection = checkGeometryIntersection(this, groupMaterial, raycaster, rayLocalSpace, uv9, uv1, normal2, a, b, c);
+                intersection = checkGeometryIntersection(this, groupMaterial, raycaster, rayLocalSpace, uv10, uv1, normal2, a, b, c);
                 if (intersection) {
                   intersection.faceIndex = Math.floor(j / 3);
                   intersection.face.materialIndex = group.materialIndex;
@@ -15008,7 +15008,7 @@ var init_three_core = __esm({
               const a = index.getX(i);
               const b = index.getX(i + 1);
               const c = index.getX(i + 2);
-              intersection = checkGeometryIntersection(this, material, raycaster, rayLocalSpace, uv9, uv1, normal2, a, b, c);
+              intersection = checkGeometryIntersection(this, material, raycaster, rayLocalSpace, uv10, uv1, normal2, a, b, c);
               if (intersection) {
                 intersection.faceIndex = Math.floor(i / 3);
                 intersects2.push(intersection);
@@ -15026,7 +15026,7 @@ var init_three_core = __esm({
                 const a = j;
                 const b = j + 1;
                 const c = j + 2;
-                intersection = checkGeometryIntersection(this, groupMaterial, raycaster, rayLocalSpace, uv9, uv1, normal2, a, b, c);
+                intersection = checkGeometryIntersection(this, groupMaterial, raycaster, rayLocalSpace, uv10, uv1, normal2, a, b, c);
                 if (intersection) {
                   intersection.faceIndex = Math.floor(j / 3);
                   intersection.face.materialIndex = group.materialIndex;
@@ -15041,7 +15041,7 @@ var init_three_core = __esm({
               const a = i;
               const b = i + 1;
               const c = i + 2;
-              intersection = checkGeometryIntersection(this, material, raycaster, rayLocalSpace, uv9, uv1, normal2, a, b, c);
+              intersection = checkGeometryIntersection(this, material, raycaster, rayLocalSpace, uv10, uv1, normal2, a, b, c);
               if (intersection) {
                 intersection.faceIndex = Math.floor(i / 3);
                 intersects2.push(intersection);
@@ -16526,11 +16526,11 @@ var init_three_core = __esm({
             const { vertexStart, reservedVertexCount } = geometryInfo;
             const attributes = geometry.attributes;
             for (const key in attributes) {
-              const attribute7 = attributes[key];
-              const { array: array2, itemSize } = attribute7;
+              const attribute8 = attributes[key];
+              const { array: array2, itemSize } = attribute8;
               array2.copyWithin(nextVertexStart * itemSize, vertexStart * itemSize, (vertexStart + reservedVertexCount) * itemSize);
-              attribute7.addUpdateRange(nextVertexStart * itemSize, reservedVertexCount * itemSize);
-              attribute7.needsUpdate = true;
+              attribute8.addUpdateRange(nextVertexStart * itemSize, reservedVertexCount * itemSize);
+              attribute8.needsUpdate = true;
             }
             geometryInfo.vertexStart = nextVertexStart;
           }
@@ -17205,14 +17205,14 @@ var init_three_core = __esm({
         _ray$1.copy(raycaster.ray).applyMatrix4(_inverseMatrix$1);
         const localThreshold = threshold / ((this.scale.x + this.scale.y + this.scale.z) / 3);
         const localThresholdSq = localThreshold * localThreshold;
-        const step8 = this.isLineSegments ? 2 : 1;
+        const step9 = this.isLineSegments ? 2 : 1;
         const index = geometry.index;
         const attributes = geometry.attributes;
         const positionAttribute = attributes.position;
         if (index !== null) {
           const start = Math.max(0, drawRange.start);
           const end = Math.min(index.count, drawRange.start + drawRange.count);
-          for (let i = start, l = end - 1; i < l; i += step8) {
+          for (let i = start, l = end - 1; i < l; i += step9) {
             const a = index.getX(i);
             const b = index.getX(i + 1);
             const intersect2 = checkIntersection(this, raycaster, _ray$1, localThresholdSq, a, b, i);
@@ -17231,7 +17231,7 @@ var init_three_core = __esm({
         } else {
           const start = Math.max(0, drawRange.start);
           const end = Math.min(positionAttribute.count, drawRange.start + drawRange.count);
-          for (let i = start, l = end - 1; i < l; i += step8) {
+          for (let i = start, l = end - 1; i < l; i += step9) {
             const intersect2 = checkIntersection(this, raycaster, _ray$1, localThresholdSq, i, i + 1, i);
             if (intersect2) {
               intersects2.push(intersect2);
@@ -18078,7 +18078,7 @@ var init_three_core = __esm({
         const normals = [];
         const uvs = [];
         const vertex = new Vector3();
-        const uv9 = new Vector2();
+        const uv10 = new Vector2();
         vertices.push(0, 0, 0);
         normals.push(0, 0, 1);
         uvs.push(0.5, 0.5);
@@ -18088,9 +18088,9 @@ var init_three_core = __esm({
           vertex.y = radius * Math.sin(segment);
           vertices.push(vertex.x, vertex.y, vertex.z);
           normals.push(0, 0, 1);
-          uv9.x = (vertices[i] / radius + 1) / 2;
-          uv9.y = (vertices[i + 1] / radius + 1) / 2;
-          uvs.push(uv9.x, uv9.y);
+          uv10.x = (vertices[i] / radius + 1) / 2;
+          uv10.y = (vertices[i + 1] / radius + 1) / 2;
+          uvs.push(uv10.x, uv10.y);
         }
         for (let i = 1; i <= segments; i++) {
           indices.push(i, i + 1, 0);
@@ -18209,7 +18209,7 @@ var init_three_core = __esm({
         }
         function generateCap(top) {
           const centerIndexStart = index;
-          const uv9 = new Vector2();
+          const uv10 = new Vector2();
           const vertex = new Vector3();
           let groupCount = 0;
           const radius = top === true ? radiusTop : radiusBottom;
@@ -18231,9 +18231,9 @@ var init_three_core = __esm({
             vertex.z = radius * cosTheta;
             vertices.push(vertex.x, vertex.y, vertex.z);
             normals.push(0, sign3, 0);
-            uv9.x = cosTheta * 0.5 + 0.5;
-            uv9.y = sinTheta * 0.5 * sign3 + 0.5;
-            uvs.push(uv9.x, uv9.y);
+            uv10.x = cosTheta * 0.5 + 0.5;
+            uv10.y = sinTheta * 0.5 * sign3 + 0.5;
+            uvs.push(uv10.x, uv10.y);
             index++;
           }
           for (let x = 0; x < radialSegments; x++) {
@@ -18446,9 +18446,9 @@ var init_three_core = __esm({
             correctUV(uvC, j + 4, c, azi);
           }
         }
-        function correctUV(uv9, stride, vector, azimuth2) {
-          if (azimuth2 < 0 && uv9.x === 1) {
-            uvBuffer[stride] = uv9.x - 1;
+        function correctUV(uv10, stride, vector, azimuth2) {
+          if (azimuth2 < 0 && uv10.x === 1) {
+            uvBuffer[stride] = uv10.x - 1;
           }
           if (vector.x === 0 && vector.z === 0) {
             uvBuffer[stride] = azimuth2 / 2 / Math.PI + 0.5;
@@ -19135,11 +19135,11 @@ var init_three_core = __esm({
         let y = this.aY + this.yRadius * Math.sin(angle);
         if (this.aRotation !== 0) {
           const cos7 = Math.cos(this.aRotation);
-          const sin14 = Math.sin(this.aRotation);
+          const sin15 = Math.sin(this.aRotation);
           const tx = x - this.aX;
           const ty = y - this.aY;
-          x = tx * cos7 - ty * sin14 + this.aX;
-          y = tx * sin14 + ty * cos7 + this.aY;
+          x = tx * cos7 - ty * sin15 + this.aX;
+          y = tx * sin15 + ty * cos7 + this.aY;
         }
         return point.set(x, y);
       }
@@ -19256,10 +19256,10 @@ var init_three_core = __esm({
           p3 = tmp;
         }
         if (this.curveType === "centripetal" || this.curveType === "chordal") {
-          const pow13 = this.curveType === "chordal" ? 0.5 : 0.25;
-          let dt0 = Math.pow(p0.distanceToSquared(p1), pow13);
-          let dt1 = Math.pow(p1.distanceToSquared(p2), pow13);
-          let dt2 = Math.pow(p2.distanceToSquared(p3), pow13);
+          const pow14 = this.curveType === "chordal" ? 0.5 : 0.25;
+          let dt0 = Math.pow(p0.distanceToSquared(p1), pow14);
+          let dt1 = Math.pow(p1.distanceToSquared(p2), pow14);
+          let dt2 = Math.pow(p2.distanceToSquared(p3), pow14);
           if (dt1 < 1e-4) dt1 = 1;
           if (dt0 < 1e-4) dt0 = dt1;
           if (dt2 < 1e-4) dt2 = dt1;
@@ -20813,7 +20813,7 @@ var init_three_core = __esm({
         const normals = [];
         const inverseSegments = 1 / segments;
         const vertex = new Vector3();
-        const uv9 = new Vector2();
+        const uv10 = new Vector2();
         const normal2 = new Vector3();
         const curNormal = new Vector3();
         const prevNormal = new Vector3();
@@ -20852,17 +20852,17 @@ var init_three_core = __esm({
         }
         for (let i = 0; i <= segments; i++) {
           const phi = phiStart + i * inverseSegments * phiLength;
-          const sin14 = Math.sin(phi);
+          const sin15 = Math.sin(phi);
           const cos7 = Math.cos(phi);
           for (let j = 0; j <= points.length - 1; j++) {
-            vertex.x = points[j].x * sin14;
+            vertex.x = points[j].x * sin15;
             vertex.y = points[j].y;
             vertex.z = points[j].x * cos7;
             vertices.push(vertex.x, vertex.y, vertex.z);
-            uv9.x = i / segments;
-            uv9.y = j / (points.length - 1);
-            uvs.push(uv9.x, uv9.y);
-            const x = initNormals[3 * j + 0] * sin14;
+            uv10.x = i / segments;
+            uv10.y = j / (points.length - 1);
+            uvs.push(uv10.x, uv10.y);
+            const x = initNormals[3 * j + 0] * sin15;
             const y = initNormals[3 * j + 1];
             const z = initNormals[3 * j + 0] * cos7;
             normals.push(x, y, z);
@@ -21074,7 +21074,7 @@ var init_three_core = __esm({
         let radius = innerRadius;
         const radiusStep = (outerRadius - innerRadius) / phiSegments;
         const vertex = new Vector3();
-        const uv9 = new Vector2();
+        const uv10 = new Vector2();
         for (let j = 0; j <= phiSegments; j++) {
           for (let i = 0; i <= thetaSegments; i++) {
             const segment = thetaStart + i / thetaSegments * thetaLength;
@@ -21082,9 +21082,9 @@ var init_three_core = __esm({
             vertex.y = radius * Math.sin(segment);
             vertices.push(vertex.x, vertex.y, vertex.z);
             normals.push(0, 0, 1);
-            uv9.x = (vertex.x / outerRadius + 1) / 2;
-            uv9.y = (vertex.y / outerRadius + 1) / 2;
-            uvs.push(uv9.x, uv9.y);
+            uv10.x = (vertex.x / outerRadius + 1) / 2;
+            uv10.y = (vertex.y / outerRadius + 1) / 2;
+            uvs.push(uv10.x, uv10.y);
           }
           radius += radiusStep;
         }
@@ -21568,7 +21568,7 @@ var init_three_core = __esm({
         this.binormals = frames.binormals;
         const vertex = new Vector3();
         const normal2 = new Vector3();
-        const uv9 = new Vector2();
+        const uv10 = new Vector2();
         let P = new Vector3();
         const vertices = [];
         const normals = [];
@@ -21593,11 +21593,11 @@ var init_three_core = __esm({
           const B2 = frames.binormals[i];
           for (let j = 0; j <= radialSegments; j++) {
             const v = j / radialSegments * Math.PI * 2;
-            const sin14 = Math.sin(v);
+            const sin15 = Math.sin(v);
             const cos7 = -Math.cos(v);
-            normal2.x = cos7 * N3.x + sin14 * B2.x;
-            normal2.y = cos7 * N3.y + sin14 * B2.y;
-            normal2.z = cos7 * N3.z + sin14 * B2.z;
+            normal2.x = cos7 * N3.x + sin15 * B2.x;
+            normal2.y = cos7 * N3.y + sin15 * B2.y;
+            normal2.z = cos7 * N3.z + sin15 * B2.z;
             normal2.normalize();
             normals.push(normal2.x, normal2.y, normal2.z);
             vertex.x = P.x + radius * normal2.x;
@@ -21621,9 +21621,9 @@ var init_three_core = __esm({
         function generateUVs() {
           for (let i = 0; i <= tubularSegments; i++) {
             for (let j = 0; j <= radialSegments; j++) {
-              uv9.x = i / tubularSegments;
-              uv9.y = j / radialSegments;
-              uvs.push(uv9.x, uv9.y);
+              uv10.x = i / tubularSegments;
+              uv10.y = j / radialSegments;
+              uvs.push(uv10.x, uv10.y);
             }
           }
         }
@@ -23407,9 +23407,9 @@ var init_three_core = __esm({
         let writeIndex = 1;
         for (let i = 1; i < lastIndex; ++i) {
           let keep = false;
-          const time11 = times[i];
+          const time12 = times[i];
           const timeNext = times[i + 1];
-          if (time11 !== timeNext && (i !== 1 || time11 !== times[0])) {
+          if (time12 !== timeNext && (i !== 1 || time12 !== times[0])) {
             if (!smoothInterpolation) {
               const offset = i * stride, offsetP = offset - stride, offsetN = offset + stride;
               for (let j = 0; j !== stride; ++j) {
@@ -26168,19 +26168,19 @@ var init_three_core = __esm({
         }
         const attributes = json.data.attributes;
         for (const key in attributes) {
-          const attribute7 = attributes[key];
+          const attribute8 = attributes[key];
           let bufferAttribute2;
-          if (attribute7.isInterleavedBufferAttribute) {
-            const interleavedBuffer = getInterleavedBuffer(json.data, attribute7.data);
-            bufferAttribute2 = new InterleavedBufferAttribute(interleavedBuffer, attribute7.itemSize, attribute7.offset, attribute7.normalized);
+          if (attribute8.isInterleavedBufferAttribute) {
+            const interleavedBuffer = getInterleavedBuffer(json.data, attribute8.data);
+            bufferAttribute2 = new InterleavedBufferAttribute(interleavedBuffer, attribute8.itemSize, attribute8.offset, attribute8.normalized);
           } else {
-            const typedArray = getTypedArray(attribute7.type, attribute7.array);
-            const bufferAttributeConstr = attribute7.isInstancedBufferAttribute ? InstancedBufferAttribute : BufferAttribute;
-            bufferAttribute2 = new bufferAttributeConstr(typedArray, attribute7.itemSize, attribute7.normalized);
+            const typedArray = getTypedArray(attribute8.type, attribute8.array);
+            const bufferAttributeConstr = attribute8.isInstancedBufferAttribute ? InstancedBufferAttribute : BufferAttribute;
+            bufferAttribute2 = new bufferAttributeConstr(typedArray, attribute8.itemSize, attribute8.normalized);
           }
-          if (attribute7.name !== void 0) bufferAttribute2.name = attribute7.name;
-          if (attribute7.usage !== void 0) bufferAttribute2.setUsage(attribute7.usage);
-          if (attribute7.gpuType !== void 0) bufferAttribute2.gpuType = attribute7.gpuType;
+          if (attribute8.name !== void 0) bufferAttribute2.name = attribute8.name;
+          if (attribute8.usage !== void 0) bufferAttribute2.setUsage(attribute8.usage);
+          if (attribute8.gpuType !== void 0) bufferAttribute2.gpuType = attribute8.gpuType;
           geometry.setAttribute(key, bufferAttribute2);
         }
         const morphAttributes = json.data.morphAttributes;
@@ -26189,18 +26189,18 @@ var init_three_core = __esm({
             const attributeArray2 = morphAttributes[key];
             const array2 = [];
             for (let i = 0, il = attributeArray2.length; i < il; i++) {
-              const attribute7 = attributeArray2[i];
+              const attribute8 = attributeArray2[i];
               let bufferAttribute2;
-              if (attribute7.isInterleavedBufferAttribute) {
-                const interleavedBuffer = getInterleavedBuffer(json.data, attribute7.data);
-                bufferAttribute2 = new InterleavedBufferAttribute(interleavedBuffer, attribute7.itemSize, attribute7.offset, attribute7.normalized);
+              if (attribute8.isInterleavedBufferAttribute) {
+                const interleavedBuffer = getInterleavedBuffer(json.data, attribute8.data);
+                bufferAttribute2 = new InterleavedBufferAttribute(interleavedBuffer, attribute8.itemSize, attribute8.offset, attribute8.normalized);
               } else {
-                const typedArray = getTypedArray(attribute7.type, attribute7.array);
-                bufferAttribute2 = new BufferAttribute(typedArray, attribute7.itemSize, attribute7.normalized);
+                const typedArray = getTypedArray(attribute8.type, attribute8.array);
+                bufferAttribute2 = new BufferAttribute(typedArray, attribute8.itemSize, attribute8.normalized);
               }
-              if (attribute7.name !== void 0) bufferAttribute2.name = attribute7.name;
-              if (attribute7.usage !== void 0) bufferAttribute2.setUsage(attribute7.usage);
-              if (attribute7.gpuType !== void 0) bufferAttribute2.gpuType = attribute7.gpuType;
+              if (attribute8.name !== void 0) bufferAttribute2.name = attribute8.name;
+              if (attribute8.usage !== void 0) bufferAttribute2.setUsage(attribute8.usage);
+              if (attribute8.gpuType !== void 0) bufferAttribute2.gpuType = attribute8.gpuType;
               array2.push(bufferAttribute2);
             }
             geometry.morphAttributes[key] = array2;
@@ -29018,8 +29018,8 @@ var init_three_core = __esm({
        * @param {number} time - The start time in seconds.
        * @return {AnimationAction} A reference to this animation action.
        */
-      startAt(time11) {
-        this._startTime = time11;
+      startAt(time12) {
+        this._startTime = time12;
         return this;
       }
       /**
@@ -29237,14 +29237,14 @@ var init_three_core = __esm({
         return this._localRoot || this._mixer._root;
       }
       // Internal
-      _update(time11, deltaTime2, timeDirection, accuIndex) {
+      _update(time12, deltaTime2, timeDirection, accuIndex) {
         if (!this.enabled) {
-          this._updateWeight(time11);
+          this._updateWeight(time12);
           return;
         }
         const startTime = this._startTime;
         if (startTime !== null) {
-          const timeRunning = (time11 - startTime) * timeDirection;
+          const timeRunning = (time12 - startTime) * timeDirection;
           if (timeRunning < 0 || timeDirection === 0) {
             deltaTime2 = 0;
           } else {
@@ -29252,9 +29252,9 @@ var init_three_core = __esm({
             deltaTime2 = timeDirection * timeRunning;
           }
         }
-        deltaTime2 *= this._updateTimeScale(time11);
+        deltaTime2 *= this._updateTimeScale(time12);
         const clipTime = this._updateTime(deltaTime2);
-        const weight = this._updateWeight(time11);
+        const weight = this._updateWeight(time12);
         if (weight > 0) {
           const interpolants = this._interpolants;
           const propertyMixers = this._propertyBindings;
@@ -29274,15 +29274,15 @@ var init_three_core = __esm({
           }
         }
       }
-      _updateWeight(time11) {
+      _updateWeight(time12) {
         let weight = 0;
         if (this.enabled) {
           weight = this.weight;
           const interpolant = this._weightInterpolant;
           if (interpolant !== null) {
-            const interpolantValue = interpolant.evaluate(time11)[0];
+            const interpolantValue = interpolant.evaluate(time12)[0];
             weight *= interpolantValue;
-            if (time11 > interpolant.parameterPositions[1]) {
+            if (time12 > interpolant.parameterPositions[1]) {
               this.stopFading();
               if (interpolantValue === 0) {
                 this.enabled = false;
@@ -29293,15 +29293,15 @@ var init_three_core = __esm({
         this._effectiveWeight = weight;
         return weight;
       }
-      _updateTimeScale(time11) {
+      _updateTimeScale(time12) {
         let timeScale = 0;
         if (!this.paused) {
           timeScale = this.timeScale;
           const interpolant = this._timeScaleInterpolant;
           if (interpolant !== null) {
-            const interpolantValue = interpolant.evaluate(time11)[0];
+            const interpolantValue = interpolant.evaluate(time12)[0];
             timeScale *= interpolantValue;
-            if (time11 > interpolant.parameterPositions[1]) {
+            if (time12 > interpolant.parameterPositions[1]) {
               if (timeScale === 0) {
                 this.paused = true;
               } else {
@@ -29320,12 +29320,12 @@ var init_three_core = __esm({
       _updateTime(deltaTime2) {
         const duration = this._clip.duration;
         const loop = this.loop;
-        let time11 = this.time + deltaTime2;
+        let time12 = this.time + deltaTime2;
         let loopCount = this._loopCount;
         const pingPong = loop === LoopPingPong;
         if (deltaTime2 === 0) {
-          if (loopCount === -1) return time11;
-          return pingPong && (loopCount & 1) === 1 ? duration - time11 : time11;
+          if (loopCount === -1) return time12;
+          return pingPong && (loopCount & 1) === 1 ? duration - time12 : time12;
         }
         if (loop === LoopOnce) {
           if (loopCount === -1) {
@@ -29333,17 +29333,17 @@ var init_three_core = __esm({
             this._setEndings(true, true, false);
           }
           handle_stop: {
-            if (time11 >= duration) {
-              time11 = duration;
-            } else if (time11 < 0) {
-              time11 = 0;
+            if (time12 >= duration) {
+              time12 = duration;
+            } else if (time12 < 0) {
+              time12 = 0;
             } else {
-              this.time = time11;
+              this.time = time12;
               break handle_stop;
             }
             if (this.clampWhenFinished) this.paused = true;
             else this.enabled = false;
-            this.time = time11;
+            this.time = time12;
             this._mixer.dispatchEvent({
               type: "finished",
               action: this,
@@ -29359,16 +29359,16 @@ var init_three_core = __esm({
               this._setEndings(this.repetitions === 0, true, pingPong);
             }
           }
-          if (time11 >= duration || time11 < 0) {
-            const loopDelta = Math.floor(time11 / duration);
-            time11 -= duration * loopDelta;
+          if (time12 >= duration || time12 < 0) {
+            const loopDelta = Math.floor(time12 / duration);
+            time12 -= duration * loopDelta;
             loopCount += Math.abs(loopDelta);
             const pending = this.repetitions - loopCount;
             if (pending <= 0) {
               if (this.clampWhenFinished) this.paused = true;
               else this.enabled = false;
-              time11 = deltaTime2 > 0 ? duration : 0;
-              this.time = time11;
+              time12 = deltaTime2 > 0 ? duration : 0;
+              this.time = time12;
               this._mixer.dispatchEvent({
                 type: "finished",
                 action: this,
@@ -29382,7 +29382,7 @@ var init_three_core = __esm({
                 this._setEndings(false, false, pingPong);
               }
               this._loopCount = loopCount;
-              this.time = time11;
+              this.time = time12;
               this._mixer.dispatchEvent({
                 type: "loop",
                 action: this,
@@ -29391,13 +29391,13 @@ var init_three_core = __esm({
             }
           } else {
             this._loopCount = loopCount;
-            this.time = time11;
+            this.time = time12;
           }
           if (pingPong && (loopCount & 1) === 1) {
-            return duration - time11;
+            return duration - time12;
           }
         }
-        return time11;
+        return time12;
       }
       _setEndings(atStart, atEnd, pingPong) {
         const settings = this._interpolantSettings;
@@ -29758,10 +29758,10 @@ var init_three_core = __esm({
        */
       update(deltaTime2) {
         deltaTime2 *= this.timeScale;
-        const actions = this._actions, nActions = this._nActiveActions, time11 = this.time += deltaTime2, timeDirection = Math.sign(deltaTime2), accuIndex = this._accuIndex ^= 1;
+        const actions = this._actions, nActions = this._nActiveActions, time12 = this.time += deltaTime2, timeDirection = Math.sign(deltaTime2), accuIndex = this._accuIndex ^= 1;
         for (let i = 0; i !== nActions; ++i) {
           const action = actions[i];
-          action._update(time11, deltaTime2, timeDirection, accuIndex);
+          action._update(time12, deltaTime2, timeDirection, accuIndex);
         }
         const bindings = this._bindings, nBindings = this._nActiveBindings;
         for (let i = 0; i !== nBindings; ++i) {
@@ -29778,12 +29778,12 @@ var init_three_core = __esm({
        * @param {number} time - The time to set in seconds.
        * @return {AnimationMixer} A reference to this animation mixer.
        */
-      setTime(time11) {
+      setTime(time12) {
         this.time = 0;
         for (let i = 0; i < this._actions.length; i++) {
           this._actions[i].time = 0;
         }
-        return this.update(time11);
+        return this.update(time12);
       }
       /**
        * Returns this mixer's root object.
@@ -31286,10 +31286,10 @@ var init_three_core = __esm({
         color1 = new Color(color1);
         color22 = new Color(color22);
         const center = divisions / 2;
-        const step8 = size / divisions;
+        const step9 = size / divisions;
         const halfSize = size / 2;
         const vertices = [], colors = [];
-        for (let i = 0, j = 0, k = -halfSize; i <= divisions; i++, k += step8) {
+        for (let i = 0, j = 0, k = -halfSize; i <= divisions; i++, k += step9) {
           vertices.push(-halfSize, 0, k, halfSize, 0, k);
           vertices.push(k, 0, -halfSize, k, 0, halfSize);
           const color9 = i === center ? color1 : color22;
@@ -34295,6 +34295,7 @@ __export(textures_exports, {
   hasTextureWorkers: () => hasTextureWorkers,
   macroTexture: () => macroTexture,
   microTexture: () => microTexture,
+  setTextureAnisotropy: () => setTextureAnisotropy,
   setTextureCacheEnabled: () => setTextureCacheEnabled,
   setTextureWorkerFactory: () => setTextureWorkerFactory,
   spriteTexture: () => spriteTexture,
@@ -34604,6 +34605,12 @@ function detailNormalTexture(kind) {
 }
 function microTexture() {
   return detailNormalTexture("grit");
+}
+function setTextureAnisotropy(a) {
+  for (const set of cache2.values()) for (const t of [set.map, set.normalMap, set.rhMap, set.emissiveMap]) if (t && t.anisotropy !== a) {
+    t.anisotropy = a;
+    t.needsUpdate = true;
+  }
 }
 var cache2, texKey, workerFactory, textureStats, storeOn, codeHash, inflight, hasTextureWorkers, macroTex, detailCache;
 var init_textures = __esm({
@@ -35036,8 +35043,8 @@ var init_audio = __esm({
         this.roarFilter.frequency.setTargetAtTime(500 + speed * 5 + (boost ? 900 : 0), t, 0.1);
         this.slideGain.gain.setTargetAtTime(x.slide * 0.09, t, 0.05);
         this.slideFilter.frequency.setTargetAtTime(1500 + speed * 6, t, 0.1);
-        this.rainGain.gain.setTargetAtTime(x.rain * (0.085 + 0.06 * x.rain) * (1 - x.enclosure * 0.6), t, 0.3);
-        this.howlGain.gain.setTargetAtTime(x.wind * 0.07, t, 0.25);
+        this.rainGain.gain.setTargetAtTime(x.rain * (0.11 + 0.1 * x.rain) * (1 - x.enclosure * 0.6), t, 0.3);
+        this.howlGain.gain.setTargetAtTime(x.wind * 0.12, t, 0.25);
         this.howlFilter.frequency.setTargetAtTime(260 + x.wind * 320 + Math.sin(t * 0.7) * 70, t, 0.3);
         this.echoSend.gain.setTargetAtTime(x.enclosure * 0.5, t, 0.15);
         if (world) {
@@ -40200,9 +40207,9 @@ var saturate = (value) => clamp2(value);
 var refract = /* @__PURE__ */ nodeProxyAssignable(MathNode, MathNode.REFRACT).setParameterLength(3);
 var smoothstep2 = /* @__PURE__ */ nodeProxyAssignable(MathNode, MathNode.SMOOTHSTEP).setParameterLength(3);
 var faceForward = /* @__PURE__ */ nodeProxyAssignable(MathNode, MathNode.FACEFORWARD).setParameterLength(3);
-var rand = /* @__PURE__ */ Fn(([uv9]) => {
+var rand = /* @__PURE__ */ Fn(([uv10]) => {
   const a = 12.9898, b = 78.233, c = 43758.5453;
-  const dt = dot(uv9.xy, vec2(a, b)), sn = mod(dt, PI);
+  const dt = dot(uv10.xy, vec2(a, b)), sn = mod(dt, PI);
   return fract(sin(sn).mul(c));
 }, { uv: "vec2", return: "float" });
 var mixElement = (t, e1, e2) => mix(e1, e2, t);
@@ -41968,8 +41975,8 @@ var AttributeNode = class extends Node {
     if (nodeType === null) {
       const attributeName = this.getAttributeName(builder);
       if (builder.hasGeometryAttribute(attributeName)) {
-        const attribute7 = builder.geometry.getAttribute(attributeName);
-        nodeType = builder.getTypeFromAttribute(attribute7);
+        const attribute8 = builder.geometry.getAttribute(attributeName);
+        nodeType = builder.getTypeFromAttribute(attribute8);
       } else {
         nodeType = "float";
       }
@@ -42004,8 +42011,8 @@ var AttributeNode = class extends Node {
     const nodeType = this.getNodeType(builder);
     const geometryAttribute = builder.hasGeometryAttribute(attributeName);
     if (geometryAttribute === true) {
-      const attribute7 = builder.geometry.getAttribute(attributeName);
-      const attributeType = builder.getTypeFromAttribute(attribute7);
+      const attribute8 = builder.geometry.getAttribute(attributeName);
+      const attributeType = builder.getTypeFromAttribute(attribute8);
       const nodeAttribute = builder.getAttribute(attributeName, attributeType);
       if (builder.shaderStage === "vertex") {
         return builder.format(nodeAttribute.name, attributeType, nodeType);
@@ -43401,14 +43408,14 @@ var tri = /* @__PURE__ */ Fn(([x]) => {
 var tri3 = /* @__PURE__ */ Fn(([p]) => {
   return vec3(tri(p.z.add(tri(p.y.mul(1)))), tri(p.z.add(tri(p.x.mul(1)))), tri(p.y.add(tri(p.x.mul(1)))));
 }, { p: "vec3", return: "vec3" });
-var triNoise3D = /* @__PURE__ */ Fn(([position, speed, time11]) => {
+var triNoise3D = /* @__PURE__ */ Fn(([position, speed, time12]) => {
   const p = vec3(position).toVar();
   const z = float(1.4).toVar();
   const rz = float(0).toVar();
   const bp = vec3(p).toVar();
   Loop({ start: float(0), end: float(3), type: "float", condition: "<=" }, () => {
     const dg = vec3(tri3(bp.mul(2))).toVar();
-    p.addAssign(dg.add(time11.mul(float(0.1).mul(speed))));
+    p.addAssign(dg.add(time12.mul(float(0.1).mul(speed))));
     bp.mulAssign(1.8);
     z.mulAssign(1.5);
     p.mulAssign(1.2);
@@ -44182,9 +44189,9 @@ var equirectUV = /* @__PURE__ */ Fn(([direction = positionWorldDirection]) => {
   const v = direction.y.clamp(-1, 1).asin().mul(1 / Math.PI).add(0.5);
   return vec2(u, v);
 });
-var equirectDirection = /* @__PURE__ */ Fn(([uv9 = uv$1()]) => {
-  const theta = uv9.x.sub(0.5).mul(Math.PI * 2);
-  const phi = uv9.y.sub(0.5).mul(Math.PI);
+var equirectDirection = /* @__PURE__ */ Fn(([uv10 = uv$1()]) => {
+  const theta = uv10.x.sub(0.5).mul(Math.PI * 2);
+  const phi = uv10.y.sub(0.5).mul(Math.PI);
   const cosPhi = phi.cos();
   const x = cosPhi.mul(theta.cos());
   const y = phi.sin();
@@ -44533,15 +44540,15 @@ function replaceDefaultUV(callback, node = null) {
   const getUV = typeof callback === "function" ? callback : () => callback;
   return context(node, { getUV });
 }
-var rotateUV = /* @__PURE__ */ Fn(([uv9, rotation, center = vec2(0.5)]) => {
-  return rotate(uv9.sub(center), rotation).add(center);
+var rotateUV = /* @__PURE__ */ Fn(([uv10, rotation, center = vec2(0.5)]) => {
+  return rotate(uv10.sub(center), rotation).add(center);
 }, { uv: "vec2", rotation: "float", center: "vec2", return: "vec2" });
-var spherizeUV = /* @__PURE__ */ Fn(([uv9, strength, center = vec2(0.5)]) => {
-  const delta = uv9.sub(center);
+var spherizeUV = /* @__PURE__ */ Fn(([uv10, strength, center = vec2(0.5)]) => {
+  const delta = uv10.sub(center);
   const delta2 = delta.dot(delta);
   const delta4 = delta2.mul(delta2);
   const deltaOffset = delta4.mul(strength);
-  return uv9.add(delta.mul(deltaOffset));
+  return uv10.add(delta.mul(deltaOffset));
 }, { uv: "vec2", strength: "float", center: "vec2", return: "vec2" });
 var billboarding = /* @__PURE__ */ Fn(({ position = null, horizontal = true, vertical = false, horizontalRotation = false }) => {
   let center;
@@ -45219,7 +45226,7 @@ var uniformTexture = (value = EmptyTexture$1) => {
   return textureNode;
 };
 var textureLoad = (...params) => texture(...params).setSampler(false);
-var textureLevel = (value, uv9, level) => texture(value, uv9).level(level);
+var textureLevel = (value, uv10, level) => texture(value, uv10).level(level);
 var sampler = (value) => (value.isNode === true ? value : texture(value)).convert("sampler");
 var samplerComparison = (value) => (value.isNode === true ? value : texture(value)).convert("samplerComparison");
 var _size$3 = /* @__PURE__ */ new Vector2();
@@ -45318,7 +45325,7 @@ var ViewportTextureNode = class extends TextureNode {
 var viewportTexture = /* @__PURE__ */ nodeProxy(ViewportTextureNode).setParameterLength(0, 3);
 var viewportMipTexture = /* @__PURE__ */ nodeProxy(ViewportTextureNode, null, null, { generateMipmaps: true }).setParameterLength(0, 3);
 var _singletonOpaqueViewportTextureNode = /* @__PURE__ */ viewportMipTexture();
-var viewportOpaqueMipTexture = (uv9 = screenUV, level = null) => _singletonOpaqueViewportTextureNode.sample(uv9, level);
+var viewportOpaqueMipTexture = (uv10 = screenUV, level = null) => _singletonOpaqueViewportTextureNode.sample(uv10, level);
 var _sharedDepthbuffer = null;
 var ViewportDepthTextureNode = class extends ViewportTextureNode {
   static get type() {
@@ -45440,10 +45447,10 @@ var depth = /* @__PURE__ */ nodeImmutable(ViewportDepthNode, ViewportDepthNode.D
 var linearDepth = /* @__PURE__ */ nodeProxy(ViewportDepthNode, ViewportDepthNode.LINEAR_DEPTH).setParameterLength(0, 1);
 var viewportLinearDepth = /* @__PURE__ */ linearDepth(viewportDepthTexture());
 depth.assign = (value) => depthBase(value);
-var viewportSafeUV = /* @__PURE__ */ Fn(([uv9 = null]) => {
+var viewportSafeUV = /* @__PURE__ */ Fn(([uv10 = null]) => {
   const depth2 = linearDepth();
-  const depthDiff = linearDepth(viewportDepthTexture(uv9)).sub(depth2);
-  const finalUV = depthDiff.lessThan(0).select(screenUV, uv9);
+  const depthDiff = linearDepth(viewportDepthTexture(uv10)).sub(depth2);
+  const finalUV = depthDiff.lessThan(0).select(screenUV, uv10);
   return finalUV;
 });
 var spritesheetUV = /* @__PURE__ */ Fn(([countNode, uvNode = uv$1(), frameNode = float(0)]) => {
@@ -46162,7 +46169,7 @@ var bitangentView = /* @__PURE__ */ Fn((builder) => {
 var bitangentWorld = /* @__PURE__ */ getBitangent(normalWorld.cross(tangentWorld), "v_bitangentWorld").normalize().toVar("bitangentWorld");
 var TBNViewMatrix = /* @__PURE__ */ mat3(tangentView, bitangentView, normalView).toVar("TBNViewMatrix");
 var parallaxDirection = /* @__PURE__ */ positionViewDirection.mul(TBNViewMatrix);
-var parallaxUV = (uv9, scale3) => uv9.sub(parallaxDirection.mul(scale3));
+var parallaxUV = (uv10, scale3) => uv10.sub(parallaxDirection.mul(scale3));
 var bentNormalView = /* @__PURE__ */ Fn(() => {
   let bentNormal = anisotropyB.cross(positionViewDirection);
   bentNormal = bentNormal.cross(anisotropyB).normalize();
@@ -46912,21 +46919,21 @@ var StorageBufferNode = class extends BufferNode {
     if (builder.isAvailable("storageBuffer") || builder.isAvailable("indirectStorageBuffer")) {
       return super.generate(builder);
     }
-    const { attribute: attribute7, varying: varying3 } = this.getAttributeData();
+    const { attribute: attribute8, varying: varying3 } = this.getAttributeData();
     const output3 = varying3.build(builder);
-    builder.registerTransform(output3, attribute7);
-    return builder.format(output3, attribute7.getNodeType(builder), this.getNodeType(builder));
+    builder.registerTransform(output3, attribute8);
+    return builder.format(output3, attribute8.getNodeType(builder), this.getNodeType(builder));
   }
 };
 var storage = (value, type = null, count = 0) => new StorageBufferNode(value, type, count);
 var _columns = /* @__PURE__ */ new WeakMap();
-function getAttributeColumn(attribute7, type, offset) {
-  let columns = _columns.get(attribute7);
+function getAttributeColumn(attribute8, type, offset) {
+  let columns = _columns.get(attribute8);
   if (columns === void 0) {
     columns = [];
-    _columns.set(attribute7, columns);
+    _columns.set(attribute8, columns);
   }
-  return columns[offset] || (columns[offset] = new InterleavedBufferAttribute(attribute7, getLengthFromType(type), offset));
+  return columns[offset] || (columns[offset] = new InterleavedBufferAttribute(attribute8, getLengthFromType(type), offset));
 }
 var ReferenceBufferAttributeNode = class extends BufferAttributeNode {
   static get type() {
@@ -46960,9 +46967,9 @@ var ReferenceBufferAttributeNode = class extends BufferAttributeNode {
    * @return {?(BufferAttribute|InterleavedBufferAttribute)} The buffer attribute.
    */
   getObjectAttribute(object) {
-    const attribute7 = this.referenceNode.getAttribute(object);
-    if (!attribute7 || this.bufferStride === 0) return attribute7;
-    return getAttributeColumn(attribute7, this.bufferType, this.bufferOffset);
+    const attribute8 = this.referenceNode.getAttribute(object);
+    if (!attribute8 || this.bufferStride === 0) return attribute8;
+    return getAttributeColumn(attribute8, this.bufferType, this.bufferOffset);
   }
   /**
    * The attribute of the object the program is built for defines the layout.
@@ -47021,8 +47028,8 @@ var ReferenceAttributeNode = class extends Node {
    */
   generateNodeType(builder) {
     if (this.nodeType !== null) return this.nodeType;
-    const attribute7 = this.getAttribute(builder.object);
-    return attribute7 ? builder.getTypeFromAttribute(attribute7) : "float";
+    const attribute8 = this.getAttribute(builder.object);
+    return attribute8 ? builder.getTypeFromAttribute(attribute8) : "float";
   }
   /**
    * Sets up the attribute nodes.
@@ -47031,12 +47038,12 @@ var ReferenceAttributeNode = class extends Node {
    * @return {Node} The attribute node.
    */
   setup(builder) {
-    const attribute7 = this.getAttribute(builder.object);
-    if (!attribute7) throw new Error(`THREE.ReferenceAttributeNode: Attribute "${this.property}" not found.`);
+    const attribute8 = this.getAttribute(builder.object);
+    if (!attribute8) throw new Error(`THREE.ReferenceAttributeNode: Attribute "${this.property}" not found.`);
     const type = this.getNodeType(builder);
-    if (attribute7.isStorageBufferAttribute === true || attribute7.isStorageInstancedBufferAttribute === true) {
-      const index = attribute7.isStorageInstancedBufferAttribute === true ? instanceIndex : vertexIndex;
-      return storage(attribute7, type, Math.max(attribute7.count, 1)).onObjectUpdate(({ object }) => this.getAttribute(object)).element(index);
+    if (attribute8.isStorageBufferAttribute === true || attribute8.isStorageInstancedBufferAttribute === true) {
+      const index = attribute8.isStorageInstancedBufferAttribute === true ? instanceIndex : vertexIndex;
+      return storage(attribute8, type, Math.max(attribute8.count, 1)).onObjectUpdate(({ object }) => this.getAttribute(object)).element(index);
     }
     if (type === "mat4") {
       return mat4(...[0, 4, 8, 12].map((offset) => new ReferenceBufferAttributeNode(this, "vec4", 16, offset)));
@@ -48060,10 +48067,10 @@ var NodeMaterialObserver = class {
   getAttributesData(attributes) {
     const attributesData = {};
     for (const name in attributes) {
-      const attribute7 = attributes[name];
+      const attribute8 = attributes[name];
       attributesData[name] = {
-        id: attribute7.isInterleavedBufferAttribute ? attribute7.data.uuid : attribute7.id,
-        version: attribute7.isInterleavedBufferAttribute ? attribute7.data.version : attribute7.version
+        id: attribute8.isInterleavedBufferAttribute ? attribute8.data.uuid : attribute8.id,
+        version: attribute8.isInterleavedBufferAttribute ? attribute8.data.version : attribute8.version
       };
     }
     return attributesData;
@@ -48279,14 +48286,14 @@ var NodeMaterialObserver = class {
       for (const name in storedAttributes) {
         storedAttributeCount++;
         const storedAttributeData = storedAttributes[name];
-        const attribute7 = attributes[name];
-        if (attribute7 === void 0) {
+        const attribute8 = attributes[name];
+        if (attribute8 === void 0) {
           delete storedAttributes[name];
           changed = true;
           continue;
         }
-        const id = attribute7.isInterleavedBufferAttribute ? attribute7.data.uuid : attribute7.id;
-        const version = attribute7.isInterleavedBufferAttribute ? attribute7.data.version : attribute7.version;
+        const id = attribute8.isInterleavedBufferAttribute ? attribute8.data.uuid : attribute8.id;
+        const version = attribute8.isInterleavedBufferAttribute ? attribute8.data.version : attribute8.version;
         if (storedAttributeData.id !== id || storedAttributeData.version !== version) {
           storedAttributeData.id = id;
           storedAttributeData.version = version;
@@ -49187,9 +49194,9 @@ var QuadGeometry = class extends BufferGeometry {
    */
   constructor(flipY = false) {
     super();
-    const uv9 = flipY === false ? [0, -1, 0, 1, 2, 1] : [0, 2, 0, 0, 2, 0];
+    const uv10 = flipY === false ? [0, -1, 0, 1, 2, 1] : [0, 2, 0, 0, 2, 0];
     this.setAttribute("position", new Float32BufferAttribute([-1, 3, 0, -1, -1, 0, 3, -1, 0], 3));
-    this.setAttribute("uv", new Float32BufferAttribute(uv9, 2));
+    this.setAttribute("uv", new Float32BufferAttribute(uv10, 2));
   }
 };
 var _geometry2 = /* @__PURE__ */ new QuadGeometry();
@@ -49510,9 +49517,9 @@ var getScreenPositionFromClip = /* @__PURE__ */ Fn(([clipPosition]) => {
   const screen = clipPosition.xy.div(clipPosition.w).mul(0.5).add(0.5).toVar();
   return vec2(screen.x, screen.y.oneMinus());
 }, { clipPosition: "vec4", return: "vec2" });
-var getNormalFromDepth = /* @__PURE__ */ Fn(([uv9, depthTexture, projectionMatrixInverse]) => {
+var getNormalFromDepth = /* @__PURE__ */ Fn(([uv10, depthTexture, projectionMatrixInverse]) => {
   const size = textureSize(textureLoad(depthTexture));
-  const p = ivec2(uv9.mul(size)).toVar();
+  const p = ivec2(uv10.mul(size)).toVar();
   const c0 = textureLoad(depthTexture, p).toVar();
   const l2 = textureLoad(depthTexture, p.sub(ivec2(2, 0))).toVar();
   const l1 = textureLoad(depthTexture, p.sub(ivec2(1, 0))).toVar();
@@ -49526,9 +49533,9 @@ var getNormalFromDepth = /* @__PURE__ */ Fn(([uv9, depthTexture, projectionMatri
   const dr = abs(sub(float(2).mul(r1).sub(r2), c0)).toVar();
   const db = abs(sub(float(2).mul(b1).sub(b2), c0)).toVar();
   const dt = abs(sub(float(2).mul(t1).sub(t2), c0)).toVar();
-  const ce = getViewPosition(uv9, c0, projectionMatrixInverse).toVar();
-  const dpdx = dl.lessThan(dr).select(ce.sub(getViewPosition(uv9.sub(vec2(float(1).div(size.x), 0)), l1, projectionMatrixInverse)), ce.negate().add(getViewPosition(uv9.add(vec2(float(1).div(size.x), 0)), r1, projectionMatrixInverse)));
-  const dpdy = db.lessThan(dt).select(ce.sub(getViewPosition(uv9.add(vec2(0, float(1).div(size.y))), b1, projectionMatrixInverse)), ce.negate().add(getViewPosition(uv9.sub(vec2(0, float(1).div(size.y))), t1, projectionMatrixInverse)));
+  const ce = getViewPosition(uv10, c0, projectionMatrixInverse).toVar();
+  const dpdx = dl.lessThan(dr).select(ce.sub(getViewPosition(uv10.sub(vec2(float(1).div(size.x), 0)), l1, projectionMatrixInverse)), ce.negate().add(getViewPosition(uv10.add(vec2(float(1).div(size.x), 0)), r1, projectionMatrixInverse)));
+  const dpdy = db.lessThan(dt).select(ce.sub(getViewPosition(uv10.add(vec2(0, float(1).div(size.y))), b1, projectionMatrixInverse)), ce.negate().add(getViewPosition(uv10.sub(vec2(0, float(1).div(size.y))), t1, projectionMatrixInverse)));
   return normalize2(cross(dpdx, dpdy));
 });
 var interleavedGradientNoise = /* @__PURE__ */ Fn(([position]) => {
@@ -49580,11 +49587,11 @@ var SampleNode = class extends Node {
    * @param {Node<vec2>} uv - The UV node or value to be passed to the callback.
    * @returns {Node} The result of the callback function.
    */
-  sample(uv9) {
-    return this.callback(uv9);
+  sample(uv10) {
+    return this.callback(uv10);
   }
 };
-var sample = (callback, uv9 = null) => new SampleNode(callback, nodeObject(uv9));
+var sample = (callback, uv10 = null) => new SampleNode(callback, nodeObject(uv10));
 var StorageInstancedBufferAttribute = class extends InstancedBufferAttribute {
   /**
    * Constructs a new storage instanced buffer attribute.
@@ -49940,26 +49947,26 @@ var StorageTexture3DNode = class extends StorageTextureNode {
   }
 };
 var storageTexture3D = /* @__PURE__ */ nodeProxy(StorageTexture3DNode).setParameterLength(1, 3);
-var normal = /* @__PURE__ */ Fn(({ texture: texture9, uv: uv9 }) => {
+var normal = /* @__PURE__ */ Fn(({ texture: texture9, uv: uv10 }) => {
   const epsilon = 1e-4;
   const ret = vec3().toVar();
-  If(uv9.x.lessThan(epsilon), () => {
+  If(uv10.x.lessThan(epsilon), () => {
     ret.assign(vec3(1, 0, 0));
-  }).ElseIf(uv9.y.lessThan(epsilon), () => {
+  }).ElseIf(uv10.y.lessThan(epsilon), () => {
     ret.assign(vec3(0, 1, 0));
-  }).ElseIf(uv9.z.lessThan(epsilon), () => {
+  }).ElseIf(uv10.z.lessThan(epsilon), () => {
     ret.assign(vec3(0, 0, 1));
-  }).ElseIf(uv9.x.greaterThan(1 - epsilon), () => {
+  }).ElseIf(uv10.x.greaterThan(1 - epsilon), () => {
     ret.assign(vec3(-1, 0, 0));
-  }).ElseIf(uv9.y.greaterThan(1 - epsilon), () => {
+  }).ElseIf(uv10.y.greaterThan(1 - epsilon), () => {
     ret.assign(vec3(0, -1, 0));
-  }).ElseIf(uv9.z.greaterThan(1 - epsilon), () => {
+  }).ElseIf(uv10.z.greaterThan(1 - epsilon), () => {
     ret.assign(vec3(0, 0, -1));
   }).Else(() => {
-    const step8 = 0.01;
-    const x = texture9.sample(uv9.add(vec3(-step8, 0, 0))).r.sub(texture9.sample(uv9.add(vec3(step8, 0, 0))).r);
-    const y = texture9.sample(uv9.add(vec3(0, -step8, 0))).r.sub(texture9.sample(uv9.add(vec3(0, step8, 0))).r);
-    const z = texture9.sample(uv9.add(vec3(0, 0, -step8))).r.sub(texture9.sample(uv9.add(vec3(0, 0, step8))).r);
+    const step9 = 0.01;
+    const x = texture9.sample(uv10.add(vec3(-step9, 0, 0))).r.sub(texture9.sample(uv10.add(vec3(step9, 0, 0))).r);
+    const y = texture9.sample(uv10.add(vec3(0, -step9, 0))).r.sub(texture9.sample(uv10.add(vec3(0, step9, 0))).r);
+    const z = texture9.sample(uv10.add(vec3(0, 0, -step9))).r.sub(texture9.sample(uv10.add(vec3(0, 0, step9))).r);
     ret.assign(vec3(x, y, z));
   });
   return ret.normalize();
@@ -52293,8 +52300,8 @@ var BasicShadowFilter = /* @__PURE__ */ Fn(({ depthTexture, shadowCoord, depthLa
   return basic.compare(shadowCoord.z);
 });
 var PCFShadowFilter = /* @__PURE__ */ Fn(({ depthTexture, shadowCoord, shadow: shadow2, depthLayer }) => {
-  const depthCompare = (uv9, compare) => {
-    let depth2 = texture(depthTexture, uv9);
+  const depthCompare = (uv10, compare) => {
+    let depth2 = texture(depthTexture, uv10);
     if (depthTexture.isArrayTexture) {
       depth2 = depth2.depth(depthLayer);
     }
@@ -53230,9 +53237,9 @@ var ggxIntegration = /* @__PURE__ */ Fn(({ roughness: roughness3, sourceLod, sou
   Loop({ start: int(0), end: int(3), name: "face" }, ({ face }) => {
     Loop({ start: int(0), end: sourceSize, name: "y" }, ({ y }) => {
       Loop({ start: int(0), end: sourceSize, name: "x" }, ({ x }) => {
-        const uv9 = vec2(x, y).add(0.5).mul(texelSize).sub(1).toConst();
-        const texelDirection = select(face.equal(0), vec3(1, uv9), select(face.equal(1), vec3(uv9.x, 1, uv9.y), vec3(uv9, 1))).toVar();
-        const invDistance = inverseSqrt(dot(uv9, uv9).add(1)).toConst();
+        const uv10 = vec2(x, y).add(0.5).mul(texelSize).sub(1).toConst();
+        const texelDirection = select(face.equal(0), vec3(1, uv10), select(face.equal(1), vec3(uv10.x, 1, uv10.y), vec3(uv10, 1))).toVar();
+        const invDistance = inverseSqrt(dot(uv10, uv10).add(1)).toConst();
         const NdotL = dot(N3, texelDirection).toVar();
         texelDirection.mulAssign(select(NdotL.lessThan(0), -1, 1));
         NdotL.assign(abs(NdotL).mul(invDistance));
@@ -53870,9 +53877,9 @@ function isEquirectangularMapReady(image) {
 }
 var pmremTexture = /* @__PURE__ */ nodeProxy(PMREMNode).setParameterLength(1, 3);
 var checker = /* @__PURE__ */ Fn(([coord = uv$1()]) => {
-  const uv9 = coord.mul(2);
-  const cx = uv9.x.floor();
-  const cy = uv9.y.floor();
+  const uv10 = coord.mul(2);
+  const cx = uv10.x.floor();
+  const cy = uv10.y.floor();
   const result = cx.add(cy).mod(2);
   return result.sign();
 }, { coord: "vec2", return: "float" });
@@ -55015,7 +55022,7 @@ var mx_aastep = (threshold, value) => {
   const afwidth = vec2(value.dFdx(), value.dFdy()).length().mul(0.7071067811865476);
   return smoothstep2(threshold.sub(afwidth), threshold.add(afwidth), value);
 };
-var _ramp = (a, b, uv9, p) => mix(a, b, uv9[p].clamp());
+var _ramp = (a, b, uv10, p) => mix(a, b, uv10[p].clamp());
 var mx_ramplr = (valuel, valuer, texcoord = uv$1()) => _ramp(valuel, valuer, texcoord, "x");
 var mx_ramptb = (valueb, valuet, texcoord = uv$1()) => _ramp(valueb, valuet, texcoord, "y");
 var mx_ramp4 = (valuetl, valuetr, valuebl, valuebr, texcoord = uv$1()) => {
@@ -55025,7 +55032,7 @@ var mx_ramp4 = (valuetl, valuetr, valuebl, valuebr, texcoord = uv$1()) => {
   const bottom = mix(valuebl, valuebr, u);
   return mix(bottom, top, v);
 };
-var _split = (a, b, center, uv9, p) => mix(a, b, mx_aastep(center, uv9[p]));
+var _split = (a, b, center, uv10, p) => mix(a, b, mx_aastep(center, uv10[p]));
 var mx_splitlr = (valuel, valuer, center, texcoord = uv$1()) => _split(valuel, valuer, center, texcoord, "x");
 var mx_splittb = (valueb, valuet, center, texcoord = uv$1()) => _split(valueb, valuet, center, texcoord, "y");
 var mx_transform_uv = (uv_scale = 1, uv_offset = 0, uv_geo = uv$1()) => uv_geo.mul(uv_scale).add(uv_offset);
@@ -55779,8 +55786,8 @@ var DFGLUT = /* @__PURE__ */ Fn(({ roughness: roughness3, dotNV }) => {
     lut.generateMipmaps = false;
     lut.needsUpdate = true;
   }
-  const uv9 = vec2(roughness3, dotNV);
-  return texture(lut, uv9).rg;
+  const uv10 = vec2(roughness3, dotNV);
+  return texture(lut, uv10).rg;
 });
 var EnvironmentBRDF = /* @__PURE__ */ Fn((inputs) => {
   const { dotNV, specularColor: specularColor2, specularF90: specularF902, roughness: roughness3 } = inputs;
@@ -55798,9 +55805,9 @@ var LTC_Uv = /* @__PURE__ */ Fn(({ N: N3, V: V2, roughness: roughness3 }) => {
   const LUT_SCALE = (LUT_SIZE - 1) / LUT_SIZE;
   const LUT_BIAS = 0.5 / LUT_SIZE;
   const dotNV = N3.dot(V2).saturate();
-  const uv9 = vec2(roughness3, dotNV.oneMinus().sqrt());
-  uv9.assign(uv9.mul(LUT_SCALE).add(LUT_BIAS));
-  return uv9;
+  const uv10 = vec2(roughness3, dotNV.oneMinus().sqrt());
+  uv10.assign(uv10.mul(LUT_SCALE).add(LUT_BIAS));
+  return uv10;
 }, { N: "vec3", V: "vec3", roughness: "float", return: "vec2" });
 var LTC_ClippedSphereFormFactor = /* @__PURE__ */ Fn(({ f }) => {
   const l = f.length();
@@ -57850,9 +57857,9 @@ var PhysicalLightingModel = class extends LightingModel {
     const N3 = normalView;
     const V2 = positionViewDirection;
     const P = positionView.toVar();
-    const uv9 = LTC_Uv({ N: N3, V: V2, roughness });
-    const t1 = ltc_1.sample(uv9).toVar();
-    const t2 = ltc_2.sample(uv9).toVar();
+    const uv10 = LTC_Uv({ N: N3, V: V2, roughness });
+    const t1 = ltc_1.sample(uv10).toVar();
+    const t2 = ltc_2.sample(uv10).toVar();
     const mInv = mat3(
       vec3(t1.x, 0, t1.y),
       vec3(0, 1, 0),
@@ -58548,12 +58555,12 @@ var MeshMatcapNodeMaterial = class extends NodeMaterial {
    * @param {NodeBuilder} builder - The current node builder.
    */
   setupVariants(builder) {
-    const uv9 = matcapUV;
+    const uv10 = matcapUV;
     let matcapColor;
     if (builder.material.matcap) {
-      matcapColor = materialReference("matcap", "texture").context({ getUV: () => uv9 });
+      matcapColor = materialReference("matcap", "texture").context({ getUV: () => uv10 });
     } else {
-      matcapColor = vec3(mix(0.2, 0.8, uv9.y));
+      matcapColor = vec3(mix(0.2, 0.8, uv10.y));
     }
     diffuseColor.rgb.mulAssign(matcapColor.rgb);
   }
@@ -58898,7 +58905,7 @@ var Animation = class {
    */
   start() {
     if (this._requestId !== null) return;
-    const update = (time11, xrFrame) => {
+    const update = (time12, xrFrame) => {
       this._requestId = this._context.requestAnimationFrame(update);
       if (this.renderer._inspector.isRunning) {
         this.renderer._inspector.finish();
@@ -58908,7 +58915,7 @@ var Animation = class {
       this.info.frame = this.nodes.nodeFrame.frameId;
       this.renderer._inspector.begin();
       if (this._animationLoop !== null) {
-        this._animationLoop(time11, xrFrame);
+        this._animationLoop(time12, xrFrame);
       }
     };
     update();
@@ -58986,9 +58993,9 @@ function getKeys(obj) {
   for (let i = 0; i < protoKeys.length; i++) keys.push(protoKeys[i]);
   return keys;
 }
-function getInstanceDataKey(attribute7) {
-  if (attribute7 === null || attribute7 === void 0) return "-";
-  return attribute7.isStorageInstancedBufferAttribute === true ? "s" : "a";
+function getInstanceDataKey(attribute8) {
+  if (attribute8 === null || attribute8 === void 0) return "-";
+  return attribute8.isStorageInstancedBufferAttribute === true ? "s" : "a";
 }
 var RenderObject = class {
   /**
@@ -59190,22 +59197,22 @@ var RenderObject = class {
     const vertexBuffers = /* @__PURE__ */ new Set();
     const attributesId = {};
     for (const nodeAttribute of nodeAttributes) {
-      let attribute7;
+      let attribute8;
       if (nodeAttribute.node && nodeAttribute.node.attribute) {
-        attribute7 = nodeAttribute.node.getObjectAttribute(this.object);
+        attribute8 = nodeAttribute.node.getObjectAttribute(this.object);
       } else {
-        attribute7 = geometry.getAttribute(nodeAttribute.name);
-        if (attribute7 !== void 0) {
-          if (attribute7.isInterleavedBufferAttribute) {
-            attributesId[nodeAttribute.name] = attribute7.data.uuid;
+        attribute8 = geometry.getAttribute(nodeAttribute.name);
+        if (attribute8 !== void 0) {
+          if (attribute8.isInterleavedBufferAttribute) {
+            attributesId[nodeAttribute.name] = attribute8.data.uuid;
           } else {
-            attributesId[nodeAttribute.name] = attribute7.id;
+            attributesId[nodeAttribute.name] = attribute8.id;
           }
         }
       }
-      if (attribute7 === void 0) continue;
-      attributes.push(attribute7);
-      const bufferAttribute2 = attribute7.isInterleavedBufferAttribute ? attribute7.data : attribute7;
+      if (attribute8 === void 0) continue;
+      attributes.push(attribute8);
+      const bufferAttribute2 = attribute8.isInterleavedBufferAttribute ? attribute8.data : attribute8;
       vertexBuffers.add(bufferAttribute2);
     }
     this.attributes = attributes;
@@ -59282,17 +59289,17 @@ var RenderObject = class {
     const { geometry } = this;
     let cacheKey = "";
     for (const name of Object.keys(geometry.attributes).sort()) {
-      const attribute7 = geometry.attributes[name];
+      const attribute8 = geometry.attributes[name];
       cacheKey += name + ",";
-      if (attribute7.itemSize) cacheKey += attribute7.itemSize + ",";
-      if (attribute7.normalized) cacheKey += "n,";
+      if (attribute8.itemSize) cacheKey += attribute8.itemSize + ",";
+      if (attribute8.normalized) cacheKey += "n,";
     }
     for (const name of Object.keys(geometry.morphAttributes).sort()) {
       const targets = geometry.morphAttributes[name];
       cacheKey += "morph-" + name + ",";
       for (let i = 0, l = targets.length; i < l; i++) {
-        const attribute7 = targets[i];
-        cacheKey += attribute7.id + ",";
+        const attribute8 = targets[i];
+        cacheKey += attribute8.id + ",";
       }
     }
     return cacheKey;
@@ -59376,17 +59383,17 @@ var RenderObject = class {
     if (this.attributes !== null) {
       const attributesId = this.attributesId;
       for (const name in attributesId) {
-        const attribute7 = this.geometry.getAttribute(name);
-        if (attribute7 === void 0) return true;
-        const id = attribute7.isInterleavedBufferAttribute ? attribute7.data.uuid : attribute7.id;
+        const attribute8 = this.geometry.getAttribute(name);
+        if (attribute8 === void 0) return true;
+        const id = attribute8.isInterleavedBufferAttribute ? attribute8.data.uuid : attribute8.id;
         if (attributesId[name] !== id) {
           return true;
         }
       }
       for (const { node } of this.getNodeBuilderState().nodeAttributes) {
         if (node && node.attribute) {
-          const attribute7 = node.getObjectAttribute(this.object);
-          if (attribute7 && this.attributes.includes(attribute7) === false) return true;
+          const attribute8 = node.getObjectAttribute(this.object);
+          if (attribute8 && this.attributes.includes(attribute8) === false) return true;
         }
       }
     }
@@ -59661,17 +59668,17 @@ var Attributes = class extends DataMap {
    * @param {BufferAttribute|InterleavedBuffer} attribute - The attribute.
    * @return {?Object} The deleted attribute data.
    */
-  delete(attribute7) {
-    const attributeData = super.delete(attribute7);
+  delete(attribute8) {
+    const attributeData = super.delete(attribute8);
     if (attributeData !== null) {
       this.disposeVersion++;
-      if (attribute7.isBufferAttribute === true) {
-        attribute7.removeEventListener("dispose", attributeData.onDispose);
+      if (attribute8.isBufferAttribute === true) {
+        attribute8.removeEventListener("dispose", attributeData.onDispose);
         this._tracked.delete(attributeData.ref);
         this._registry.unregister(attributeData.ref);
       }
-      this.backend.destroyAttribute(attribute7);
-      this.info.destroyAttribute(attribute7);
+      this.backend.destroyAttribute(attribute8);
+      this.info.destroyAttribute(attribute8);
     }
     return attributeData;
   }
@@ -59682,45 +59689,45 @@ var Attributes = class extends DataMap {
    * @param {BufferAttribute|InterleavedBuffer} attribute - The attribute to update.
    * @param {number} type - The attribute type.
    */
-  update(attribute7, type) {
-    const data = this.get(attribute7);
+  update(attribute8, type) {
+    const data = this.get(attribute8);
     if (data.version === void 0) {
       if (type === AttributeType.VERTEX) {
-        this.backend.createAttribute(attribute7);
-        this.info.createAttribute(attribute7);
+        this.backend.createAttribute(attribute8);
+        this.info.createAttribute(attribute8);
       } else if (type === AttributeType.INDEX) {
-        this.backend.createIndexAttribute(attribute7);
-        this.info.createIndexAttribute(attribute7);
+        this.backend.createIndexAttribute(attribute8);
+        this.info.createIndexAttribute(attribute8);
       } else if (type === AttributeType.STORAGE) {
-        this.backend.createStorageAttribute(attribute7);
-        this.info.createStorageAttribute(attribute7);
+        this.backend.createStorageAttribute(attribute8);
+        this.info.createStorageAttribute(attribute8);
       } else if (type === AttributeType.INDIRECT) {
-        this.backend.createIndirectStorageAttribute(attribute7);
-        this.info.createIndirectStorageAttribute(attribute7);
+        this.backend.createIndirectStorageAttribute(attribute8);
+        this.info.createIndirectStorageAttribute(attribute8);
       }
-      data.version = attribute7.version;
+      data.version = attribute8.version;
       data.generation = _generation++;
-      if (attribute7.isBufferAttribute === true) {
+      if (attribute8.isBufferAttribute === true) {
         data.onDispose = () => {
-          this.delete(attribute7);
+          this.delete(attribute8);
         };
-        attribute7.addEventListener("dispose", data.onDispose);
-        data.ref = new WeakRef(attribute7);
+        attribute8.addEventListener("dispose", data.onDispose);
+        data.ref = new WeakRef(attribute8);
         this._tracked.add(data.ref);
-        this._registry.register(attribute7, data.ref, data.ref);
+        this._registry.register(attribute8, data.ref, data.ref);
       }
     } else {
-      if (data.version < attribute7.version || attribute7.usage === DynamicDrawUsage) {
-        this.backend.updateAttribute(attribute7);
-        data.version = attribute7.version;
+      if (data.version < attribute8.version || attribute8.usage === DynamicDrawUsage) {
+        this.backend.updateAttribute(attribute8);
+        data.version = attribute8.version;
       }
     }
   }
   dispose() {
     for (const ref of this._tracked) {
-      const attribute7 = ref.deref();
-      if (attribute7 === void 0 || this.has(attribute7) === false) continue;
-      this.delete(attribute7);
+      const attribute8 = ref.deref();
+      if (attribute8 === void 0 || this.has(attribute8) === false) continue;
+      this.delete(attribute8);
     }
     this._tracked.clear();
     super.dispose();
@@ -59737,8 +59744,8 @@ function getWireframeIndex(geometry) {
   const geometryPosition = geometry.attributes.position;
   const count = geometryIndex !== null ? geometryIndex.array.length : geometryPosition.array.length / 3 - 1;
   const IndexBufferAttribute = geometryPosition.count >= 65535 ? Uint32BufferAttribute : Uint16BufferAttribute;
-  const attribute7 = new IndexBufferAttribute(Math.ceil(count / 3) * 6, 1);
-  const indices = attribute7.array;
+  const attribute8 = new IndexBufferAttribute(Math.ceil(count / 3) * 6, 1);
+  const indices = attribute8.array;
   if (geometryIndex !== null) {
     const array2 = geometryIndex.array;
     for (let i = 0, j = 0; i < count; i += 3) {
@@ -59765,9 +59772,9 @@ function getWireframeIndex(geometry) {
       indices[j++] = a;
     }
   }
-  attribute7.version = getWireframeVersion(geometry);
-  attribute7.__id = getWireframeId(geometry);
-  return attribute7;
+  attribute8.version = getWireframeVersion(geometry);
+  attribute8.__id = getWireframeId(geometry);
+  return attribute8;
 }
 var Geometries2 = class extends DataMap {
   /**
@@ -59821,8 +59828,8 @@ var Geometries2 = class extends DataMap {
       if (index !== null) {
         this.attributes.delete(index);
       }
-      for (const attribute7 of Object.values(geometry.attributes)) {
-        this.attributes.delete(this.backend.getBufferAttribute(attribute7));
+      for (const attribute8 of Object.values(geometry.attributes)) {
+        this.attributes.delete(this.backend.getBufferAttribute(attribute8));
       }
       const wireframeAttribute = this.wireframes.get(geometry);
       if (wireframeAttribute !== void 0) {
@@ -59845,11 +59852,11 @@ var Geometries2 = class extends DataMap {
    */
   updateAttributes(renderObject) {
     const attributes = renderObject.getAttributes();
-    for (const attribute7 of attributes) {
-      if (attribute7.isStorageBufferAttribute || attribute7.isStorageInstancedBufferAttribute) {
-        this.updateAttribute(attribute7, AttributeType.STORAGE);
+    for (const attribute8 of attributes) {
+      if (attribute8.isStorageBufferAttribute || attribute8.isStorageInstancedBufferAttribute) {
+        this.updateAttribute(attribute8, AttributeType.STORAGE);
       } else {
-        this.updateAttribute(attribute7, AttributeType.VERTEX);
+        this.updateAttribute(attribute8, AttributeType.VERTEX);
       }
     }
     const index = this.getIndex(renderObject);
@@ -59867,9 +59874,9 @@ var Geometries2 = class extends DataMap {
    * @param {BufferAttribute} attribute - The attribute to update.
    * @param {number} type - The attribute type.
    */
-  updateAttribute(attribute7, type) {
+  updateAttribute(attribute8, type) {
     const callId = this.info.render.calls;
-    const bufferAttribute2 = this.backend.getBufferAttribute(attribute7);
+    const bufferAttribute2 = this.backend.getBufferAttribute(attribute8);
     if (this.attributeCall.get(bufferAttribute2) !== callId) {
       this.attributes.update(bufferAttribute2, type);
       this.attributeCall.set(bufferAttribute2, callId);
@@ -59925,9 +59932,9 @@ var Geometries2 = class extends DataMap {
    */
   deleteNodeAttributes(renderObject) {
     const currentAttributes = new Set(Object.values(renderObject.geometry.attributes));
-    for (const attribute7 of renderObject.getAttributes()) {
-      if (currentAttributes.has(attribute7) === false) {
-        this.attributes.delete(this.backend.getBufferAttribute(attribute7));
+    for (const attribute8 of renderObject.getAttributes()) {
+      if (currentAttributes.has(attribute8) === false) {
+        this.attributes.delete(this.backend.getBufferAttribute(attribute8));
       }
     }
   }
@@ -60076,9 +60083,9 @@ var Info = class {
    * @param {string} type - type of attribute
    * @private
    */
-  _createAttribute(attribute7, type) {
-    const size = this._getAttributeMemorySize(attribute7);
-    this.memoryMap.set(attribute7, { size, type });
+  _createAttribute(attribute8, type) {
+    const size = this._getAttributeMemorySize(attribute8);
+    this.memoryMap.set(attribute8, { size, type });
     this.memory[type]++;
     this.memory.total += size;
     this.memory[type + "Size"] += size;
@@ -60088,42 +60095,42 @@ var Info = class {
    *
    * @param {BufferAttribute} attribute - The attribute to track.
    */
-  createAttribute(attribute7) {
-    this._createAttribute(attribute7, "attributes");
+  createAttribute(attribute8) {
+    this._createAttribute(attribute8, "attributes");
   }
   /**
    * Tracks an index attribute memory explicitly.
    *
    * @param {BufferAttribute} attribute - The index attribute to track.
    */
-  createIndexAttribute(attribute7) {
-    this._createAttribute(attribute7, "indexAttributes");
+  createIndexAttribute(attribute8) {
+    this._createAttribute(attribute8, "indexAttributes");
   }
   /**
    * Tracks a storage attribute memory explicitly.
    *
    * @param {BufferAttribute} attribute - The storage attribute to track.
    */
-  createStorageAttribute(attribute7) {
-    this._createAttribute(attribute7, "storageAttributes");
+  createStorageAttribute(attribute8) {
+    this._createAttribute(attribute8, "storageAttributes");
   }
   /**
    * Tracks an indirect storage attribute memory explicitly.
    *
    * @param {BufferAttribute} attribute - The indirect storage attribute to track.
    */
-  createIndirectStorageAttribute(attribute7) {
-    this._createAttribute(attribute7, "indirectStorageAttributes");
+  createIndirectStorageAttribute(attribute8) {
+    this._createAttribute(attribute8, "indirectStorageAttributes");
   }
   /**
    * Tracks attribute memory explicitly, updating counts and byte tracking.
    *
    * @param {BufferAttribute} attribute
    */
-  destroyAttribute(attribute7) {
-    const data = this.memoryMap.get(attribute7);
+  destroyAttribute(attribute8) {
+    const data = this.memoryMap.get(attribute8);
     if (data) {
-      this.memoryMap.delete(attribute7);
+      this.memoryMap.delete(attribute8);
       this.memory[data.type]--;
       this.memory.total -= data.size;
       this.memory[data.type + "Size"] -= data.size;
@@ -60255,12 +60262,12 @@ var Info = class {
    * @return {number} The calculated size in bytes.
    * @private
    */
-  _getAttributeMemorySize(attribute7) {
-    if (attribute7.isInterleavedBufferAttribute) attribute7 = attribute7.data;
-    if (attribute7.array) {
-      return attribute7.array.byteLength;
-    } else if (attribute7.count && attribute7.itemSize) {
-      return attribute7.count * attribute7.itemSize * 4;
+  _getAttributeMemorySize(attribute8) {
+    if (attribute8.isInterleavedBufferAttribute) attribute8 = attribute8.data;
+    if (attribute8.array) {
+      return attribute8.array.byteLength;
+    } else if (attribute8.count && attribute8.itemSize) {
+      return attribute8.count * attribute8.itemSize * 4;
     }
     return 0;
   }
@@ -60780,9 +60787,9 @@ var Bindings = class extends DataMap {
           } else if (binding.isSampler) {
             binding.samplerKey = this.textures.updateSampler(binding);
           } else if (binding.isStorageBuffer) {
-            const attribute7 = binding.attribute;
-            const attributeType = attribute7.isIndirectStorageBufferAttribute ? AttributeType.INDIRECT : AttributeType.STORAGE;
-            this.attributes.update(attribute7, attributeType);
+            const attribute8 = binding.attribute;
+            const attributeType = attribute8.isIndirectStorageBufferAttribute ? AttributeType.INDIRECT : AttributeType.STORAGE;
+            this.attributes.update(attribute8, attributeType);
           }
         }
         this.backend.createBindings(bindGroup, bindings, "");
@@ -60853,17 +60860,17 @@ var Bindings = class extends DataMap {
       const updatedGroup = this.nodes.updateGroup(binding);
       if (updatedGroup === false) continue;
       if (binding.isStorageBuffer) {
-        const attribute7 = binding.attribute;
-        const attributeType = attribute7.isIndirectStorageBufferAttribute ? AttributeType.INDIRECT : AttributeType.STORAGE;
+        const attribute8 = binding.attribute;
+        const attributeType = attribute8.isIndirectStorageBufferAttribute ? AttributeType.INDIRECT : AttributeType.STORAGE;
         const bindingData = backend.get(binding);
-        this.attributes.update(attribute7, attributeType);
-        const generation = this.attributes.get(attribute7).generation;
-        if (bindingData.attribute !== attribute7 || bindingData.generation !== generation) {
-          bindingData.attribute = attribute7;
+        this.attributes.update(attribute8, attributeType);
+        const generation = this.attributes.get(attribute8).generation;
+        if (bindingData.attribute !== attribute8 || bindingData.generation !== generation) {
+          bindingData.attribute = attribute8;
           bindingData.generation = generation;
           needsBindingsUpdate = true;
         }
-        _cacheKeyIds[cacheKeyLength++] = attribute7.id;
+        _cacheKeyIds[cacheKeyLength++] = attribute8.id;
         version += generation;
       }
       if (binding.isUniformBuffer) {
@@ -63263,15 +63270,15 @@ var NodeBuilder = class {
    */
   getAttribute(name, type) {
     const attributes = this.attributes;
-    for (const attribute8 of attributes) {
-      if (attribute8.name === name) {
-        return attribute8;
+    for (const attribute9 of attributes) {
+      if (attribute9.name === name) {
+        return attribute9;
       }
     }
-    const attribute7 = new NodeAttribute(name, type);
-    this.registerDeclaration(attribute7);
-    attributes.push(attribute7);
-    return attribute7;
+    const attribute8 = new NodeAttribute(name, type);
+    this.registerDeclaration(attribute8);
+    attributes.push(attribute8);
+    return attribute8;
   }
   /**
    * Returns for the given node and shader stage the property name for the shader.
@@ -63443,14 +63450,14 @@ var NodeBuilder = class {
    * @param {BufferAttribute} attribute - The buffer attribute.
    * @return {string} The type.
    */
-  getTypeFromAttribute(attribute7) {
-    let dataAttribute = attribute7;
-    if (attribute7.isInterleavedBufferAttribute) dataAttribute = attribute7.data;
+  getTypeFromAttribute(attribute8) {
+    let dataAttribute = attribute8;
+    if (attribute8.isInterleavedBufferAttribute) dataAttribute = attribute8.data;
     const array2 = dataAttribute.array;
-    const itemSize = attribute7.itemSize;
-    const normalized = attribute7.normalized;
+    const itemSize = attribute8.itemSize;
+    const normalized = attribute8.normalized;
     let arrayType;
-    if (!(attribute7 instanceof Float16BufferAttribute) && normalized !== true) {
+    if (!(attribute8 instanceof Float16BufferAttribute) && normalized !== true) {
       arrayType = this.getTypeFromArray(array2);
     }
     return this.getTypeFromLength(itemSize, arrayType);
@@ -67478,7 +67485,7 @@ function createXRLayer(layer) {
     });
   }
 }
-function onAnimationFrame(time11, frame) {
+function onAnimationFrame(time12, frame) {
   if (frame === void 0) return;
   const cameraXR = this._cameraXR;
   const renderer = this._renderer;
@@ -67559,7 +67566,7 @@ function onAnimationFrame(time11, frame) {
       controller.update(inputSource, frame, referenceSpace);
     }
   }
-  if (this._currentAnimationLoop) this._currentAnimationLoop(time11, frame);
+  if (this._currentAnimationLoop) this._currentAnimationLoop(time12, frame);
   if (frame.detectedPlanes) {
     this.dispatchEvent({ type: "planesdetected", data: frame });
   }
@@ -69037,7 +69044,7 @@ Reason: ${info.reason}`;
    * @param {number} [count=-1] - The number of bytes to read. Must be a multiple of 4, or `-1` to read to the end of the buffer.
    * @return {Promise<ArrayBuffer|ReadbackBuffer>} A promise that resolves with the buffer data when the data are ready.
    */
-  async getArrayBufferAsync(attribute7, target = null, offset = 0, count = -1) {
+  async getArrayBufferAsync(attribute8, target = null, offset = 0, count = -1) {
     if (target !== null && target.isReadbackBuffer) {
       if (this.info.memoryMap.has(target) === false) {
         this.info.createReadbackBuffer(target);
@@ -69051,7 +69058,7 @@ Reason: ${info.reason}`;
     if (offset % 4 !== 0 || count > 0 && count % 4 !== 0) {
       throw new Error('THREE.Renderer: "getArrayBufferAsync()" offset and count must be a multiple of 4.');
     }
-    return await this.backend.getArrayBufferAsync(attribute7, target, offset, count);
+    return await this.backend.getArrayBufferAsync(attribute8, target, offset, count);
   }
   /**
    * Returns the rendering context.
@@ -71364,12 +71371,12 @@ ${flowData.code}
    * @param {StorageBufferNode} storageBufferNode - The storage buffer node.
    */
   setupPBO(storageBufferNode) {
-    const attribute7 = storageBufferNode.value;
-    if (attribute7.pbo === void 0) {
-      const originalArray = attribute7.array;
-      const numElements = attribute7.count * attribute7.itemSize;
-      const { itemSize } = attribute7;
-      const isInteger = attribute7.array.constructor.name.toLowerCase().includes("int");
+    const attribute8 = storageBufferNode.value;
+    if (attribute8.pbo === void 0) {
+      const originalArray = attribute8.array;
+      const numElements = attribute8.count * attribute8.itemSize;
+      const { itemSize } = attribute8;
+      const isInteger = attribute8.array.constructor.name.toLowerCase().includes("int");
       let format = isInteger ? RedIntegerFormat : RedFormat;
       if (itemSize === 2) {
         format = isInteger ? RGIntegerFormat : RGFormat;
@@ -71394,15 +71401,15 @@ ${flowData.code}
       const newSize = width * height * itemSize;
       const newArray = new originalArray.constructor(newSize);
       newArray.set(originalArray, 0);
-      attribute7.array = newArray;
-      const pboTexture = new DataTexture(attribute7.array, width, height, format, typeMap[attribute7.array.constructor.name] || FloatType);
+      attribute8.array = newArray;
+      const pboTexture = new DataTexture(attribute8.array, width, height, format, typeMap[attribute8.array.constructor.name] || FloatType);
       pboTexture.needsUpdate = true;
       pboTexture.isPBOTexture = true;
       const pbo = new TextureNode(pboTexture, null, null);
       pbo.setPrecision("high");
-      attribute7.pboNode = pbo;
-      attribute7.pbo = pbo.value;
-      this.getUniformFromNode(attribute7.pboNode, "texture", this.shaderStage, this.context.nodeName);
+      attribute8.pboNode = pbo;
+      attribute8.pbo = pbo.value;
+      this.getUniformFromNode(attribute8.pboNode, "texture", this.shaderStage, this.context.nodeName);
     }
   }
   /**
@@ -71436,12 +71443,12 @@ ${flowData.code}
    */
   generatePBO(storageArrayElementNode) {
     const { node, indexNode } = storageArrayElementNode;
-    const attribute7 = node.value;
-    if (this.renderer.backend.has(attribute7)) {
-      const attributeData = this.renderer.backend.get(attribute7);
-      attributeData.pbo = attribute7.pbo;
+    const attribute8 = node.value;
+    if (this.renderer.backend.has(attribute8)) {
+      const attributeData = this.renderer.backend.get(attribute8);
+      attributeData.pbo = attribute8.pbo;
     }
-    const nodeUniform = this.getUniformFromNode(attribute7.pboNode, "texture", this.shaderStage, this.context.nodeName);
+    const nodeUniform = this.getUniformFromNode(attribute8.pboNode, "texture", this.shaderStage, this.context.nodeName);
     const textureName = this.getPropertyName(nodeUniform);
     this.increaseUsage(indexNode);
     const indexSnippet = indexNode.build(this, "uint");
@@ -71458,14 +71465,14 @@ ${flowData.code}
         this.addLineFlowCode(`${propertySizeName} = uint( textureSize( ${textureName}, 0 ).x )`, storageArrayElementNode);
         bufferNodeData.propertySizeName = propertySizeName;
       }
-      const { itemSize } = attribute7;
+      const { itemSize } = attribute8;
       const channel = "." + vectorComponents.join("").slice(0, itemSize);
       const uvSnippet = `ivec2(${indexSnippet} % ${propertySizeName}, ${indexSnippet} / ${propertySizeName})`;
       const snippet = this.generateTextureLoad(null, textureName, uvSnippet, "0", null, null);
       let prefix = "vec4";
-      if (attribute7.pbo.type === UnsignedIntType) {
+      if (attribute8.pbo.type === UnsignedIntType) {
         prefix = "uvec4";
-      } else if (attribute7.pbo.type === IntType) {
+      } else if (attribute8.pbo.type === IntType) {
         prefix = "ivec4";
       }
       const texelType = this.getTypeFromLength(itemSize, this.getComponentType(prefix));
@@ -71793,11 +71800,11 @@ ${flowData.code}
    * @param {BufferAttribute} attribute - The buffer attribute.
    * @return {string} The type.
    */
-  getTypeFromAttribute(attribute7) {
-    let nodeType = super.getTypeFromAttribute(attribute7);
-    if (/^[iu]/.test(nodeType) && attribute7.gpuType !== IntType) {
-      let dataAttribute = attribute7;
-      if (attribute7.isInterleavedBufferAttribute) dataAttribute = attribute7.data;
+  getTypeFromAttribute(attribute8) {
+    let nodeType = super.getTypeFromAttribute(attribute8);
+    if (/^[iu]/.test(nodeType) && attribute8.gpuType !== IntType) {
+      let dataAttribute = attribute8;
+      if (attribute8.isInterleavedBufferAttribute) dataAttribute = attribute8.data;
       const array2 = dataAttribute.array;
       if ((array2 instanceof Uint32Array || array2 instanceof Int32Array) === false) {
         nodeType = nodeType.slice(1);
@@ -71816,8 +71823,8 @@ ${flowData.code}
     if (shaderStage === "vertex" || shaderStage === "compute") {
       const attributes = this.getAttributesArray();
       let location2 = 0;
-      for (const attribute7 of attributes) {
-        snippet += `layout( location = ${location2++} ) in ${attribute7.type} ${attribute7.name};
+      for (const attribute8 of attributes) {
+        snippet += `layout( location = ${location2++} ) in ${attribute8.type} ${attribute8.name};
 `;
       }
     }
@@ -72788,9 +72795,9 @@ var Backend = class {
    * @param {BufferAttribute|InterleavedBufferAttribute} attribute - The attribute.
    * @return {BufferAttribute|InterleavedBuffer}
    */
-  getBufferAttribute(attribute7) {
-    if (attribute7.isInterleavedBufferAttribute) attribute7 = attribute7.data;
-    return attribute7;
+  getBufferAttribute(attribute8) {
+    if (attribute8.isInterleavedBufferAttribute) attribute8 = attribute8.data;
+    return attribute8;
   }
   // canvas
   /**
@@ -73160,13 +73167,13 @@ var WebGLAttributeUtils = class {
    * @param {BufferAttribute} attribute - The buffer attribute.
    * @param {GLenum } bufferType - A flag that indicates the buffer type and thus binding point target.
    */
-  createAttribute(attribute7, bufferType) {
+  createAttribute(attribute8, bufferType) {
     const backend = this.backend;
     const { gl } = backend;
-    const bufferAttribute2 = backend.getBufferAttribute(attribute7);
+    const bufferAttribute2 = backend.getBufferAttribute(attribute8);
     if (backend.get(bufferAttribute2).bufferGPU !== void 0) return;
-    const array2 = attribute7.array;
-    const usage = attribute7.usage || gl.STATIC_DRAW;
+    const array2 = attribute8.array;
+    const usage = attribute8.usage || gl.STATIC_DRAW;
     const bufferGPU = this._createBuffer(gl, bufferType, array2, usage);
     let type;
     if (array2 instanceof Float32Array) {
@@ -73174,7 +73181,7 @@ var WebGLAttributeUtils = class {
     } else if (typeof Float16Array !== "undefined" && array2 instanceof Float16Array) {
       type = gl.HALF_FLOAT;
     } else if (array2 instanceof Uint16Array) {
-      if (attribute7.isFloat16BufferAttribute) {
+      if (attribute8.isFloat16BufferAttribute) {
         type = gl.HALF_FLOAT;
       } else {
         type = gl.UNSIGNED_SHORT;
@@ -73201,11 +73208,11 @@ var WebGLAttributeUtils = class {
       byteLength: array2.byteLength,
       bytesPerElement: array2.BYTES_PER_ELEMENT,
       version: bufferAttribute2.version,
-      pbo: attribute7.pbo,
-      isInteger: type === gl.INT || type === gl.UNSIGNED_INT || attribute7.gpuType === IntType,
+      pbo: attribute8.pbo,
+      isInteger: type === gl.INT || type === gl.UNSIGNED_INT || attribute8.gpuType === IntType,
       id: _id$12++
     };
-    if (attribute7.isStorageBufferAttribute || attribute7.isStorageInstancedBufferAttribute) {
+    if (attribute8.isStorageBufferAttribute || attribute8.isStorageInstancedBufferAttribute) {
       const bufferGPUDual = this._createBuffer(gl, bufferType, array2, usage);
       attributeData = new DualAttributeData(attributeData, bufferGPUDual);
     }
@@ -73216,11 +73223,11 @@ var WebGLAttributeUtils = class {
    *
    * @param {BufferAttribute} attribute - The buffer attribute.
    */
-  updateAttribute(attribute7) {
+  updateAttribute(attribute8) {
     const backend = this.backend;
     const { gl } = backend;
-    const array2 = attribute7.array;
-    const bufferAttribute2 = backend.getBufferAttribute(attribute7);
+    const array2 = attribute8.array;
+    const bufferAttribute2 = backend.getBufferAttribute(attribute8);
     const bufferData = backend.get(bufferAttribute2);
     const updateRanges = bufferAttribute2.updateRanges;
     const target = bufferData.bufferType === gl.ELEMENT_ARRAY_BUFFER ? gl.COPY_WRITE_BUFFER : bufferData.bufferType;
@@ -73248,10 +73255,10 @@ var WebGLAttributeUtils = class {
    *
    * @param {BufferAttribute} attribute - The buffer attribute.
    */
-  destroyAttribute(attribute7) {
+  destroyAttribute(attribute8) {
     const backend = this.backend;
     const { gl } = backend;
-    const bufferAttribute2 = backend.getBufferAttribute(attribute7);
+    const bufferAttribute2 = backend.getBufferAttribute(attribute8);
     const attributeData = backend.get(bufferAttribute2);
     if (attributeData.buffers !== void 0) {
       for (const buffer2 of attributeData.buffers) {
@@ -73275,10 +73282,10 @@ var WebGLAttributeUtils = class {
    * @param {number} [count=-1] - The number of bytes to read. Must be a multiple of 4, or `-1` to read to the end of the buffer.
    * @return {Promise<ArrayBuffer|ReadbackBuffer>} A promise that resolves with the buffer data when the data are ready.
    */
-  async getArrayBufferAsync(attribute7, target = null, offset = 0, count = -1) {
+  async getArrayBufferAsync(attribute8, target = null, offset = 0, count = -1) {
     const backend = this.backend;
     const { gl } = backend;
-    const bufferAttribute2 = backend.getBufferAttribute(attribute7);
+    const bufferAttribute2 = backend.getBufferAttribute(attribute8);
     const attributeInfo = backend.get(bufferAttribute2);
     const { bufferGPU } = attributeInfo;
     const byteLength = count === -1 ? attributeInfo.byteLength - offset : count;
@@ -73361,10 +73368,10 @@ var WebGLVertexArrayUtils = class {
     const buffers = [];
     const buffersData = [];
     for (let i = 0; i < attributes.length; i++) {
-      const attribute7 = attributes[i];
-      const attributeData = backend.get(backend.getBufferAttribute(attribute7));
+      const attribute8 = attributes[i];
+      const attributeData = backend.get(backend.getBufferAttribute(attribute8));
       key += ":" + attributeData.id;
-      if (attribute7.isInterleavedBufferAttribute) key += "." + attribute7.offset;
+      if (attribute8.isInterleavedBufferAttribute) key += "." + attribute8.offset;
       variant += ":" + (attributeData.activeBufferIndex || 0);
       buffers.push(attributeData.bufferGPU);
       buffersData.push(attributeData);
@@ -73498,24 +73505,24 @@ var WebGLVertexArrayUtils = class {
     const vaoGPU = gl.createVertexArray();
     state.setVertexState(vaoGPU, indexGPU);
     for (let i = 0; i < attributes.length; i++) {
-      const attribute7 = attributes[i];
-      const bufferAttribute2 = this.backend.getBufferAttribute(attribute7);
+      const attribute8 = attributes[i];
+      const bufferAttribute2 = this.backend.getBufferAttribute(attribute8);
       const attributeData = this.backend.get(bufferAttribute2);
       gl.bindBuffer(gl.ARRAY_BUFFER, attributeData.bufferGPU);
       gl.enableVertexAttribArray(i);
       let stride, offset;
-      if (attribute7.isInterleavedBufferAttribute === true) {
+      if (attribute8.isInterleavedBufferAttribute === true) {
         const bufferStride = bufferAttribute2.isInterleavedBuffer === true ? bufferAttribute2.stride : bufferAttribute2.itemSize;
         stride = bufferStride * attributeData.bytesPerElement;
-        offset = attribute7.offset * attributeData.bytesPerElement;
+        offset = attribute8.offset * attributeData.bytesPerElement;
       } else {
         stride = 0;
         offset = 0;
       }
       if (attributeData.isInteger) {
-        gl.vertexAttribIPointer(i, attribute7.itemSize, attributeData.type, stride, offset);
+        gl.vertexAttribIPointer(i, attribute8.itemSize, attributeData.type, stride, offset);
       } else {
-        gl.vertexAttribPointer(i, attribute7.itemSize, attributeData.type, attribute7.normalized, stride, offset);
+        gl.vertexAttribPointer(i, attribute8.itemSize, attributeData.type, attribute8.normalized, stride, offset);
       }
       if (bufferAttribute2.isInstancedBufferAttribute === true || bufferAttribute2.isInstancedInterleavedBuffer === true) {
         gl.vertexAttribDivisor(i, bufferAttribute2.meshPerAttribute);
@@ -76108,8 +76115,8 @@ var WebGLBackend = class extends Backend {
    * @param {number} [count=-1] - The number of bytes to read. Must be a multiple of 4, or `-1` to read to the end of the buffer.
    * @return {Promise<ArrayBuffer|ReadbackBuffer>} A promise that resolves with the buffer data when the data are ready.
    */
-  async getArrayBufferAsync(attribute7, target = null, offset = 0, count = -1) {
-    return await this.attributeUtils.getArrayBufferAsync(attribute7, target, offset, count);
+  async getArrayBufferAsync(attribute8, target = null, offset = 0, count = -1) {
+    return await this.attributeUtils.getArrayBufferAsync(attribute8, target, offset, count);
   }
   /**
    * Ensures the backend is XR compatible.
@@ -76520,9 +76527,9 @@ var WebGLBackend = class extends Backend {
    * @private
    * @param {BufferAttribute|InterleavedBufferAttribute} attribute - The buffer attribute.
    */
-  _updateComputeAttribute(attribute7) {
-    const bufferAttribute2 = this.getBufferAttribute(attribute7);
-    const attributeType = attribute7.isStorageBufferAttribute || attribute7.isStorageInstancedBufferAttribute ? AttributeType.STORAGE : AttributeType.VERTEX;
+  _updateComputeAttribute(attribute8) {
+    const bufferAttribute2 = this.getBufferAttribute(attribute8);
+    const attributeType = attribute8.isStorageBufferAttribute || attribute8.isStorageInstancedBufferAttribute ? AttributeType.STORAGE : AttributeType.VERTEX;
     this.renderer._attributes.update(bufferAttribute2, attributeType);
   }
   /**
@@ -77214,46 +77221,46 @@ var WebGLBackend = class extends Backend {
    *
    * @param {BufferAttribute} attribute - The indexed buffer attribute.
    */
-  createIndexAttribute(attribute7) {
+  createIndexAttribute(attribute8) {
     const gl = this.gl;
-    this.attributeUtils.createAttribute(attribute7, gl.ELEMENT_ARRAY_BUFFER);
+    this.attributeUtils.createAttribute(attribute8, gl.ELEMENT_ARRAY_BUFFER);
   }
   /**
    * Creates the GPU buffer of a shader attribute.
    *
    * @param {BufferAttribute} attribute - The buffer attribute.
    */
-  createAttribute(attribute7) {
-    if (this.has(attribute7)) return;
+  createAttribute(attribute8) {
+    if (this.has(attribute8)) return;
     const gl = this.gl;
-    this.attributeUtils.createAttribute(attribute7, gl.ARRAY_BUFFER);
+    this.attributeUtils.createAttribute(attribute8, gl.ARRAY_BUFFER);
   }
   /**
    * Creates the GPU buffer of a storage attribute.
    *
    * @param {BufferAttribute} attribute - The buffer attribute.
    */
-  createStorageAttribute(attribute7) {
-    if (this.has(attribute7)) return;
+  createStorageAttribute(attribute8) {
+    if (this.has(attribute8)) return;
     const gl = this.gl;
-    this.attributeUtils.createAttribute(attribute7, gl.ARRAY_BUFFER);
+    this.attributeUtils.createAttribute(attribute8, gl.ARRAY_BUFFER);
   }
   /**
    * Updates the GPU buffer of a shader attribute.
    *
    * @param {BufferAttribute} attribute - The buffer attribute to update.
    */
-  updateAttribute(attribute7) {
-    this.attributeUtils.updateAttribute(attribute7);
+  updateAttribute(attribute8) {
+    this.attributeUtils.updateAttribute(attribute8);
   }
   /**
    * Destroys the GPU buffer of a shader attribute.
    *
    * @param {BufferAttribute} attribute - The buffer attribute to destroy.
    */
-  destroyAttribute(attribute7) {
-    this.vertexArrayUtils.releaseBuffer(this.get(this.getBufferAttribute(attribute7)));
-    this.attributeUtils.destroyAttribute(attribute7);
+  destroyAttribute(attribute8) {
+    this.vertexArrayUtils.releaseBuffer(this.get(this.getBufferAttribute(attribute8)));
+    this.attributeUtils.destroyAttribute(attribute8);
   }
   /**
    * Checks if the given feature is supported  by the backend.
@@ -77942,9 +77949,9 @@ var StorageBuffer = class extends Buffer2 {
    * @param {string} name - The buffer's name.
    * @param {BufferAttribute} attribute - The buffer attribute.
    */
-  constructor(name, attribute7) {
-    super(name, attribute7 ? attribute7.array : null);
-    this._attribute = attribute7;
+  constructor(name, attribute8) {
+    super(name, attribute8 ? attribute8.array : null);
+    this._attribute = attribute8;
     this.isStorageBuffer = true;
   }
   /**
@@ -81543,9 +81550,9 @@ ${flowData.code}
       if (builtins) snippets.push(builtins);
       const attributes = this.getAttributesArray();
       for (let index = 0, length12 = attributes.length; index < length12; index++) {
-        const attribute7 = attributes[index];
-        const name = attribute7.name;
-        const type = this.getType(attribute7.type);
+        const attribute8 = attributes[index];
+        const name = attribute8.name;
+        const type = this.getType(attribute8.type);
         snippets.push(`@location( ${index} ) ${name} : ${type}`);
       }
     }
@@ -82198,15 +82205,15 @@ var WebGPUAttributeUtils = class {
    * @param {BufferAttribute} attribute - The buffer attribute.
    * @param {GPUBufferUsage} usage - A flag that indicates how the buffer may be used after its creation.
    */
-  createAttribute(attribute7, usage) {
+  createAttribute(attribute8, usage) {
     const backend = this.backend;
-    const bufferAttribute2 = backend.getBufferAttribute(attribute7);
+    const bufferAttribute2 = backend.getBufferAttribute(attribute8);
     const bufferData = backend.get(bufferAttribute2);
     let buffer2 = bufferData.buffer;
     if (buffer2 === void 0) {
       const device = backend.device;
       let array2 = bufferAttribute2.array;
-      if (attribute7.normalized === false && attribute7.isInterleavedBufferAttribute !== true) {
+      if (attribute8.normalized === false && attribute8.isInterleavedBufferAttribute !== true) {
         if (array2.constructor === Int16Array || array2.constructor === Int8Array) {
           array2 = new Int32Array(array2);
         } else if (array2.constructor === Uint16Array || array2.constructor === Uint8Array) {
@@ -82263,10 +82270,10 @@ var WebGPUAttributeUtils = class {
    *
    * @param {BufferAttribute} attribute - The buffer attribute.
    */
-  updateAttribute(attribute7) {
+  updateAttribute(attribute8) {
     const backend = this.backend;
     const device = backend.device;
-    const bufferAttribute2 = backend.getBufferAttribute(attribute7);
+    const bufferAttribute2 = backend.getBufferAttribute(attribute8);
     const bufferData = backend.get(bufferAttribute2);
     const buffer2 = backend.get(bufferAttribute2).buffer;
     let array2 = bufferAttribute2.array;
@@ -82370,8 +82377,8 @@ var WebGPUAttributeUtils = class {
     let cacheKey = "";
     for (const entry of vertexBufferLayout) {
       cacheKey += entry.arrayStride + "," + entry.stepMode + ",";
-      for (const attribute7 of entry.attributes) {
-        cacheKey += attribute7.shaderLocation + "," + attribute7.offset + "," + attribute7.format + ",";
+      for (const attribute8 of entry.attributes) {
+        cacheKey += attribute8.shaderLocation + "," + attribute8.offset + "," + attribute8.format + ",";
       }
     }
     return cacheKey;
@@ -82381,9 +82388,9 @@ var WebGPUAttributeUtils = class {
    *
    * @param {BufferAttribute} attribute - The buffer attribute.
    */
-  destroyAttribute(attribute7) {
+  destroyAttribute(attribute8) {
     const backend = this.backend;
-    const bufferAttribute2 = backend.getBufferAttribute(attribute7);
+    const bufferAttribute2 = backend.getBufferAttribute(attribute8);
     const data = backend.get(bufferAttribute2);
     data.buffer.destroy();
     backend.delete(bufferAttribute2);
@@ -82401,10 +82408,10 @@ var WebGPUAttributeUtils = class {
    * @param {number} [count=-1] - The number of bytes to read. Must be a multiple of 4, or `-1` to read to the end of the buffer.
    * @return {Promise<ArrayBuffer|ReadbackBuffer>} A promise that resolves with the buffer data when the data are ready.
    */
-  async getArrayBufferAsync(attribute7, target = null, offset = 0, count = -1) {
+  async getArrayBufferAsync(attribute8, target = null, offset = 0, count = -1) {
     const backend = this.backend;
     const device = backend.device;
-    const data = backend.get(backend.getBufferAttribute(attribute7));
+    const data = backend.get(backend.getBufferAttribute(attribute8));
     const bufferGPU = data.buffer;
     const byteLength = count === -1 ? bufferGPU.size - offset : count;
     let readBufferGPU;
@@ -82440,13 +82447,13 @@ var WebGPUAttributeUtils = class {
         readBufferGPU = readbackInfo.readBufferGPU;
       }
     } else {
-      _bufferDescriptor$3.label = `${attribute7.name}_readback`;
+      _bufferDescriptor$3.label = `${attribute8.name}_readback`;
       _bufferDescriptor$3.size = byteLength;
       _bufferDescriptor$3.usage = GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ;
       readBufferGPU = device.createBuffer(_bufferDescriptor$3);
       _bufferDescriptor$3.reset();
     }
-    _commandEncoderDescriptor$2.label = `readback_encoder_${attribute7.name}`;
+    _commandEncoderDescriptor$2.label = `readback_encoder_${attribute8.name}`;
     const cmdEncoder = device.createCommandEncoder(_commandEncoderDescriptor$2);
     _commandEncoderDescriptor$2.reset();
     cmdEncoder.copyBufferToBuffer(
@@ -83987,8 +83994,8 @@ var WebGPUBackend = class extends Backend {
    * @param {number} [count=-1] - The number of bytes to read. Must be a multiple of 4, or `-1` to read to the end of the buffer.
    * @return {Promise<ArrayBuffer|ReadbackBuffer>} A promise that resolves with the buffer data when the data are ready.
    */
-  async getArrayBufferAsync(attribute7, target = null, offset = 0, count = -1) {
-    return await this.attributeUtils.getArrayBufferAsync(attribute7, target, offset, count);
+  async getArrayBufferAsync(attribute8, target = null, offset = 0, count = -1) {
+    return await this.attributeUtils.getArrayBufferAsync(attribute8, target, offset, count);
   }
   /**
    * Returns the backend's rendering context.
@@ -85559,52 +85566,52 @@ var WebGPUBackend = class extends Backend {
    *
    * @param {BufferAttribute} attribute - The indexed buffer attribute.
    */
-  createIndexAttribute(attribute7) {
+  createIndexAttribute(attribute8) {
     let usage = GPUBufferUsage.INDEX | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST;
-    if (attribute7.isStorageBufferAttribute || attribute7.isStorageInstancedBufferAttribute) {
+    if (attribute8.isStorageBufferAttribute || attribute8.isStorageInstancedBufferAttribute) {
       usage |= GPUBufferUsage.STORAGE;
     }
-    this.attributeUtils.createAttribute(attribute7, usage);
+    this.attributeUtils.createAttribute(attribute8, usage);
   }
   /**
    * Creates the GPU buffer of a shader attribute.
    *
    * @param {BufferAttribute} attribute - The buffer attribute.
    */
-  createAttribute(attribute7) {
-    this.attributeUtils.createAttribute(attribute7, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
+  createAttribute(attribute8) {
+    this.attributeUtils.createAttribute(attribute8, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
   }
   /**
    * Creates the GPU buffer of a storage attribute.
    *
    * @param {BufferAttribute} attribute - The buffer attribute.
    */
-  createStorageAttribute(attribute7) {
-    this.attributeUtils.createAttribute(attribute7, GPUBufferUsage.STORAGE | GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
+  createStorageAttribute(attribute8) {
+    this.attributeUtils.createAttribute(attribute8, GPUBufferUsage.STORAGE | GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
   }
   /**
    * Creates the GPU buffer of an indirect storage attribute.
    *
    * @param {BufferAttribute} attribute - The buffer attribute.
    */
-  createIndirectStorageAttribute(attribute7) {
-    this.attributeUtils.createAttribute(attribute7, GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
+  createIndirectStorageAttribute(attribute8) {
+    this.attributeUtils.createAttribute(attribute8, GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
   }
   /**
    * Updates the GPU buffer of a shader attribute.
    *
    * @param {BufferAttribute} attribute - The buffer attribute to update.
    */
-  updateAttribute(attribute7) {
-    this.attributeUtils.updateAttribute(attribute7);
+  updateAttribute(attribute8) {
+    this.attributeUtils.updateAttribute(attribute8);
   }
   /**
    * Destroys the GPU buffer of a shader attribute.
    *
    * @param {BufferAttribute} attribute - The buffer attribute to destroy.
    */
-  destroyAttribute(attribute7) {
-    this.attributeUtils.destroyAttribute(attribute7);
+  destroyAttribute(attribute8) {
+    this.attributeUtils.destroyAttribute(attribute8);
   }
   // canvas
   /**
@@ -86814,23 +86821,27 @@ function resolveOne(base, tod, key) {
       break;
     case "rain":
       th.clouds = Math.max(th.clouds, 0.6 + 0.3 * k);
-      th.fogDensity *= 1 + 0.45 * k;
-      th.sunIntensity *= 1 - 0.4 * k;
+      th.fogDensity *= 1 + 0.75 * k;
+      th.sunIntensity *= 1 - 0.5 * k;
       th.skyTop = overcast(th.skyTop, 0.6 * k, [0.9, 1, 1.12], 0.85);
       th.skyHorizon = overcast(th.skyHorizon, 0.55 * k, [0.94, 1, 1.06], 0.9);
       th.fogColor = overcast(th.fogColor, 0.5 * k, [0.92, 1, 1.08], 0.9);
       th.ambient = "rain";
-      fx.rain = 0.7 * k;
-      fx.wind = 0.4 * k;
+      fx.rain = Math.min(1, 0.85 * k);
+      fx.wind = 0.55 * k;
       fx.grip = 1 - 0.07 * k;
       fx.flare = 0.3 * (1.6 - k);
-      fx.volFog = 0.4;
+      fx.volFog = 0.5;
       fx.amb = fx.rain;
+      fx.gust = "mist";
+      fx.gustColor = th.fogColor;
+      fx.gustAmt = 0.5 * k;
       break;
+    // Session 16: rain squalls drift across the track
     case "storm":
       th.clouds = 1;
-      th.fogDensity *= 1 + 0.8 * k;
-      th.sunIntensity *= 1 - 0.66 * k;
+      th.fogDensity *= 1 + 1.25 * k;
+      th.sunIntensity *= 1 - 0.74 * k;
       th.skyTop = overcast(th.skyTop, 0.85 * k, [0.85, 0.95, 1.15], 0.42);
       th.skyHorizon = overcast(th.skyHorizon, 0.75 * k, [0.9, 1, 1.1], 0.55);
       th.fogColor = overcast(th.fogColor, 0.7 * k, [0.9, 1, 1.1], 0.6);
@@ -86841,16 +86852,16 @@ function resolveOne(base, tod, key) {
       fx.gust = "mist";
       fx.gustColor = th.fogColor;
       fx.gustAmt = k;
-      fx.wind = 0.9 * k;
+      fx.wind = Math.min(1, 1.05 * k);
       fx.grip = 1 - 0.1 * k;
       fx.flare = 0;
-      fx.volFog = 0.55;
+      fx.volFog = 0.72;
       fx.amb = fx.rain;
       break;
     case "snow":
       th.clouds = Math.max(th.clouds, 0.55 + 0.35 * k);
-      th.fogDensity *= 1 + 0.9 * k;
-      th.sunIntensity *= 1 - 0.4 * k;
+      th.fogDensity *= 1 + 1.35 * k;
+      th.sunIntensity *= 1 - 0.45 * k;
       th.skyTop = overcast(th.skyTop, 0.6 * k, [0.95, 1, 1.08], 1.15);
       th.skyHorizon = overcast(th.skyHorizon, 0.6 * k, [0.97, 1, 1.04], 1.2);
       th.fogColor = overcast(th.fogColor, 0.6 * k, [0.96, 1, 1.05], 1.25);
@@ -86858,16 +86869,16 @@ function resolveOne(base, tod, key) {
       fx.gust = "snow";
       fx.gustColor = mixHex(th.fogColor, "#ffffff", night ? 0.15 : 0.6);
       fx.gustAmt = k;
-      fx.wind = 0.75 * k;
+      fx.wind = 0.92 * k;
       fx.grip = 1 - 0.1 * k;
       fx.flare = 0.2;
-      fx.volFog = 0.5;
+      fx.volFog = 0.65;
       fx.amb = 0.45 + 0.55 * k;
       break;
     case "dust": {
       const ash = base.id === "lava";
       th.clouds *= 1 - 0.4 * k;
-      th.fogDensity *= 1 + 1.3 * k;
+      th.fogDensity *= 1 + 1.8 * k;
       th.sunIntensity *= 1 - 0.25 * k;
       th.sunColor = mixHex(th.sunColor, ash ? "#ff7a40" : "#ffc890", 0.4 * k);
       th.fogColor = mixHex(th.fogColor, ash ? "#2a1c18" : mixHex(base.palette.ground[1], th.fogColor, night ? 0.8 : 0.25), 0.6 * k);
@@ -86877,9 +86888,9 @@ function resolveOne(base, tod, key) {
       fx.gust = "dust";
       fx.gustColor = ash ? "#3a302c" : mixHex(base.palette.ground[2], th.fogColor, night ? 0.75 : 0.3);
       fx.gustAmt = k;
-      fx.wind = 0.85 * k;
-      fx.flare = 0.55;
-      fx.volFog = 0.45 + 0.3 * k;
+      fx.wind = Math.min(1, 1 * k);
+      fx.flare = 0.5;
+      fx.volFog = 0.5 + 0.35 * k;
       fx.amb = 0.4 + 0.6 * k;
       if (ash) {
         fx.lightning = 0.6 * k;
@@ -86889,11 +86900,11 @@ function resolveOne(base, tod, key) {
     }
     case "fog":
       th.clouds = Math.max(th.clouds, 0.5);
-      th.fogDensity *= 1 + 0.7 * k;
+      th.fogDensity *= 1 + 1.05 * k;
       th.sunIntensity *= 1 - 0.3 * k;
       th.skyHorizon = mixHex(th.skyHorizon, th.fogColor, 0.5 * k);
       if (th.ambient === "rain") th.ambient = "dust";
-      fx.volFog = 0.45 + 0.55 * k;
+      fx.volFog = Math.min(1, 0.55 + 0.6 * k);
       fx.flare = 0.4;
       fx.wind = 0.1;
       break;
@@ -86947,10 +86958,10 @@ function blend(o, a, b, s) {
     z[2] = x[2] + (y[2] - x[2]) * s;
   }
 }
-function evalTrack(tr, time11) {
+function evalTrack(tr, time12) {
   const K = tr.keys;
   if (K.length === 1) return { a: K[0].v, b: K[0].v, s: 0 };
-  let t = Math.max(0, time11);
+  let t = Math.max(0, time12);
   if (tr.loop) t %= tr.loop;
   let i = 0;
   while (i < K.length - 2 && t >= K[i + 1].t) i++;
@@ -86995,8 +87006,8 @@ var EnvTimeline = class {
     return s;
   }
   /** Blends tod (a→b) × weather (c→d). Sun ↔ moon hand-overs dip the light to zero before it returns from the new direction. */
-  eval(time11) {
-    const T2 = evalTrack(this.tod, time11), W2 = evalTrack(this.wx, time11), o = this.cur;
+  eval(time12) {
+    const T2 = evalTrack(this.tod, time12), W2 = evalTrack(this.wx, time12), o = this.cur;
     blend(this.A, this.state(T2.a, W2.a), this.state(T2.a, W2.b), W2.s);
     if (T2.a === T2.b) {
       blend(o, this.A, this.A, 0);
@@ -87589,9 +87600,9 @@ var DebrisPool = class {
       this.p[j + 1] += this.v[j + 1] * dt;
       this.p[j + 2] += this.v[j + 2] * dt;
       this.ang[i] += dt * 7;
-      const floor5 = this.gy[i] + this.size[i] * 0.5;
-      if (this.p[j + 1] < floor5) {
-        this.p[j + 1] = floor5;
+      const floor6 = this.gy[i] + this.size[i] * 0.5;
+      if (this.p[j + 1] < floor6) {
+        this.p[j + 1] = floor6;
         this.v[j + 1] = Math.abs(this.v[j + 1]) * 0.32;
         this.v[j] *= 0.6;
         this.v[j + 2] *= 0.6;
@@ -88097,6 +88108,37 @@ function buildTrack(def) {
     bounds.minY = Math.min(bounds.minY, s.y);
     bounds.maxY = Math.max(bounds.maxY, s.y);
   }
+  if (!globalThis.NO_TUNNELS) {
+    const rt = mulberry32(hashStr(def.id + "|tunnels"));
+    const want = { aquilaris: 4, oovo: 3, ice: 4, malastare: 4 }[def.theme] ?? 2;
+    const W2 = (i) => samples[(i % N3 + N3) % N3];
+    const near = (i, j, d) => {
+      let k = Math.abs(i - j);
+      if (closed) k = Math.min(k, N3 - k);
+      return k < d;
+    };
+    const cands = [];
+    for (let i = 40; i < N3 - 280; i += 12) {
+      const len = 60 + Math.floor(rt() * 60), mid = i + len / 2;
+      if (near(mid, startIdx, 110 + len / 2) || !closed && near(mid, finishIdx, 90 + len / 2)) continue;
+      let ok = true, walls = 0;
+      for (let k = -14; k <= len + 14 && ok; k += 2) {
+        const q = W2(i + k);
+        if (q.gap || q.ramp > 0 || q.zeroG || q.openL || q.openR || q.link >= 0 || q.roof > 0) ok = false;
+        else if (q.hL > 0 && q.hR > 0) walls++;
+      }
+      if (!ok || setPieces.some((sp) => near(sp.idx, mid, 70 + len / 2)) || hazards.some((h) => near(h.idx, mid, 10 + len / 2))) continue;
+      cands.push({ i, len, score: walls / (len / 2) + rt() * 0.6 });
+    }
+    cands.sort((a, b) => b.score - a.score);
+    const taken2 = [];
+    for (const c of cands) {
+      if (taken2.length >= want) break;
+      if (taken2.some((t) => near(t.i + t.len / 2, c.i + c.len / 2, 150 + (t.len + c.len) / 2))) continue;
+      taken2.push(c);
+      for (let k = 0; k <= c.len; k++) samples[c.i + k].roof = 13;
+    }
+  }
   for (const o of obstacles) if (o.kind === 2 || o.kind === 0 && o.r < 2.9) o.breakable = true;
   return { def, paths, main, N: N3, startIdx, finishIdx, obstacles, obstaclesByPath, hazards, setPieces, arches, bounds, overheads: [] };
 }
@@ -88205,11 +88247,11 @@ function roadSurfaceAt(path, guessIdx, x, z) {
   const fr = frameAt(path, idx, x, z);
   return { y: fr.groundY, gap: fr.gap || Math.abs(fr.lat) > fr.hw + 2.5 };
 }
-function rotorAngle(sp, time11) {
-  return sp.phase + sp.speed * time11;
+function rotorAngle(sp, time12) {
+  return sp.phase + sp.speed * time12;
 }
-function cycPhase(time11, phase, period, off = 0) {
-  let ph = ((time11 + phase) / period - off) % 1;
+function cycPhase(time12, phase, period, off = 0) {
+  let ph = ((time12 + phase) / period - off) % 1;
   if (ph < 0) ph += 1;
   return ph;
 }
@@ -88217,15 +88259,15 @@ var ss01 = (a, b, x) => {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
-function gateDrop(sp, k, time11) {
-  const ph = cycPhase(time11, sp.phase, sp.period, k / 3);
+function gateDrop(sp, k, time12) {
+  const ph = cycPhase(time12, sp.phase, sp.period, k / 3);
   return ph < 0.06 ? ss01(0, 0.06, ph) : ph < 0.26 ? 1 : ph < 0.32 ? 1 - ss01(0.26, 0.32, ph) : 0;
 }
-function gateWarn(sp, k, time11) {
-  return cycPhase(time11, sp.phase, sp.period, k / 3) > 0.86;
+function gateWarn(sp, k, time12) {
+  return cycPhase(time12, sp.phase, sp.period, k / 3) > 0.86;
 }
-function boulderState(sp, time11) {
-  const ph = cycPhase(time11, sp.phase, sp.period);
+function boulderState(sp, time12) {
+  const ph = cycPhase(time12, sp.phase, sp.period);
   if (ph < 0.16) return { active: false, warn: true, lat: sp.lat * (sp.hw + 7), hop: 6, spin: 0, bounce: false };
   if (ph > 0.74) return { active: false, warn: false, lat: -sp.lat * (sp.hw + 9), hop: -4, spin: 0, bounce: false };
   const u = (ph - 0.16) / 0.58;
@@ -88234,12 +88276,12 @@ function boulderState(sp, time11) {
   const hop = (u < 0.1 ? (1 - u / 0.1) * 4.5 : 0) + Math.abs(Math.sin(u * Math.PI * 3)) * 2.4 * (1 - u * 0.35);
   return { active: true, warn: false, lat, hop, spin: u * Math.PI * 7, bounce: bPh < 0.06 && u > 0.08 && u < 0.92 };
 }
-function bridgeSwing(sp, time11) {
-  const ph = cycPhase(time11, sp.phase, sp.period);
+function bridgeSwing(sp, time12) {
+  const ph = cycPhase(time12, sp.phase, sp.period);
   return ph < 0.16 ? ss01(0, 0.16, ph) : ph < 0.44 ? 1 : ph < 0.6 ? 1 - ss01(0.44, 0.6, ph) : 0;
 }
-function bridgeWarn(sp, time11) {
-  return cycPhase(time11, sp.phase, sp.period) > 0.88;
+function bridgeWarn(sp, time12) {
+  return cycPhase(time12, sp.phase, sp.period) > 0.88;
 }
 function h1(i) {
   const s = Math.sin(i * 127.1 + 31.7) * 43758.5453;
@@ -88284,6 +88326,40 @@ function normalizeKeys(k) {
   if (!k) return d;
   for (const [a] of ACTIONS) if (Array.isArray(k[a])) d[a] = k[a].filter((c) => typeof c === "string");
   return d;
+}
+var defaultPad = () => ({
+  thrust: [{ b: 7 }],
+  brake: [{ b: 6 }],
+  left: [{ a: 0, d: -1 }],
+  right: [{ a: 0, d: 1 }],
+  boost: [{ b: 0 }],
+  airbrake: [{ b: 1 }, { b: 4 }, { b: 5 }],
+  pitchDown: [{ a: 3, d: -1 }],
+  pitchUp: [{ a: 3, d: 1 }],
+  rollLeft: [{ a: 2, d: -1 }],
+  rollRight: [{ a: 2, d: 1 }],
+  repair: [{ b: 2 }],
+  view: [{ b: 3 }]
+});
+var isBind = (x) => !!x && typeof x === "object" && (typeof x.b === "number" || typeof x.a === "number");
+function normalizePad(p) {
+  const d = defaultPad();
+  if (!p) return d;
+  for (const [a] of ACTIONS) if (Array.isArray(p[a])) d[a] = p[a].filter(isBind);
+  return d;
+}
+function padValue(gp, binds) {
+  let v = 0;
+  for (const x of binds) {
+    if ("b" in x) {
+      const bt = gp.buttons[x.b];
+      if (bt) v = Math.max(v, bt.value > 0.05 ? bt.value : bt.pressed ? 1 : 0);
+    } else {
+      const ax = (gp.axes[x.a] ?? 0) * x.d;
+      if (ax > 0.15) v = Math.max(v, Math.min(1, (ax - 0.15) / 0.85));
+    }
+  }
+  return v;
 }
 
 // ../../src/game/podDesigns.ts
@@ -88407,46 +88483,46 @@ function mergeAttributes(attributes) {
   let gpuType = -1;
   let arrayLength = 0;
   for (let i = 0; i < attributes.length; ++i) {
-    const attribute7 = attributes[i];
-    if (TypedArray === void 0) TypedArray = attribute7.array.constructor;
-    if (TypedArray !== attribute7.array.constructor) {
+    const attribute8 = attributes[i];
+    if (TypedArray === void 0) TypedArray = attribute8.array.constructor;
+    if (TypedArray !== attribute8.array.constructor) {
       console.error("THREE.BufferGeometryUtils: .mergeAttributes() failed. BufferAttribute.array must be of consistent array types across matching attributes.");
       return null;
     }
-    if (itemSize === void 0) itemSize = attribute7.itemSize;
-    if (itemSize !== attribute7.itemSize) {
+    if (itemSize === void 0) itemSize = attribute8.itemSize;
+    if (itemSize !== attribute8.itemSize) {
       console.error("THREE.BufferGeometryUtils: .mergeAttributes() failed. BufferAttribute.itemSize must be consistent across matching attributes.");
       return null;
     }
-    if (normalized === void 0) normalized = attribute7.normalized;
-    if (normalized !== attribute7.normalized) {
+    if (normalized === void 0) normalized = attribute8.normalized;
+    if (normalized !== attribute8.normalized) {
       console.error("THREE.BufferGeometryUtils: .mergeAttributes() failed. BufferAttribute.normalized must be consistent across matching attributes.");
       return null;
     }
-    if (gpuType === -1) gpuType = attribute7.gpuType;
-    if (gpuType !== attribute7.gpuType) {
+    if (gpuType === -1) gpuType = attribute8.gpuType;
+    if (gpuType !== attribute8.gpuType) {
       console.error("THREE.BufferGeometryUtils: .mergeAttributes() failed. BufferAttribute.gpuType must be consistent across matching attributes.");
       return null;
     }
-    arrayLength += attribute7.count * itemSize;
+    arrayLength += attribute8.count * itemSize;
   }
   const array2 = new TypedArray(arrayLength);
   const result = new BufferAttribute(array2, itemSize, normalized);
   let offset = 0;
   for (let i = 0; i < attributes.length; ++i) {
-    const attribute7 = attributes[i];
-    if (attribute7.isInterleavedBufferAttribute) {
+    const attribute8 = attributes[i];
+    if (attribute8.isInterleavedBufferAttribute) {
       const tupleOffset = offset / itemSize;
-      for (let j = 0, l = attribute7.count; j < l; j++) {
+      for (let j = 0, l = attribute8.count; j < l; j++) {
         for (let c = 0; c < itemSize; c++) {
-          const value = attribute7.getComponent(j, c);
+          const value = attribute8.getComponent(j, c);
           result.setComponent(j + tupleOffset, c, value);
         }
       }
     } else {
-      array2.set(attribute7.array, offset);
+      array2.set(attribute8.array, offset);
     }
-    offset += attribute7.count * itemSize;
+    offset += attribute8.count * itemSize;
   }
   if (gpuType !== void 0) {
     result.gpuType = gpuType;
@@ -88651,7 +88727,7 @@ var M4 = {
 };
 function projUV(g2, tile = TILE) {
   const p = g2.attributes.position, n = g2.attributes.normal;
-  const uv9 = new Float32Array(p.count * 2);
+  const uv10 = new Float32Array(p.count * 2);
   for (let i = 0; i < p.count; i++) {
     const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
     let u, v;
@@ -88665,10 +88741,10 @@ function projUV(g2, tile = TILE) {
       u = p.getX(i);
       v = p.getY(i);
     }
-    uv9[i * 2] = u / tile;
-    uv9[i * 2 + 1] = v / tile;
+    uv10[i * 2] = u / tile;
+    uv10[i * 2 + 1] = v / tile;
   }
-  g2.setAttribute("uv", new Float32BufferAttribute(uv9, 2));
+  g2.setAttribute("uv", new Float32BufferAttribute(uv10, 2));
   return g2;
 }
 function rbox(w, h, d, r = 0.04, seg = 1) {
@@ -88684,8 +88760,8 @@ function rbox(w, h, d, r = 0.04, seg = 1) {
   return projUV(geo);
 }
 function scaleUV(g2, su, sv) {
-  const uv9 = g2.attributes.uv;
-  for (let i = 0; i < uv9.count; i++) uv9.setXY(i, uv9.getX(i) * su, uv9.getY(i) * sv);
+  const uv10 = g2.attributes.uv;
+  for (let i = 0; i < uv10.count; i++) uv10.setXY(i, uv10.getX(i) * su, uv10.getY(i) * sv);
   return g2;
 }
 function cyl(rTop, rBot, h, seg, open2 = false, hSeg = 1) {
@@ -88739,7 +88815,7 @@ function lathe(profile, seg, mode = 1, phiStart = 0, phiLen = Math.PI * 2) {
   }
   const cols = seg + 1;
   const R = rows.length;
-  const pos = new Float32Array(R * cols * 3), nrm = new Float32Array(R * cols * 3), uv9 = new Float32Array(R * cols * 2), liv = new Float32Array(R * cols * 3);
+  const pos = new Float32Array(R * cols * 3), nrm = new Float32Array(R * cols * 3), uv10 = new Float32Array(R * cols * 2), liv = new Float32Array(R * cols * 3);
   const zr = Math.max(1e-4, zmax - zmin);
   for (let j = 0; j < R; j++) {
     const row = rows[j];
@@ -88753,8 +88829,8 @@ function lathe(profile, seg, mode = 1, phiStart = 0, phiLen = Math.PI * 2) {
       nrm[k * 3] = row.nr * sp;
       nrm[k * 3 + 1] = row.nr * cp;
       nrm[k * 3 + 2] = row.nz;
-      uv9[k * 2] = phi * Math.max(0.12, row.r) / TILE;
-      uv9[k * 2 + 1] = row.s / TILE;
+      uv10[k * 2] = phi * Math.max(0.12, row.r) / TILE;
+      uv10[k * 2 + 1] = row.s / TILE;
       liv[k * 3] = (phi / (Math.PI * 2) % 1 + 1) % 1;
       liv[k * 3 + 1] = (row.z - zmin) / zr;
       liv[k * 3 + 2] = mode;
@@ -88771,7 +88847,7 @@ function lathe(profile, seg, mode = 1, phiStart = 0, phiLen = Math.PI * 2) {
   const g2 = new BufferGeometry();
   g2.setAttribute("position", new BufferAttribute(pos, 3));
   g2.setAttribute("normal", new BufferAttribute(nrm, 3));
-  g2.setAttribute("uv", new BufferAttribute(uv9, 2));
+  g2.setAttribute("uv", new BufferAttribute(uv10, 2));
   g2.setAttribute("aLiv", new BufferAttribute(liv, 3));
   g2.setIndex(idx);
   return g2;
@@ -88793,7 +88869,7 @@ function sectionPoint(s, phi) {
 }
 function loft(sections2, seg, mode = 0, caps = [true, true], inward = false) {
   const R = sections2.length, cols = seg + 1;
-  const pos = new Float32Array(R * cols * 3), uv9 = new Float32Array(R * cols * 2), liv = new Float32Array(R * cols * 3);
+  const pos = new Float32Array(R * cols * 3), uv10 = new Float32Array(R * cols * 2), liv = new Float32Array(R * cols * 3);
   const z0 = sections2[0].z, z1 = sections2[R - 1].z;
   const zr = Math.max(1e-4, z1 - z0);
   let vAcc = 0;
@@ -88816,8 +88892,8 @@ function loft(sections2, seg, mode = 0, caps = [true, true], inward = false) {
       pos[k * 3] = x;
       pos[k * 3 + 1] = y;
       pos[k * 3 + 2] = s.z;
-      uv9[k * 2] = uAcc / TILE;
-      uv9[k * 2 + 1] = vAcc / TILE;
+      uv10[k * 2] = uAcc / TILE;
+      uv10[k * 2 + 1] = vAcc / TILE;
       liv[k * 3] = phi / (Math.PI * 2);
       liv[k * 3 + 1] = (s.z - z0) / zr;
       liv[k * 3 + 2] = mode;
@@ -88831,7 +88907,7 @@ function loft(sections2, seg, mode = 0, caps = [true, true], inward = false) {
   }
   const g2 = new BufferGeometry();
   g2.setAttribute("position", new BufferAttribute(pos, 3));
-  g2.setAttribute("uv", new BufferAttribute(uv9, 2));
+  g2.setAttribute("uv", new BufferAttribute(uv10, 2));
   g2.setAttribute("aLiv", new BufferAttribute(liv, 3));
   g2.setIndex(idx);
   g2.computeVertexNormals();
@@ -88880,7 +88956,7 @@ function loft(sections2, seg, mode = 0, caps = [true, true], inward = false) {
   return m;
 }
 function loftRim(outer, inner, seg) {
-  const pos = [], uv9 = [], idx = [];
+  const pos = [], uv10 = [], idx = [];
   let v = 0, acc = 0;
   for (const side of [0, 1]) {
     acc = 0;
@@ -88892,7 +88968,7 @@ function loftRim(outer, inner, seg) {
       const [xo, yo] = sectionPoint(so, phiO), [xi, yi] = sectionPoint(si, phiI);
       if (j > 0) acc += Math.abs(so.z - outer[j - 1].z);
       pos.push(xo, yo, so.z, xi, yi, si.z);
-      uv9.push(acc / TILE, 0, acc / TILE, 0.05);
+      uv10.push(acc / TILE, 0, acc / TILE, 0.05);
       if (j > 0) {
         if (side === 0) idx.push(v - 2, v - 1, v, v - 1, v + 1, v);
         else idx.push(v - 2, v, v - 1, v - 1, v, v + 1);
@@ -88902,7 +88978,7 @@ function loftRim(outer, inner, seg) {
   }
   const g2 = new BufferGeometry();
   g2.setAttribute("position", new Float32BufferAttribute(pos, 3));
-  g2.setAttribute("uv", new Float32BufferAttribute(uv9, 2));
+  g2.setAttribute("uv", new Float32BufferAttribute(uv10, 2));
   g2.setIndex(idx);
   g2.computeVertexNormals();
   return g2;
@@ -89349,7 +89425,7 @@ var WeatherFx = class {
     for (let i = 1; i <= SEG; i++) {
       const t = i / SEG;
       const nx = x + (px2 - x) * (1 - t) * 0.9 + (Math.random() - 0.5) * jag * 2, ny = top + (groundY - top) * t, nz = z + (pz2 - z) * (1 - t) * 0.9 + (Math.random() - 0.5) * jag * 2;
-      quad(px2, py2, pz2, nx, ny, nz, l * 26e-4);
+      quad(px2, py2, pz2, nx, ny, nz, l * 34e-4);
       if ((i === 7 || i === 13 || i === 20) && forks.length < FORKS) forks.push([nx, ny, nz, forks.length % 2 ? -1 : 1]);
       px2 = nx;
       py2 = ny;
@@ -89377,7 +89453,7 @@ var WeatherFx = class {
     if (fx.lightning > 0.03 || this.strikeAge < 2) {
       if (fx.lightning > 0.03) this.nextStrike -= dt * (frozen ? 0.4 : 1);
       if (this.nextStrike <= 0) {
-        this.nextStrike = (3 + Math.random() * 6) / Math.max(0.25, fx.lightning);
+        this.nextStrike = (1.8 + Math.random() * 4) / Math.max(0.25, fx.lightning);
         this.strikeAge = 0;
         this.hasBolt = Math.random() < 0.8;
         const dist = 380 + Math.random() * Math.random() * 1100;
@@ -89431,10 +89507,10 @@ var WeatherFx = class {
       this.fwd.y = 0;
       this.fwd.normalize();
       this.right.set(-this.fwd.z, 0, this.fwd.x);
-      this.carry += (0.22 + 0.78 * env) * fx.wind * fx.gustAmt * 300 * this.particles.amount * this.quality * dt;
-      const n = Math.min(12, Math.floor(this.carry));
+      this.carry += (0.22 + 0.78 * env) * fx.wind * fx.gustAmt * 480 * this.particles.amount * this.quality * dt;
+      const n = Math.min(18, Math.floor(this.carry));
       this.carry -= Math.floor(this.carry);
-      const snow = fx.gust === "snow", alpha = snow ? 0.085 : fx.gust === "dust" ? 0.11 : 0.05;
+      const snow = fx.gust === "snow", alpha = snow ? 0.125 : fx.gust === "dust" ? 0.155 : 0.085;
       for (let i = 0; i < n; i++) {
         const f = 14 + Math.random() * 110, r = (Math.random() - 0.5) * 120;
         this.p.copy(cam).addScaledVector(this.fwd, f).addScaledVector(this.right, r).addScaledVector(this.wind, -22);
@@ -90258,11 +90334,12 @@ var THEMES = {
     hemiSky: "#d8e8c0",
     hemiGround: "#4a4a2a",
     exposure: 1,
-    road: "road",
+    road: "cityRoad",
     wall: "rock",
     ground: "jungle",
+    // Session 16: panelled metal race deck with light lines (methane refinery world)
     palette: { road: ["#4a4436", "#665e4a", "#8a8064"], wall: ["#3e3a2e", "#625a46", "#8e8466"], ground: ["#3a4422", "#566230", "#7a8240"] },
-    decor: ["rocks", "spires", "wrecks"],
+    decor: ["rocks", "spires", "wrecks", "pylons"],
     ambient: "spores",
     terrain: "jungle",
     barrierColor: "#c8ff3a"
@@ -90540,7 +90617,7 @@ var defaultGfx = () => ({ preset: "high", backend: "auto", batching: true, fov: 
 function defaultProfile() {
   const custom = {};
   for (const p of PODS) custom[p.id] = { colors: [...p.colors], tuning: Object.fromEntries(STAT_KEYS.map((k) => [k, 0])) };
-  return { podId: PODS[0].id, custom, race: { trackId: "boonta", laps: 3, opponents: 7, difficulty: 1, camera: 0, timeOfDay: "auto", weather: "auto" }, gfx: defaultGfx(), volume: 0.6, best: {}, keys: defaultKeys() };
+  return { podId: PODS[0].id, custom, race: { trackId: "boonta", laps: 3, opponents: 7, difficulty: 1, camera: 0, timeOfDay: "auto", weather: "auto" }, gfx: defaultGfx(), volume: 0.6, best: {}, keys: defaultKeys(), pad: defaultPad() };
 }
 function effectiveStats(podId, custom) {
   const pod = PODS.find((p) => p.id === podId);
@@ -90763,8 +90840,8 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
   }
   {
     const poles = [], heads = [];
-    const step8 = Math.round(170 / 2 / Math.max(0.5, det2));
-    for (let i = 0, k = 0; i < N3; i += step8, k++) {
+    const step9 = Math.round(170 / 2 / Math.max(0.5, det2));
+    for (let i = 0, k = 0; i < N3; i += step9, k++) {
       const s = S[i];
       const side = k % 2 ? 1 : -1;
       if (!sideOK(s, side)) continue;
@@ -90866,7 +90943,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
     for (let g2 = 0; g2 < count; g2++) {
       const i = Math.floor((g2 + 0.5) / count * N3);
       const s = S[i];
-      if (s.gap || s.ramp > 0 || nearStart(i) || s.openL || s.openR) continue;
+      if (s.gap || s.ramp > 0 || nearStart(i) || s.openL || s.openR || s.roof > 0 || s.zeroG) continue;
       const R = s.hw + 5;
       if (![-1, 1].every((sd) => clear(s.x + s.rx * sd * R, s.z + s.rz * sd * R, 2.6, -0.5))) continue;
       const m = new Matrix4().compose(new Vector3(s.x, s.y, s.z), new Quaternion().setFromAxisAngle(UP, yawOf(s)), new Vector3(1, 0.82, 1));
@@ -90918,7 +90995,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
     });
     const mat = new MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     disp.push(mat, tex);
-    const pos = [], uv9 = [], ind = [];
+    const pos = [], uv10 = [], ind = [];
     let v = 0;
     const count = Math.floor(N3 / 42 * det2);
     for (let d = 0; d < count; d++) {
@@ -90940,7 +91017,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
         for (const sd of [-0.5, 0.5]) {
           const l = lat + sd * width;
           pos.push(s.x + s.rx * l, surfY(s, l) + 0.07 + dOff, s.z + s.rz * l);
-          uv9.push(sd + 0.5, k / len);
+          uv10.push(sd + 0.5, k / len);
         }
         if (k > 0) ind.push(v - 2, v - 1, v, v - 1, v + 1, v);
         v += 2;
@@ -90949,7 +91026,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
     if (ind.length) {
       const g2 = new BufferGeometry();
       g2.setAttribute("position", new Float32BufferAttribute(pos, 3));
-      g2.setAttribute("uv", new Float32BufferAttribute(uv9, 2));
+      g2.setAttribute("uv", new Float32BufferAttribute(uv10, 2));
       g2.setIndex(ind);
       g2.computeVertexNormals();
       const m = new Mesh(g2, mat);
@@ -91465,8 +91542,8 @@ function addMechProps(td, theme, group, disp, heightAt, roadClear, waterY, detai
   }
   const ringGeo = merge(rg);
   const towers = [];
-  const step8 = Math.max(60, Math.round(280 / DS / Math.max(0.5, Math.min(1.3, detail))));
-  for (let i = 60, n = 0; i < N3 - 40; i += step8, n++) {
+  const step9 = Math.max(60, Math.round(280 / DS / Math.max(0.5, Math.min(1.3, detail))));
+  for (let i = 60, n = 0; i < N3 - 40; i += step9, n++) {
     const s = S[i];
     if (s.gap || s.zeroG || s.roof > 0 || s.ramp > 0) continue;
     let side = n % 2 ? 1 : -1;
@@ -91533,9 +91610,169 @@ function addMechProps(td, theme, group, disp, heightAt, roadClear, waterY, detai
   return { update, towers: towers.length, drones: nDr };
 }
 
-// ../../src/game/trackDetail.ts
+// ../../src/game/scifi.ts
 var TSL6 = three_tsl_exports;
-var { abs: abs5, clamp: clamp6, color: color4, float: float4, length: length4, max: max5, mix: mix4, oneMinus: oneMinus4, positionView: positionView4, positionWorld: positionWorld4, sin: sin5, smoothstep: smoothstep5, time: time5, uniform: uniform5, uv: uv5 } = TSL6;
+var { attribute: attribute4, dot: dot4, floor: floor3, fract: fract4, pow: pow7, sin: sin5, step: step2, time: time5, uv: uv5, vec2: vec24, vec3: vec37 } = TSL6;
+var SCIFI_THEMES = /* @__PURE__ */ new Set(["oovo", "aquilaris", "malastare", "city"]);
+function addSciFi(td, theme, group, disp) {
+  const S = td.main.samples, N3 = td.N, closed = td.main.closed, sci = SCIFI_THEMES.has(theme.id);
+  const glowC = new Color(theme.barrierColor);
+  const nearStart = (i, d) => {
+    let k = Math.abs(i - td.startIdx);
+    if (closed) k = Math.min(k, N3 - k);
+    return k < d;
+  };
+  const edgeY = (s, sd) => s.y + s.ramp - sd * s.hw * s.bank;
+  {
+    const pos = [], uvs = [], ind = [];
+    for (const sd of [-1, 1]) {
+      let prev = -1;
+      for (let i = 0; i <= N3; i += 2) {
+        if (!closed && i >= N3) break;
+        const s = S[i % N3], on = !s.gap && (sci || s.roof > 0);
+        if (!on) {
+          prev = -1;
+          continue;
+        }
+        const base = pos.length / 3;
+        for (const w of [-0.26, 0.26]) {
+          const lat = sd * (s.hw - 0.8 + w);
+          pos.push(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + 0.36, s.z + s.rz * lat);
+          uvs.push(w > 0 ? 1 : 0, i * 2);
+        }
+        if (prev >= 0) {
+          if (sd > 0) ind.push(prev, base, prev + 1, prev + 1, base, base + 1);
+          else ind.push(prev, prev + 1, base, prev + 1, base + 1, base);
+        }
+        prev = base;
+      }
+    }
+    if (ind.length) {
+      const g2 = new BufferGeometry();
+      g2.setAttribute("position", new Float32BufferAttribute(pos, 3));
+      g2.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+      g2.setIndex(ind);
+      g2.computeVertexNormals();
+      const m = new MeshBasicNodeMaterial({ side: DoubleSide });
+      const run = fract4(uv5().y.mul(1 / 28).sub(time5.mul(1.5)));
+      m.colorNode = vec37(glowC.r, glowC.g, glowC.b).mul(pow7(run, 5).mul(2.4).add(0.55));
+      const mesh2 = new Mesh(g2, m);
+      mesh2.frustumCulled = false;
+      group.add(mesh2);
+      disp.push(g2, m);
+    }
+  }
+  if (!sci) return;
+  const sideFree = (s, sd) => (sd > 0 ? s.hR : s.hL) === 0 && !(sd > 0 ? s.openR : s.openL) && !s.gap && !(s.roof > 0) && !s.zeroG;
+  const panels = [], solids = [], glows = [];
+  const up = new Vector3(0, 1, 0), q = new Quaternion();
+  let n = 0;
+  for (let i = 70; i < N3 - 40; i += 88, n++) {
+    const s = S[i];
+    let sd = n % 2 ? 1 : -1;
+    if (!sideFree(s, sd)) sd = -sd;
+    if (!sideFree(s, sd) || nearStart(i, 70)) continue;
+    const lat = sd * ((sd > 0 ? s.wallR : s.wallL) + 6.5), cx = s.x + s.rx * lat, cz = s.z + s.rz * lat, y0 = edgeY(s, sd);
+    q.setFromAxisAngle(up, Math.atan2(s.tx, s.tz) + Math.PI + sd * 0.35);
+    const pg = new PlaneGeometry(8.4, 3.5);
+    pg.setAttribute("aSeed", new Float32BufferAttribute(new Float32Array(4).fill(n * 7.3 + 1), 1));
+    pg.applyQuaternion(q);
+    pg.translate(cx, y0 + 9.4, cz);
+    panels.push(pg);
+    solids.push(new CylinderGeometry(0.16, 0.3, 9.2, 6).translate(cx, y0 + 3.2, cz), new BoxGeometry(1.6, 0.5, 1.6).translate(cx, y0 - 1.2, cz), new BoxGeometry(8.9, 0.14, 0.3).applyQuaternion(q).translate(cx, y0 + 7.55, cz));
+    glows.push(new BoxGeometry(8.6, 0.06, 0.12).applyQuaternion(q).translate(cx, y0 + 7.68, cz));
+  }
+  for (let i = 20; i < N3 - 10; i += 25) {
+    const s = S[i];
+    if (nearStart(i, 30)) continue;
+    for (const sd of [-1, 1]) {
+      if (!sideFree(s, sd)) continue;
+      const lat = sd * ((sd > 0 ? s.wallR : s.wallL) + 1.7), x = s.x + s.rx * lat, z = s.z + s.rz * lat, y = edgeY(s, sd);
+      glows.push(new IcosahedronGeometry(0.34, 0).translate(x, y + 4.1, z), new TorusGeometry(0.62, 0.04, 4, 10).rotateX(Math.PI / 2).translate(x, y + 4.1, z));
+      solids.push(new CylinderGeometry(0.05, 0.09, 2.6, 5).translate(x, y + 2.3, z));
+    }
+  }
+  {
+    const pos = [], ind = [];
+    const R = 0.8, SEG3 = 8;
+    for (const sd of [-1, 1]) {
+      let prev = -1, runLen = 0;
+      for (let i = 60; i < N3 - 30; i += 3) {
+        const s = S[i], zone = Math.floor(i / 260) % 2 === (sd > 0 ? 0 : 1);
+        if (!zone || !sideFree(s, sd) || nearStart(i, 80)) {
+          prev = -1;
+          runLen = 0;
+          continue;
+        }
+        const lat = sd * ((sd > 0 ? s.wallR : s.wallL) + 4.3), cx = s.x + s.rx * lat, cz = s.z + s.rz * lat, cy = edgeY(s, sd) + 1.5, base = pos.length / 3;
+        for (let a = 0; a < SEG3; a++) {
+          const an = a / SEG3 * Math.PI * 2, c = Math.cos(an) * R, d = Math.sin(an) * R;
+          pos.push(cx + s.rx * c, cy + d, cz + s.rz * c);
+        }
+        if (prev >= 0) for (let a = 0; a < SEG3; a++) {
+          const b = (a + 1) % SEG3;
+          if (sd > 0) ind.push(prev + a, prev + b, base + a, prev + b, base + b, base + a);
+          else ind.push(prev + a, base + a, prev + b, prev + b, base + a, base + b);
+        }
+        prev = base;
+        runLen++;
+        if (runLen % 4 === 1) {
+          q.setFromAxisAngle(up, Math.atan2(s.tx, s.tz));
+          solids.push(new BoxGeometry(3.6, 0.28, 0.4).applyQuaternion(q).translate(cx - s.rx * sd * 2, cy - 0.5, cz - s.rz * sd * 2));
+          glows.push(new TorusGeometry(R + 0.08, 0.09, 5, 12).applyQuaternion(q).translate(cx, cy, cz));
+        }
+      }
+    }
+    if (ind.length) {
+      const pg = new BufferGeometry();
+      pg.setAttribute("position", new Float32BufferAttribute(pos, 3));
+      pg.setIndex(ind);
+      pg.computeVertexNormals();
+      const g2 = pg.toNonIndexed();
+      pg.dispose();
+      g2.setAttribute("uv", new Float32BufferAttribute(new Float32Array(g2.attributes.position.count * 2), 2));
+      solids.push(g2);
+    }
+  }
+  const addM = (list, mat, order = 0) => {
+    if (!list.length) return;
+    const g2 = mergeGeometries(list.map((x) => {
+      const y = x.index ? x.toNonIndexed() : x;
+      if (y !== x) x.dispose();
+      return y;
+    }), false);
+    list.forEach((x) => x.dispose());
+    if (!g2) return;
+    const mesh2 = new Mesh(g2, mat);
+    mesh2.frustumCulled = false;
+    mesh2.receiveShadow = true;
+    mesh2.renderOrder = order;
+    group.add(mesh2);
+    disp.push(g2);
+  };
+  const metal = new MeshStandardMaterial({ color: "#4c535e", metalness: 0.86, roughness: 0.36 });
+  const glow = new MeshBasicMaterial({ color: glowC.clone().multiplyScalar(1.7) });
+  const holo = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide, fog: false });
+  {
+    const u = uv5(), seed = attribute4("aSeed", "float");
+    const cell = floor3(u.mul(vec24(16, 6))), h = fract4(sin5(dot4(cell.add(seed), vec24(127.1, 311.7))).mul(43758.5453));
+    const lit = step2(0.5, fract4(h.add(floor3(time5.mul(1.6).add(seed)).mul(0.37))));
+    const gaps = step2(0.14, fract4(u.x.mul(16))).mul(step2(0.24, fract4(u.y.mul(6))));
+    const inside = step2(0.04, u.x).mul(step2(u.x, 0.96)).mul(step2(0.09, u.y)).mul(step2(u.y, 0.91));
+    const scan = sin5(u.y.mul(120).add(time5.mul(7))).mul(0.2).add(0.8);
+    const flick = step2(0.04, fract4(sin5(floor3(time5.mul(11)).add(seed)).mul(917.3))).mul(0.35).add(0.65);
+    holo.colorNode = vec37(glowC.r, glowC.g, glowC.b).mul(1.25).add(vec37(0.25));
+    holo.opacityNode = lit.mul(gaps).mul(inside).mul(0.5).add(inside.oneMinus().mul(0.85)).add(0.07).mul(scan).mul(flick);
+  }
+  disp.push(metal, glow, holo);
+  addM(solids, metal);
+  addM(glows, glow);
+  addM(panels, holo, 3);
+}
+
+// ../../src/game/trackDetail.ts
+var TSL7 = three_tsl_exports;
+var { abs: abs5, clamp: clamp6, color: color4, float: float4, length: length4, max: max5, mix: mix4, oneMinus: oneMinus4, positionView: positionView4, positionWorld: positionWorld4, sin: sin6, smoothstep: smoothstep5, time: time6, uniform: uniform5, uv: uv6 } = TSL7;
 var ssInv3 = (a, b, x) => oneMinus4(smoothstep5(b, a, x));
 function canvasTex2(w, h, draw, srgb = true) {
   const cv = document.createElement("canvas");
@@ -91617,13 +91854,13 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
   };
   const fieldMat = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide, blending: AdditiveBlending });
   {
-    const fu = uv5();
+    const fu = uv6();
     const pw = positionWorld4;
     const dCam = length4(positionView4);
     const distFade = ssInv3(135, 22, dCam);
     const bottomGlow = ssInv3(0.42, 0, fu.y).mul(0.11);
     const topRim = ssInv3(0.12, 0, oneMinus4(fu.y)).mul(0.08);
-    const pulse = sin5(fu.x.mul(0.18).sub(time5.mul(3.2))).mul(0.02).add(0.03);
+    const pulse = sin6(fu.x.mul(0.18).sub(time6.mul(3.2))).mul(0.02).add(0.03);
     const idle = bottomGlow.add(topRim).add(pulse.mul(ssInv3(0.85, 0, fu.y))).mul(distFade);
     let flare = float4(0);
     for (let k = 0; k < 4; k++) {
@@ -91633,7 +91870,7 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
       const radius = oneMinus4(clamp6(hu.w, 0, 1)).mul(17).add(1.2);
       const ring2 = ssInv3(2.5, 0, abs5(r.sub(radius))).mul(active);
       const core = ssInv3(8, 0, r).mul(active);
-      const grid = sin5(fu.x.mul(3.8)).mul(sin5(fu.y.mul(14))).mul(0.35).add(0.65);
+      const grid = sin6(fu.x.mul(3.8)).mul(sin6(fu.y.mul(14))).mul(0.35).add(0.65);
       flare = max5(flare, ring2.mul(1.05).add(core.mul(grid).mul(0.75)));
     }
     const fCol = color4(barrier2);
@@ -92073,7 +92310,7 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
       let ok = true;
       for (let k = -20; k <= 20 && ok; k += 2) {
         const q = S[(i + k + N3) % N3];
-        if (Math.abs(q.curv) > 1 / 700 || q.canyon || q.gap || q.ramp > 0 || q.openL || q.openR) ok = false;
+        if (Math.abs(q.curv) > 1 / 700 || q.canyon || q.gap || q.ramp > 0 || q.openL || q.openR || q.roof > 0 || q.zeroG) ok = false;
       }
       if (!ok || Math.abs(i - td.startIdx) < 90 || td.setPieces.some((sp) => Math.abs(sp.idx - i) < 70)) continue;
       last = i;
@@ -92257,8 +92494,8 @@ var StaticBatcher = class {
         if (!it.g.boundingSphere) it.g.computeBoundingSphere();
         const sp = it.g.boundingSphere;
         cTmp.copy(sp.center);
-        const step8 = sp.radius > 450 ? CELL * 3 : CELL;
-        const k = `${sig(it.g)}|${step8}|${Math.floor(cTmp.x / step8)},${Math.floor(cTmp.z / step8)}`;
+        const step9 = sp.radius > 450 ? CELL * 3 : CELL;
+        const k = `${sig(it.g)}|${step9}|${Math.floor(cTmp.x / step9)},${Math.floor(cTmp.z / step9)}`;
         let list = cells.get(k);
         if (!list) {
           list = [];
@@ -93365,6 +93602,7 @@ function buildSetPieces(td, theme, group, disp, rockMat) {
       group.add(root);
       const Ra = sp.hw + 8, tube3 = (isIce ? 4 : 4.5) + h25(sp.idx, 3) * 1.5, segs = 9;
       const pieces = [];
+      (td.overheads ??= []).push({ idx: sp.idx, y0: 0, y1: 0, half: tube3 * 1.5, arch: { R: Ra, sy: 1.18, inner: tube3 * 1.3, yOff: -3, thick: tube3 * 2.5, sp: td.setPieces.indexOf(sp) } });
       for (let k = 0; k < segs; k++) {
         const rs = isIce ? 6 : 10, arc = Math.PI / segs;
         const tg = new TorusGeometry(Ra, tube3, rs, 8, arc);
@@ -93513,16 +93751,17 @@ function deform(g2, amp, f, seed) {
 }
 function projectUV(g2, tile) {
   const p = g2.attributes.position, n = g2.attributes.normal;
-  const uv9 = new Float32Array(p.count * 2);
+  const uv10 = new Float32Array(p.count * 2);
   for (let i = 0; i < p.count; i++) {
     const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
     const [u, v] = ax >= ay && ax >= az ? [p.getZ(i), p.getY(i)] : ay >= az ? [p.getX(i), p.getZ(i)] : [p.getX(i), p.getY(i)];
-    uv9[i * 2] = u / tile;
-    uv9[i * 2 + 1] = v / tile;
+    uv10[i * 2] = u / tile;
+    uv10[i * 2 + 1] = v / tile;
   }
-  g2.setAttribute("uv", new BufferAttribute(uv9, 2));
+  g2.setAttribute("uv", new BufferAttribute(uv10, 2));
 }
 function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smokes = []) {
+  const hMin = (x, z) => Math.min(field.heightAt(x, z), field.heightAt(x + 7, z), field.heightAt(x - 7, z), field.heightAt(x, z + 7), field.heightAt(x, z - 7));
   const S = td.main.samples, N3 = S.length;
   const std = (c, r, m, e, ei = 0) => {
     const mt = new MeshStandardMaterial({ color: c, roughness: r, metalness: m, emissive: e ?? "#000000", emissiveIntensity: ei });
@@ -93603,7 +93842,7 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
       const x = s.x + s.rx * side * (s.hw + dd), z = s.z + s.rz * side * (s.hw + dd);
       if (!field.roadClear(x, z, r, 22) || placed.some((p) => Math.hypot(p.x - x, p.z - z) < p.r + r + 60)) continue;
       placed.push({ x, z, r });
-      return { x, z, y: field.heightAt(x, z), yaw: rng2() * Math.PI * 2 };
+      return { x, z, y: hMin(x, z), yaw: rng2() * Math.PI * 2 };
     }
     return null;
   };
@@ -93618,7 +93857,7 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
       put(mat, g2, TRS(p.x, p.y - th * 0.6, p.z, p.yaw));
       for (const sd of [-1, 1]) {
         const bx = p.x + Math.cos(p.yaw) * sd * (span * 0.5), bz = p.z - Math.sin(p.yaw) * sd * (span * 0.5);
-        put(mat, deform(new ConeGeometry(th * 1.9, th * 2.6, 14), th * 0.3, 0.06, sd + 4), TRS(bx, field.heightAt(bx, bz) + th * 0.6, bz, rng2() * 6));
+        put(mat, deform(new ConeGeometry(th * 1.9, th * 2.6, 14), th * 0.3, 0.06, sd + 4), TRS(bx, hMin(bx, bz) + th * 0.6, bz, rng2() * 6));
       }
     },
     butte: (mat) => {
@@ -93653,19 +93892,19 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
       put(M3.metal, new CylinderGeometry(0.6, 1.4, 24, 10), TRS(p.x, p.y + 50, p.z));
       put(M3.glow, new SphereGeometry(1.4, 10, 8), TRS(p.x, p.y + 62.5, p.z));
       for (let k = 0; k < 24; k++) {
-        const a = rng2() * Math.PI * 2, d = 46 + rng2() * 142, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = field.heightAt(x, z), r = 6 + rng2() * 9, hb = 3.5 + rng2() * 5.5;
+        const a = rng2() * Math.PI * 2, d = 46 + rng2() * 142, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = hMin(x, z), r = 6 + rng2() * 9, hb = 3.5 + rng2() * 5.5;
         put(M3.adobe, new SphereGeometry(r, 18, 9, 0, Math.PI * 2, 0, Math.PI / 2), TRS(x, y + hb, z));
         put(M3.adobe, new CylinderGeometry(r, r * 1.06, hb, 18), TRS(x, y + hb / 2, z));
         put(M3.adobeDark, new BoxGeometry(r * 0.55, hb * 0.7, r * 0.5), TRS(x + Math.cos(a) * r * 0.9, y + hb * 0.35, z + Math.sin(a) * r * 0.9, -a + Math.PI / 2));
       }
       for (let k = 0; k < 9; k++) {
-        const a = rng2() * Math.PI * 2, d = 32 + rng2() * 125, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = field.heightAt(x, z), h = 24 + rng2() * 32;
+        const a = rng2() * Math.PI * 2, d = 32 + rng2() * 125, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = hMin(x, z), h = 24 + rng2() * 32;
         put(M3.adobe, new CylinderGeometry(3, 4.4, h, 16), TRS(x, y + h / 2, z));
         put(M3.adobeDark, new CylinderGeometry(4.2, 3.6, 2.2, 16), TRS(x, y + h * 0.78, z));
         put(M3.adobe, new SphereGeometry(4, 14, 8), TRS(x, y + h, z));
       }
       for (let k = 0; k < 6; k++) {
-        const a = k / 6 * Math.PI * 2 + rng2() * 0.4, x = p.x + Math.cos(a) * 175, z = p.z + Math.sin(a) * 175, wy = field.heightAt(x, z);
+        const a = k / 6 * Math.PI * 2 + rng2() * 0.4, x = p.x + Math.cos(a) * 175, z = p.z + Math.sin(a) * 175, wy = hMin(x, z);
         put(M3.adobe, new BoxGeometry(64 + rng2() * 36, 8, 3.4), TRS(x, wy + 3.5, z, -a + Math.PI / 2));
         put(M3.adobeDark, new CylinderGeometry(3.2, 3.8, 12, 12), TRS(x, wy + 5.5, z));
       }
@@ -93691,7 +93930,7 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
       for (const [mt, g2] of parts) put(mt, g2, m0);
       for (let k = 0; k < 12; k++) {
         const a = rng2() * Math.PI * 2, d = 58 + rng2() * 82, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
-        put(k % 3 ? M3.rust : M3.metal, new BoxGeometry(4 + rng2() * 9, 1.5 + rng2() * 4, 4 + rng2() * 11), TRS(x, field.heightAt(x, z) + 0.8, z, rng2() * 6, rng2() - 0.5, rng2() - 0.5));
+        put(k % 3 ? M3.rust : M3.metal, new BoxGeometry(4 + rng2() * 9, 1.5 + rng2() * 4, 4 + rng2() * 11), TRS(x, hMin(x, z) + 0.8, z, rng2() * 6, rng2() - 0.5, rng2() - 0.5));
       }
       smokes.push({ x: p.x, y: p.y + 6, z: p.z, kind: "dark", scale: 0.95 });
     },
@@ -93702,7 +93941,7 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
       put(M3.white, new SphereGeometry(18, 26, 13, 0, Math.PI * 2, 0, Math.PI / 2), TRS(p.x, p.y - 0.4, p.z));
       put(M3.cyan, new TorusGeometry(18.1, 0.45, 6, 32).rotateX(Math.PI / 2), TRS(p.x, p.y + 1.2, p.z));
       for (let k = 1; k <= 3; k++) {
-        const a = k * 2.05, d = 28 + rng2() * 12, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = field.heightAt(x, z), r = 9 + rng2() * 5;
+        const a = k * 2.05, d = 28 + rng2() * 12, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = hMin(x, z), r = 9 + rng2() * 5;
         put(M3.white, new SphereGeometry(r, 22, 11, 0, Math.PI * 2, 0, Math.PI / 2), TRS(x, y - 0.4, z));
         put(M3.metal, new CylinderGeometry(2.2, 2.2, d - 14, 10).rotateZ(Math.PI / 2), TRS((p.x + x) / 2, (p.y + y) / 2 + 2.2, (p.z + z) / 2, -a));
       }
@@ -93715,13 +93954,13 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
       const p = spot(330, 1100, 95);
       if (!p) return;
       for (let k = 0; k < 5; k++) {
-        const a = rng2() * Math.PI * 2, d = rng2() * 58, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = field.heightAt(x, z), r = 9 + rng2() * 7, h = 18 + rng2() * 18;
+        const a = rng2() * Math.PI * 2, d = rng2() * 58, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = hMin(x, z), r = 9 + rng2() * 7, h = 18 + rng2() * 18;
         put(M3.rust, new CylinderGeometry(r, r, h, 24), TRS(x, y + h / 2, z));
         put(M3.rust, new SphereGeometry(r, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2), TRS(x, y + h, z));
         put(M3.metal, new TorusGeometry(r + 0.3, 0.35, 6, 24).rotateX(Math.PI / 2), TRS(x, y + h * 0.65, z));
       }
       for (const sd of [-1, 1]) {
-        const sx = p.x + sd * 48, sz = p.z - 28, sy = field.heightAt(sx, sz), sr = 12;
+        const sx = p.x + sd * 48, sz = p.z - 28, sy = hMin(sx, sz), sr = 12;
         put(M3.white, new SphereGeometry(sr, 22, 16), TRS(sx, sy + sr + 6, sz));
         for (let l = 0; l < 4; l++) {
           const la = l / 4 * Math.PI * 2;
@@ -93729,7 +93968,7 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
         }
       }
       for (let k = 0; k < 3; k++) {
-        const x = p.x - 40 + k * 24, z = p.z + 50, y = field.heightAt(x, z), h = 72 + rng2() * 32;
+        const x = p.x - 40 + k * 24, z = p.z + 50, y = hMin(x, z), h = 72 + rng2() * 32;
         put(M3.metal, new CylinderGeometry(2.1, 3.5, h, 14), TRS(x, y + h / 2, z));
         put(M3.glow, new TorusGeometry(2.5, 0.55, 8, 16).rotateX(Math.PI / 2), TRS(x, y + h, z));
         emitters.push({ x, y: y + h + 2, z, type: "smoke" });
@@ -93794,7 +94033,7 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
       const sx = Math.sin(p.yaw), cz = Math.cos(p.yaw);
       put(M3.stone, new BoxGeometry(15, 6, 66), TRS(p.x + sx * 38, p.y + 24, p.z + cz * 38, p.yaw, -0.66));
       for (const sd of [-1, 1]) {
-        const bx = p.x + sx * 56 + cz * sd * 12, bz = p.z + cz * 56 - sx * sd * 12, by = field.heightAt(bx, bz);
+        const bx = p.x + sx * 56 + cz * sd * 12, bz = p.z + cz * 56 - sx * sd * 12, by = hMin(bx, bz);
         put(M3.stone, new CylinderGeometry(2.2, 2.8, 9, 8), TRS(bx, by + 4.5, bz));
         put(M3.glow, new SphereGeometry(1.6, 10, 8), TRS(bx, by + 9.8, bz));
       }
@@ -93816,7 +94055,7 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
       if (!p) return;
       const deck = field.avgY + 40;
       for (const [dx, dz] of [[-19, -19], [19, -19], [-19, 19], [19, 19]]) {
-        const y0 = field.heightAt(p.x + dx, p.z + dz);
+        const y0 = hMin(p.x + dx, p.z + dz);
         put(M3.metal, new CylinderGeometry(2.5, 3.4, deck - y0, 12), TRS(p.x + dx, (deck + y0) / 2, p.z + dz));
       }
       put(M3.rust, new BoxGeometry(58, 8, 58), TRS(p.x, deck + 4, p.z, p.yaw));
@@ -93840,7 +94079,7 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
       for (let i = 0; i <= 46; i++) {
         const t = i / 46;
         const [x, z] = pt(t);
-        const y = field.heightAt(x, z);
+        const y = hMin(x, z);
         const r = 0.72 + Math.sin(t * Math.PI) * 1.15;
         put(M3.bone, deform(new IcosahedronGeometry(r, 1), r * 0.25, 0.7, i), TRS(x, y + r * 0.22, z));
         if (i % 2 === 0 && t > 0.13 && t < 0.79) {
@@ -93851,7 +94090,7 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
         }
       }
       const [hx, hz] = pt(1), [hx2, hz2] = pt(0.97);
-      const hy = field.heightAt(hx, hz), hyaw = Math.atan2(hx - hx2, hz - hz2);
+      const hy = hMin(hx, hz), hyaw = Math.atan2(hx - hx2, hz - hz2);
       const skull = deform(new SphereGeometry(1, 16, 12), 0.16, 1.2, 3);
       skull.scale(1.75, 1.35, 3.8);
       put(M3.bone, skull, TRS(hx, hy + 1.15, hz, hyaw, 0.15));
@@ -93862,11 +94101,11 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
       if (!p) return;
       put(M3.adobe, new TorusGeometry(15, 2.4, 10, 36).rotateX(Math.PI / 2), TRS(p.x, p.y + 0.7, p.z));
       put(M3.adobeDark, new CylinderGeometry(13.5, 13.5, 1.2, 28), TRS(p.x, p.y - 0.3, p.z));
-      const dx = p.x + 22, dz = p.z, dy = field.heightAt(dx, dz);
+      const dx = p.x + 22, dz = p.z, dy = hMin(dx, dz);
       put(M3.adobe, new SphereGeometry(7, 22, 11, 0, Math.PI * 2, 0, Math.PI / 2), TRS(dx, dy - 0.3, dz));
       put(M3.adobe, new CylinderGeometry(2.6, 2.6, 5, 12, 1, false, 0, Math.PI).rotateZ(Math.PI / 2), TRS(dx - 6.5, dy + 0.2, dz));
       for (let k = 0; k < 6; k++) {
-        const a = k / 6 * Math.PI * 2 + rng2() * 0.5, d = 30 + rng2() * 25, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = field.heightAt(x, z);
+        const a = k / 6 * Math.PI * 2 + rng2() * 0.5, d = 30 + rng2() * 25, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = hMin(x, z);
         put(M3.metal, new CylinderGeometry(0.35, 0.55, 6.5, 10), TRS(x, y + 3.25, z));
         put(M3.metal, new CylinderGeometry(1, 1, 0.22, 14), TRS(x, y + 4.4, z));
         put(M3.metal, new CylinderGeometry(0.75, 0.75, 0.16, 14), TRS(x, y + 5.5, z));
@@ -93878,7 +94117,7 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
       const p = spot(280, 900, 52);
       if (!p) return;
       for (let k = 0; k < 11; k++) {
-        const a = k / 11 * Math.PI * 2, x = p.x + Math.cos(a) * 32, z = p.z + Math.sin(a) * 32, h = 16 + rng2() * 13, oy = field.heightAt(x, z);
+        const a = k / 11 * Math.PI * 2, x = p.x + Math.cos(a) * 32, z = p.z + Math.sin(a) * 32, h = 16 + rng2() * 13, oy = hMin(x, z);
         put(M3.stone, deform(new CylinderGeometry(1.7, 2.5, h, 5, 6), 0.35, 0.3, k), TRS(x, oy + h / 2 - 1, z, a, (rng2() - 0.5) * 0.22, (rng2() - 0.5) * 0.22));
       }
       put(M3.stone, new CylinderGeometry(7, 8, 2.2, 18), TRS(p.x, p.y + 0.6, p.z));
@@ -93953,8 +94192,8 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
 }
 
 // ../../src/game/groundCover.ts
-var TSL7 = three_tsl_exports;
-var { clamp: clamp7, color: color5, cos: cos2, interleavedGradientNoise: interleavedGradientNoise2, length: length5, oneMinus: oneMinus5, positionGeometry: positionGeometry3, positionLocal: positionLocal4, positionView: positionView5, screenCoordinate: screenCoordinate2, sin: sin6, smoothstep: smoothstep6, time: time6, vec3: vec37, vertexColor: vertexColor4 } = TSL7;
+var TSL8 = three_tsl_exports;
+var { clamp: clamp7, color: color5, cos: cos2, interleavedGradientNoise: interleavedGradientNoise2, length: length5, oneMinus: oneMinus5, positionGeometry: positionGeometry3, positionLocal: positionLocal4, positionView: positionView5, screenCoordinate: screenCoordinate2, sin: sin7, smoothstep: smoothstep6, time: time7, vec3: vec38, vertexColor: vertexColor4 } = TSL8;
 function h27(x, y) {
   const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
   return s - Math.floor(s);
@@ -94238,7 +94477,7 @@ function coverMaterial(t, H, isImpostor = false) {
   if (t.wind && !isImpostor) {
     const k = clamp7(positionGeometry3.y.div(H), 0, 1);
     const ph = positionLocal4.x.mul(0.07).add(positionLocal4.z.mul(0.05));
-    mat.positionNode = positionLocal4.add(vec37(sin6(time6.mul(1.9).add(ph)), 0, cos2(time6.mul(1.4).add(ph.mul(1.3)))).mul(k.mul(k)).mul(t.wind));
+    mat.positionNode = positionLocal4.add(vec38(sin7(time7.mul(1.9).add(ph)), 0, cos2(time7.mul(1.4).add(ph.mul(1.3)))).mul(k.mul(k)).mul(t.wind));
   }
   const d = length5(positionView5);
   if (isImpostor) {
@@ -94252,7 +94491,7 @@ function coverMaterial(t, H, isImpostor = false) {
   if (t.glow === "crystal") mat.emissiveNode = vertexColor4().mul(0.5);
   else if (t.glow === "ice") mat.emissiveNode = color5("#3a8ac8").mul(0.22);
   else if (t.glow === "fungus") mat.emissiveNode = color5("#9aff5a").mul(smoothstep6(0.24, 0.3, positionGeometry3.y)).mul(0.32);
-  else if (t.glow === "ember") mat.emissiveNode = color5("#ff5010").mul(smoothstep6(0.86, 0.96, sin6(positionGeometry3.x.mul(9).add(positionGeometry3.z.mul(5))).mul(sin6(positionGeometry3.y.mul(11).add(positionGeometry3.x.mul(3)))).mul(0.5).add(0.5))).mul(2.1);
+  else if (t.glow === "ember") mat.emissiveNode = color5("#ff5010").mul(smoothstep6(0.86, 0.96, sin7(positionGeometry3.x.mul(9).add(positionGeometry3.z.mul(5))).mul(sin7(positionGeometry3.y.mul(11).add(positionGeometry3.x.mul(3)))).mul(0.5).add(0.5))).mul(2.1);
   return mat;
 }
 function buildGroundCover(td, theme, gfx, field, waterY, rng2, group, disp) {
@@ -94352,8 +94591,8 @@ function buildGroundCover(td, theme, gfx, field, waterY, rng2, group, disp) {
 
 // ../../src/game/smoke.ts
 init_textures();
-var TSL8 = three_tsl_exports;
-var { abs: abs6, attribute: attribute4, cameraPosition: cameraPosition2, clamp: clamp8, color: color6, cos: cos3, length: length6, mix: mix5, normalize: normalize5, oneMinus: oneMinus6, positionLocal: positionLocal5, pow: pow7, sin: sin7, smoothstep: smoothstep7, texture: texture4, time: time7, uniform: uniform6, vec2: vec24, vec3: vec38 } = TSL8;
+var TSL9 = three_tsl_exports;
+var { abs: abs6, attribute: attribute5, cameraPosition: cameraPosition2, clamp: clamp8, color: color6, cos: cos3, length: length6, mix: mix5, normalize: normalize5, oneMinus: oneMinus6, positionLocal: positionLocal5, pow: pow8, sin: sin8, smoothstep: smoothstep7, texture: texture4, time: time8, uniform: uniform6, vec2: vec25, vec3: vec39 } = TSL9;
 var KINDS = {
   smoke: { col: [0.34, 0.32, 0.3], h: 170, w0: 6, w1: 42, op: 0.7 },
   steam: { col: [0.95, 0.96, 0.98], h: 90, w0: 4, w1: 26, op: 0.55 },
@@ -94450,25 +94689,25 @@ function buildSmoke(srcs, theme, td, field, group, disp, rng2, waterY) {
   g2.setAttribute("aCol", new BufferAttribute(colA, 3));
   g2.setAttribute("aMisc", new BufferAttribute(misc, 2));
   g2.setIndex(idx);
-  const c = attribute4("aCorner", "vec2"), p = attribute4("aParam", "vec4"), pc = attribute4("aCol", "vec3"), pm = attribute4("aMisc", "vec2");
+  const c = attribute5("aCorner", "vec2"), p = attribute5("aParam", "vec4"), pc = attribute5("aCol", "vec3"), pm = attribute5("aMisc", "vec2");
   const wind = uniform6(new Vector3(1, 0, 0.45).normalize());
   const v = c.y, H = p.x, devil = pm.y;
-  const tw = v.mul(10).sub(time7.mul(4)).add(p.w);
-  const swirl = vec38(sin7(tw), 0, cos3(tw)).mul(v.mul(p.z).mul(0.35)).mul(devil);
-  const bend = wind.mul(pow7(v, 1.6).mul(H).mul(0.35)).mul(oneMinus6(devil));
-  const center = positionLocal5.add(vec38(0, v.mul(H), 0)).add(bend).add(swirl);
+  const tw = v.mul(10).sub(time8.mul(4)).add(p.w);
+  const swirl = vec39(sin8(tw), 0, cos3(tw)).mul(v.mul(p.z).mul(0.35)).mul(devil);
+  const bend = wind.mul(pow8(v, 1.6).mul(H).mul(0.35)).mul(oneMinus6(devil));
+  const center = positionLocal5.add(vec39(0, v.mul(H), 0)).add(bend).add(swirl);
   const toCam = cameraPosition2.sub(center);
-  const right = normalize5(vec38(toCam.z, 0, toCam.x.negate()).add(vec38(1e-4, 0, 0)));
-  const w = p.y.add(p.z.sub(p.y).mul(pow7(v, 0.75)));
+  const right = normalize5(vec39(toCam.z, 0, toCam.x.negate()).add(vec39(1e-4, 0, 0)));
+  const w = p.y.add(p.z.sub(p.y).mul(pow8(v, 0.75)));
   const mat = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide, fog: false });
   mat.positionNode = center.add(right.mul(c.x).mul(w));
   const u = c.x;
   const mTex = macroTexture();
-  const n1 = texture4(mTex, vec24(u.mul(0.28).add(p.w.mul(0.13)), v.mul(H.div(150)).sub(time7.mul(0.045)))).r;
-  const n2 = texture4(mTex, vec24(u.mul(0.62).sub(p.w.mul(0.07)), v.mul(H.div(58)).sub(time7.mul(0.085)))).g;
+  const n1 = texture4(mTex, vec25(u.mul(0.28).add(p.w.mul(0.13)), v.mul(H.div(150)).sub(time8.mul(0.045)))).r;
+  const n2 = texture4(mTex, vec25(u.mul(0.62).sub(p.w.mul(0.07)), v.mul(H.div(58)).sub(time8.mul(0.085)))).g;
   const n = n1.mul(0.65).add(n2.mul(0.35));
-  const edge = oneMinus6(pow7(abs6(u), 1.6));
-  const vert = smoothstep7(0, 0.05, v).mul(pow7(oneMinus6(v), 1.2));
+  const edge = oneMinus6(pow8(abs6(u), 1.6));
+  const vert = smoothstep7(0, 0.05, v).mul(pow8(oneMinus6(v), 1.2));
   const camD = length6(center.sub(cameraPosition2));
   const haze = smoothstep7(300, 5e3, camD).mul(0.55);
   mat.colorNode = mix5(pc.mul(n.mul(0.5).add(0.72)), color6(new Color(theme.fogColor)), haze);
@@ -94501,8 +94740,8 @@ function buildSmoke(srcs, theme, td, field, group, disp, rng2, waterY) {
 }
 
 // ../../src/game/wildlife.ts
-var TSL9 = three_tsl_exports;
-var { abs: abs7, attribute: attribute5, clamp: clamp9, cos: cos4, float: float5, hash: hash3, instanceIndex: instanceIndex3, max: max6, oneMinus: oneMinus7, positionGeometry: positionGeometry4, positionLocal: positionLocal6, sin: sin8, smoothstep: smoothstep8, step: step2, time: time8, vec3: vec39, vertexColor: vertexColor5 } = TSL9;
+var TSL10 = three_tsl_exports;
+var { abs: abs7, attribute: attribute6, clamp: clamp9, cos: cos4, float: float5, hash: hash3, instanceIndex: instanceIndex3, max: max6, oneMinus: oneMinus7, positionGeometry: positionGeometry4, positionLocal: positionLocal6, sin: sin9, smoothstep: smoothstep8, step: step3, time: time9, vec3: vec310, vertexColor: vertexColor5 } = TSL10;
 var rgb2 = (s, k = 1) => {
   const c = new Color(s);
   return [c.r * k, c.g * k, c.b * k];
@@ -94618,20 +94857,20 @@ function lifeMat(kind, o = {}) {
   const mat = new MeshStandardNodeMaterial({ vertexColors: true, side: o.side ?? FrontSide });
   mat.roughness = 0.8;
   mat.metalness = 0.05;
-  const a = attribute5("aAnim", "float");
+  const a = attribute6("aAnim", "float");
   const ph = hash3(instanceIndex3).mul(6.2832);
   if (kind === "walker") {
     const hip = o.hip ?? 1.55;
-    const tt = time8.mul(o.speed ?? 3).add(ph);
+    const tt = time9.mul(o.speed ?? 3).add(ph);
     const legW = clamp9(oneMinus7(positionGeometry4.y.div(hip)), 0, 1);
-    const isA = step2(0.5, a).mul(step2(a, 1.5)), isB = step2(1.5, a).mul(step2(a, 2.5)), isN = step2(2.5, a);
-    const lift = max6(sin8(tt), 0).mul(isA).add(max6(sin8(tt.add(Math.PI)), 0).mul(isB)).mul(legW).mul(o.amp ?? 0.3);
+    const isA = step3(0.5, a).mul(step3(a, 1.5)), isB = step3(1.5, a).mul(step3(a, 2.5)), isN = step3(2.5, a);
+    const lift = max6(sin9(tt), 0).mul(isA).add(max6(sin9(tt.add(Math.PI)), 0).mul(isB)).mul(legW).mul(o.amp ?? 0.3);
     const nW = clamp9(positionGeometry4.y.sub(o.neckBase ?? 8).div(9), 0, 1).mul(isN);
-    mat.positionNode = positionLocal6.add(vec39(sin8(tt.mul(0.23)).mul(nW).mul(0.9), lift.add(sin8(tt.mul(2)).mul(0.04 * hip)), cos4(tt.mul(0.19)).mul(nW).mul(0.6)));
+    mat.positionNode = positionLocal6.add(vec310(sin9(tt.mul(0.23)).mul(nW).mul(0.9), lift.add(sin9(tt.mul(2)).mul(0.04 * hip)), cos4(tt.mul(0.19)).mul(nW).mul(0.6)));
   } else if (kind === "bird") {
-    const gate = o.soar ? smoothstep8(-0.3, 0.5, sin8(time8.mul(0.55).add(ph))).mul(0.85).add(0.15) : float5(1);
-    mat.positionNode = positionLocal6.add(vec39(0, sin8(time8.mul(o.speed ?? 10).add(ph.mul(3))).mul(abs7(a)).mul(o.amp ?? 0.5).mul(gate), 0));
-  } else if (kind === "hover") mat.positionNode = positionLocal6.add(vec39(0, sin8(time8.mul(2.1).add(ph)).mul(o.amp ?? 0.12), 0));
+    const gate = o.soar ? smoothstep8(-0.3, 0.5, sin9(time9.mul(0.55).add(ph))).mul(0.85).add(0.15) : float5(1);
+    mat.positionNode = positionLocal6.add(vec310(0, sin9(time9.mul(o.speed ?? 10).add(ph.mul(3))).mul(abs7(a)).mul(o.amp ?? 0.5).mul(gate), 0));
+  } else if (kind === "hover") mat.positionNode = positionLocal6.add(vec310(0, sin9(time9.mul(2.1).add(ph)).mul(o.amp ?? 0.12), 0));
   mat.emissiveNode = max6(vertexColor5().sub(1), 0).mul(1.3);
   return mat;
 }
@@ -94972,8 +95211,8 @@ function buildLife(td, theme, field, waterY, rng2, group, disp, detail, landmark
 
 // ../../src/game/waterfalls.ts
 init_textures();
-var TSL10 = three_tsl_exports;
-var { clamp: clamp10, color: color7, float: float6, length: length7, mix: mix6, oneMinus: oneMinus8, sin: sin9, smoothstep: smoothstep9, texture: texture5, time: time9, uv: uv6, vec2: vec25, vec3: vec310 } = TSL10;
+var TSL11 = three_tsl_exports;
+var { clamp: clamp10, color: color7, float: float6, length: length7, mix: mix6, oneMinus: oneMinus8, sin: sin10, smoothstep: smoothstep9, texture: texture5, time: time10, uv: uv7, vec2: vec26, vec3: vec311 } = TSL11;
 var ssInv4 = (a, b, x) => oneMinus8(smoothstep9(b, a, x));
 function addWaterfalls(td, theme, group, disp, rng2, smokes, rockMat) {
   const id = theme.id;
@@ -95079,11 +95318,11 @@ function addWaterfalls(td, theme, group, disp, rng2, smokes, rockMat) {
   }
   if (!ribbons.length) return [];
   const m = macroTexture();
-  const u = uv6();
+  const u = uv7();
   const speed = isLava ? 0.22 : isIce ? 0.55 : 0.92;
   const edgeFade = smoothstep9(0, 0.14, u.x).mul(ssInv4(1, 0.86, u.x));
-  const f1 = texture5(m, vec25(u.x.mul(1.8), u.y.mul(0.55).sub(time9.mul(speed)))).r;
-  const f2 = texture5(m, vec25(u.x.mul(4.2).add(0.37), u.y.mul(1.25).sub(time9.mul(speed * 1.45)))).b;
+  const f1 = texture5(m, vec26(u.x.mul(1.8), u.y.mul(0.55).sub(time10.mul(speed)))).r;
+  const f2 = texture5(m, vec26(u.x.mul(4.2).add(0.37), u.y.mul(1.25).sub(time10.mul(speed * 1.45)))).b;
   const stream = f1.mul(0.55).add(f2.mul(0.45));
   const fallMat = new MeshStandardNodeMaterial({
     transparent: true,
@@ -95095,7 +95334,7 @@ function addWaterfalls(td, theme, group, disp, rng2, smokes, rockMat) {
   if (isLava) {
     const hot = smoothstep9(0.32, 0.78, stream);
     const bright = smoothstep9(0.68, 0.92, stream);
-    fallMat.colorNode = mix6(vec310(0.08, 0.04, 0.03), vec310(0.45, 0.12, 0.03), hot);
+    fallMat.colorNode = mix6(vec311(0.08, 0.04, 0.03), vec311(0.45, 0.12, 0.03), hot);
     fallMat.emissiveNode = mix6(color7("#c83206"), color7("#ffb238"), bright).mul(hot).mul(2.1);
     fallMat.opacityNode = clamp10(edgeFade.mul(smoothstep9(0.18, 0.45, stream.add(0.2))), 0, 0.96);
   } else {
@@ -95114,13 +95353,13 @@ function addWaterfalls(td, theme, group, disp, rng2, smokes, rockMat) {
     roughness: isLava ? 0.35 : 0.1,
     metalness: 0.1
   });
-  const pc = uv6().sub(0.5).mul(2);
+  const pc = uv7().sub(0.5).mul(2);
   const pr = length7(pc);
-  const ring = sin9(pr.mul(16).sub(time9.mul(isLava ? 2.4 : 5.5))).mul(0.5).add(0.5);
+  const ring = sin10(pr.mul(16).sub(time10.mul(isLava ? 2.4 : 5.5))).mul(0.5).add(0.5);
   const radial2 = ssInv4(1, 0.15, pr);
   if (isLava) {
     const core = ssInv4(0.75, 0, pr).mul(float6(0.7).add(ring.mul(0.3)));
-    poolMat.colorNode = vec310(0.12, 0.05, 0.03);
+    poolMat.colorNode = vec311(0.12, 0.05, 0.03);
     poolMat.emissiveNode = mix6(color7("#c83008"), color7("#ffa830"), core).mul(radial2).mul(2);
     poolMat.opacityNode = clamp10(radial2.mul(0.92), 0, 0.95);
   } else {
@@ -95322,7 +95561,7 @@ async function buildWorld(td, theme, gfx, progress) {
     if (path.closed) idxs.push(0);
     else if (idxs[idxs.length - 1] !== n - 1) idxs.push(n - 1);
     {
-      const pos = [], uv9 = [], ind = [];
+      const pos = [], uv10 = [], ind = [];
       let vbase = 0;
       let vAcc = 0;
       for (let k = 0; k < idxs.length; k++) {
@@ -95339,7 +95578,7 @@ async function buildWorld(td, theme, gfx, progress) {
           const lip = e > lipStart ? 0.18 * (e - lipStart) / (1 - lipStart) : 0;
           const crown = (1 - e * e) * 0.2 + lip;
           pos.push(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + crown, s.z + s.rz * lat);
-          uv9.push(f, vAcc);
+          uv10.push(f, vAcc);
         }
         if (k > 0 && !S2[idxs[k]].gap && !S2[idxs[k - 1]].gap) {
           const r0 = vbase - (across + 1), r1 = vbase;
@@ -95349,7 +95588,7 @@ async function buildWorld(td, theme, gfx, progress) {
       }
       const g2 = new BufferGeometry();
       g2.setAttribute("position", new Float32BufferAttribute(pos, 3));
-      g2.setAttribute("uv", new Float32BufferAttribute(uv9, 2));
+      g2.setAttribute("uv", new Float32BufferAttribute(uv10, 2));
       g2.setIndex(ind);
       g2.computeVertexNormals();
       batcher.addStrip(g2, roadMat, 5400, false);
@@ -95455,7 +95694,7 @@ async function buildWorld(td, theme, gfx, progress) {
       group.add(abM);
       disposables.push(abG);
     }
-    if (path.id > 0) buildTunnel(path, group, wallMat, abutmentMetal, disposables, theme);
+    buildTunnel(path, group, wallMat, abutmentMetal, disposables, theme);
     if (td.def.theme === "oovo") buildZeroGTubes(path, group, wallMat, abutmentMetal, disposables, theme);
   }
   {
@@ -95531,6 +95770,7 @@ async function buildWorld(td, theme, gfx, progress) {
   await yield_();
   const groundMin = (x, z, r) => Math.min(heightAt(x, z), heightAt(x + r, z), heightAt(x - r, z), heightAt(x, z + r), heightAt(x, z - r));
   const props = addProps(td, theme, group, gfx, (x, z) => groundMin(x, z, 1.4), disposables, rng2, roadClear, roadDispOff);
+  addSciFi(td, theme, group, disposables);
   const mech = addMechProps(td, theme, group, disposables, (x, z) => groundMin(x, z, 2.8), roadClear, waterY, gfx.detail);
   const setPieces = buildSetPieces(td, theme, group, disposables, wallMat);
   const landRock = surfaceMaterial(wallTex, {
@@ -95615,11 +95855,11 @@ async function buildWorld(td, theme, gfx, progress) {
     dispose: () => disposables.forEach((d) => d.dispose())
   };
 }
-function addViaductPiers(td, group, mat, disp, step8, spec2) {
+function addViaductPiers(td, group, mat, disp, step9, spec2) {
   const S = td.main.samples;
   const cols = [], caps = [];
   const up = new Vector3(0, 1, 0);
-  for (let i = 0; i < S.length; i += step8) {
+  for (let i = 0; i < S.length; i += step9) {
     const s = S[i];
     if (s.gap) continue;
     const sp = spec2(s);
@@ -95654,40 +95894,60 @@ function addViaductPiers(td, group, mat, disp, step8, spec2) {
 function buildTunnel(path, group, mat, ribMat, disp, theme) {
   const S = path.samples;
   const n = S.length;
-  const from = Math.floor(n * 0.25), to = Math.floor(n * 0.75);
+  const runs = [];
+  let a0 = -1;
+  for (let i = 0; i < n; i++) {
+    const on = S[i].roof > 0;
+    if (on && a0 < 0) a0 = i;
+    if ((!on || i === n - 1) && a0 >= 0) {
+      const b0 = on ? i : i - 1;
+      if (b0 - a0 >= 6) runs.push([a0, b0]);
+      a0 = -1;
+    }
+  }
+  if (!runs.length) return;
   const segA = 18;
-  const pos = [], uv9 = [], ind = [];
+  const pos = [], uv10 = [], ind = [];
   let v = 0;
   const lamps = [], ribs = [];
   const upV = new Vector3(0, 1, 0);
-  for (let i = from; i <= to; i += 2) {
-    const s = S[i];
-    for (let a = 0; a <= segA; a++) {
-      const ang = Math.PI * a / segA;
-      const lat = Math.cos(ang) * (s.hw + 1.5);
-      const up = Math.sin(ang) * 11 + 1;
-      const nz = (vnoise2(i * 0.2, a * 0.7) - 0.5) * 1.5;
-      pos.push(s.x + s.rx * (lat + nz * Math.cos(ang)), s.y + up + nz * Math.sin(ang), s.z + s.rz * (lat + nz * Math.cos(ang)));
-      uv9.push(s.s / 15, a / segA * 2.2);
+  const arch = (s, R, tube3, H) => {
+    const rg = new TorusGeometry(R, tube3, 8, 28, Math.PI);
+    rg.scale(1, H / R, 1);
+    const p = rg.attributes.position;
+    for (let k = 0; k < p.count; k++) p.setY(k, p.getY(k) + p.getX(k) * s.bank);
+    rg.applyMatrix4(new Matrix4().compose(new Vector3(s.x, s.y + s.ramp + 1, s.z), new Quaternion().setFromAxisAngle(upV, Math.atan2(s.tx, s.tz)), new Vector3(1, 1, 1)));
+    const out = rg.toNonIndexed();
+    rg.dispose();
+    return out;
+  };
+  for (const [ra, rb] of runs) {
+    let first = true;
+    for (let i = ra; i <= rb; i = i === rb ? rb + 1 : Math.min(rb, i + 2)) {
+      const s = S[i], H = s.roof - 1, W2 = s.hw + 1.5;
+      for (let a = 0; a <= segA; a++) {
+        const ang = Math.PI * a / segA;
+        const nz = (vnoise2(i * 0.2, a * 0.7) - 0.5) * 1.5;
+        const lat = Math.cos(ang) * W2 + nz * Math.cos(ang), up = Math.sin(ang) * H + 1 + nz * Math.sin(ang);
+        pos.push(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + up, s.z + s.rz * lat);
+        uv10.push(s.s / 15, a / segA * 2.2);
+      }
+      if (!first) for (let a = 0; a < segA; a++) {
+        const p0 = v - (segA + 1) + a, p1 = v + a;
+        ind.push(p0, p0 + 1, p1, p1, p0 + 1, p1 + 1);
+      }
+      first = false;
+      v += segA + 1;
+      if ((i - ra) % 12 === 0) {
+        lamps.push(new Matrix4().compose(new Vector3(s.x, s.y + s.ramp + s.roof - 0.6, s.z), new Quaternion().setFromAxisAngle(upV, Math.atan2(s.tx, s.tz)), new Vector3(1, 1, 1)));
+        ribs.push(arch(s, s.hw + 1.3, 0.36, H - 0.2));
+      }
     }
-    if (i > from) for (let a = 0; a < segA; a++) {
-      const p0 = v - (segA + 1) + a, p1 = v + a;
-      ind.push(p0, p0 + 1, p1, p1, p0 + 1, p1 + 1);
-    }
-    v += segA + 1;
-    const yaw = Math.atan2(s.tx, s.tz);
-    if (i % 12 === 0) {
-      lamps.push(new Matrix4().compose(new Vector3(s.x, s.y + 11.4, s.z), new Quaternion().setFromAxisAngle(upV, yaw), new Vector3(1, 1, 1)));
-      const rg = new TorusGeometry(s.hw + 1.3, 0.36, 8, 28, Math.PI);
-      rg.scale(1, 10.8 / (s.hw + 1.3), 1);
-      rg.applyMatrix4(new Matrix4().compose(new Vector3(s.x, s.y + 1, s.z), new Quaternion().setFromAxisAngle(upV, yaw), new Vector3(1, 1, 1)));
-      ribs.push(rg.toNonIndexed());
-      rg.dispose();
-    }
+    for (const e of [ra, rb]) ribs.push(arch(S[e], S[e].hw + 2.3, 1.25, S[e].roof + 0.6));
   }
   const g2 = new BufferGeometry();
   g2.setAttribute("position", new Float32BufferAttribute(pos, 3));
-  g2.setAttribute("uv", new Float32BufferAttribute(uv9, 2));
+  g2.setAttribute("uv", new Float32BufferAttribute(uv10, 2));
   g2.setIndex(ind);
   g2.computeVertexNormals();
   const m2 = mat.clone();
@@ -95815,6 +96075,7 @@ function addStartArea(td, group, theme, disp, rng2, dOff = 0) {
     for (const side of [-1, 1]) {
       const standM = new Matrix4().compose(new Vector3(side * (s.hw + 26), 0, -40), new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), side * Math.PI / 2), new Vector3(1, 1, 1));
       for (let r = 0; r < 8; r++) put(r % 2 ? metal : dark, new BoxGeometry(72, 1.25, 2.25).translate(0, r * 1.2 + 0.6, r * 2.2), standM);
+      put(dark, new BoxGeometry(73, 18, 19).translate(0, -9.05, 8.4), standM);
       for (const px2 of [-32, -16, 0, 16, 32]) {
         put(dark, new CylinderGeometry(0.45, 0.55, 17.5, 8).translate(px2, 8.75, 16.8), standM);
         put(metal, new BoxGeometry(0.5, 0.65, 21).rotateX(-0.06).translate(px2, 16.9, 7.2), standM);
@@ -96136,9 +96397,11 @@ function addArches(td, group, mat, disp, rng2, roadClear) {
   for (const idx of td.arches) {
     const s = S[idx];
     const span = s.hw + 12;
+    if (s.roof > 0 || s.zeroG) continue;
     const feetOk = [-1, 1].every((sd) => roadClear(s.x + s.rx * sd * span, s.z + s.rz * sd * span, 5, 0));
     if (!feetOk) continue;
-    const g2 = new TorusGeometry(span, 4.2 + rng2() * 3.2, 20, 56, Math.PI);
+    const tube3 = 4.2 + rng2() * 3.2;
+    const g2 = new TorusGeometry(span, tube3, 20, 56, Math.PI);
     const p = g2.attributes.position;
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
@@ -96147,9 +96410,11 @@ function addArches(td, group, mat, disp, rng2, roadClear) {
       p.setXYZ(i, x + x * 0.06 * (n - 1) * 5, y * 0.76 + (n - 1) * 3, z * n * 1.65 + ledge);
     }
     g2.computeVertexNormals();
-    const uv9 = g2.attributes.uv;
-    for (let i = 0; i < uv9.count; i++) uv9.setXY(i, uv9.getX(i) * 6, uv9.getY(i) * 2.2);
-    g2.applyMatrix4(new Matrix4().compose(new Vector3(s.x, s.y - 3, s.z), new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.atan2(s.tx, s.tz)), new Vector3(1, 1.2 + rng2() * 0.8, 1)));
+    const uv10 = g2.attributes.uv;
+    for (let i = 0; i < uv10.count; i++) uv10.setXY(i, uv10.getX(i) * 6, uv10.getY(i) * 2.2);
+    const syR = 1.2 + rng2() * 0.8;
+    g2.applyMatrix4(new Matrix4().compose(new Vector3(s.x, s.y - 3, s.z), new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.atan2(s.tx, s.tz)), new Vector3(1, syR, 1)));
+    (td.overheads ??= []).push({ idx, y0: 0, y1: 0, half: tube3 * 1.35, arch: { R: span, sy: 0.76 * syR, inner: tube3 * 1.3, yOff: -3, thick: tube3 * 2 * 0.76 * syR } });
     list.push(g2);
   }
   if (!list.length) return;
@@ -96274,7 +96539,7 @@ function buildZeroGTubes(path, group, mat, ribMat, disp, theme) {
     while (j < n && S[j].zeroG) j++;
     const from = i + 2, to = j - 3;
     const segA = 24;
-    const pos = [], uv9 = [], ind = [];
+    const pos = [], uv10 = [], ind = [];
     let v = 0;
     const lamps = [], rings = [];
     for (let k = from; k <= to; k += 2) {
@@ -96286,7 +96551,7 @@ function buildZeroGTubes(path, group, mat, ribMat, disp, theme) {
         const up = Math.sin(ang) * R + 7;
         const nz = (vnoise2(k * 0.15, a * 0.5) - 0.5) * 1;
         pos.push(s.x + s.rx * (lat + nz * Math.cos(ang)), s.y + up + nz * Math.sin(ang), s.z + s.rz * (lat + nz * Math.cos(ang)));
-        uv9.push(s.s / 14, a / segA * 4);
+        uv10.push(s.s / 14, a / segA * 4);
       }
       if (k > from) for (let a = 0; a < segA; a++) {
         const p0 = v - (segA + 1) + a, p1 = v + a;
@@ -96305,7 +96570,7 @@ function buildZeroGTubes(path, group, mat, ribMat, disp, theme) {
     if (ind.length) {
       const g2 = new BufferGeometry();
       g2.setAttribute("position", new Float32BufferAttribute(pos, 3));
-      g2.setAttribute("uv", new Float32BufferAttribute(uv9, 2));
+      g2.setAttribute("uv", new Float32BufferAttribute(uv10, 2));
       g2.setIndex(ind);
       g2.computeVertexNormals();
       const m2 = mat.clone();
@@ -96359,8 +96624,8 @@ function addAsteroidBelt(td, group, mat, disp, rng2) {
 
 // ../../src/game/sky.ts
 init_textures();
-var TSL11 = three_tsl_exports;
-var { atan: atan2, cameraProjectionMatrix: cameraProjectionMatrix2, cross: cross4, dot: dot4, exp: exp3, float: float7, floor: floor3, fract: fract4, length: length8, max: max7, mix: mix7, modelViewMatrix: modelViewMatrix2, normalize: normalize6, oneMinus: oneMinus9, positionLocal: positionLocal7, pow: pow8, sin: sin10, smoothstep: smoothstep10, step: step3, texture: texture6, uniform: uniform7, vec2: vec26, vec3: vec311, vec4: vec42 } = TSL11;
+var TSL12 = three_tsl_exports;
+var { atan: atan2, cameraProjectionMatrix: cameraProjectionMatrix2, cross: cross4, dot: dot5, exp: exp3, float: float7, floor: floor4, fract: fract5, length: length8, max: max7, mix: mix7, modelViewMatrix: modelViewMatrix2, normalize: normalize6, oneMinus: oneMinus9, positionLocal: positionLocal7, pow: pow9, sin: sin11, smoothstep: smoothstep10, step: step4, texture: texture6, uniform: uniform7, vec2: vec27, vec3: vec312, vec4: vec42 } = TSL12;
 var ssInv5 = (a, b, x) => oneMinus9(smoothstep10(b, a, x));
 function sunDirection(theme) {
   const el = theme.sunElev * Math.PI / 180, az = theme.sunAz * Math.PI / 180;
@@ -96388,63 +96653,63 @@ function makeSky(theme, forEnv = false) {
     // runtime-blended by the environment timeline
   };
   const d = normalize6(positionLocal7);
-  const sd = max7(dot4(d, normalize6(uniforms.sunDir)), 0);
-  let col = mix7(uniforms.horizon, uniforms.top, pow8(max7(d.y, 0), 0.55));
+  const sd = max7(dot5(d, normalize6(uniforms.sunDir)), 0);
+  let col = mix7(uniforms.horizon, uniforms.top, pow9(max7(d.y, 0), 0.55));
   col = mix7(col, uniforms.horizon.mul(0.6), ssInv5(0, -0.25, d.y));
-  col = col.add(uniforms.sunColor.mul(pow8(sd, 6).mul(0.35).add(pow8(sd, forEnv ? 24 : 64).mul(forEnv ? 0.45 : 0.75))));
+  col = col.add(uniforms.sunColor.mul(pow9(sd, 6).mul(0.35).add(pow9(sd, forEnv ? 24 : 64).mul(forEnv ? 0.45 : 0.75))));
   if (theme.stars !== void 0 && !isPrison && !forEnv) {
-    const h21s = (p) => fract4(sin10(dot4(p, vec26(127.1, 311.7))).mul(43758.5453));
-    const cellS = floor3(d.mul(210));
-    const sh = h21s(cellS.xy.add(cellS.z.mul(vec26(17.31, 41.7))));
-    col = col.add(vec311(0.8, 0.88, 1).mul(step3(0.9955, sh)).mul(sh.sub(0.9955).mul(180).add(0.25)).mul(smoothstep10(0.02, 0.35, d.y)).mul(uniforms.stars));
+    const h21s = (p) => fract5(sin11(dot5(p, vec27(127.1, 311.7))).mul(43758.5453));
+    const cellS = floor4(d.mul(210));
+    const sh = h21s(cellS.xy.add(cellS.z.mul(vec27(17.31, 41.7))));
+    col = col.add(vec312(0.8, 0.88, 1).mul(step4(0.9955, sh)).mul(sh.sub(0.9955).mul(180).add(0.25)).mul(smoothstep10(0.02, 0.35, d.y)).mul(uniforms.stars));
   }
   let covN = float7(0);
   if (theme.clouds > 1e-3) {
     const m = macroTexture();
-    const cuv = d.xz.div(max7(d.y, 0).add(0.1)).mul(0.26).add(vec26(uniforms.time.mul(25e-4), uniforms.time.mul(14e-4)));
+    const cuv = d.xz.div(max7(d.y, 0).add(0.1)).mul(0.26).add(vec27(uniforms.time.mul(25e-4), uniforms.time.mul(14e-4)));
     const cn = texture6(m, cuv).r.mul(0.65).add(texture6(m, cuv.mul(2.3).add(0.37)).g.mul(0.35));
     const cov = smoothstep10(oneMinus9(uniforms.clouds), oneMinus9(uniforms.clouds).add(0.34), cn);
     const hc = new Color(theme.skyHorizon), tc = new Color(theme.skyTop);
     const lit = Math.min(1, (0.2126 * hc.r + 0.7152 * hc.g + 0.0722 * hc.b) * 2.4 + (0.2126 * tc.r + 0.7152 * tc.g + 0.0722 * tc.b) * 0.8);
     uniforms.cloudLit.value = lit;
-    let cc = mix7(uniforms.horizon.mul(1.08), vec311(uniforms.cloudLit), 0.48).mul(pow8(sd, 4).mul(0.45).add(0.75));
-    cc = mix7(cc, uniforms.sunColor.mul(1.3), pow8(sd, 12).mul(0.55));
+    let cc = mix7(uniforms.horizon.mul(1.08), vec312(uniforms.cloudLit), 0.48).mul(pow9(sd, 4).mul(0.45).add(0.75));
+    cc = mix7(cc, uniforms.sunColor.mul(1.3), pow9(sd, 12).mul(0.55));
     col = mix7(col, cc, cov.mul(smoothstep10(0, 0.16, d.y)).mul(0.85));
     covN = cov;
   }
-  if (!forEnv) col = col.add(vec311(0.5, 0.6, 0.85).mul(uniforms.flash).mul(covN.mul(0.75).add(0.25)).mul(smoothstep10(-0.05, 0.3, d.y)));
+  if (!forEnv) col = col.add(vec312(0.5, 0.6, 0.85).mul(uniforms.flash).mul(covN.mul(0.75).add(0.25)).mul(smoothstep10(-0.05, 0.3, d.y)));
   if (!forEnv) {
     col = col.add(uniforms.sunColor.mul(smoothstep10(0.9992, 0.9997, sd).mul(8.5)));
     if (hasSun2) {
-      const sdB = max7(dot4(d, normalize6(uniforms.sunDir2)), 0);
-      col = col.add(uniforms.sunColor.mul(vec311(1, 0.82, 0.62)).mul(smoothstep10(0.9995, 0.99975, sdB).mul(6.5).add(pow8(sdB, 48).mul(0.28))));
+      const sdB = max7(dot5(d, normalize6(uniforms.sunDir2)), 0);
+      col = col.add(uniforms.sunColor.mul(vec312(1, 0.82, 0.62)).mul(smoothstep10(0.9995, 0.99975, sdB).mul(6.5).add(pow9(sdB, 48).mul(0.28))));
     }
   }
   if (isPrison && !forEnv) {
     const m = macroTexture();
-    const h21 = (p) => fract4(sin10(dot4(p, vec26(127.1, 311.7))).mul(43758.5453));
-    const cell = floor3(d.mul(250));
-    const starH = h21(cell.xy.add(cell.z.mul(vec26(17.31, 41.7))));
-    let night = col.add(vec311(0.85, 0.9, 1).mul(step3(0.996, starH)).mul(smoothstep10(-0.1, 0.3, d.y)));
-    const belt = normalize6(vec311(d.x, d.y.mul(0.4).sub(0.15), d.z));
-    const band = exp3(pow8(d.y.add(0.05).mul(9), 2).negate());
-    const beltN = texture6(m, vec26(atan2(belt.z, belt.x).mul(0.48), belt.y.mul(3.2))).r;
-    night = night.add(vec311(0.35, 0.3, 0.25).mul(band).mul(beltN).mul(0.8));
-    const gp = normalize6(vec311(-0.25, 0.32, 0.91));
-    const along = dot4(d, gp);
-    const front = step3(0, along);
+    const h21 = (p) => fract5(sin11(dot5(p, vec27(127.1, 311.7))).mul(43758.5453));
+    const cell = floor4(d.mul(250));
+    const starH = h21(cell.xy.add(cell.z.mul(vec27(17.31, 41.7))));
+    let night = col.add(vec312(0.85, 0.9, 1).mul(step4(0.996, starH)).mul(smoothstep10(-0.1, 0.3, d.y)));
+    const belt = normalize6(vec312(d.x, d.y.mul(0.4).sub(0.15), d.z));
+    const band = exp3(pow9(d.y.add(0.05).mul(9), 2).negate());
+    const beltN = texture6(m, vec27(atan2(belt.z, belt.x).mul(0.48), belt.y.mul(3.2))).r;
+    night = night.add(vec312(0.35, 0.3, 0.25).mul(band).mul(beltN).mul(0.8));
+    const gp = normalize6(vec312(-0.25, 0.32, 0.91));
+    const along = dot5(d, gp);
+    const front = step4(0, along);
     const gdist = length8(cross4(d, gp));
     const disc = ssInv5(0.13, 0.125, gdist).mul(front);
-    const pBands = texture6(m, vec26(d.x.mul(2.5), d.y.mul(8)).add(0.3)).r;
-    const planetCol = mix7(vec311(0.62, 0.5, 0.36), vec311(0.85, 0.72, 0.5), pBands).mul(ssInv5(0.13, 0, gdist).mul(0.45).add(0.55));
+    const pBands = texture6(m, vec27(d.x.mul(2.5), d.y.mul(8)).add(0.3)).r;
+    const planetCol = mix7(vec312(0.62, 0.5, 0.36), vec312(0.85, 0.72, 0.5), pBands).mul(ssInv5(0.13, 0, gdist).mul(0.45).add(0.55));
     night = mix7(night, planetCol, disc);
-    const axis = normalize6(vec311(0.55, 0.75, -0.35));
+    const axis = normalize6(vec312(0.55, 0.75, -0.35));
     const radialV = d.sub(gp.mul(along));
     const radial2 = length8(radialV);
-    const tilt = dot4(normalize6(radialV.add(1e-5)), axis).abs();
+    const tilt = dot5(normalize6(radialV.add(1e-5)), axis).abs();
     const ring = smoothstep10(0.16, 0.17, radial2).mul(ssInv5(0.32, 0.3, radial2)).mul(ssInv5(0.045, 0.01, tilt)).mul(oneMinus9(disc)).mul(front);
     const gap = ssInv5(4e-3, 0, radial2.sub(0.23).abs().sub(4e-3));
-    col = night.add(vec311(0.62, 0.55, 0.42).mul(ring).mul(oneMinus9(gap)).mul(0.85));
+    col = night.add(vec312(0.62, 0.55, 0.42).mul(ring).mul(oneMinus9(gap)).mul(0.85));
   }
   const mat = new MeshBasicNodeMaterial({ side: BackSide, depthWrite: false, fog: false });
   mat.colorNode = col;
@@ -96546,7 +96811,26 @@ function engineGeo(spec2, seg) {
   pb.add("glow", new CircleGeometry(0.5 * R, seg).rotateY(Math.PI).translate(0, 0, Z(0.07) - 0.01));
   pb.add("glow", torus(0.6 * R, 0.018 * R, 6, seg), M4.t(0, 0, Z(0.035)));
   const np = Math.max(10, Math.round(seg * 0.35));
-  pb.add("dark", radial(() => rbox(Math.PI * 2 * 0.72 * R / np * 0.92, 0.025 * R, 0.09 * L, 0.01).rotateX(-0.2).translate(0, 0.72 * R, Z(0) - 0.035 * L), np));
+  const petals = (() => {
+    const pos = [], pet = [], idx = [];
+    const zH = Z(0) + 0.012 * L, zT = Z(0) - 0.085 * L, rH = 0.745 * R, rT = 0.6 * R;
+    for (let q = 0; q < np; q++) {
+      const a0 = (q + 0.05) / np * Math.PI * 2, a1 = (q + 0.95) / np * Math.PI * 2, am = (a0 + a1) / 2, b = pos.length / 3;
+      for (const [a, z, r, d] of [[a0, zH, rH, 0], [a1, zH, rH, 0], [a0, zT, rT, 0.42 * R], [a1, zT, rT, 0.42 * R]]) {
+        pos.push(Math.cos(a) * r, Math.sin(a) * r, z);
+        pet.push(Math.cos(am), Math.sin(am), d);
+      }
+      idx.push(b, b + 2, b + 1, b + 1, b + 2, b + 3);
+    }
+    const g2 = new BufferGeometry();
+    g2.setAttribute("position", new Float32BufferAttribute(pos, 3));
+    g2.setAttribute("aPet", new Float32BufferAttribute(pet, 3));
+    g2.setIndex(idx);
+    g2.computeVertexNormals();
+    const out2 = g2.toNonIndexed();
+    g2.dispose();
+    return out2;
+  })();
   pb.add("steel", torus(0.75 * R, 0.03 * R, 6, seg), M4.t(0, 0, Z(5e-3)));
   bandTs.forEach((tb, i) => {
     if (tb > bodyEnd - 0.04) return;
@@ -96652,6 +96936,7 @@ function engineGeo(spec2, seg) {
     fan,
     fanZ: faceZ + 0.06 * L * 0.5,
     flaps,
+    petals,
     flameOuter: flameGeo(rn, L * 0.75, Math.max(12, Math.round(seg * 0.5))),
     flameCore: flameGeo(rn * 0.42, L * 0.38, 12),
     flameZ: Z(0.07) - 0.02,
@@ -96865,12 +97150,12 @@ function hullTextures(size = 1024) {
     const big = w > 90 * k && h > 70 * k;
     const r = rnd();
     if (rnd() < 0.5) {
-      const ins = 7 * k, step8 = 13 * k, rr = 2.3 * k;
-      for (let t = x + ins; t < x + w - ins; t += step8) {
+      const ins = 7 * k, step9 = 13 * k, rr = 2.3 * k;
+      for (let t = x + ins; t < x + w - ins; t += step9) {
         rivet(t, y + ins, rr);
         rivet(t, y + h - ins, rr);
       }
-      for (let t = y + ins + step8; t < y + h - ins - step8 * 0.5; t += step8) {
+      for (let t = y + ins + step9; t < y + h - ins - step9 * 0.5; t += step9) {
         rivet(x + ins, t, rr);
         rivet(x + w - ins, t, rr);
       }
@@ -97286,19 +97571,20 @@ function carbonTexture() {
 }
 
 // ../../src/game/podMaterials.ts
-var TSL12 = three_tsl_exports;
+var TSL13 = three_tsl_exports;
 var {
+  userData: userDataN,
   floor: floorN,
   abs: abs8,
-  attribute: attribute6,
+  attribute: attribute7,
   clamp: clamp11,
   cos: cos5,
   cross: cross5,
   dFdx: dFdx3,
   dFdy: dFdy3,
-  dot: dot5,
+  dot: dot6,
   float: float8,
-  fract: fract5,
+  fract: fract6,
   fwidth: fwidth2,
   inverseSqrt: inverseSqrt3,
   length: length9,
@@ -97315,18 +97601,18 @@ var {
   positionLocal: positionLocal8,
   positionView: positionView6,
   positionViewDirection: positionViewDirection3,
-  pow: pow9,
+  pow: pow10,
   select: select3,
-  sin: sin11,
+  sin: sin12,
   smoothstep: smoothstep11,
-  step: step4,
+  step: step5,
   texture: texture7,
   uniform: uniform8,
-  uv: uv7,
-  vec2: vec27,
-  vec3: vec312,
+  uv: uv8,
+  vec2: vec28,
+  vec3: vec313,
   vertexColor: vertexColor6
-} = TSL12;
+} = TSL13;
 var ssInv6 = (a, b, x) => oneMinus10(smoothstep11(b, a, x));
 var podSharedTime = uniform8(0);
 function safeHullNormal(nTex, tuv, scale3) {
@@ -97337,8 +97623,8 @@ function safeHullNormal(nTex, tuv, scale3) {
   const dp2p = cross5(dp2, Nn), dp1p = cross5(Nn, dp1);
   const T2 = dp2p.mul(duv1.x).add(dp1p.mul(duv2.x));
   const B2 = dp2p.mul(duv1.y).add(dp1p.mul(duv2.y));
-  const det2 = max8(dot5(T2, T2), dot5(B2, B2));
-  const quadJump = dot5(dp1, dp1).add(dot5(dp2, dp2));
+  const det2 = max8(dot6(T2, T2), dot6(B2, B2));
+  const quadJump = dot6(dp1, dp1).add(dot6(dp2, dp2));
   const valid = smoothstep11(1e-7, 2e-6, det2).mul(ssInv6(9e4, 2e4, quadJump)).mul(ssInv6(85, 18, length9(p))).mul(scale3);
   const sc = inverseSqrt3(max8(det2, float8(1e-7))).mul(valid);
   return normalize7(T2.mul(tsN.x.mul(sc)).add(B2.mul(tsN.y.mul(sc)).add(Nn.mul(max8(tsN.z, float8(0.4))))));
@@ -97362,8 +97648,8 @@ function hullMaterial(c1, c2, glow, livery, texSize) {
     uLivery: uniform8(livery)
   };
   mat.userData.u = u;
-  const L = attribute6("aLiv", "vec3");
-  const tuv = uv7();
+  const L = attribute7("aLiv", "vec3");
+  const tuv = uv8();
   const hMask = texture7(tex.mask, tuv), hDec = texture7(tex.decal, tuv);
   const c = L.x, a = L.y;
   const cd = min3(c, oneMinus10(c));
@@ -97371,29 +97657,29 @@ function hullMaterial(c1, c2, glow, livery, texSize) {
   const side0 = abs8(cd.sub(0.25).add(a.sub(0.5).mul(0.12))), side1 = abs8(cd.sub(0.25));
   const aaS0 = fwidth2(side0).mul(1.5).add(1e-4), aaS1 = fwidth2(side1).mul(1.5).add(1e-4);
   const band = (x, cc, w, aa) => oneMinus10(smoothstep11(float8(w).sub(aa), float8(w).add(aa), abs8(x.sub(cc))));
-  const eng = livery === 0 ? max8(band(cd, 0, 0.06, aaC), band(a, 0.8, 0.035, aaA)) : livery === 1 ? max8(max8(band(cd, 0.05, 0.018, aaC), band(cd, 0, 0.012, aaC)), step4(0.86, a)) : livery === 2 ? (() => {
-    const ez = float8(0.12).add(abs8(fract5(a.mul(5)).sub(0.5)).mul(0.16));
-    return oneMinus10(smoothstep11(ez.sub(aaC), ez.add(aaC), cd)).mul(step4(0.14, a));
-  })() : max8(max8(band(a, 0.25, 0.04, aaA), band(a, 0.7, 0.04, aaA)), band(side1, 0, 0.03, aaS1).mul(step4(0.3, a)).mul(step4(a, 0.65)));
-  const ck0 = max8(band(side0, 0, a.mul(0.02).add(0.035), aaS0), step4(0.9, a));
+  const eng = livery === 0 ? max8(band(cd, 0, 0.06, aaC), band(a, 0.8, 0.035, aaA)) : livery === 1 ? max8(max8(band(cd, 0.05, 0.018, aaC), band(cd, 0, 0.012, aaC)), step5(0.86, a)) : livery === 2 ? (() => {
+    const ez = float8(0.12).add(abs8(fract6(a.mul(5)).sub(0.5)).mul(0.16));
+    return oneMinus10(smoothstep11(ez.sub(aaC), ez.add(aaC), cd)).mul(step5(0.14, a));
+  })() : max8(max8(band(a, 0.25, 0.04, aaA), band(a, 0.7, 0.04, aaA)), band(side1, 0, 0.03, aaS1).mul(step5(0.3, a)).mul(step5(a, 0.65)));
+  const ck0 = max8(band(side0, 0, a.mul(0.02).add(0.035), aaS0), step5(0.9, a));
   const ck = livery >= 2 ? max8(ck0, band(cd, 0, 0.05, aaC)) : ck0;
   const livM = clamp11(select3(L.z.lessThan(0.5), float8(0), select3(L.z.greaterThan(2.5), float8(1), select3(L.z.lessThan(1.5), eng, ck))), 0, 1);
   const wt = oneMinus10(u.uWear);
   const hWear = smoothstep11(wt.sub(0.06), wt.add(0.06), hMask.b);
   let col = mix8(materialColor3, u.uPaint2, livM);
-  col = mix8(col, vec312(0.025), hDec.r.mul(0.9));
-  col = mix8(col, vec312(0.78, 0.56, 0.07), hDec.g);
-  col = mix8(col, vec312(0.52, 0.53, 0.56), hWear);
+  col = mix8(col, vec313(0.025), hDec.r.mul(0.9));
+  col = mix8(col, vec313(0.78, 0.56, 0.07), hDec.g);
+  col = mix8(col, vec313(0.52, 0.53, 0.56), hWear);
   const hGrime = clamp11(hMask.a.mul(u.uGrime), 0, 1);
-  col = col.mul(mix8(vec312(1), vec312(0.42, 0.36, 0.3), hGrime));
+  col = col.mul(mix8(vec313(1), vec313(0.42, 0.36, 0.3), hGrime));
   const hScorch = clamp11(u.uScorch.mul(ssInv6(0.72, 0, a)).mul(hMask.a.mul(0.7).add(0.55)), 0, 0.95);
-  col = mix8(col, vec312(0.02, 0.018, 0.016), hScorch);
+  col = mix8(col, vec313(0.02, 0.018, 0.016), hScorch);
   mat.colorNode = col.mul(hMask.r);
   mat.roughnessNode = clamp11(mix8(materialRoughness3.mul(hMask.g.mul(0.55).add(0.72)), hMask.g.mul(0.28).add(0.3), hWear).add(hGrime.mul(0.34)).add(hScorch.mul(0.42)), 0.12, 1);
   mat.metalnessNode = mix8(materialMetalness2, float8(0.95), hWear).mul(oneMinus10(hScorch.mul(0.7))).mul(oneMinus10(hGrime.mul(0.3)));
   mat.clearcoatNode = float8(0.82).mul(oneMinus10(hWear)).mul(oneMinus10(hGrime.mul(0.7))).mul(oneMinus10(hScorch));
   mat.normalNode = safeHullNormal(tex.normal, tuv, 0.85);
-  mat.emissiveNode = u.uGlowCol.mul(hDec.b.mul(1.3)).add(vec312(1, 0.32, 0.06).mul(hScorch).mul(u.uHeat).mul(1.25).mul(ssInv6(0.35, 0, a)));
+  mat.emissiveNode = u.uGlowCol.mul(hDec.b.mul(1.3)).add(vec313(1, 0.32, 0.06).mul(hScorch).mul(u.uHeat).mul(1.25).mul(ssInv6(0.35, 0, a)));
   return mat;
 }
 var oppHullCache = /* @__PURE__ */ new Map();
@@ -97405,20 +97691,20 @@ function sharedOpponentHullMaterial(texSize) {
   mat.metalness = 0.48;
   mat.roughness = 0.28;
   mat.envMapIntensity = 0.92;
-  const tuv = uv7();
+  const tuv = uv8();
   const hMask = texture7(tex.mask, tuv), hDec = texture7(tex.decal, tuv);
   const hWear = smoothstep11(0.66, 0.78, hMask.b);
   const hGrime = clamp11(hMask.a.mul(0.72), 0, 1);
   let col = vertexColor6();
-  col = mix8(col, vec312(0.025), hDec.r.mul(0.88));
-  col = mix8(col, vec312(0.78, 0.56, 0.07), hDec.g);
-  col = mix8(col, vec312(0.52, 0.53, 0.56), hWear);
-  col = col.mul(mix8(vec312(1), vec312(0.44, 0.38, 0.32), hGrime));
+  col = mix8(col, vec313(0.025), hDec.r.mul(0.88));
+  col = mix8(col, vec313(0.78, 0.56, 0.07), hDec.g);
+  col = mix8(col, vec313(0.52, 0.53, 0.56), hWear);
+  col = col.mul(mix8(vec313(1), vec313(0.44, 0.38, 0.32), hGrime));
   mat.colorNode = col.mul(hMask.r);
   mat.roughnessNode = clamp11(mix8(hMask.g.mul(0.18).add(0.22), float8(0.34), hWear).add(hGrime.mul(0.32)), 0.14, 1);
   mat.metalnessNode = mix8(float8(0.48), float8(0.94), hWear).mul(oneMinus10(hGrime.mul(0.28)));
   mat.normalNode = safeHullNormal(tex.normal, tuv, 0.7);
-  mat.emissiveNode = vec312(1, 0.68, 0.28).mul(hDec.b.mul(0.9));
+  mat.emissiveNode = vec313(1, 0.68, 0.28).mul(hDec.b.mul(0.9));
   mat.userData.shared = true;
   oppHullCache.set(texSize, mat);
   return mat;
@@ -97427,14 +97713,14 @@ var oppFlameCache = null;
 function sharedOpponentFlameMaterial() {
   if (oppFlameCache) return oppFlameCache;
   const mat = new MeshBasicNodeMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide });
-  const L = attribute6("aLiv", "vec3");
+  const L = attribute7("aLiv", "vec3");
   const t = oneMinus10(L.y);
   const ang = L.x.mul(Math.PI * 2);
-  const fl = sin11(ang.mul(3).add(t.mul(9)).sub(podSharedTime.mul(22))).mul(0.3).add(0.72);
-  const dia = pow9(abs8(sin11(t.mul(18).sub(podSharedTime.mul(3)))), 3).mul(0.45).add(0.55);
-  const fade = pow9(clamp11(oneMinus10(t), 0, 1), 1.3).mul(smoothstep11(0, 0.05, t.add(0.01)));
-  const edge = pow9(abs8(dot5(normalViewGeometry3, positionViewDirection3)), 1.3);
-  mat.colorNode = mix8(vertexColor6(), vec312(1, 0.96, 0.9), pow9(clamp11(oneMinus10(t), 0, 1), 1.8).mul(0.65));
+  const fl = sin12(ang.mul(3).add(t.mul(9)).sub(podSharedTime.mul(22))).mul(0.3).add(0.72);
+  const dia = pow10(abs8(sin12(t.mul(18).sub(podSharedTime.mul(3)))), 3).mul(0.45).add(0.55);
+  const fade = pow10(clamp11(oneMinus10(t), 0, 1), 1.3).mul(smoothstep11(0, 0.05, t.add(0.01)));
+  const edge = pow10(abs8(dot6(normalViewGeometry3, positionViewDirection3)), 1.3);
+  mat.colorNode = mix8(vertexColor6(), vec313(1, 0.96, 0.9), pow10(clamp11(oneMinus10(t), 0, 1), 1.8).mul(0.65));
   mat.opacityNode = clamp11(fade.mul(edge).mul(fl).mul(dia).mul(0.92), 0, 1);
   mat.userData.shared = true;
   oppFlameCache = mat;
@@ -97443,27 +97729,27 @@ function sharedOpponentFlameMaterial() {
 var oppBinderCache = null;
 function boltLook(f, y, t) {
   const c = y.mul(2).sub(1), ac = oneMinus10(abs8(c));
-  const core = pow9(ac, 7), halo = pow9(ac, 1.5).mul(0.5);
-  const w12 = sin11(f.mul(21).add(t.mul(33))).mul(0.34).add(sin11(f.mul(47).sub(t.mul(58))).mul(0.14));
-  const w22 = cos5(f.mul(17).sub(t.mul(41))).mul(0.4).add(sin11(f.mul(61).add(t.mul(77))).mul(0.1));
-  const arc1 = pow9(oneMinus10(clamp11(abs8(c.sub(w12)), 0, 1)), 18);
-  const arc2 = pow9(oneMinus10(clamp11(abs8(c.sub(w22)), 0, 1)), 26).mul(0.75);
-  const strobe = fract5(sin11(floorN(t.mul(24)).mul(91.7)).mul(43758.5)).mul(0.55).add(0.6);
-  const pulse = pow9(sin11(f.mul(9).sub(t.mul(24))).mul(0.5).add(0.5), 6).mul(0.9);
+  const core = pow10(ac, 7), halo = pow10(ac, 1.5).mul(0.5);
+  const w12 = sin12(f.mul(21).add(t.mul(33))).mul(0.34).add(sin12(f.mul(47).sub(t.mul(58))).mul(0.14));
+  const w22 = cos5(f.mul(17).sub(t.mul(41))).mul(0.4).add(sin12(f.mul(61).add(t.mul(77))).mul(0.1));
+  const arc1 = pow10(oneMinus10(clamp11(abs8(c.sub(w12)), 0, 1)), 18);
+  const arc2 = pow10(oneMinus10(clamp11(abs8(c.sub(w22)), 0, 1)), 26).mul(0.75);
+  const strobe = fract6(sin12(floorN(t.mul(24)).mul(91.7)).mul(43758.5)).mul(0.55).add(0.6);
+  const pulse = pow10(sin12(f.mul(9).sub(t.mul(24))).mul(0.5).add(0.5), 6).mul(0.9);
   const ends = smoothstep11(0, 0.05, f).mul(ssInv6(1, 0.95, f));
   return [clamp11(core.add(arc1).add(arc2).mul(0.9), 0, 1), core.add(halo).add(arc1).add(arc2).mul(strobe.add(pulse)).mul(ends)];
 }
 function sharedOpponentBinderMaterial() {
   if (oppBinderCache) return oppBinderCache;
   const mat = new MeshBasicNodeMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide });
-  const vUv = uv7();
+  const vUv = uv8();
   const f = vUv.x;
-  const env = sin11(f.mul(Math.PI));
-  const jigY = sin11(podSharedTime.mul(36).add(f.mul(14))).mul(0.26).add(sin11(podSharedTime.mul(71).sub(f.mul(31))).mul(0.1));
+  const env = sin12(f.mul(Math.PI));
+  const jigY = sin12(podSharedTime.mul(36).add(f.mul(14))).mul(0.26).add(sin12(podSharedTime.mul(71).sub(f.mul(31))).mul(0.1));
   const jigZ = cos5(podSharedTime.mul(27).add(f.mul(11))).mul(0.16);
-  mat.positionNode = positionLocal8.add(vec312(0, env.mul(float8(0.16).add(jigY)), env.mul(jigZ)));
+  mat.positionNode = positionLocal8.add(vec313(0, env.mul(float8(0.16).add(jigY)), env.mul(jigZ)));
   const [wh, al] = boltLook(f, vUv.y, podSharedTime);
-  mat.colorNode = mix8(vertexColor6(), vec312(1), wh).mul(1.7);
+  mat.colorNode = mix8(vertexColor6(), vec313(1), wh).mul(1.7);
   mat.opacityNode = clamp11(al.mul(0.95), 0, 1);
   mat.userData.shared = true;
   oppBinderCache = mat;
@@ -97516,16 +97802,16 @@ function flameMaterial(color9, core) {
   const mat = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide });
   const u = { uColor: uniform8(color9.clone()), uTime: uniform8(0), uPower: uniform8(1) };
   const coreF = core ? 1 : 0;
-  const L = attribute6("aLiv", "vec3");
+  const L = attribute7("aLiv", "vec3");
   const t = oneMinus10(L.y);
   const ang = L.x.mul(Math.PI * 2);
-  const w12 = sin11(ang.mul(3).add(t.mul(9)).sub(u.uTime.mul(22))).mul(0.5).add(0.5);
+  const w12 = sin12(ang.mul(3).add(t.mul(9)).sub(u.uTime.mul(22))).mul(0.5).add(0.5);
   const w22 = cos5(ang.mul(5).sub(t.mul(17)).add(u.uTime.mul(31))).mul(0.5).add(0.5);
   const fl = w12.mul(0.6).add(w22.mul(0.4));
-  const dia = pow9(abs8(sin11(t.mul(19).sub(u.uTime.mul(3)))), 3).mul(0.45).add(0.55);
-  const fade = pow9(clamp11(oneMinus10(t), 0, 1), 1.35).mul(smoothstep11(0, 0.05, t.add(0.01)));
-  const edge = pow9(abs8(dot5(normalViewGeometry3, positionViewDirection3)), 1.35);
-  mat.colorNode = mix8(u.uColor, vec312(1, 0.96, 0.9), oneMinus10(t).mul(0.7 * coreF));
+  const dia = pow10(abs8(sin12(t.mul(19).sub(u.uTime.mul(3)))), 3).mul(0.45).add(0.55);
+  const fade = pow10(clamp11(oneMinus10(t), 0, 1), 1.35).mul(smoothstep11(0, 0.05, t.add(0.01)));
+  const edge = pow10(abs8(dot6(normalViewGeometry3, positionViewDirection3)), 1.35);
+  mat.colorNode = mix8(u.uColor, vec313(1, 0.96, 0.9), oneMinus10(t).mul(0.7 * coreF));
   mat.opacityNode = clamp11(fade.mul(edge).mul(fl.mul(0.75).add(0.42)).mul(mix8(float8(1), dia, 0.25 + 0.4 * coreF)).mul(u.uPower), 0, 1);
   mat.userData.u = u;
   return mat;
@@ -97533,15 +97819,15 @@ function flameMaterial(color9, core) {
 function binderMaterial(color9) {
   const mat = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide });
   const u = { uColor: uniform8(color9.clone()), uTime: uniform8(0), uPower: uniform8(1), uLift: uniform8(new Vector2(0, 0)) };
-  const vUv = uv7();
+  const vUv = uv8();
   const f = vUv.x;
-  const env = sin11(f.mul(Math.PI));
+  const env = sin12(f.mul(Math.PI));
   const endLift = mix8(u.uLift.x, u.uLift.y, f);
-  const jigY = sin11(u.uTime.mul(38).add(f.mul(14))).mul(0.27).add(sin11(u.uTime.mul(67).sub(f.mul(29))).mul(0.13));
+  const jigY = sin12(u.uTime.mul(38).add(f.mul(14))).mul(0.27).add(sin12(u.uTime.mul(67).sub(f.mul(29))).mul(0.13));
   const jigZ = cos5(u.uTime.mul(29).add(f.mul(11))).mul(0.17);
-  mat.positionNode = positionLocal8.add(vec312(0, endLift.add(env.mul(float8(0.18).add(jigY))), env.mul(jigZ)));
+  mat.positionNode = positionLocal8.add(vec313(0, endLift.add(env.mul(float8(0.18).add(jigY))), env.mul(jigZ)));
   const [wh, al] = boltLook(f, vUv.y, u.uTime);
-  mat.colorNode = mix8(u.uColor, vec312(1), wh).mul(1.8);
+  mat.colorNode = mix8(u.uColor, vec313(1), wh).mul(1.8);
   mat.opacityNode = clamp11(al.mul(u.uPower), 0, 1);
   mat.userData.u = u;
   return mat;
@@ -97552,12 +97838,23 @@ function cableFlexMaterial() {
   braid.needsUpdate = true;
   const mat = new MeshStandardNodeMaterial({ color: "#17171a", metalness: 0.14, roughness: 0.58 });
   const uLift = uniform8(new Vector2(0, 0));
-  const L = attribute6("aLiv", "vec3");
+  const L = attribute7("aLiv", "vec3");
   const lift = mix8(uLift.x, uLift.y, L.x).mul(L.y);
-  mat.positionNode = positionLocal8.add(vec312(0, lift, 0));
-  mat.normalNode = safeHullNormal(braid, uv7().mul(vec27(26, 6)), 0.65);
+  mat.positionNode = positionLocal8.add(vec313(0, lift, 0));
+  mat.normalNode = safeHullNormal(braid, uv8().mul(vec28(26, 6)), 0.65);
   mat.userData.uLift = uLift;
   return mat;
+}
+var petalMat = null;
+function petalMaterial() {
+  if (petalMat) return petalMat;
+  const m = new MeshStandardNodeMaterial({ color: "#30333a", metalness: 0.86, roughness: 0.36, side: DoubleSide });
+  const A = attribute7("aPet", "vec3"), open2 = userDataN("open", "float");
+  m.positionNode = positionLocal8.add(vec313(A.x, A.y, 0).mul(A.z).mul(open2));
+  m.emissiveNode = vec313(1, 0.42, 0.1).mul(open2).mul(A.z).mul(0.9);
+  m.userData.shared = true;
+  petalMat = m;
+  return m;
 }
 
 // ../../src/game/podModel.ts
@@ -97671,7 +97968,7 @@ function bakeSolidColor(g2, col) {
   return g2;
 }
 function makeBinderGeo(a, b, vertCol) {
-  const pos = new Float32Array(BINDER_PTS * 4 * 3), uv9 = new Float32Array(BINDER_PTS * 4 * 2);
+  const pos = new Float32Array(BINDER_PTS * 4 * 3), uv10 = new Float32Array(BINDER_PTS * 4 * 2);
   const idx = [];
   const w = 0.3;
   const tmp3 = new Vector3();
@@ -97679,8 +97976,8 @@ function makeBinderGeo(a, b, vertCol) {
     const f = i / (BINDER_PTS - 1);
     tmp3.copy(a).lerp(b, f);
     for (let k = 0; k < 4; k++) {
-      uv9[(i * 4 + k) * 2] = f;
-      uv9[(i * 4 + k) * 2 + 1] = k % 2 === 0 ? 1 : 0;
+      uv10[(i * 4 + k) * 2] = f;
+      uv10[(i * 4 + k) * 2 + 1] = k % 2 === 0 ? 1 : 0;
     }
     const o = i * 12;
     pos[o] = tmp3.x;
@@ -97702,7 +97999,7 @@ function makeBinderGeo(a, b, vertCol) {
   }
   const geo = new BufferGeometry();
   geo.setAttribute("position", new BufferAttribute(pos, 3));
-  geo.setAttribute("uv", new BufferAttribute(uv9, 2));
+  geo.setAttribute("uv", new BufferAttribute(uv10, 2));
   geo.setIndex(idx);
   if (vertCol) bakeSolidColor(geo, vertCol);
   geo.computeBoundingSphere();
@@ -97743,61 +98040,7 @@ function getOppGlow() {
 function getOppFarHull() {
   return sharedOppFarHull ?? (sharedOppFarHull = new MeshStandardMaterial({ vertexColors: true, metalness: 0.48, roughness: 0.34 }));
 }
-var numAtlas = null;
-var numMat = null;
-function numberPlate(L, num) {
-  if (!numAtlas) {
-    const cv = document.createElement("canvas");
-    cv.width = cv.height = 512;
-    const c = cv.getContext("2d");
-    c.fillStyle = "#15171c";
-    c.fillRect(0, 0, 512, 512);
-    for (let i = 0; i < 15; i++) {
-      const x = i % 4 * 128, y = Math.floor(i / 4) * 128;
-      c.fillStyle = "#f2efe6";
-      c.fillRect(x + 6, y + 6, 116, 116);
-      c.strokeStyle = "#15171c";
-      c.lineWidth = 7;
-      c.strokeRect(x + 12, y + 12, 104, 104);
-      c.fillStyle = "#15171c";
-      c.font = "bold 84px sans-serif";
-      c.textAlign = "center";
-      c.textBaseline = "middle";
-      c.fillText(String(i + 1), x + 64, y + 70);
-    }
-    numAtlas = new CanvasTexture(cv);
-    numAtlas.colorSpace = SRGBColorSpace;
-    numAtlas.anisotropy = 4;
-    numMat = new MeshStandardMaterial({ map: numAtlas, emissiveMap: numAtlas, emissive: "#ffffff", emissiveIntensity: 0.22, roughness: 0.55, metalness: 0.1 });
-  }
-  const cell = ((num - 1) % 15 + 15) % 15, u0 = cell % 4 / 4, v0 = 1 - (Math.floor(cell / 4) + 1) / 4;
-  const mk = (flip) => {
-    const g3 = new PlaneGeometry(0.86, 0.86);
-    const uv9 = g3.attributes.uv;
-    for (let i = 0; i < uv9.count; i++) uv9.setXY(i, u0 + uv9.getX(i) * 0.25, v0 + uv9.getY(i) * 0.25);
-    if (flip) g3.rotateY(Math.PI);
-    g3.translate(0, 0, flip ? -0.022 : 0.022);
-    return g3;
-  };
-  const post = new BoxGeometry(0.07, 0.6, 0.07);
-  {
-    const uv9 = post.attributes.uv;
-    for (let i = 0; i < uv9.count; i++) uv9.setXY(i, 0.88, 0.12);
-  }
-  post.translate(0, -0.7, 0);
-  const frame = new BoxGeometry(0.94, 0.94, 0.03);
-  {
-    const uv9 = frame.attributes.uv;
-    for (let i = 0; i < uv9.count; i++) uv9.setXY(i, 0.88, 0.12);
-  }
-  const g2 = mergeGeometries([mk(false), mk(true), post, frame], false);
-  const m = new Mesh(g2, numMat);
-  m.position.set(0, L.cockpit.y + 1.75, L.cockpit.z - 1.55);
-  m.rotation.x = -0.12;
-  m.castShadow = false;
-  return m;
-}
-function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = false, num) {
+function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = false) {
   const seg = isOpponent ? quality >= 3 ? 18 : 14 : quality >= 3 ? 40 : quality === 2 ? 28 : 20;
   const texSize = texRes >= 2048 && !isOpponent ? 2048 : 1024;
   const L = podLayout(def);
@@ -97867,6 +98110,8 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       l.push(c);
     };
     let spanX = 4.6;
+    const oppPetals = [];
+    let oppOpen = 0;
     const oppPivots = [];
     for (const side of [-1, 1]) {
       const sideMs = L.engines.filter((e) => (e.x < 0 ? -1 : 1) === side);
@@ -97884,6 +98129,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       engines2.push(grp);
       const b = /* @__PURE__ */ new Map();
       const fls = [];
+      const pts = [];
       for (const em of sideMs) {
         const ox = em.x - piv.x, oy = em.y - piv.y, oz = em.z - piv.z;
         const eg = engineGeo(em.spec, seg);
@@ -97894,8 +98140,18 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
         const fo = eg.flameOuter.clone();
         fo.applyMatrix4(M4.t(ox, oy, oz + eg.flameZ));
         fls.push(fo);
+        pts.push(eg.petals.clone().translate(ox, oy, oz));
       }
       addBucket(b, grp);
+      if (pts.length) {
+        const pg = mergeGeometries(pts, false);
+        pts.forEach((x) => x.dispose());
+        ownedGeos.push(pg);
+        const pm = new Mesh(pg, petalMaterial());
+        pm.userData.open = 0;
+        grp.add(pm);
+        oppPetals.push(pm);
+      }
       if (fls.length) {
         const fg = mergeGeometries(fls, false);
         fls.forEach((x) => x.dispose());
@@ -97959,7 +98215,6 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     farGrp.add(fhM);
     farGrp.add(new Mesh(far.dark, shared.dark));
     farGrp.add(new Mesh(fgGeo, oppGlow));
-    nearGrp.add(numberPlate(L, num ?? 1));
     const setDistance = (d, forceAll = false) => {
       if (forceAll) {
         nearGrp.visible = true;
@@ -97988,8 +98243,11 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
         binderMesh.rotation.z = Math.atan2(yR - yL, spanX);
       }
     };
-    const update2 = (t) => {
+    const update2 = (t, throttle = 0, boost = 0) => {
       podSharedTime.value = t;
+      oppOpen += (boost - oppOpen) * 0.14;
+      const o = 0.1 * throttle + 0.9 * oppOpen;
+      for (let i = 0; i < oppPetals.length; i++) oppPetals[i].userData.open = o;
     };
     const dispose2 = () => {
       ownedGeos.forEach((g2) => g2.dispose());
@@ -98021,6 +98279,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
   const engines = [];
   const fans = [];
   const flaps = [];
+  const petals = [];
   const flames = [];
   const sideGeos = [];
   const hc = new Color(), hot = new Color("#ff5a1a");
@@ -98061,6 +98320,14 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       fan.castShadow = false;
       engGrp.add(fan);
       fans.push(fan);
+      {
+        const pm = new Mesh(eg.petals, petalMaterial());
+        pm.position.set(ox, oy, oz);
+        pm.userData.open = 0;
+        pm.castShadow = false;
+        engGrp.add(pm);
+        petals.push(pm);
+      }
       for (const f of eg.flaps) {
         const m = new Mesh(f.geo, hull);
         m.position.set(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z);
@@ -98182,7 +98449,6 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     if (binderU?.uLift) binderU.uLift.value.set(binderSwap ? yR : yL, binderSwap ? yL : yR);
   };
   let boostK = 0, flapT = 0;
-  body.add(numberPlate(L, num ?? 1));
   const update = (t, throttle, boost, airbrake, dmgL, dmgR, heat) => {
     podSharedTime.value = t;
     const fl = 0.35 + throttle * 0.75 + boost * 0.8;
@@ -98209,8 +98475,9 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     const dtF = Math.max(0, Math.min(0.1, t - flapT));
     flapT = t;
     boostK += (boost - boostK) * Math.min(1, dtF * (boost > boostK ? 9 : 4));
-    const open2 = boostK * (0.5 + 0.035 * Math.sin(t * 43));
-    for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (Math.max(airbrake * 1.05, open2) + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
+    const open2 = 0.1 * throttle + 0.9 * boostK * (1 + 0.04 * Math.sin(t * 43));
+    for (let i = 0; i < petals.length; i++) petals[i].userData.open = open2;
+    for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (airbrake * 1.05 + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
     const uL = hullL.userData.u, uR = hullR.userData.u;
     uL.uScorch.value = Math.min(1, (1 - dmgL) * 1.1 + Math.max(0, heat - 0.75) * 0.8);
     uL.uHeat.value = heat;
@@ -98234,9 +98501,9 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
 }
 
 // ../../src/game/particles.ts
-var TSL13 = three_tsl_exports;
-var { cameraViewMatrix: cameraViewMatrix2, dot: dot6, normalize: normalize8, vec2: vec28, clamp: clamp12, color: color8, cos: cos6, exp: exp4, float: float9, fract: fract6, hash: hash4, instanceIndex: instanceIndex4, instancedBufferAttribute: instancedBufferAttribute2, length: length10, max: tslMax, min: tslMin, mix: mix9, oneMinus: oneMinus11, positionView: positionView7, pow: pow10, sin: sin12, smoothstep: smoothstep12, step: step5, uniform: uniform9, uv: uv8, varying: varying2, vec3: vec313, vec4: vec43 } = TSL13;
-var softDisc = () => pow10(tslMax(oneMinus11(length10(uv8().sub(0.5)).mul(2)), 0), 1.7);
+var TSL14 = three_tsl_exports;
+var { cameraViewMatrix: cameraViewMatrix2, dot: dot7, normalize: normalize8, vec2: vec29, clamp: clamp12, color: color8, cos: cos6, exp: exp4, float: float9, fract: fract7, hash: hash4, instanceIndex: instanceIndex4, instancedBufferAttribute: instancedBufferAttribute2, length: length10, max: tslMax, min: tslMin, mix: mix9, oneMinus: oneMinus11, positionView: positionView7, pow: pow11, sin: sin13, smoothstep: smoothstep12, step: step6, uniform: uniform9, uv: uv9, varying: varying2, vec3: vec314, vec4: vec43 } = TSL14;
+var softDisc = () => pow11(tslMax(oneMinus11(length10(uv9().sub(0.5)).mul(2)), 0), 1.7);
 var Pool = class {
   max;
   head = 0;
@@ -98275,13 +98542,13 @@ var Pool = class {
     });
     const A = instancedBufferAttribute2(this.aPos), B2 = instancedBufferAttribute2(this.aVel), C0 = instancedBufferAttribute2(this.aC0), C1 = instancedBufferAttribute2(this.aC1), M3 = instancedBufferAttribute2(this.aMisc);
     const age = this.uTime.sub(A.w), life = tslMax(B2.w, float9(1e-4)), t = clamp12(age.div(life), 0, 1);
-    const alive = step5(float9(0), age).mul(step5(age, B2.w.sub(1e-5)));
+    const alive = step6(float9(0), age).mul(step6(age, B2.w.sub(1e-5)));
     const k = tslMax(C1.w, float9(0.02)), f1 = oneMinus11(exp4(k.negate().mul(age))).div(k);
-    mat.positionNode = A.xyz.add(B2.xyz.mul(f1)).sub(vec313(0, 1, 0).mul(M3.z.mul(age.sub(f1)).div(k)));
+    mat.positionNode = A.xyz.add(B2.xyz.mul(f1)).sub(vec314(0, 1, 0).mul(M3.z.mul(age.sub(f1)).div(k)));
     const vz = positionView7.z.negate();
     const rawSz = mix9(M3.x, M3.y, t).mul(1.45).mul(alive);
     const maxWorldSz = tslMax(vz.sub(1.1), float9(0)).mul(additive ? 0.16 : 0.14);
-    mat.sizeNode = tslMin(rawSz, maxWorldSz).mul(step5(float9(1.2), vz));
+    mat.sizeNode = tslMin(rawSz, maxWorldSz).mul(step6(float9(1.2), vz));
     const nearFade = smoothstep12(additive ? 2 : 4.5, additive ? 6 : 12, vz);
     const c = varying2(vec43(mix9(C0.xyz, C1.xyz, t), C0.w.mul(tslMin(t.mul(8), float9(1))).mul(oneMinus11(t)).mul(alive)));
     mat.colorNode = c.xyz;
@@ -98542,21 +98809,21 @@ var Particles = class {
   }
   /** `wind` (0..1) slants rain/snow/dust and speeds them up, `dense` scales the count (storms, gusts). */
   initAmbient(type, wind = 0, dense = 1) {
-    const n = Math.max(1, Math.min(2e3, Math.floor(900 * this.amount * dense)));
+    const n = Math.max(1, Math.min(4200, Math.floor(1500 * this.amount * dense)));
     const colors = { dust: "#e8c8a0", snow: "#ffffff", embers: "#ff7020", spores: "#d8ff9a", rain: "#cfdcee", sparkle: "#e0b0ff" };
     const vel = { dust: [8 + wind * 26, 0.5, 3 + wind * 10], snow: [2 + wind * 18, -4 - wind * 2, 1 + wind * 8], embers: [1 + wind * 6, 3, 0.5], spores: [0.5 + wind * 3, 0.4, 0.3], rain: [1 + wind * 16, -40, 0.5 + wind * 7], sparkle: [0.3, 0.6, 0.2] };
     const add2 = type === "embers" || type === "sparkle" || type === "spores";
     const v = vel[type] ?? [2, -2, 1];
     const id = instanceIndex4;
     const span = float9(type === "rain" ? 64 : type === "snow" && wind > 0.3 ? 96 : 150);
-    const seedPos = vec313(hash4(id), hash4(id.add(1999)), hash4(id.add(4099))).mul(span);
+    const seedPos = vec314(hash4(id), hash4(id.add(1999)), hash4(id.add(4099))).mul(span);
     const ph = hash4(id.add(7919)).mul(6.2832);
     const t = this.ambTime;
-    const drift = vec313(t.mul(v[0]).add(sin12(t.add(ph)).mul(0.6)), t.mul(v[1]), t.mul(v[2]).add(cos6(t.mul(0.7).add(ph)).mul(0.6)));
-    const wrapped = fract6(seedPos.add(drift).sub(this.ambCam).div(span).add(0.5)).sub(0.5).mul(span).add(this.ambCam);
+    const drift = vec314(t.mul(v[0]).add(sin13(t.add(ph)).mul(0.6)), t.mul(v[1]), t.mul(v[2]).add(cos6(t.mul(0.7).add(ph)).mul(0.6)));
+    const wrapped = fract7(seedPos.add(drift).sub(this.ambCam).div(span).add(0.5)).sub(0.5).mul(span).add(this.ambCam);
     const vz = positionView7.z.negate();
     const rain = type === "rain";
-    const baseSz = rain ? 1.2 : type === "dust" ? 0.24 : type === "snow" ? 0.2 + wind * 0.08 : 0.2;
+    const baseSz = rain ? 1.2 : type === "dust" ? 0.24 : type === "snow" ? 0.27 + wind * 0.13 : 0.2;
     const mat = new PointsNodeMaterial({
       transparent: true,
       depthWrite: false,
@@ -98565,21 +98832,21 @@ var Particles = class {
       sizeAttenuation: true
     });
     mat.positionNode = wrapped;
-    mat.sizeNode = tslMin(float9(baseSz), tslMax(vz.sub(2), float9(0)).mul(rain ? 0.1 : 0.05)).mul(step5(float9(2.2), vz));
+    mat.sizeNode = tslMin(float9(baseSz), tslMax(vz.sub(2), float9(0)).mul(rain ? 0.1 : 0.05)).mul(step6(float9(2.2), vz));
     mat.colorNode = color8(new Color(colors[type]).multiplyScalar(add2 ? 1.3 : 1));
     if (rain) {
-      const vRel = vec313(v[0], v[1], v[2]).sub(this.ambVel);
+      const vRel = vec314(v[0], v[1], v[2]).sub(this.ambVel);
       const pV = cameraViewMatrix2.mul(vec43(wrapped, 1)).xyz, vV = cameraViewMatrix2.mul(vec43(vRel, 0)).xyz;
       const sdir = pV.xy.mul(vV.z).sub(vV.xy.mul(pV.z));
-      const rHat = normalize8(pV), vPerp = vV.sub(rHat.mul(dot6(vV, rHat)));
+      const rHat = normalize8(pV), vPerp = vV.sub(rHat.mul(dot7(vV, rHat)));
       const lenW = clamp12(length10(vPerp).mul(0.021), 0.35, 3.4);
-      const dirV = varying2(normalize8(sdir.add(vec28(1e-4, 0)))), lenV = varying2(lenW);
-      mat.sizeNode = tslMin(lenW.mul(1.1), tslMax(vz.sub(2), float9(0)).mul(0.14)).mul(step5(float9(2.2), vz));
-      const q = uv8().sub(0.5), along = dot6(q, dirV), across = dot6(q, vec28(dirV.y.negate(), dirV.x));
-      const wUv = float9(0.034).div(lenV.mul(1.1));
+      const dirV = varying2(normalize8(sdir.add(vec29(1e-4, 0)))), lenV = varying2(lenW);
+      mat.sizeNode = tslMin(lenW.mul(1.1), tslMax(vz.sub(2), float9(0)).mul(0.14)).mul(step6(float9(2.2), vz));
+      const q = uv9().sub(0.5), along = dot7(q, dirV), across = dot7(q, vec29(dirV.y.negate(), dirV.x));
+      const wUv = float9(0.046).div(lenV.mul(1.1));
       const streak = oneMinus11(smoothstep12(wUv.mul(0.45), wUv, across.abs())).mul(oneMinus11(smoothstep12(0.3, 0.46, along.abs())));
-      mat.opacityNode = streak.mul(0.6).mul(smoothstep12(2.5, 7, vz)).mul(this.ambFade);
-    } else mat.opacityNode = softDisc().mul(type === "dust" ? 0.2 : 0.72).mul(smoothstep12(2.5, 7, vz)).mul(this.ambFade);
+      mat.opacityNode = streak.mul(0.8).mul(smoothstep12(2.5, 7, vz)).mul(this.ambFade);
+    } else mat.opacityNode = softDisc().mul(type === "dust" ? 0.32 : 0.8).mul(smoothstep12(2.5, 7, vz)).mul(this.ambFade);
     const sp = new Sprite(mat);
     sp.count = n;
     sp.frustumCulled = false;
@@ -98837,7 +99104,7 @@ var BloomNode = class extends Node {
     const invSize = uniform(new Vector2());
     const direction = uniform(new Vector2(0.5, 0.5));
     const uvNode = uv$1();
-    const sampleTexel = (uv9) => colorTexture.sample(uv9);
+    const sampleTexel = (uv10) => colorTexture.sample(uv10);
     const separableBlurPass = Fn(() => {
       const diffuseSum = sampleTexel(uvNode).rgb.mul(centerWeight).toVar();
       Loop({ start: int(0), end: int(offsets.length), type: "int", condition: "<" }, ({ i }) => {
@@ -99043,8 +99310,8 @@ var boxBlur = /* @__PURE__ */ Fn(([textureNode, options = {}]) => {
   const size = nodeObject(options.size) || int(1);
   const separation = nodeObject(options.separation) || int(1);
   const premultipliedAlpha = options.premultipliedAlpha || false;
-  const tap = (uv9) => {
-    const sample3 = textureNode.sample(uv9);
+  const tap = (uv10) => {
+    const sample3 = textureNode.sample(uv10);
     return premultipliedAlpha ? premultiplyAlpha(sample3) : sample3;
   };
   const targetUV = textureNode.uvNode || uv$1();
@@ -99745,7 +100012,7 @@ var SSRNode = class extends Node {
       }
       return viewZNode;
     });
-    const sampleDepth = (uv9) => projectionDepth(this.depthNode.sample(uv9).r, this._cameraNear, this._cameraFar);
+    const sampleDepth = (uv10) => projectionDepth(this.depthNode.sample(uv10).r, this._cameraNear, this._cameraFar);
     const sampleMarchNoise = this.stochastic === true ? bindAnalyticNoise(this._resolution, 47) : null;
     const computeScreenBorderFactor = Fn(([uvCoord, borderWidth]) => {
       const border = borderWidth.max(1e-4);
@@ -100413,30 +100680,30 @@ var FXAANode = class extends Node {
     const _ContrastThreshold = float(0.0312);
     const _RelativeThreshold = float(0.063);
     const _SubpixelBlending = float(1);
-    const Sample = Fn(([uv9]) => {
-      return textureNode.sample(uv9);
+    const Sample = Fn(([uv10]) => {
+      return textureNode.sample(uv10);
     });
-    const SampleLuminance = Fn(([uv9]) => {
-      return dot(Sample(uv9).rgb, vec3(0.3, 0.59, 0.11));
+    const SampleLuminance = Fn(([uv10]) => {
+      return dot(Sample(uv10).rgb, vec3(0.3, 0.59, 0.11));
     });
-    const SampleLuminanceOffset = Fn(([texSize, uv9, uOffset, vOffset]) => {
-      const shiftedUv = uv9.add(texSize.mul(vec2(uOffset, vOffset)));
+    const SampleLuminanceOffset = Fn(([texSize, uv10, uOffset, vOffset]) => {
+      const shiftedUv = uv10.add(texSize.mul(vec2(uOffset, vOffset)));
       return SampleLuminance(shiftedUv);
     });
     const ShouldSkipPixel = (l) => {
       const threshold = max(_ContrastThreshold, _RelativeThreshold.mul(l.highest));
       return l.contrast.lessThan(threshold);
     };
-    const SampleLuminanceNeighborhood = (texSize, uv9) => {
-      const m = SampleLuminance(uv9);
-      const n = SampleLuminanceOffset(texSize, uv9, 0, -1);
-      const e = SampleLuminanceOffset(texSize, uv9, 1, 0);
-      const s = SampleLuminanceOffset(texSize, uv9, 0, 1);
-      const w = SampleLuminanceOffset(texSize, uv9, -1, 0);
-      const ne = SampleLuminanceOffset(texSize, uv9, 1, -1);
-      const nw = SampleLuminanceOffset(texSize, uv9, -1, -1);
-      const se = SampleLuminanceOffset(texSize, uv9, 1, 1);
-      const sw = SampleLuminanceOffset(texSize, uv9, -1, 1);
+    const SampleLuminanceNeighborhood = (texSize, uv10) => {
+      const m = SampleLuminance(uv10);
+      const n = SampleLuminanceOffset(texSize, uv10, 0, -1);
+      const e = SampleLuminanceOffset(texSize, uv10, 1, 0);
+      const s = SampleLuminanceOffset(texSize, uv10, 0, 1);
+      const w = SampleLuminanceOffset(texSize, uv10, -1, 0);
+      const ne = SampleLuminanceOffset(texSize, uv10, 1, -1);
+      const nw = SampleLuminanceOffset(texSize, uv10, -1, -1);
+      const se = SampleLuminanceOffset(texSize, uv10, 1, 1);
+      const sw = SampleLuminanceOffset(texSize, uv10, -1, 1);
       const highest = max(s, e, n, w, m);
       const lowest = min(s, e, n, w, m);
       const contrast = highest.sub(lowest);
@@ -100480,8 +100747,8 @@ var FXAANode = class extends Node {
       });
       return { isHorizontal, pixelStep, oppositeLuminance, gradient };
     };
-    const DetermineEdgeBlendFactor = (texSize, l, e, uv9) => {
-      const uvEdge = uv9.toVar();
+    const DetermineEdgeBlendFactor = (texSize, l, e, uv10) => {
+      const uvEdge = uv10.toVar();
       const edgeStep = vec2().toVar();
       If(e.isHorizontal, () => {
         uvEdge.y.addAssign(e.pixelStep.mul(0.5));
@@ -100523,11 +100790,11 @@ var FXAANode = class extends Node {
       const pDistance = float().toVar();
       const nDistance = float().toVar();
       If(e.isHorizontal, () => {
-        pDistance.assign(puv.x.sub(uv9.x));
-        nDistance.assign(uv9.x.sub(nuv.x));
+        pDistance.assign(puv.x.sub(uv10.x));
+        nDistance.assign(uv10.x.sub(nuv.x));
       }).Else(() => {
-        pDistance.assign(puv.y.sub(uv9.y));
-        nDistance.assign(uv9.y.sub(nuv.y));
+        pDistance.assign(puv.y.sub(uv10.y));
+        nDistance.assign(uv10.y.sub(nuv.y));
       });
       const shortestDistance = float().toVar();
       const deltaSign = bool().toVar();
@@ -100546,13 +100813,13 @@ var FXAANode = class extends Node {
       });
       return blendFactor;
     };
-    const ApplyFXAA = Fn(([uv9, texSize]) => {
-      const luminance3 = SampleLuminanceNeighborhood(texSize, uv9);
-      const finalUv = vec2(uv9).toVar();
+    const ApplyFXAA = Fn(([uv10, texSize]) => {
+      const luminance3 = SampleLuminanceNeighborhood(texSize, uv10);
+      const finalUv = vec2(uv10).toVar();
       If(ShouldSkipPixel(luminance3).not(), () => {
         const pixelBlend = DeterminePixelBlendFactor(luminance3);
         const edge = DetermineEdge(texSize, luminance3);
-        const edgeBlend = DetermineEdgeBlendFactor(texSize, luminance3, edge, uv9);
+        const edgeBlend = DetermineEdgeBlendFactor(texSize, luminance3, edge, uv10);
         const finalBlend = max(pixelBlend, edgeBlend);
         If(edge.isHorizontal, () => {
           finalUv.y.addAssign(edge.pixelStep.mul(finalBlend));
@@ -100572,7 +100839,7 @@ var FXAANode = class extends Node {
 var fxaa = (node) => new FXAANode(convertToTexture(node));
 
 // ../../src/game/post.ts
-var TSL14 = three_tsl_exports;
+var TSL15 = three_tsl_exports;
 var {
   Fn: Fn3,
   If: If3,
@@ -100581,12 +100848,12 @@ var {
   atan: atan3,
   clamp: clamp13,
   convertToTexture: convertToTexture2,
-  dot: dot7,
+  dot: dot8,
   exp: exp5,
   float: float10,
-  floor: floor4,
-  fract: fract7,
-  sin: sin13,
+  floor: floor5,
+  fract: fract8,
+  sin: sin14,
   interleavedGradientNoise: interleavedGradientNoise3,
   ivec2: ivec22,
   length: length11,
@@ -100602,22 +100869,22 @@ var {
   packNormalToRGB: packNormalToRGB2,
   pass: pass2,
   perspectiveDepthToViewZ: perspectiveDepthToViewZ2,
-  pow: pow11,
+  pow: pow12,
   renderOutput: renderOutput2,
   roughness: roughness2,
   sample: sample2,
   screenCoordinate: screenCoordinate3,
   screenUV: screenUV2,
   smoothstep: smoothstep13,
-  step: step6,
+  step: step7,
   textureLoad: textureLoad2,
   textureSize: textureSize2,
   uniform: uniform10,
   unpackRGBToNormal: unpackRGBToNormal2,
-  vec2: vec29,
-  vec3: vec314,
+  vec2: vec210,
+  vec3: vec315,
   vec4: vec44
-} = TSL14;
+} = TSL15;
 var ssInv7 = (a, b, x) => oneMinus12(smoothstep13(b, a, x));
 var AnyTHREE = three_webgpu_exports;
 var PostFX = class {
@@ -100663,7 +100930,7 @@ var PostFX = class {
     const needDepth = gfx.ao || gfx.ssr || gfx.godRays || flareOn;
     const depthNode = needDepth ? scenePass.getTextureNode("depth") : null;
     const depthTex = needDepth ? scenePass.getTexture("depth") : null;
-    let col = Fn3(() => vec44(clamp13(sceneColor.sample(screenUV2).rgb, vec314(0), vec314(12)), float10(1)))();
+    let col = Fn3(() => vec44(clamp13(sceneColor.sample(screenUV2).rgb, vec315(0), vec315(12)), float10(1)))();
     if (gfx.ssr && depthNode) {
       const nNode = scenePass.getTextureNode("normal");
       const mrNode = scenePass.getTextureNode("metalrough");
@@ -100687,9 +100954,9 @@ var PostFX = class {
         const vz = perspectiveDepthToViewZ2(d, camNear, camFar).negate();
         const mr = mrNode.sample(screenUV2);
         const r = ssrTex.sample(screenUV2);
-        const fade = ssInv7(110, 35, vz).mul(ssInv7(0.38, 0.14, mr.g)).mul(smoothstep13(0.08, 0.25, mr.r)).mul(step6(d, 0.9998));
+        const fade = ssInv7(110, 35, vz).mul(ssInv7(0.38, 0.14, mr.g)).mul(smoothstep13(0.08, 0.25, mr.r)).mul(step7(d, 0.9998));
         const w = clamp13(r.a.mul(fade).mul(0.8), 0, 0.8);
-        const safeR = clamp13(r.rgb, vec314(0), vec314(2.2));
+        const safeR = clamp13(r.rgb, vec315(0), vec315(2.2));
         return vec44(b.add(safeR.mul(w)), 1);
       })();
     }
@@ -100698,12 +100965,12 @@ var PostFX = class {
       const dirs = [[0.96, 0.28], [-0.42, 0.91], [0.58, -0.81], [0.18, 0.98]];
       col = Fn3(() => {
         const b = prev.rgb;
-        const dSz = vec29(textureSize2(textureLoad2(depthTex)));
-        const maxPx = ivec22(dSz.sub(vec29(1)));
+        const dSz = vec210(textureSize2(textureLoad2(depthTex)));
+        const maxPx = ivec22(dSz.sub(vec210(1)));
         const px0 = clamp13(ivec22(screenUV2.mul(dSz)), ivec22(0), maxPx);
         const d0 = float10(textureLoad2(depthTex, px0));
         const vz0 = perspectiveDepthToViewZ2(d0, camNear, camFar).negate();
-        const fade = ssInv7(95, 32, vz0).mul(smoothstep13(1.2, 3, vz0)).mul(step6(d0, 0.9998));
+        const fade = ssInv7(95, 32, vz0).mul(smoothstep13(1.2, 3, vz0)).mul(step7(d0, 0.9998));
         const emGuard = ssInv7(1.8, 0.95, luminance2(b));
         const strength = fade.mul(emGuard).mul(0.75);
         const aoFactor = float10(1).toVar();
@@ -100714,15 +100981,15 @@ var PostFX = class {
           const occ = float10(0).toVar();
           for (let k = 0; k < dirs.length; k++) {
             const rad = rPx.mul(k < 2 ? 0.62 : 1);
-            const off = vec29(dirs[k][0], dirs[k][1]).mul(rad);
-            const pA = clamp13(ivec22(vec29(px0).add(off)), ivec22(0), maxPx);
-            const pB = clamp13(ivec22(vec29(px0).sub(off)), ivec22(0), maxPx);
+            const off = vec210(dirs[k][0], dirs[k][1]).mul(rad);
+            const pA = clamp13(ivec22(vec210(px0).add(off)), ivec22(0), maxPx);
+            const pB = clamp13(ivec22(vec210(px0).sub(off)), ivec22(0), maxPx);
             const dA = float10(textureLoad2(depthTex, pA));
             const dB = float10(textureLoad2(depthTex, pB));
             const zA = perspectiveDepthToViewZ2(dA, camNear, camFar).negate();
             const zB = perspectiveDepthToViewZ2(dB, camNear, camFar).negate();
             const jump = max9(abs9(zA.sub(vz0)), abs9(zB.sub(vz0)));
-            const valid = ssInv7(maxJump, maxJump.mul(0.35), jump).mul(step6(dA, 0.9998)).mul(step6(dB, 0.9998));
+            const valid = ssInv7(maxJump, maxJump.mul(0.35), jump).mul(step7(dA, 0.9998)).mul(step7(dB, 0.9998));
             const concav = max9(vz0.sub(zA.add(zB).mul(0.5)).sub(bias), float10(0));
             occ.addAssign(clamp13(concav.div(max9(float10(0.55), vz0.mul(0.03))), 0, 1).mul(valid));
           }
@@ -100758,58 +101025,58 @@ var PostFX = class {
       const r = length11(c);
       let uvS = uvv, dropM = null;
       if (rainOn) {
-        const h21 = (p) => fract7(sin13(dot7(p, vec29(127.1, 311.7))).mul(43758.5453));
-        const asp = vec29(aspectU, 1);
+        const h21 = (p) => fract8(sin14(dot8(p, vec210(127.1, 311.7))).mul(43758.5453));
+        const asp = vec210(aspectU, 1);
         const spd = clamp13(u.speed, 0, 1);
         const wG = oneMinus12(smoothstep13(0.2, 0.6, spd)), wR = smoothstep13(0.15, 0.55, spd);
         const p1 = uvv.mul(asp).mul(9);
-        const id1 = floor4(p1);
-        const f1 = fract7(p1).sub(0.5);
+        const id1 = floor5(p1);
+        const f1 = fract8(p1).sub(0.5);
         const rn = h21(id1), rn2 = h21(id1.add(17.3));
-        const life = fract7(u.time.mul(0.11).mul(rn2.mul(0.8).add(0.6)).add(rn));
+        const life = fract8(u.time.mul(0.11).mul(rn2.mul(0.8).add(0.6)).add(rn));
         const rad = rn2.mul(0.14).add(0.09).mul(smoothstep13(0, 0.08, life)).mul(ssInv7(1, 0.55, life)).add(5e-4);
-        const dv1 = f1.sub(vec29(rn, rn2).sub(0.5).mul(0.5));
-        const m1 = oneMinus12(smoothstep13(rad.mul(0.55), rad, length11(dv1))).mul(step6(rn, rainU.mul(0.9).mul(oneMinus12(spd.mul(0.6)))));
-        const p2 = vec29(uvv.x.mul(aspectU).mul(14), uvv.y.mul(2.2));
-        const rc = h21(vec29(floor4(p2.x), 3.7));
-        const s2 = fract7(p2.y.sub(u.time.mul(rc.mul(0.5).add(0.35))).add(rc.mul(7)));
-        const fx2 = fract7(p2.x).sub(0.5).add(sin13(p2.y.mul(9).add(rc.mul(20))).mul(0.12));
-        const dvh = vec29(fx2, s2.sub(0.8).mul(6.36));
-        const on2 = step6(rc, rainU.mul(0.75)).mul(wG);
+        const dv1 = f1.sub(vec210(rn, rn2).sub(0.5).mul(0.5));
+        const m1 = oneMinus12(smoothstep13(rad.mul(0.55), rad, length11(dv1))).mul(step7(rn, rainU.mul(0.9).mul(oneMinus12(spd.mul(0.6)))));
+        const p2 = vec210(uvv.x.mul(aspectU).mul(14), uvv.y.mul(2.2));
+        const rc = h21(vec210(floor5(p2.x), 3.7));
+        const s2 = fract8(p2.y.sub(u.time.mul(rc.mul(0.5).add(0.35))).add(rc.mul(7)));
+        const fx2 = fract8(p2.x).sub(0.5).add(sin14(p2.y.mul(9).add(rc.mul(20))).mul(0.12));
+        const dvh = vec210(fx2, s2.sub(0.8).mul(6.36));
+        const on2 = step7(rc, rainU.mul(0.75)).mul(wG);
         const m2 = oneMinus12(smoothstep13(0.08, 0.16, length11(dvh))).mul(on2);
-        const trail = oneMinus12(smoothstep13(0.02, 0.06, abs9(fx2))).mul(smoothstep13(0.2, 0.8, s2)).mul(step6(s2, 0.8)).mul(on2).mul(0.45);
+        const trail = oneMinus12(smoothstep13(0.02, 0.06, abs9(fx2))).mul(smoothstep13(0.2, 0.8, s2)).mul(step7(s2, 0.8)).mul(on2).mul(0.45);
         const cc = uvv.sub(0.5).mul(asp);
         const rr = length11(cc).add(1e-4);
-        const er = cc.div(rr), et = vec29(er.y.negate(), er.x);
+        const er = cc.div(rr), et = vec210(er.y.negate(), er.x);
         const aa = atan3(cc.y, cc.x).div(6.2832).add(0.5).mul(30);
-        const rc3 = h21(vec29(floor4(aa), 9.1));
-        const s3 = fract7(rr.mul(2.6).sub(u.flow.mul(rc3.mul(0.6).add(0.7))).add(rc3.mul(5)));
-        const tx = fract7(aa).sub(0.5).mul(rr.mul(6.2832 / 30)), ry = s3.sub(0.8).div(2.6);
-        const on3 = step6(rc3, rainU.mul(0.85)).mul(wR).mul(smoothstep13(0.1, 0.24, rr));
-        const m3 = oneMinus12(smoothstep13(7e-3, 0.014, length11(vec29(tx, ry)))).mul(on3);
-        const tail3 = oneMinus12(smoothstep13(15e-4, 5e-3, abs9(tx))).mul(smoothstep13(float10(0.65).sub(spd.mul(0.4)), 0.8, s3)).mul(step6(s3, 0.8)).mul(on3).mul(0.5);
-        const off = dv1.div(asp).div(9).mul(m1).mul(2.2).add(vec29(dvh.x.div(aspectU.mul(14)), dvh.y.div(14)).mul(m2).mul(2)).add(vec29(fx2.div(aspectU.mul(14)), 0).mul(trail).mul(1.5)).add(et.mul(tx).add(er.mul(ry)).div(asp).mul(m3).mul(2.4)).add(et.mul(tx).div(asp).mul(tail3).mul(1.6));
-        uvS = clamp13(uvv.sub(off), vec29(1e-3), vec29(0.999));
+        const rc3 = h21(vec210(floor5(aa), 9.1));
+        const s3 = fract8(rr.mul(2.6).sub(u.flow.mul(rc3.mul(0.6).add(0.7))).add(rc3.mul(5)));
+        const tx = fract8(aa).sub(0.5).mul(rr.mul(6.2832 / 30)), ry = s3.sub(0.8).div(2.6);
+        const on3 = step7(rc3, rainU.mul(0.85)).mul(wR).mul(smoothstep13(0.1, 0.24, rr));
+        const m3 = oneMinus12(smoothstep13(7e-3, 0.014, length11(vec210(tx, ry)))).mul(on3);
+        const tail3 = oneMinus12(smoothstep13(15e-4, 5e-3, abs9(tx))).mul(smoothstep13(float10(0.65).sub(spd.mul(0.4)), 0.8, s3)).mul(step7(s3, 0.8)).mul(on3).mul(0.5);
+        const off = dv1.div(asp).div(9).mul(m1).mul(2.2).add(vec210(dvh.x.div(aspectU.mul(14)), dvh.y.div(14)).mul(m2).mul(2)).add(vec210(fx2.div(aspectU.mul(14)), 0).mul(trail).mul(1.5)).add(et.mul(tx).add(er.mul(ry)).div(asp).mul(m3).mul(2.4)).add(et.mul(tx).div(asp).mul(tail3).mul(1.6));
+        uvS = clamp13(uvv.sub(off), vec210(1e-3), vec210(0.999));
         dropM = max9(max9(max9(m1, m2), trail), max9(m3, tail3));
       }
       if (lensOn) {
-        const asp2 = vec29(aspectU, 1);
+        const asp2 = vec210(aspectU, 1);
         const fall = (pos) => {
           const dd = uvv.sub(pos).mul(asp2).div(heatR);
-          return exp5(dot7(dd, dd).negate());
+          return exp5(dot8(dd, dd).negate());
         };
         const amt = fall(heatA).add(fall(heatB)).mul(heatS);
-        const wob = vec29(sin13(uvv.y.mul(240).add(u.time.mul(31))).add(sin13(uvv.y.mul(97).sub(u.time.mul(17)))), sin13(uvv.x.mul(210).sub(u.time.mul(26))));
-        uvS = clamp13(uvS.add(wob.mul(amt).mul(65e-5)), vec29(1e-3), vec29(0.999));
+        const wob = vec210(sin14(uvv.y.mul(240).add(u.time.mul(31))).add(sin14(uvv.y.mul(97).sub(u.time.mul(17)))), sin14(uvv.x.mul(210).sub(u.time.mul(26))));
+        uvS = clamp13(uvS.add(wob.mul(amt).mul(65e-5)), vec210(1e-3), vec210(0.999));
       }
-      const base = vec314(src.sample(uvS).level(0).rgb).toVar();
+      const base = vec315(src.sample(uvS).level(0).rgb).toVar();
       if (motion) {
         const bs = u.speed.mul(smoothstep13(0.2, 0.65, r)).mul(0.028);
         If3(bs.greaterThan(15e-4), () => {
-          const acc = vec314(base).toVar();
+          const acc = vec315(base).toVar();
           Loop3(4, ({ i }) => {
             const f = float10(i).add(1).mul(0.25);
-            acc.addAssign(src.sample(clamp13(c.mul(oneMinus12(bs.mul(f))).add(0.5), vec29(1e-3), vec29(0.999))).level(0).rgb);
+            acc.addAssign(src.sample(clamp13(c.mul(oneMinus12(bs.mul(f))).add(0.5), vec210(1e-3), vec210(0.999))).level(0).rgb);
           });
           base.assign(acc.mul(0.2));
         });
@@ -100817,34 +101084,34 @@ var PostFX = class {
       let g2 = base;
       if (cineOn) {
         const ca = u.speed.mul(3e-3).add(u.damage.mul(5e-3)).mul(smoothstep13(0.22, 0.78, r));
-        const caCol = vec314(base).toVar();
+        const caCol = vec315(base).toVar();
         If3(ca.greaterThan(5e-4), () => {
-          const uvR = clamp13(uvv.sub(c.mul(ca).mul(1.6)), vec29(1e-3), vec29(0.999));
-          const uvB = clamp13(uvv.add(c.mul(ca).mul(1.6)), vec29(1e-3), vec29(0.999));
-          caCol.assign(vec314(mix10(base.r, src.sample(uvR).level(0).r, 0.7), base.g, mix10(base.b, src.sample(uvB).level(0).b, 0.7)));
+          const uvR = clamp13(uvv.sub(c.mul(ca).mul(1.6)), vec210(1e-3), vec210(0.999));
+          const uvB = clamp13(uvv.add(c.mul(ca).mul(1.6)), vec210(1e-3), vec210(0.999));
+          caCol.assign(vec315(mix10(base.r, src.sample(uvR).level(0).r, 0.7), base.g, mix10(base.b, src.sample(uvB).level(0).b, 0.7)));
         });
         g2 = caCol;
         const l = luminance2(g2);
-        g2 = mix10(g2, g2.mul(vec314(0.93, 1, 1.07)), ssInv7(0.4, 0, l).mul(0.3));
-        g2 = mix10(g2, g2.mul(vec314(1.05, 1, 0.93)), smoothstep13(0.4, 1.2, l).mul(0.26));
-        g2 = g2.add(vec314(0.55, 0.82, 1).mul(u.boost).mul(smoothstep13(0.34, 0.8, r)).mul(0.2));
-        g2 = mix10(g2, vec314(l).mul(vec314(1.38, 0.4, 0.3)), u.damage.mul(smoothstep13(0.25, 0.8, r)).mul(0.48));
+        g2 = mix10(g2, g2.mul(vec315(0.93, 1, 1.07)), ssInv7(0.4, 0, l).mul(0.3));
+        g2 = mix10(g2, g2.mul(vec315(1.05, 1, 0.93)), smoothstep13(0.4, 1.2, l).mul(0.26));
+        g2 = g2.add(vec315(0.55, 0.82, 1).mul(u.boost).mul(smoothstep13(0.34, 0.8, r)).mul(0.2));
+        g2 = mix10(g2, vec315(l).mul(vec315(1.38, 0.4, 0.3)), u.damage.mul(smoothstep13(0.25, 0.8, r)).mul(0.48));
       }
       if (hasRays) {
         const toSun = sunPosU.sub(uvv);
         const fall = ssInv7(0.68, 0, length11(toSun)).mul(sunIntU);
         If3(fall.greaterThan(8e-3), () => {
-          const dSz = vec29(textureSize2(textureLoad2(depthTex)));
-          const maxPx = ivec22(dSz.sub(vec29(1)));
+          const dSz = vec210(textureSize2(textureLoad2(depthTex)));
+          const maxPx = ivec22(dSz.sub(vec210(1)));
           const stepUv = toSun.div(14);
-          const cur2 = vec29(uvv.add(stepUv.mul(interleavedGradientNoise3(screenCoordinate3)))).toVar();
+          const cur2 = vec210(uvv.add(stepUv.mul(interleavedGradientNoise3(screenCoordinate3)))).toVar();
           const occSum = float10(0).toVar();
           const w = float10(1).toVar();
           Loop3(14, () => {
             cur2.addAssign(stepUv);
-            const inScr = step6(0, cur2.x).mul(step6(cur2.x, 1)).mul(step6(0, cur2.y)).mul(step6(cur2.y, 1));
+            const inScr = step7(0, cur2.x).mul(step7(cur2.x, 1)).mul(step7(0, cur2.y)).mul(step7(cur2.y, 1));
             const px2 = clamp13(ivec22(cur2.mul(dSz)), ivec22(0), maxPx);
-            const skyHit = step6(0.99995, float10(textureLoad2(depthTex, px2))).mul(inScr);
+            const skyHit = step7(0.99995, float10(textureLoad2(depthTex, px2))).mul(inScr);
             const sunCore = ssInv7(0.16, 0, length11(cur2.sub(sunPosU)));
             occSum.addAssign(skyHit.mul(sunCore).mul(w));
             w.mulAssign(0.93);
@@ -100853,32 +101120,32 @@ var PostFX = class {
         });
       }
       if (flareOn && depthTex && sunPosU) {
-        const dSz = vec29(textureSize2(textureLoad2(depthTex)));
-        const maxPx = ivec22(dSz.sub(vec29(1)));
+        const dSz = vec210(textureSize2(textureLoad2(depthTex)));
+        const maxPx = ivec22(dSz.sub(vec210(1)));
         let vis = float10(0);
         const taps = [[0, 0], [9e-3, 0], [-9e-3, 0], [0, 0.016], [0, -0.016], [6e-3, 0.011], [-6e-3, 0.011], [6e-3, -0.011], [-6e-3, -0.011]];
         for (const [ox, oy] of taps) {
-          const q = sunPosU.add(vec29(ox, oy));
-          const inScr = step6(0, q.x).mul(step6(q.x, 1)).mul(step6(0, q.y)).mul(step6(q.y, 1));
-          vis = vis.add(step6(0.99995, float10(textureLoad2(depthTex, clamp13(ivec22(q.mul(dSz)), ivec22(0), maxPx)))).mul(inScr));
+          const q = sunPosU.add(vec210(ox, oy));
+          const inScr = step7(0, q.x).mul(step7(q.x, 1)).mul(step7(0, q.y)).mul(step7(q.y, 1));
+          vis = vis.add(step7(0.99995, float10(textureLoad2(depthTex, clamp13(ivec22(q.mul(dSz)), ivec22(0), maxPx)))).mul(inScr));
         }
         const I = flareU.mul(vis.div(taps.length));
-        const asp = vec29(aspectU, 1);
+        const asp = vec210(aspectU, 1);
         const dS = uvv.sub(sunPosU).mul(asp);
         const dl = length11(dS);
         let fl = sunColU.mul(exp5(dl.mul(-3.4)).mul(0.2).add(exp5(dl.mul(-24)).mul(0.42)));
-        fl = fl.add(vec314(0.55, 0.75, 1).mul(exp5(abs9(dS.y).mul(-110)).mul(exp5(abs9(dS.x).mul(-2.6))).mul(0.2)));
-        const axis = vec29(0.5).sub(sunPosU);
+        fl = fl.add(vec315(0.55, 0.75, 1).mul(exp5(abs9(dS.y).mul(-110)).mul(exp5(abs9(dS.x).mul(-2.6))).mul(0.2)));
+        const axis = vec210(0.5).sub(sunPosU);
         const ghosts = [[0.45, 0.035, 1, 0.7, 0.4, 0.07], [0.9, 0.06, 0.5, 0.9, 0.6, 0.05], [1.35, 0.022, 0.6, 0.7, 1, 0.08], [1.8, 0.1, 0.9, 0.6, 1, 0.035]];
         for (const [k, gr, cr, cg, cb, ga] of ghosts) {
           const gd = length11(uvv.sub(sunPosU.add(axis.mul(k))).mul(asp));
-          fl = fl.add(vec314(cr, cg, cb).mul(oneMinus12(smoothstep13(gr * 0.72, gr, gd))).mul(smoothstep13(0, gr, gd).mul(0.7).add(0.3)).mul(ga));
+          fl = fl.add(vec315(cr, cg, cb).mul(oneMinus12(smoothstep13(gr * 0.72, gr, gd))).mul(smoothstep13(0, gr, gd).mul(0.7).add(0.3)).mul(ga));
         }
         g2 = g2.add(fl.mul(I));
       }
       if (dropM) g2 = g2.mul(dropM.mul(0.1).add(1));
-      g2 = g2.mul(oneMinus12(pow11(r.mul(1.2), 2.6).mul(vignette * 0.7)));
-      return vec44(max9(min4(g2.add(vec314(1, 0.9, 0.8).mul(u.flash)), vec314(12)), vec314(0)), 1);
+      g2 = g2.mul(oneMinus12(pow12(r.mul(1.2), 2.6).mul(vignette * 0.7)));
+      return vec44(max9(min4(g2.add(vec315(1, 0.9, 0.8).mul(u.flash)), vec315(12)), vec315(0)), 1);
     })();
     const RP = AnyTHREE.RenderPipeline ?? AnyTHREE.PostProcessing;
     this.pipeline = new RP(renderer);
@@ -100948,7 +101215,7 @@ function wrapAngle(a) {
   while (a < -Math.PI) a += Math.PI * 2;
   return a;
 }
-function stepPod(p, td, dt, time11, gripMul, frozen) {
+function stepPod(p, td, dt, time12, gripMul, frozen) {
   const P = podParams(p);
   const inp = p.input;
   if (p.dead > 0) return;
@@ -101007,22 +101274,22 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
   const sp = Math.abs(vf);
   const lowF = Math.min(1, sp / 22);
   const highF = 1 - 0.32 * Math.min(1, sp / P.vmax);
-  let omega = p.steer * P.turn * lowF * highF * (1 + (P.abTurn - 1) * 0.45 * sk) * (p.grounded ? 1 : 0.55) * (1 + 0.45 * knife);
+  let omega = p.steer * P.turn * lowF * highF * (1 + ((P.abTurn - 1) * 0.45 + 0.6) * sk) * (p.grounded ? 1 : 0.55) * (1 + 0.45 * knife);
   if (sk > 0 && p.steer * vr < 0) {
     const slip = Math.atan2(Math.abs(vr), Math.max(8, vf));
-    if (slip > 0.88) omega *= Math.max(0.15, 1 - (slip - 0.88) / 0.45);
+    if (slip > 1.05) omega *= Math.max(0.12, 1 - (slip - 1.05) / 0.4);
   }
   omega += (p.hpR - p.hpL) / 100 * 0.25 * lowF;
-  if (p.zeroG) omega *= 1.4;
+  if (p.zeroG) omega *= 1.75;
   if (frozen) omega = 0;
-  p.yawRate += (omega - p.yawRate) * Math.min(1, dt * 9);
+  p.yawRate += (omega - p.yawRate) * Math.min(1, dt * (9 - 5.2 * sk));
   p.yaw -= p.yawRate * dt;
-  let vmaxE = P.vmax * (0.72 + 0.28 * hp) * (p.boosting ? 1.32 : 1) * (p.repairing ? 0.55 : 1);
+  let vmaxE = P.vmax * (0.72 + 0.28 * hp) * (p.boosting ? 1.32 : 1) * (p.repairing ? 0.55 : 1) * (p.zeroG ? 1.28 : 1);
   if (p.isPlayer === false && p.ai) vmaxE *= p.ai.speedF * p.ai.rubber;
   if (!frozen) {
     if (inp.throttle > 0) {
       const ratio = Math.max(0, vf) / vmaxE;
-      const a = P.accel * (p.boosting ? 1.7 : 1) * Math.max(0, 1 - ratio * ratio) * inp.throttle * (p.grounded ? 1 : 0.5);
+      const a = P.accel * (p.boosting ? 1.7 : 1) * Math.max(0, 1 - ratio * ratio) * inp.throttle * (p.grounded ? 1 : p.zeroG ? 1.35 : 0.5);
       vf += a * dt;
       if (ratio > 1) vf -= (vf - vmaxE) * 1.2 * dt;
     }
@@ -101032,9 +101299,9 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
     }
     if (p.airbraking) vf = Math.max(10, vf - P.abDecel * (1 - 0.8 * sk) * dt);
   } else vf *= Math.exp(-3 * dt);
-  vf *= Math.exp(-(inp.throttle > 0 ? 0.04 : 0.28) * dt);
+  vf *= Math.exp(-(p.zeroG ? inp.throttle > 0 ? 0 : 0.05 : inp.throttle > 0 ? 0.04 : 0.28) * dt);
   const attGrip = (p.bankGrip ?? 1) * (pc < 0 ? 1 - 0.14 * pc : 1 - 0.2 * pc);
-  vr *= Math.exp(-P.grip * gripMul * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.035 * sk) * (p.grounded ? 1 : 0.15));
+  vr *= Math.exp(-P.grip * gripMul * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.035 * sk) * (p.grounded ? 1 : p.zeroG ? 0.34 : 0.15));
   const fx2 = Math.sin(p.yaw), fz2 = Math.cos(p.yaw), rx2 = -fz2, rz2 = fx2;
   p.vel.x = fx2 * vf + rx2 * vr;
   p.vel.z = fz2 * vf + rz2 * vr;
@@ -101079,14 +101346,20 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
   const gap = fr.gap || offRoad;
   p.prevGroundY = p.groundY;
   p.groundY = fr.groundY;
-  const bob = Math.sin(time11 * 2.8 + p.id) * 0.1;
+  const bob = Math.sin(time12 * 2.8 + p.id) * 0.1;
   const targetY = fr.groundY + HOVER + bob + (pc > 0 ? pc * 1.6 : pc * 0.45) + knife * halfSpan * 0.92;
   const wasGrounded = p.grounded;
   let landImpulse = 0;
   p.zeroG = fr.zeroG && !fr.gap;
   if (p.zeroG) {
-    const tubeY = fr.groundY + 7;
-    p.vel.y += ((tubeY - p.pos.y) * 3.2 - p.vel.y * 1.2) * dt;
+    let exit = false;
+    const nS = path.samples.length;
+    for (let k = 6; k <= 26 && !exit; k += 5) {
+      const j = path.closed ? (p.idx + k) % nS : Math.min(nS - 1, p.idx + k);
+      if (!path.samples[j].zeroG) exit = true;
+    }
+    const tubeY = fr.groundY + (exit ? HOVER + 0.8 : 7), kC = exit ? 3.2 : 0.5, dC = exit ? 2.2 : 0.45;
+    p.vel.y += ((tubeY - p.pos.y) * kC - p.vel.y * dC + pc * 30) * dt;
     p.grounded = false;
   } else if (!gap && p.pos.y <= targetY + 1.05) {
     const k = 155, c = 22;
@@ -101225,14 +101498,15 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
         if (di > Nm / 2) di -= Nm;
         else if (di < -Nm / 2) di += Nm;
       }
-      if (Math.abs(di) > 5) continue;
+      if (Math.abs(di) > 5 + oh.half / DS) continue;
       const s0 = td.main.samples[oh.idx], along = (p.pos.x - s0.x) * s0.tx + (p.pos.z - s0.z) * s0.tz;
       if (Math.abs(along) > oh.half + 2.4) continue;
       let y0 = oh.y0, y1 = oh.y1;
       if (oh.arch) {
-        const lat = (p.pos.x - s0.x) * s0.rx + (p.pos.z - s0.z) * s0.rz, Ri = oh.arch.R - 1.7;
-        y0 = s0.y + oh.arch.sy * Math.sqrt(Math.max(0, Ri * Ri - lat * lat));
-        y1 = y0 + 3.6;
+        const A = oh.arch, lat = (p.pos.x - s0.x) * s0.rx + (p.pos.z - s0.z) * s0.rz, Ri = A.R - (A.inner ?? 1.7);
+        if (A.sp !== void 0 && td.setPieces[A.sp] && td.setPieces[A.sp].state >= 1 && Math.abs(lat) < A.R * 0.5) continue;
+        y0 = s0.y + (A.yOff ?? 0) + A.sy * Math.sqrt(Math.max(0, Ri * Ri - lat * lat));
+        y1 = y0 + (A.thick ?? 3.6);
       }
       if (p.pos.y + ext <= y0 || p.pos.y - ext >= y1) continue;
       const below = p.pos.y < (y0 + y1) * 0.5, hitY = below ? y0 : y1;
@@ -101263,7 +101537,7 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
     if (!list) continue;
     for (const o of list) if (o.kind !== 3 && !o.broken) collideObstacle(p, o, P.sturdy);
   }
-  if (td.setPieces.length) collideSetPieces(p, td, time11, P.sturdy);
+  if (td.setPieces.length) collideSetPieces(p, td, time12, P.sturdy);
   const N3 = td.N;
   let mainIdx = p.idx;
   if (p.path > 0) {
@@ -101278,8 +101552,8 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
       if (p.passedMid) {
         p.lap++;
         p.passedMid = false;
-        if (p.lap > 0) p.lapTimes.push(time11 - p.lapStart);
-        p.lapStart = time11;
+        if (p.lap > 0) p.lapTimes.push(time12 - p.lapStart);
+        p.lapStart = time12;
       }
     } else if (d > N3 / 2) {
       p.lap--;
@@ -101333,25 +101607,27 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
       roadSlope = Math.atan2((sLF.y + sRF.y) * 0.5 - sCk.y, dz);
     }
   }
-  const rawRoll = p.steer * 0.07 + vr * 4e-3 + p.steer * 0.12 * sk + (p.grounded ? Math.atan(S.bank) * 0.92 : 0);
+  const zg = p.zeroG ? 1 : 0;
+  const rawRoll = p.steer * (0.07 + 0.34 * zg) + zg * Math.sin(time12 * 0.6 + p.id * 1.3) * 0.13 + vr * 4e-3 + p.steer * 0.12 * sk + (p.grounded ? Math.atan(S.bank) * 0.92 : 0);
   const targetRoll = Math.max(-0.5, Math.min(0.5, rawRoll));
   p.rollBase = (p.rollBase ?? 0) + (targetRoll - (p.rollBase ?? 0)) * Math.min(1, dt * 7);
   p.roll = p.rollBase * (1 - knife) + rollA;
   p.bankGrip = p.grounded ? 1 + Math.min(0.9, Math.abs(S.bank) * 2.4) : 1;
   const hs = Math.max(12, Math.hypot(p.vel.x, p.vel.z));
   const flightPitch = -Math.atan2(p.vel.y, hs) * 0.72;
-  const targetPitch = Math.max(-0.42, Math.min(0.42, (p.grounded ? -roadSlope * 0.92 : flightPitch) + (p.boosting ? -0.045 : 0) + (p.airbraking ? 0.065 : 0))) - pc * (p.grounded ? 0.2 : 0.34);
+  const targetPitch = Math.max(-0.42, Math.min(0.42, (p.grounded ? -roadSlope * 0.92 : flightPitch) + (p.boosting ? -0.045 : 0) + (p.airbraking ? 0.065 : 0))) - pc * (p.grounded ? 0.2 : 0.34) + zg * Math.sin(time12 * 0.47 + p.id * 2.1) * 0.06;
   p.pitch += (targetPitch - p.pitch) * Math.min(1, dt * 8);
   const spdK = 0.42 + 0.58 * Math.min(1, sp / 90);
   const turn = Math.max(-1.35, Math.min(1.35, p.steer * 0.9 + p.yawRate / Math.max(1, P.turn) * 0.42)) * (p.airbraking ? 1.28 : 1) * spdK;
-  const oscA = Math.sin(time11 * 4.5 + p.id * 1.7) * 0.1 + Math.sin(time11 * 1.8 + p.id) * 0.05;
-  const oscB = Math.sin(time11 * 4.2 + p.id * 2.3 + 2.2) * 0.1 + Math.cos(time11 * 2 + p.id) * 0.05;
+  const oscA = Math.sin(time12 * 4.5 + p.id * 1.7) * 0.1 + Math.sin(time12 * 1.8 + p.id) * 0.05;
+  const oscB = Math.sin(time12 * 4.2 + p.id * 2.3 + 2.2) * 0.1 + Math.cos(time12 * 2 + p.id) * 0.05;
   const boostLift = p.boosting ? 0.14 : 0;
   const sagA = p.hpL < 35 ? -(1 - p.hpL / 35) * 0.22 : 0;
   const sagB = p.hpR < 35 ? -(1 - p.hpR / 35) * 0.22 : 0;
   const driveA = -turn, driveB = turn;
-  const tgtA = (driveA >= 0 ? driveA * 1.1 : driveA * 0.22) + oscA + boostLift + sagA;
-  const tgtB = (driveB >= 0 ? driveB * 1.1 : driveB * 0.22) + oscB + boostLift + sagB;
+  const flA = zg * Math.sin(time12 * 1.1 + p.id) * 0.42, flB = zg * Math.sin(time12 * 0.9 + p.id + 2.4) * 0.42;
+  const tgtA = (driveA >= 0 ? driveA * 1.1 : driveA * 0.22) + oscA + boostLift + sagA + flA;
+  const tgtB = (driveB >= 0 ? driveB * 1.1 : driveB * 0.22) + oscB + boostLift + sagB + flB;
   let yA = p.engYL ?? 0, yB = p.engYR ?? 0, vA = p.engVL ?? 0, vB = p.engVR ?? 0;
   if (landImpulse > 0) {
     const j = -Math.min(5.2, landImpulse * 0.18);
@@ -101478,14 +101754,14 @@ function collideObstacle(p, o, sturdy) {
     return;
   }
 }
-function collideSetPieces(p, td, time11, sturdy) {
+function collideSetPieces(p, td, time12, sturdy) {
   const C = podCollision(p.def).circles;
   const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
   const hurt = (dmg, side, x, z, nx, nz, strength) => {
     if (p.invuln > 0) return;
     const hp = p;
-    if (time11 - (hp.spHit ?? -9) < 0.7) return;
-    hp.spHit = time11;
+    if (time12 - (hp.spHit ?? -9) < 0.7) return;
+    hp.spHit = time12;
     if (!p.isPlayer) dmg *= 0.45;
     if (side < 0) p.hpL -= dmg;
     else if (side > 0) p.hpR -= dmg;
@@ -101502,7 +101778,7 @@ function collideSetPieces(p, td, time11, sturdy) {
     if (dxc * dxc + dzc * dzc > reach * reach) continue;
     if (sp.type === "rotor") {
       if (p.pos.y > sp.y + 5) continue;
-      const a0 = rotorAngle(sp, time11);
+      const a0 = rotorAngle(sp, time12);
       for (const c of C) {
         const wx = p.pos.x + c.x * cy + c.z * sy, wz = p.pos.z - c.x * sy + c.z * cy;
         for (let k = 0; k < sp.arms; k++) {
@@ -101544,7 +101820,7 @@ function collideSetPieces(p, td, time11, sturdy) {
         for (let k = 0; k < 3; k++) {
           const l0 = -sp.hw + k * w32;
           if (lat + c.r < l0 || lat - c.r > l0 + w32) continue;
-          if (sp.y + 0.2 + (1 - gateDrop(sp, k, time11)) * 9.5 < p.pos.y + 1) blocked = true;
+          if (sp.y + 0.2 + (1 - gateDrop(sp, k, time12)) * 9.5 < p.pos.y + 1) blocked = true;
         }
         if (!blocked) continue;
         const nx = s.tx * sgn, nz = s.tz * sgn;
@@ -101559,7 +101835,7 @@ function collideSetPieces(p, td, time11, sturdy) {
         break;
       }
     } else if (sp.type === "boulder") {
-      const bs = boulderState(sp, time11);
+      const bs = boulderState(sp, time12);
       if (!bs.active) continue;
       const s = td.main.samples[sp.idx];
       const br = sp.armLen;
@@ -101584,7 +101860,7 @@ function collideSetPieces(p, td, time11, sturdy) {
       }
     } else if (sp.type === "bridge") {
       if (p.pos.y > sp.y + 4.8) continue;
-      const sw = bridgeSwing(sp, time11);
+      const sw = bridgeSwing(sp, time12);
       if (sw < 0.08) continue;
       const s = td.main.samples[sp.idx];
       const phi = (1 - sw) * (Math.PI * 0.48);
@@ -101696,13 +101972,13 @@ function rotorArmClearance(sp, s, lat, eta, spd) {
   }
   return minD;
 }
-function aiInputs(p, td, pods, time11, player) {
+function aiInputs(p, td, pods, time12, player) {
   const ai = p.ai;
   const P = podParams(p);
-  const adt = Math.min(0.1, Math.max(0, time11 - (ai.lastT ?? time11)));
-  ai.lastT = time11;
+  const adt = Math.min(0.1, Math.max(0, time12 - (ai.lastT ?? time12)));
+  ai.lastT = time12;
   const speed = Math.hypot(p.vel.x, p.vel.z);
-  if (speed < 8 && time11 > 3 && !p.finished && p.dead <= 0) ai.stuck = (ai.stuck ?? 0) + adt;
+  if (speed < 8 && time12 > 3 && !p.finished && p.dead <= 0) ai.stuck = (ai.stuck ?? 0) + adt;
   else ai.stuck = 0;
   if ((ai.stuck ?? 0) > 2.5) {
     ai.stuck = 0;
@@ -101731,7 +102007,7 @@ function aiInputs(p, td, pods, time11, player) {
   for (let k = 10; k < 60; k += 5) cAvg += at(k).curv;
   cAvg /= 10;
   let idealLat = -Math.sign(cAvg) * Math.min(0.58, Math.abs(cAvg) * 34) * t.hw * ai.skill + ai.lineOff * t.hw * 0.32;
-  idealLat += Math.sin(time11 * 0.4 + ai.noiseT) * (1 - ai.skill) * t.hw * 0.3;
+  idealLat += Math.sin(time12 * 0.4 + ai.noiseT) * (1 - ai.skill) * t.hw * 0.3;
   let enteringShortcut = false;
   if (p.path === 0 && ai.takeShortcut) {
     for (let k = 0; k < 68; k += 2) {
@@ -101759,7 +102035,7 @@ function aiInputs(p, td, pods, time11, player) {
       if (ah < -2 || ah > 66) continue;
       if (o.hz !== void 0) {
         const h = td.hazards[o.hz];
-        const eta = time11 + ah * 2 / estSpd;
+        const eta = time12 + ah * 2 / estSpd;
         const ph = ((eta + h.phase) % h.period + h.period) % h.period;
         if (ph > h.period * h.duty + 0.65 && ph < h.period - 2.1) continue;
         obs.push({ ahead: Math.max(1, ah), lat: o.lat, r: o.r + P.width + 1.6, weight: 0.85 });
@@ -101772,7 +102048,7 @@ function aiInputs(p, td, pods, time11, player) {
     for (const sp of td.setPieces) {
       const ah = aheadOf(sp.idx);
       if (ah < -2 || ah > 82) continue;
-      const eta = time11 + Math.max(0, ah) * 2 / estSpd;
+      const eta = time12 + Math.max(0, ah) * 2 / estSpd;
       if (sp.type === "rotor") {
         nearRotors.push({ sp, ahead: Math.max(1, ah), eta, s: S[sp.idx] });
       } else if (sp.type === "gate") {
@@ -101799,12 +102075,18 @@ function aiInputs(p, td, pods, time11, player) {
       }
     }
   }
+  if (ai.gridLat !== void 0 && time12 < 7.5) {
+    const h = Math.max(0, Math.min(1, (7 - time12) / 3));
+    idealLat = idealLat * (1 - h) + ai.gridLat * h;
+  }
+  let startBlock = false;
   let ramTarget = null;
   for (const q of pods) {
     if (q === p || q.dead > 0 || q.path !== p.path) continue;
     const ah = aheadOf(q.idx);
-    if (ah > 0 && ah < 16) obs.push({ ahead: Math.max(2, ah), lat: q.lat, r: P.width * 1.85 + 1.2, weight: 0.32 });
-    if (q === player && Math.abs(ah) < 4 && !obs.length && p.pilot.aggression > 0.75 && Math.sin(time11 * 0.7 + ai.noiseT) > 0.6) ramTarget = q.lat;
+    if (ah > 0 && ah < 16 && !(time12 < 4.5 && ai.gridLat !== void 0)) obs.push({ ahead: Math.max(2, ah), lat: q.lat, r: P.width * 1.85 + 1.2, weight: 0.32 });
+    if (time12 < 7.5 && ai.gridLat !== void 0 && ah > 0 && ah < 9 && Math.abs(q.lat - p.lat) < P.width * 1.9 && Math.hypot(p.vel.x, p.vel.z) > Math.hypot(q.vel.x, q.vel.z) - 1) startBlock = true;
+    if (q === player && Math.abs(ah) < 4 && !obs.length && p.pilot.aggression > 0.75 && Math.sin(time12 * 0.7 + ai.noiseT) > 0.6) ramTarget = q.lat;
   }
   if (ramTarget !== null && !enteringShortcut) idealLat = ramTarget;
   const s0 = S[p.idx];
@@ -101917,9 +102199,10 @@ function aiInputs(p, td, pods, time11, player) {
   if (speed > vTarget + 4) throttle = 0;
   if (speed > vTarget + 14) airbrake = true;
   if (speed > vTarget + 40) brake = 0.6;
+  if (startBlock) throttle = Math.min(throttle, 0.3);
   let boost = false;
-  if (!denseField && time11 < ai.boostUntil && p.heat < 0.6 + ai.skill * 0.3) boost = true;
-  else if (!denseField && (vlim > 160 || rampAhead) && speed > 50 && p.heat < 0.35 && Math.random() < dtChance(ai.skill)) ai.boostUntil = time11 + 1.5 + ai.skill * 2.5;
+  if (!denseField && time12 < ai.boostUntil && p.heat < 0.6 + ai.skill * 0.3) boost = true;
+  else if (!denseField && (vlim > 160 || rampAhead) && speed > 50 && p.heat < 0.35 && Math.random() < dtChance(ai.skill)) ai.boostUntil = time12 + 1.5 + ai.skill * 2.5;
   const hp = Math.min(p.hpL, p.hpR);
   if (hp < 38) ai.repairMode = true;
   if (hp > 78) ai.repairMode = false;
@@ -101937,13 +102220,13 @@ function aiInputs(p, td, pods, time11, player) {
       if (ai.dive) {
         if (h < 4) {
           ai.dive = false;
-          ai.diveT = time11 + 6;
+          ai.diveT = time12 + 6;
         }
       } else if (p.air < 0.1) ai.diveRoll = Math.random();
-      else if (ai.skill > 0.62 && (ai.diveRoll ?? 1) < 0.22 && p.air > 0.9 && h > 9 && p.vel.y < -2 && time11 > (ai.diveT ?? 0)) ai.dive = true;
+      else if (ai.skill > 0.62 && (ai.diveRoll ?? 1) < 0.22 && p.air > 0.9 && h > 9 && p.vel.y < -2 && time12 > (ai.diveT ?? 0)) ai.dive = true;
       if (ai.dive) pitchIn = -Math.min(0.6, 0.25 + 0.3 * ai.skill);
     }
-  } else if ((ai.dive ? (ai.dive = false, ai.diveT = time11 + 6, false) : false) || ai.skill > 0.55 && speed > 45 && !p.zeroG) {
+  } else if ((ai.dive ? (ai.dive = false, ai.diveT = time12 + 6, false) : false) || ai.skill > 0.55 && speed > 45 && !p.zeroG) {
     const bk = td.obstaclesByPath[p.path], b0 = Math.floor(p.idx / 10);
     for (let bb = b0; bb <= b0 + 4 && !rollIn; bb++) {
       const l = bk.get(bb);
@@ -101989,7 +102272,7 @@ function aiInputs(p, td, pods, time11, player) {
 function dtChance(skill) {
   return 4e-3 + skill * 0.01;
 }
-function collidePods(ps, time11) {
+function collidePods(ps, time12) {
   for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
     const a = ps[i], b = ps[j];
     if (a.dead > 0 || b.dead > 0 || a.invuln > 0 || b.invuln > 0) continue;
@@ -102016,9 +102299,9 @@ function collidePods(ps, time11) {
       b.vel.z += nz * jv;
       const ac = a, bc = b;
       const dmg = Math.min(22, Math.max(0, -rv - 5) * 0.85);
-      if (dmg > 0 && time11 - (ac.pCd ?? -1) > 0.2 && time11 - (bc.pCd ?? -1) > 0.2) {
-        ac.pCd = time11;
-        bc.pCd = time11;
+      if (dmg > 0 && time12 - (ac.pCd ?? -1) > 0.2 && time12 - (bc.pCd ?? -1) > 0.2) {
+        ac.pCd = time12;
+        bc.pCd = time12;
         a.hpL -= dmg * 0.5;
         a.hpR -= dmg * 0.5;
         b.hpL -= dmg * 0.5;
@@ -102033,8 +102316,8 @@ function collidePods(ps, time11) {
 
 // ../../src/game/atmosphere.ts
 init_textures();
-var TSL15 = three_tsl_exports;
-var { cameraPosition: cameraPosition3, clamp: clamp14, dot: dot8, exp: exp6, fog: fog2, max: max10, min: min5, mix: mix11, normalize: normalize9, oneMinus: oneMinus13, positionView: positionView8, positionWorld: positionWorld5, pow: pow12, step: step7, texture: texture8, time: time10, uniform: uniform11, vec2: vec210 } = TSL15;
+var TSL16 = three_tsl_exports;
+var { cameraPosition: cameraPosition3, clamp: clamp14, dot: dot9, exp: exp6, fog: fog2, max: max10, min: min5, mix: mix11, normalize: normalize9, oneMinus: oneMinus13, positionView: positionView8, positionWorld: positionWorld5, pow: pow13, step: step8, texture: texture8, time: time11, uniform: uniform11, vec2: vec211 } = TSL16;
 var HEIGHT_FOG = { desert: 0.32, mesa: 0.32, ice: 0.55, jungle: 0.65, malastare: 0.75, lava: 0.55, crystal: 0.5, aquilaris: 0.45, city: 0.4, oovo: 0 };
 function applyAtmosphere(scene, theme, density, baseY, sunDir, volFog = 0.25, quality = 2) {
   const fogCol = uniform11(new Color(theme.fogColor)), sunCol = uniform11(new Color(theme.sunColor)), vf = uniform11(volFog);
@@ -102044,24 +102327,25 @@ function applyAtmosphere(scene, theme, density, baseY, sunDir, volFog = 0.25, qu
   const toFrag = positionWorld5.sub(cameraPosition3), rd = normalize9(toFrag);
   const fd = oneMinus13(exp6(dens.mul(dist).pow(2).negate()));
   let factor = fd, fh = null;
-  if (hStr > 0 && volFog > 0 && quality > 0) {
+  const hOn = uniform11(quality > 0 ? 1 : 0), bankOn = uniform11(quality >= 2 ? 1 : 0);
+  if (hStr > 0) {
     const a = vf.mul(2.2).add(1).mul(17e-4 * hStr), b = 0.032;
     const h0 = max10(cameraPosition3.y.sub(baseY), 0), h12 = max10(positionWorld5.y.sub(baseY), 0);
-    const dh = h12.sub(h0), dhS = mix11(min5(dh, -2e-3), max10(dh, 2e-3), step7(0, dh));
+    const dh = h12.sub(h0), dhS = mix11(min5(dh, -2e-3), max10(dh, 2e-3), step8(0, dh));
     const rhoAvg = exp6(h0.mul(-b)).sub(exp6(h12.mul(-b))).div(dhS.mul(b)).mul(a);
     const m = macroTexture();
-    const drift = vec210(time10.mul(52e-4), time10.mul(31e-4));
+    const drift = vec211(time11.mul(52e-4), time11.mul(31e-4));
     const pA = cameraPosition3.xz.add(toFrag.xz.mul(0.5)), pB = cameraPosition3.xz.add(toFrag.xz.mul(0.86));
     const n = texture8(m, pA.mul(11e-4).add(drift)).level(0).r.mul(0.62).add(texture8(m, pB.mul(27e-4).sub(drift.mul(1.7))).level(0).g.mul(0.38));
-    const bank = quality >= 2 ? clamp14(n.sub(0.5).mul(vf.mul(0.55).add(0.35).mul(2.2)).add(1), 0.25, 2.2) : 1;
-    fh = oneMinus13(exp6(rhoAvg.mul(dist).mul(bank).negate()));
+    const bank = mix11(1, clamp14(n.sub(0.5).mul(vf.mul(0.55).add(0.35).mul(2.2)).add(1), 0.25, 2.2), bankOn);
+    fh = oneMinus13(exp6(rhoAvg.mul(dist).mul(bank).negate())).mul(hOn);
     factor = clamp14(fd.add(fh.mul(oneMinus13(fd))), 0, 1);
   }
-  const mu = max10(dot8(rd, sd), 0);
-  let sunAmt = pow12(mu, 8).mul(0.3);
-  if (fh) sunAmt = sunAmt.add(pow12(mu, 40).mul(fh).mul(vf.mul(0.25).add(0.2)));
+  const mu = max10(dot9(rd, sd), 0);
+  let sunAmt = pow13(mu, 8).mul(0.3);
+  if (fh) sunAmt = sunAmt.add(pow13(mu, 40).mul(fh).mul(vf.mul(0.25).add(0.2)));
   scene.fogNode = fog2(mix11(fogCol, sunCol.mul(1.1), clamp14(sunAmt, 0, 0.62)), factor);
-  return { color: fogCol, sunColor: sunCol, density: dens, volFog: vf, sunDir: sd };
+  return { color: fogCol, sunColor: sunCol, density: dens, volFog: vf, sunDir: sd, hOn, bankOn };
 }
 
 // ../../src/game/Game.ts
@@ -102092,6 +102376,7 @@ var Game = class _Game {
   hemi;
   prevRoll = 0;
   keymap = normalizeKeys(null);
+  padmap = normalizePad(null);
   envLabel = "";
   fog;
   navLights = null;
@@ -102190,6 +102475,7 @@ var Game = class _Game {
     this.tl = res.timeline;
     this.envLabel = res.label;
     this.keymap = normalizeKeys(this.profile.keys);
+    this.padmap = normalizePad(this.profile.pad);
     this.baseGrip = theme.id === "ice" ? 0.55 : theme.id === "jungle" ? 0.85 : 1;
     this.gripMul = this.baseGrip * fx.grip;
     this.dustBase.set(theme.palette.ground[1]);
@@ -102366,7 +102652,7 @@ var Game = class _Game {
     const N3 = this.td.N;
     order.forEach((e, g2) => {
       const row = Math.floor(g2 / 3), col = g2 % 3;
-      let idx = this.td.startIdx - 6 - row * 9;
+      let idx = this.td.startIdx - 6 - row * 13;
       idx = this.td.main.closed ? (idx % N3 + N3) % N3 : Math.max(0, idx);
       const s = S[idx];
       const lat = (col - 1) * s.hw * 0.55;
@@ -102374,7 +102660,7 @@ var Game = class _Game {
       const custom = e.isPlayer ? prof2.custom[e.def.id] : void 0;
       const colors = custom ? custom.colors : g2 > 10 ? [e.def.colors[1], e.def.colors[0], e.def.colors[2]] : e.def.colors;
       const geo = this.profile.gfx.geometry;
-      const vis = buildPodModel(e.def, colors, geo, this.profile.gfx.texRes, !e.isPlayer, g2 + 1);
+      const vis = buildPodModel(e.def, colors, geo, this.profile.gfx.texRes, !e.isPlayer);
       this.scene.add(vis.group);
       const eLat = Math.min(1, Math.abs(lat) / s.hw);
       const gY = s.y - lat * s.bank + (1 - eLat * eLat) * 0.2 + 0.08;
@@ -102433,7 +102719,7 @@ var Game = class _Game {
         shake: 0,
         events: [],
         visual: vis,
-        ai: e.isPlayer ? null : { skill, speedF: diff.speed * (0.93 + 0.09 * pilot.skill), lineOff: Math.random() * 2 - 1, takeShortcut: Math.random() < skill * 0.75, boostUntil: 0, repairMode: false, noiseT: Math.random() * 100, rubber: 1 },
+        ai: e.isPlayer ? null : { skill, speedF: diff.speed * (0.93 + 0.09 * pilot.skill), lineOff: Math.random() * 2 - 1, takeShortcut: Math.random() < skill * 0.75, boostUntil: 0, repairMode: false, noiseT: Math.random() * 100, rubber: 1, gridLat: lat },
         place: g2 + 1
       };
       const rel = ((idx - this.td.startIdx) % N3 + N3) % N3;
@@ -102510,18 +102796,19 @@ var Game = class _Game {
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     for (const gp of pads) {
       if (!gp) continue;
-      const ax = gp.axes[0] ?? 0;
-      if (Math.abs(ax) > 0.12) steer = Math.sign(ax) * (Math.abs(ax) - 0.12) / 0.88;
-      const rt = gp.buttons[7]?.value ?? 0, lt = gp.buttons[6]?.value ?? 0;
-      if (rt > 0.05) throttle = Math.max(throttle, rt);
-      if (lt > 0.05) brake = Math.max(brake, lt);
-      if (gp.buttons[0]?.pressed) boost = true;
-      if (gp.buttons[1]?.pressed || gp.buttons[4]?.pressed || gp.buttons[5]?.pressed) airbrake = true;
-      if (gp.buttons[2]?.pressed) repair = true;
-      const rx = gp.axes[2] ?? 0, ry = gp.axes[3] ?? 0;
-      if (Math.abs(rx) > 0.3) roll = Math.sign(rx) * Math.min(1, (Math.abs(rx) - 0.3) / 0.6);
-      if (Math.abs(ry) > 0.3) pitch = Math.sign(ry) * Math.min(1, (Math.abs(ry) - 0.3) / 0.6);
-      const cam = !!gp.buttons[3]?.pressed;
+      const pm = this.padmap, pv = (a) => padValue(gp, pm[a]);
+      const st = pv("right") - pv("left");
+      if (Math.abs(st) > 0.02) steer = st;
+      throttle = Math.max(throttle, pv("thrust"));
+      brake = Math.max(brake, pv("brake"));
+      if (pv("boost") > 0.5) boost = true;
+      if (pv("airbrake") > 0.5) airbrake = true;
+      if (pv("repair") > 0.5) repair = true;
+      const rl = pv("rollRight") - pv("rollLeft");
+      if (Math.abs(rl) > 0.02) roll = rl;
+      const pt = pv("pitchUp") - pv("pitchDown");
+      if (Math.abs(pt) > 0.02) pitch = pt;
+      const cam = pv("view") > 0.5;
       if (cam && !this.prevCamBtn) this.cycleCamera();
       this.prevCamBtn = cam;
       if (gp.buttons[9]?.pressed && !this.paused) this.setPaused(true);
@@ -102683,6 +102970,7 @@ var Game = class _Game {
       this.particles.setAmbientFade(1 - this.cover);
     }
     this.applyEnv(dt);
+    if (this.env.wind > 0.6 && this.cover < 0.5 && this.state === "race") this.player.shake = Math.max(this.player.shake, this.weather.gust * (this.env.wind - 0.5) * 0.22);
     if (this.post) this.post.lens.rain.value = this.wxQ > 0 ? this.env.rain * (1 - this.cover) : 0;
     if (this.messageT > 0) this.messageT -= dt;
     this.flash = Math.max(0, this.flash - dt * 2);
@@ -102767,8 +103055,20 @@ var Game = class _Game {
   updateVisuals(dt = 0.016) {
     this.particles.setFrameDt(dt);
     const camPos = this.camera.position;
+    {
+      const pl = this.player;
+      if (pl.zeroG && dt > 0) {
+        const path = this.td.paths[pl.path], S = path.samples;
+        for (let i = 0; i < 4; i++) {
+          let k = pl.idx + 12 + Math.floor(Math.random() * 60);
+          k = path.closed ? k % S.length : Math.min(S.length - 1, k);
+          const s = S[k], a = Math.random() * Math.PI * 2, r = (0.25 + Math.random() * 0.75) * (s.hw + 0.5);
+          this.particles.add.spawn(this.tmpV.set(s.x + s.rx * Math.cos(a) * r, s.y + 7 + Math.sin(a) * r * 0.8, s.z + s.rz * Math.cos(a) * r), ZERO, 1.1, 0.2, 0.2, this.barrierGlow, this.barrierGlow, 0.6, 0, 0);
+        }
+      }
+    }
     if (this.env.rain > 0.08 && dt > 0 && this.wxQ > 0 && this.cover < 0.5) {
-      const pl = this.player, path = this.td.paths[pl.path], S = path.samples, n = Math.round(this.env.rain * 9 * this.wxQ * Math.min(1.2, this.particles.amount) * this.particles.rateScale + Math.random());
+      const pl = this.player, path = this.td.paths[pl.path], S = path.samples, n = Math.round(this.env.rain * 20 * this.wxQ * Math.min(1.2, this.particles.amount) * this.particles.rateScale + Math.random());
       for (let i = 0; i < n; i++) {
         let k = pl.idx - 3 + Math.floor(Math.random() * 46);
         k = path.closed ? (k % S.length + S.length) % S.length : Math.max(0, Math.min(S.length - 1, k));
@@ -102891,7 +103191,7 @@ var Game = class _Game {
   }
   /** Graphics settings that take effect while the race is running (pause menu). The rest needs a restart of the race:
    *  texture resolution, geometry/detail density, tessellation, parallax, shader detail, bump mapping, batching, backend,
-   *  anisotropy, cascaded shadows, volumetrics, screen-space reflections – they are baked into geometry, compiled materials or the
+   *  cascaded shadows, screen-space reflections – they are baked into geometry, compiled materials or the
    *  render-target layout. */
   static LIVE_GFX = [
     "fov",
@@ -102911,7 +103211,9 @@ var Game = class _Game {
     "lensFx",
     "shadows",
     "particles",
-    "drawDistance"
+    "drawDistance",
+    "volumetrics",
+    "anisotropy"
   ];
   // (SSR is NOT live: it adds two render targets to the scene pass; pipelines compiled for the old attachment layout become invalid on WebGPU)
   static POST_KEYS = ["bloom", "bloomStrength", "ao", "godRays", "motionBlur", "cinematic", "aa", "lensFx", "weatherFx"];
@@ -102927,6 +103229,17 @@ var Game = class _Game {
     this.weather.quality = this.wxQ;
     this.envDirty = true;
     if (g2.particles !== prev.particles) this.particles.amount = g2.particles;
+    {
+      const vq = g2.volumetrics ?? 2;
+      this.fog.hOn.value = vq > 0 ? 1 : 0;
+      this.fog.bankOn.value = vq >= 2 ? 1 : 0;
+      if (vq > 0 && !this.beams && this.navLights) {
+        this.beams = makeBeams(this.pods.length * 2);
+        this.scene.add(this.beams.mesh);
+      }
+      if (this.beams) this.beams.mesh.userData.off = vq === 0;
+    }
+    if ((g2.anisotropy ?? 8) !== (prev.anisotropy ?? 8)) setTextureAnisotropy(g2.anisotropy ?? 8);
     if (g2.shadows !== prev.shadows && !this.csm) {
       const on = g2.shadows > 0, ms = [0, 1024, 1536, 2048][g2.shadows] ?? 1536;
       this.renderer.shadowMap.enabled = on;
@@ -103021,8 +103334,8 @@ var Game = class _Game {
     WEATHER.wet.value = b.rainRoad ? this.wet : 1;
     const f = this.weather ? this.weather.flash : 0;
     this.sun.intensity = this.sunBaseI;
-    this.hemi.intensity = 0.58 + f * 2;
-    this.scene.environmentIntensity = this.envI + f * 0.7;
+    this.hemi.intensity = 0.58 + f * 3;
+    this.scene.environmentIntensity = this.envI + f * 1.1;
     this.sky.uniforms.flash.value = f;
   }
   /** Running lights (fade in with darkness): headlights with soft volumetric beams at both engine noses, wingtip markers, cockpit strobe.
@@ -103033,7 +103346,7 @@ var Game = class _Game {
     const lv = this.lightLevel, bm = this.beams, sl = this.headLamp;
     im.visible = lv > 0.01;
     if (bm) {
-      bm.mesh.visible = lv > 0.01;
+      bm.mesh.visible = lv > 0.01 && !bm.mesh.userData.off;
       bm.strength.value = lv;
     }
     if (lv <= 0.01) {
@@ -103081,7 +103394,7 @@ var Game = class _Game {
     const gfx = this.profile.gfx;
     const sp = Math.hypot(p.vel.x, p.vel.z);
     const vmax = podParams(p).vmax;
-    let fov2 = gfx.fov + Math.min(1.3, sp / vmax) * 16 + (p.boosting ? 8 : 0);
+    let fov2 = gfx.fov + Math.min(1.3, sp / vmax) * 16 + (p.boosting ? 8 : 0) + (p.zeroG ? 8 : 0);
     const velYaw = sp > 8 ? Math.atan2(p.vel.x, p.vel.z) : p.yaw;
     let dy = velYaw - p.yaw;
     while (dy > Math.PI) dy -= Math.PI * 2;
@@ -103266,12 +103579,12 @@ var Game = class _Game {
   results(sorted) {
     const L = this.td.main.closed ? this.td.N * this.profile.race.laps : this.td.finishIdx - this.td.startIdx;
     return sorted.map((q, i) => {
-      let time11 = q.finished ? q.finishTime : null;
+      let time12 = q.finished ? q.finishTime : null;
       if (!q.finished) {
         const avg = Math.max(30, q.prog * 2 / Math.max(1, this.raceTime));
-        time11 = this.raceTime + (L - q.prog) * 2 / avg;
+        time12 = this.raceTime + (L - q.prog) * 2 / avg;
       }
-      return { place: i + 1, name: q.name, pod: q.def.name, color: q.color, isPlayer: q.isPlayer, time: time11, bestLap: q.lapTimes.length && this.td.main.closed ? Math.min(...q.lapTimes) : null };
+      return { place: i + 1, name: q.name, pod: q.def.name, color: q.color, isPlayer: q.isPlayer, time: time12, bestLap: q.lapTimes.length && this.td.main.closed ? Math.min(...q.lapTimes) : null };
     }).sort((a, b) => (a.time ?? 1e9) - (b.time ?? 1e9)).map((r, i) => ({ ...r, place: i + 1 }));
   }
   drawMinimap() {
@@ -103484,6 +103797,13 @@ window.track = async (i, view) => {
       G2.camera.position.set(a.x, a.y + 4.2, a.z);
       G2.camera.lookAt(b.x, b.y + 0.5, b.z);
     }
+  } else if (view === "u" || view === "w") {
+    const S = G2.td.main.samples, N3 = S.length;
+    let k = S.findIndex((s, j) => j > 50 && (view === "u" ? s.roof > 0 : s.zeroG));
+    if (k < 0) k = 100;
+    const a = S[(k + (view === "u" ? -9 : 14)) % N3], b = S[(k + 40) % N3];
+    G2.camera.position.set(a.x + a.rx * 2, a.y + (view === "u" ? 4.5 : 7), a.z + a.rz * 2);
+    G2.camera.lookAt(b.x, b.y + (view === "u" ? 4 : 7), b.z);
   } else if (view === "s") {
     const S = G2.td.main.samples, a = S[Math.floor(S.length * 0.2)];
     G2.camera.position.set(a.x, a.y + 6, a.z);
@@ -103524,7 +103844,7 @@ window.track = async (i, view) => {
     const g0 = G2.profile.gfx;
     G2.render(0.016);
     await new Promise((r) => setTimeout(r, 300));
-    G2.applyLiveGfx({ ...g0, bloom: !g0.bloom, ao: !g0.ao, godRays: !g0.godRays, aa: g0.aa === "fxaa" ? "smaa" : "fxaa", shadows: g0.shadows ? 0 : 2, particles: 0.5, drawDistance: 0.8, motionBlur: !g0.motionBlur });
+    G2.applyLiveGfx({ ...g0, volumetrics: 0, anisotropy: 2, bloom: !g0.bloom, ao: !g0.ao, godRays: !g0.godRays, aa: g0.aa === "fxaa" ? "smaa" : "fxaa", shadows: g0.shadows ? 0 : 2, particles: 0.5, drawDistance: 0.8, motionBlur: !g0.motionBlur });
     await new Promise((r) => setTimeout(r, 1500));
     G2.render(0.016);
     await new Promise((r) => setTimeout(r, 600));

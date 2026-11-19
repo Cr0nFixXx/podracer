@@ -174,6 +174,7 @@ export function buildSetPieces(td: TrackData, theme: ThemeDef, group: THREE.Grou
       const isIce = sp.type === 'icefall';
       const root = new THREE.Group(); root.position.set(s.x, s.y - 3, s.z); root.rotation.y = yaw; group.add(root);
       const Ra = sp.hw + 8, tube = (isIce ? 4.0 : 4.5) + h2(sp.idx, 3) * 1.5, segs = 9; const pieces: THREE.Mesh[] = [];
+      (td.overheads ??= []).push({ idx: sp.idx, y0: 0, y1: 0, half: tube * 1.5, arch: { R: Ra, sy: 1.18, inner: tube * 1.3, yOff: -3, thick: tube * 2.5, sp: td.setPieces.indexOf(sp) } }); // solid; after the collapse only the stumps remain
       for (let k = 0; k < segs; k++) {
         // Session 15: torus arc segments are open tubes – once a block broke out you could look straight through its ends. Both ends get caps.
         const rs = isIce ? 6 : 10, arc = Math.PI / segs;

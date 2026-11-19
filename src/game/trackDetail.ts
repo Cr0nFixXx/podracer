@@ -414,7 +414,7 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
     let last = -1e9;
     for (let i = 60; i < N - 60; i += 10) {
       if (i - last < 280) continue;
-      let ok = true; for (let k = -20; k <= 20 && ok; k += 2) { const q = S[(i + k + N) % N]; if (Math.abs(q.curv) > 1 / 700 || q.canyon || q.gap || q.ramp > 0 || q.openL || q.openR) ok = false; }
+      let ok = true; for (let k = -20; k <= 20 && ok; k += 2) { const q = S[(i + k + N) % N]; if (Math.abs(q.curv) > 1 / 700 || q.canyon || q.gap || q.ramp > 0 || q.openL || q.openR || q.roof > 0 || q.zeroG) ok = false; }
       if (!ok || Math.abs(i - td.startIdx) < 90 || td.setPieces.some(sp => Math.abs(sp.idx - i) < 70)) continue;
       last = i; const s = S[i]; const yaw = Math.atan2(s.tx, s.tz); const span = Math.max(s.wallL, s.wallR) + 1.8; const H = 21; // Session 14: was 11 m – the banner hung into the flight path (lift + knife-edge reach ~10 m)
       (td.overheads ??= []).push({ idx: i, y0: s.y + H - 1.8 - span * 1.5 / 16, y1: s.y + H + 2.1, half: 1.0 }); // solid for pods (stepPod)

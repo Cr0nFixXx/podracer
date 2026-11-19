@@ -258,3 +258,8 @@ export function detailNormalTexture(kind: DetailKind): THREE.DataTexture {
 }
 
 export function microTexture() { return detailNormalTexture('grit'); }
+
+/** Live graphics option: anisotropic filtering of all generated texture sets. */
+export function setTextureAnisotropy(a: number) {
+  for (const set of cache.values()) for (const t of [set.map, set.normalMap, set.rhMap, set.emissiveMap]) if (t && t.anisotropy !== a) { t.anisotropy = a; t.needsUpdate = true; }
+}

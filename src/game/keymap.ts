@@ -43,3 +43,42 @@ export function keyLabel(code: string) {
 export const keysLabel = (codes: string[]) => codes.length ? [...new Set(codes.map(keyLabel))].join(' / ') : '—';
 /** Codes that must never be bound (pause / browser). */
 export const RESERVED = new Set(['Escape', 'KeyP', 'F5', 'F11', 'F12', 'MetaLeft', 'MetaRight']);
+
+// ---------- Session 16: rebindable gamepad controls ----------
+/** A button (index, analog value used when available) or one direction of an axis. */
+export type PadBind = { b: number } | { a: number; d: 1 | -1 };
+export type PadMap = Record<Action, PadBind[]>;
+export const defaultPad = (): PadMap => ({
+  thrust: [{ b: 7 }], brake: [{ b: 6 }], left: [{ a: 0, d: -1 }], right: [{ a: 0, d: 1 }], boost: [{ b: 0 }], airbrake: [{ b: 1 }, { b: 4 }, { b: 5 }],
+  pitchDown: [{ a: 3, d: -1 }], pitchUp: [{ a: 3, d: 1 }], rollLeft: [{ a: 2, d: -1 }], rollRight: [{ a: 2, d: 1 }], repair: [{ b: 2 }], view: [{ b: 3 }],
+});
+const isBind = (x: unknown): x is PadBind => !!x && typeof x === 'object' && (typeof (x as { b?: unknown }).b === 'number' || typeof (x as { a?: unknown }).a === 'number');
+export function normalizePad(p?: Partial<PadMap> | null): PadMap {
+  const d = defaultPad(); if (!p) return d;
+  for (const [a] of ACTIONS) if (Array.isArray(p[a])) d[a] = (p[a] as unknown[]).filter(isBind);
+  return d;
+}
+const sameBind = (x: PadBind, y: PadBind) => 'b' in x ? 'b' in y && x.b === y.b : 'a' in y && x.a === y.a && x.d === y.d;
+export function bindPad(map: PadMap, action: Action, bind: PadBind): PadMap {
+  const out = {} as PadMap;
+  for (const [a] of ACTIONS) out[a] = a === action ? [bind] : map[a].filter(x => !sameBind(x, bind));
+  return out;
+}
+/** 0..1 value of an action on this gamepad (analog triggers and sticks stay analog; 15 % dead zone on axes). */
+export function padValue(gp: Gamepad, binds: PadBind[]): number {
+  let v = 0;
+  for (const x of binds) {
+    if ('b' in x) { const bt = gp.buttons[x.b]; if (bt) v = Math.max(v, bt.value > 0.05 ? bt.value : bt.pressed ? 1 : 0); }
+    else { const ax = (gp.axes[x.a] ?? 0) * x.d; if (ax > 0.15) v = Math.max(v, Math.min(1, (ax - 0.15) / 0.85)); }
+  }
+  return v;
+}
+/** First button pressed / stick pushed right now (for the binding dialog). Button 9 (Start = pause) is reserved. */
+export function readPadBind(gp: Gamepad): PadBind | null {
+  for (let i = 0; i < gp.buttons.length; i++) if (i !== 9 && (gp.buttons[i].pressed || gp.buttons[i].value > 0.6)) return { b: i };
+  for (let i = 0; i < gp.axes.length; i++) if (Math.abs(gp.axes[i]) > 0.65) return { a: i, d: gp.axes[i] > 0 ? 1 : -1 };
+  return null;
+}
+const BTN = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'Back', 'Start', 'L3', 'R3', 'D-Pad ↑', 'D-Pad ↓', 'D-Pad ←', 'D-Pad →'];
+const AXIS = [['L-Stick ←', 'L-Stick →'], ['L-Stick ↑', 'L-Stick ↓'], ['R-Stick ←', 'R-Stick →'], ['R-Stick ↑', 'R-Stick ↓']];
+export const padLabel = (binds: PadBind[]) => binds.length ? binds.map(x => 'b' in x ? BTN[x.b] ?? 'Taste ' + x.b : AXIS[x.a]?.[x.d > 0 ? 1 : 0] ?? `Achse ${x.a}${x.d > 0 ? '+' : '−'}`).join(' / ') : '—';

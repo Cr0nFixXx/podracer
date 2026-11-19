@@ -58,7 +58,7 @@ export class WeatherFx {
     const forks: [number, number, number, number][] = [];
     for (let i = 1; i <= SEG; i++) {
       const t = i / SEG; const nx = x + (px - x) * (1 - t) * 0.9 + (Math.random() - 0.5) * jag * 2, ny = top + (groundY - top) * t, nz = z + (pz - z) * (1 - t) * 0.9 + (Math.random() - 0.5) * jag * 2;
-      quad(px, py, pz, nx, ny, nz, l * 0.0026);
+      quad(px, py, pz, nx, ny, nz, l * 0.0034);
       if ((i === 7 || i === 13 || i === 20) && forks.length < FORKS) forks.push([nx, ny, nz, forks.length % 2 ? -1 : 1]);
       px = nx; py = ny; pz = nz;
     }
@@ -84,7 +84,7 @@ export class WeatherFx {
     if (fx.lightning > 0.03 || this.strikeAge < 2) {
       if (fx.lightning > 0.03) this.nextStrike -= dt * (frozen ? 0.4 : 1);
       if (this.nextStrike <= 0) {
-        this.nextStrike = (3 + Math.random() * 6) / Math.max(0.25, fx.lightning);
+        this.nextStrike = (1.8 + Math.random() * 4) / Math.max(0.25, fx.lightning); // Session 16: more frequent
         this.strikeAge = 0; this.hasBolt = Math.random() < 0.8;
         const dist = 380 + Math.random() * Math.random() * 1100;
         camera.getWorldDirection(this.fwd); const a = Math.atan2(this.fwd.x, this.fwd.z) + (Math.random() - 0.5) * 2.0; // mostly in view
@@ -110,9 +110,9 @@ export class WeatherFx {
       this.gust = env;
       const az = this.windAz + Math.sin(t * 0.05) * 0.5; this.wind.set(Math.sin(az), 0, Math.cos(az));
       camera.getWorldDirection(this.fwd); this.fwd.y = 0; this.fwd.normalize(); this.right.set(-this.fwd.z, 0, this.fwd.x);
-      this.carry += (0.22 + 0.78 * env) * fx.wind * fx.gustAmt * 300 * this.particles.amount * this.quality * dt;
-      const n = Math.min(12, Math.floor(this.carry)); this.carry -= Math.floor(this.carry);
-      const snow = fx.gust === 'snow', alpha = snow ? 0.085 : fx.gust === 'dust' ? 0.11 : 0.05;
+      this.carry += (0.22 + 0.78 * env) * fx.wind * fx.gustAmt * 480 * this.particles.amount * this.quality * dt;
+      const n = Math.min(18, Math.floor(this.carry)); this.carry -= Math.floor(this.carry);
+      const snow = fx.gust === 'snow', alpha = snow ? 0.125 : fx.gust === 'dust' ? 0.155 : 0.085;
       for (let i = 0; i < n; i++) {
         const f = 14 + Math.random() * 110, r = (Math.random() - 0.5) * 120;
         this.p.copy(cam).addScaledVector(this.fwd, f).addScaledVector(this.right, r).addScaledVector(this.wind, -22);

@@ -1,11 +1,11 @@
 import * as THREE from 'three/webgpu';
 import { resolveEnvironment, type EnvBuild, type EnvFx, type EnvTimeline } from './environment';
 import { WEATHER } from './materials';
-import { generateTextures, hasTextureWorkers, textureStats } from './textures';
+import { generateTextures, hasTextureWorkers, setTextureAnisotropy, textureStats } from './textures';
 import { makeBeams } from './lights';
 import { DebrisPool } from './debris';
 import { roadSurfaceAt } from './trackBuilder';
-import { normalizeKeys, type Action, type KeyMap } from './keymap';
+import { normalizeKeys, normalizePad, padValue, type Action, type KeyMap, type PadMap } from './keymap';
 import { podEnvelope } from './podDesigns';
 import { WeatherFx } from './weather';
 import { CSMShadowNode } from 'three/examples/jsm/csm/CSMShadowNode.js';
@@ -53,7 +53,7 @@ export class Game {
   sky!: ReturnType<typeof makeSky>; sun!: THREE.DirectionalLight; sunDir = new THREE.Vector3();
   csm: CSMShadowNode | null = null; csmFov = 0;
   env!: EnvFx; weather!: WeatherFx; hemi!: THREE.HemisphereLight; prevRoll = 0;
-  keymap: KeyMap = normalizeKeys(null); envLabel = '';
+  keymap: KeyMap = normalizeKeys(null); padmap: PadMap = normalizePad(null); envLabel = '';
   fog!: ReturnType<typeof applyAtmosphere>;
   navLights: THREE.InstancedMesh | null = null; headLamp: THREE.SpotLight | null = null; private tmpM = new THREE.Matrix4();
   /** Session 13: environment timeline (time of day × weather) + derived runtime state */
@@ -97,7 +97,7 @@ export class Game {
     const tL0 = performance.now();
     const res = resolveEnvironment(THEMES[trackDef.theme], this.profile.race.timeOfDay, this.profile.race.weather);
     const { theme, fx, build } = res;
-    this.env = fx; this.envBuild = build; this.tl = res.timeline; this.envLabel = res.label; this.keymap = normalizeKeys(this.profile.keys);
+    this.env = fx; this.envBuild = build; this.tl = res.timeline; this.envLabel = res.label; this.keymap = normalizeKeys(this.profile.keys); this.padmap = normalizePad(this.profile.pad);
     this.baseGrip = theme.id === 'ice' ? 0.55 : theme.id === 'jungle' ? 0.85 : 1;
     this.gripMul = this.baseGrip * fx.grip;
     this.dustBase.set(theme.palette.ground[1]); this.dustCol.copy(this.dustBase);
@@ -246,14 +246,14 @@ export class Game {
     const S = this.td.main.samples; const N = this.td.N;
     order.forEach((e, g) => {
       const row = Math.floor(g / 3), col = g % 3;
-      let idx = this.td.startIdx - 6 - row * 9;
+      let idx = this.td.startIdx - 6 - row * 13; // Session 16: 26 m between grid rows (pods are up to 22 m long)
       idx = this.td.main.closed ? ((idx % N) + N) % N : Math.max(0, idx);
       const s = S[idx]; const lat = (col - 1) * s.hw * 0.55;
       const pilot = PILOTS.find(p => p.id === e.def.pilotId) ?? PILOTS[0];
       const custom = e.isPlayer ? prof.custom[e.def.id] : undefined;
       const colors = custom ? custom.colors : (g > 10 ? [e.def.colors[1], e.def.colors[0], e.def.colors[2]] as [string, string, string] : e.def.colors);
       const geo = this.profile.gfx.geometry;
-      const vis = buildPodModel(e.def, colors, geo, this.profile.gfx.texRes, !e.isPlayer, g + 1);
+      const vis = buildPodModel(e.def, colors, geo, this.profile.gfx.texRes, !e.isPlayer);
       this.scene.add(vis.group);
       const eLat = Math.min(1, Math.abs(lat) / s.hw);
       const gY = s.y - lat * s.bank + (1 - eLat * eLat) * 0.2 + 0.08;
@@ -269,7 +269,7 @@ export class Game {
         hpL: 100, hpR: 100, heat: 0, boosting: false, overheat: false, repairing: false, airbraking: false,
         lap: 0, passedMid: true, rel: 0, prog: 0, finished: false, finishTime: 0, lapStart: 0, lapTimes: [],
         dead: 0, invuln: 0, lastSafePath: 0, lastSafeIdx: idx, wrongWay: 0, roll: 0, pitch: 0, shake: 0, events: [], visual: vis,
-        ai: e.isPlayer ? null : { skill, speedF: diff.speed * (0.93 + 0.09 * pilot.skill), lineOff: Math.random() * 2 - 1, takeShortcut: Math.random() < skill * 0.75, boostUntil: 0, repairMode: false, noiseT: Math.random() * 100, rubber: 1 },
+        ai: e.isPlayer ? null : { skill, speedF: diff.speed * (0.93 + 0.09 * pilot.skill), lineOff: Math.random() * 2 - 1, takeShortcut: Math.random() < skill * 0.75, boostUntil: 0, repairMode: false, noiseT: Math.random() * 100, rubber: 1, gridLat: lat },
         place: g + 1,
       };
       const rel = ((idx - this.td.startIdx) % N + N) % N;
@@ -323,14 +323,14 @@ export class Game {
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     for (const gp of pads) {
       if (!gp) continue;
-      const ax = gp.axes[0] ?? 0; if (Math.abs(ax) > 0.12) steer = Math.sign(ax) * (Math.abs(ax) - 0.12) / 0.88;
-      const rt = gp.buttons[7]?.value ?? 0, lt = gp.buttons[6]?.value ?? 0;
-      if (rt > 0.05) throttle = Math.max(throttle, rt); if (lt > 0.05) brake = Math.max(brake, lt);
-      if (gp.buttons[0]?.pressed) boost = true;
-      if (gp.buttons[1]?.pressed || gp.buttons[4]?.pressed || gp.buttons[5]?.pressed) airbrake = true;
-      if (gp.buttons[2]?.pressed) repair = true;
-      const rx = gp.axes[2] ?? 0, ry = gp.axes[3] ?? 0; if (Math.abs(rx) > 0.3) roll = Math.sign(rx) * Math.min(1, (Math.abs(rx) - 0.3) / 0.6); if (Math.abs(ry) > 0.3) pitch = Math.sign(ry) * Math.min(1, (Math.abs(ry) - 0.3) / 0.6);
-      const cam = !!gp.buttons[3]?.pressed; if (cam && !this.prevCamBtn) this.cycleCamera(); this.prevCamBtn = cam;
+      // Session 16: rebindable gamepad mapping (keymap.ts → PadMap); analog triggers / sticks stay analog
+      const pm = this.padmap, pv = (a: Action) => padValue(gp, pm[a]);
+      const st = pv('right') - pv('left'); if (Math.abs(st) > 0.02) steer = st;
+      throttle = Math.max(throttle, pv('thrust')); brake = Math.max(brake, pv('brake'));
+      if (pv('boost') > 0.5) boost = true; if (pv('airbrake') > 0.5) airbrake = true; if (pv('repair') > 0.5) repair = true;
+      const rl = pv('rollRight') - pv('rollLeft'); if (Math.abs(rl) > 0.02) roll = rl;
+      const pt = pv('pitchUp') - pv('pitchDown'); if (Math.abs(pt) > 0.02) pitch = pt;
+      const cam = pv('view') > 0.5; if (cam && !this.prevCamBtn) this.cycleCamera(); this.prevCamBtn = cam;
       if (gp.buttons[9]?.pressed && !this.paused) this.setPaused(true);
       break;
     }
@@ -447,6 +447,7 @@ export class Game {
     this.weather.update(dt, this.clock, this.camera, this.state === 'countdown', v => this.audio.thunder(v), near => { if (near > 0.5) this.player.shake = Math.min(1, this.player.shake + (near - 0.5) * 0.9); });
     { const pl = this.player, ps = this.td.paths[pl.path].samples[pl.idx]; this.cover += ((ps && ps.roof > 0 ? 1 : 0) - this.cover) * Math.min(1, dt * 5); this.particles.setAmbientFade(1 - this.cover); }
     this.applyEnv(dt);
+    if (this.env.wind > 0.6 && this.cover < 0.5 && this.state === 'race') this.player.shake = Math.max(this.player.shake, this.weather.gust * (this.env.wind - 0.5) * 0.22); // storm gusts buffet the pod
     if (this.post) this.post.lens.rain.value = this.wxQ > 0 ? this.env.rain * (1 - this.cover) : 0;
     if (this.messageT > 0) this.messageT -= dt;
     this.flash = Math.max(0, this.flash - dt * 2);
@@ -501,9 +502,20 @@ export class Game {
   updateVisuals(dt = 0.016) {
     this.particles.setFrameDt(dt);
     const camPos = this.camera.position;
+    // Session 16 – zero-G: drifting star dust in the tube streaks past the camera (sense of speed and of floating)
+    { const pl = this.player;
+      if (pl.zeroG && dt > 0) {
+        const path = this.td.paths[pl.path], S = path.samples;
+        for (let i = 0; i < 4; i++) {
+          let k = pl.idx + 12 + Math.floor(Math.random() * 60); k = path.closed ? k % S.length : Math.min(S.length - 1, k);
+          const s = S[k], a = Math.random() * Math.PI * 2, r = (0.25 + Math.random() * 0.75) * (s.hw + 0.5);
+          this.particles.add.spawn(this.tmpV.set(s.x + s.rx * Math.cos(a) * r, s.y + 7 + Math.sin(a) * r * 0.8, s.z + s.rz * Math.cos(a) * r), ZERO, 1.1, 0.2, 0.2, this.barrierGlow, this.barrierGlow, 0.6, 0, 0);
+        }
+      }
+    }
     // rain drops bursting on the road ahead of the player (count follows the rain intensity)
     if (this.env.rain > 0.08 && dt > 0 && this.wxQ > 0 && this.cover < 0.5) {
-      const pl = this.player, path = this.td.paths[pl.path], S = path.samples, n = Math.round(this.env.rain * 9 * this.wxQ * Math.min(1.2, this.particles.amount) * this.particles.rateScale + Math.random());
+      const pl = this.player, path = this.td.paths[pl.path], S = path.samples, n = Math.round(this.env.rain * 20 * this.wxQ * Math.min(1.2, this.particles.amount) * this.particles.rateScale + Math.random());
       for (let i = 0; i < n; i++) {
         let k = pl.idx - 3 + Math.floor(Math.random() * 46); k = path.closed ? ((k % S.length) + S.length) % S.length : Math.max(0, Math.min(S.length - 1, k));
         const s = S[k]; if (s.gap || s.roof > 0) continue; const lat = (Math.random() * 2 - 1) * s.hw, x = s.x + s.rx * lat, z = s.z + s.rz * lat;
@@ -614,10 +626,10 @@ export class Game {
 
   /** Graphics settings that take effect while the race is running (pause menu). The rest needs a restart of the race:
    *  texture resolution, geometry/detail density, tessellation, parallax, shader detail, bump mapping, batching, backend,
-   *  anisotropy, cascaded shadows, volumetrics, screen-space reflections – they are baked into geometry, compiled materials or the
+   *  cascaded shadows, screen-space reflections – they are baked into geometry, compiled materials or the
    *  render-target layout. */
   static readonly LIVE_GFX: (keyof GfxSettings)[] = ['fov', 'showFps', 'renderScale', 'lodBias', 'podDetail', 'weatherFx', 'preset',
-    'bloom', 'bloomStrength', 'ao', 'godRays', 'motionBlur', 'cinematic', 'aa', 'lensFx', 'shadows', 'particles', 'drawDistance'];
+    'bloom', 'bloomStrength', 'ao', 'godRays', 'motionBlur', 'cinematic', 'aa', 'lensFx', 'shadows', 'particles', 'drawDistance', 'volumetrics', 'anisotropy'];
   // (SSR is NOT live: it adds two render targets to the scene pass; pipelines compiled for the old attachment layout become invalid on WebGPU)
   private static readonly POST_KEYS: (keyof GfxSettings)[] = ['bloom', 'bloomStrength', 'ao', 'godRays', 'motionBlur', 'cinematic', 'aa', 'lensFx', 'weatherFx'];
   applyLiveGfx(g: GfxSettings, volume?: number) {
@@ -628,6 +640,10 @@ export class Game {
     this.world.setLodBias(g.lodBias ?? 1); setPodLodScale(g.podDetail ?? 1);
     this.wxQ = [0, 0.5, 1][g.weatherFx ?? 2] ?? 1; this.weather.quality = this.wxQ; this.envDirty = true; // also re-applies fog density (draw distance)
     if (g.particles !== prev.particles) this.particles.amount = g.particles;
+    { const vq = g.volumetrics ?? 2; this.fog.hOn.value = vq > 0 ? 1 : 0; this.fog.bankOn.value = vq >= 2 ? 1 : 0; // fog layers + light cones
+      if (vq > 0 && !this.beams && this.navLights) { this.beams = makeBeams(this.pods.length * 2); this.scene.add(this.beams.mesh); }
+      if (this.beams) this.beams.mesh.userData.off = vq === 0; }
+    if ((g.anisotropy ?? 8) !== (prev.anisotropy ?? 8)) setTextureAnisotropy(g.anisotropy ?? 8);
     if (g.shadows !== prev.shadows && !this.csm) { // sun shadows on/off + resolution (cascaded shadows stay as built)
       const on = g.shadows > 0, ms = [0, 1024, 1536, 2048][g.shadows] ?? 1536;
       this.renderer.shadowMap.enabled = on; this.sun.castShadow = on;
@@ -687,7 +703,7 @@ export class Game {
     if (b.rainRoad) { if (snapWet) this.wet = this.wetTarget; else this.wet += Math.max(-0.02 * dt, Math.min(0.085 * dt, this.wetTarget - this.wet)); } // soaks in ~12 s, dries in ~50 s
     WEATHER.wet.value = b.rainRoad ? this.wet : 1;
     const f = this.weather ? this.weather.flash : 0;
-    this.sun.intensity = this.sunBaseI; this.hemi.intensity = 0.58 + f * 2.0; this.scene.environmentIntensity = this.envI + f * 0.7; this.sky.uniforms.flash.value = f;
+    this.sun.intensity = this.sunBaseI; this.hemi.intensity = 0.58 + f * 3.0; this.scene.environmentIntensity = this.envI + f * 1.1; this.sky.uniforms.flash.value = f;
   }
 
   /** Running lights (fade in with darkness): headlights with soft volumetric beams at both engine noses, wingtip markers, cockpit strobe.
@@ -695,7 +711,7 @@ export class Game {
   updateLights() {
     const im = this.navLights; if (!im) return;
     const lv = this.lightLevel, bm = this.beams, sl = this.headLamp;
-    im.visible = lv > 0.01; if (bm) { bm.mesh.visible = lv > 0.01; bm.strength.value = lv; }
+    im.visible = lv > 0.01; if (bm) { bm.mesh.visible = lv > 0.01 && !bm.mesh.userData.off; bm.strength.value = lv; }
     if (lv <= 0.01) { if (sl) sl.intensity = 0; return; }
     const m = this.tmpM, q0 = this.tmpQ.identity(), pos = this.tmpV, sc = this.tmpV2, qb = this.tmpQ2; let n = 0, nb = 0;
     for (const p of this.pods) {
@@ -727,7 +743,7 @@ export class Game {
   updateCamera(dt: number) {
     const p = this.player; const cam = this.camera; const gfx = this.profile.gfx;
     const sp = Math.hypot(p.vel.x, p.vel.z); const vmax = podParams(p).vmax;
-    let fov = gfx.fov + Math.min(1.3, sp / vmax) * 16 + (p.boosting ? 8 : 0);
+    let fov = gfx.fov + Math.min(1.3, sp / vmax) * 16 + (p.boosting ? 8 : 0) + (p.zeroG ? 8 : 0); // zero-G: wider view = more sense of speed
     const velYaw = sp > 8 ? Math.atan2(p.vel.x, p.vel.z) : p.yaw;
     let dy = velYaw - p.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
     const tgtYaw = p.yaw + dy * 0.45;

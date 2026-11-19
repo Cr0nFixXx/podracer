@@ -71,7 +71,7 @@ export default function PodPreview({ podId, colors, className, autoRotate = true
     const st = stateRef.current; if (!st) return;
     if (st.pod) { st.scene.remove(st.pod.group); st.pod.dispose(); }
     const def = PODS.find(p => p.id === podId)!;
-    const pod = buildPodModel(def, colors, 3, 1024, false, PODS.findIndex(p => p.id === def.id) + 1);
+    const pod = buildPodModel(def, colors, 3);
     st.scene.add(pod.group); st.pod = pod; st.podId = podId;
   }, [podId, colors]);
 

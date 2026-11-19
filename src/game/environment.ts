@@ -122,32 +122,33 @@ function resolveOne(base: ThemeDef, tod: Tod, key: WxKey): EnvState {
     case 'clear':
       th.clouds = Math.min(th.clouds, 0.2); th.fogDensity *= 0.8; if (wetAmbient) th.ambient = 'dust'; fx.flare = 1; fx.amb = 0.3; break;
     case 'rain':
-      th.clouds = Math.max(th.clouds, 0.6 + 0.3 * k); th.fogDensity *= 1 + 0.45 * k; th.sunIntensity *= 1 - 0.4 * k;
+      th.clouds = Math.max(th.clouds, 0.6 + 0.3 * k); th.fogDensity *= 1 + 0.75 * k; th.sunIntensity *= 1 - 0.5 * k;
       th.skyTop = overcast(th.skyTop, 0.6 * k, [0.9, 1, 1.12], 0.85); th.skyHorizon = overcast(th.skyHorizon, 0.55 * k, [0.94, 1, 1.06], 0.9);
       th.fogColor = overcast(th.fogColor, 0.5 * k, [0.92, 1, 1.08], 0.9); th.ambient = 'rain';
-      fx.rain = 0.7 * k; fx.wind = 0.4 * k; fx.grip = 1 - 0.07 * k; fx.flare = 0.3 * (1.6 - k); fx.volFog = 0.4; fx.amb = fx.rain; break;
+      fx.rain = Math.min(1, 0.85 * k); fx.wind = 0.55 * k; fx.grip = 1 - 0.07 * k; fx.flare = 0.3 * (1.6 - k); fx.volFog = 0.5; fx.amb = fx.rain;
+      fx.gust = 'mist'; fx.gustColor = th.fogColor; fx.gustAmt = 0.5 * k; break; // Session 16: rain squalls drift across the track
     case 'storm':
-      th.clouds = 1; th.fogDensity *= 1 + 0.8 * k; th.sunIntensity *= 1 - 0.66 * k;
+      th.clouds = 1; th.fogDensity *= 1 + 1.25 * k; th.sunIntensity *= 1 - 0.74 * k;
       th.skyTop = overcast(th.skyTop, 0.85 * k, [0.85, 0.95, 1.15], 0.42); th.skyHorizon = overcast(th.skyHorizon, 0.75 * k, [0.9, 1, 1.1], 0.55);
       th.fogColor = overcast(th.fogColor, 0.7 * k, [0.9, 1, 1.1], 0.6); th.hemiSky = overcast(th.hemiSky, 0.55 * k, [0.9, 1, 1.12], 0.75); th.ambient = 'rain';
-      fx.rain = 0.55 + 0.45 * k; fx.lightning = k; fx.gust = 'mist'; fx.gustColor = th.fogColor; fx.gustAmt = k; fx.wind = 0.9 * k; fx.grip = 1 - 0.1 * k; fx.flare = 0; fx.volFog = 0.55; fx.amb = fx.rain; break;
+      fx.rain = 0.55 + 0.45 * k; fx.lightning = k; fx.gust = 'mist'; fx.gustColor = th.fogColor; fx.gustAmt = k; fx.wind = Math.min(1, 1.05 * k); fx.grip = 1 - 0.1 * k; fx.flare = 0; fx.volFog = 0.72; fx.amb = fx.rain; break;
     case 'snow':
-      th.clouds = Math.max(th.clouds, 0.55 + 0.35 * k); th.fogDensity *= 1 + 0.9 * k; th.sunIntensity *= 1 - 0.4 * k;
+      th.clouds = Math.max(th.clouds, 0.55 + 0.35 * k); th.fogDensity *= 1 + 1.35 * k; th.sunIntensity *= 1 - 0.45 * k;
       th.skyTop = overcast(th.skyTop, 0.6 * k, [0.95, 1, 1.08], 1.15); th.skyHorizon = overcast(th.skyHorizon, 0.6 * k, [0.97, 1, 1.04], 1.2);
       th.fogColor = overcast(th.fogColor, 0.6 * k, [0.96, 1, 1.05], 1.25); th.ambient = 'snow';
-      fx.gust = 'snow'; fx.gustColor = mixHex(th.fogColor, '#ffffff', night ? 0.15 : 0.6); fx.gustAmt = k; fx.wind = 0.75 * k; fx.grip = 1 - 0.1 * k; fx.flare = 0.2; fx.volFog = 0.5; fx.amb = 0.45 + 0.55 * k; break;
+      fx.gust = 'snow'; fx.gustColor = mixHex(th.fogColor, '#ffffff', night ? 0.15 : 0.6); fx.gustAmt = k; fx.wind = 0.92 * k; fx.grip = 1 - 0.1 * k; fx.flare = 0.2; fx.volFog = 0.65; fx.amb = 0.45 + 0.55 * k; break;
     case 'dust': {
       const ash = base.id === 'lava'; // volcano: dark ash fall with dry volcanic lightning instead of a sand storm
-      th.clouds *= 1 - 0.4 * k; th.fogDensity *= 1 + 1.3 * k; th.sunIntensity *= 1 - 0.25 * k; th.sunColor = mixHex(th.sunColor, ash ? '#ff7a40' : '#ffc890', 0.4 * k);
+      th.clouds *= 1 - 0.4 * k; th.fogDensity *= 1 + 1.8 * k; th.sunIntensity *= 1 - 0.25 * k; th.sunColor = mixHex(th.sunColor, ash ? '#ff7a40' : '#ffc890', 0.4 * k);
       th.fogColor = mixHex(th.fogColor, ash ? '#2a1c18' : mixHex(base.palette.ground[1], th.fogColor, night ? 0.8 : 0.25), 0.6 * k);
       th.skyTop = mixHex(th.skyTop, th.fogColor, 0.45 * k); th.skyHorizon = mixHex(th.skyHorizon, th.fogColor, 0.6 * k); th.ambient = ash ? 'embers' : 'dust';
-      fx.gust = 'dust'; fx.gustColor = ash ? '#3a302c' : mixHex(base.palette.ground[2], th.fogColor, night ? 0.75 : 0.3); fx.gustAmt = k; fx.wind = 0.85 * k; fx.flare = 0.55; fx.volFog = 0.45 + 0.3 * k;
+      fx.gust = 'dust'; fx.gustColor = ash ? '#3a302c' : mixHex(base.palette.ground[2], th.fogColor, night ? 0.75 : 0.3); fx.gustAmt = k; fx.wind = Math.min(1, 1.0 * k); fx.flare = 0.5; fx.volFog = 0.5 + 0.35 * k;
       fx.amb = 0.4 + 0.6 * k; if (ash) { fx.lightning = 0.6 * k; th.clouds = Math.max(th.clouds, 0.8); } break;
     }
     case 'fog':
-      th.clouds = Math.max(th.clouds, 0.5); th.fogDensity *= 1 + 0.7 * k; th.sunIntensity *= 1 - 0.3 * k;
+      th.clouds = Math.max(th.clouds, 0.5); th.fogDensity *= 1 + 1.05 * k; th.sunIntensity *= 1 - 0.3 * k;
       th.skyHorizon = mixHex(th.skyHorizon, th.fogColor, 0.5 * k); if (th.ambient === 'rain') th.ambient = 'dust';
-      fx.volFog = 0.45 + 0.55 * k; fx.flare = 0.4; fx.wind = 0.1; break;
+      fx.volFog = Math.min(1, 0.55 + 0.6 * k); fx.flare = 0.4; fx.wind = 0.1; break;
   }
   if (night) fx.flare *= 0.4;
   fx.dark = Math.max(0, Math.min(1, 1 - (lumS(rgb(th.skyTop)) + lumS(rgb(th.skyHorizon))) * 0.5 / 0.4));

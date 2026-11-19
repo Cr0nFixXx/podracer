@@ -6,7 +6,7 @@ import type { MatKey } from './podKit';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
 const {
-  floor: floorN, abs, attribute, clamp, cos, cross, dFdx, dFdy, dot, float, fract, fwidth, inverseSqrt, length,
+  userData: userDataN, floor: floorN, abs, attribute, clamp, cos, cross, dFdx, dFdy, dot, float, fract, fwidth, inverseSqrt, length,
   materialColor, materialMetalness, materialRoughness, max, min, mix,
   normalView, normalViewGeometry, normalize, oneMinus, positionLocal, positionView, positionViewDirection, pow, select, sin, smoothstep, step, texture, uniform, uv, vec2, vec3, vertexColor,
 } = TSL;
@@ -244,4 +244,16 @@ export function cableFlexMaterial() {
   mat.normalNode = safeHullNormal(braid, uv().mul(vec2(26.0, 6.0)), 0.65);
   mat.userData.uLift = uLift;
   return mat;
+}
+
+/** Session 16 – nozzle petals of every pod (player, rivals, hangar) share ONE material; the opening comes per mesh from `mesh.userData.open` (0..1). */
+let petalMat: THREE.MeshStandardNodeMaterial | null = null;
+export function petalMaterial() {
+  if (petalMat) return petalMat;
+  const m = new THREE.MeshStandardNodeMaterial({ color: '#30333a', metalness: 0.86, roughness: 0.36, side: THREE.DoubleSide });
+  const A = attribute('aPet', 'vec3'), open = userDataN('open', 'float');
+  m.positionNode = positionLocal.add(vec3(A.x, A.y, 0.0).mul(A.z).mul(open));
+  m.emissiveNode = vec3(1.0, 0.42, 0.1).mul(open).mul(A.z).mul(0.9); // tips glow when the nozzle is wide open
+  m.userData.shared = true; petalMat = m;
+  return m;
 }

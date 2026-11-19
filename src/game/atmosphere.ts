@@ -31,7 +31,8 @@ export function applyAtmosphere(scene: THREE.Scene, theme: ThemeDef, density: nu
   const fd = oneMinus(exp(dens.mul(dist).pow(2).negate()));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let factor: any = fd, fh: any = null;
-  if (hStr > 0 && volFog > 0 && quality > 0) {
+  const hOn = uniform(quality > 0 ? 1 : 0), bankOn = uniform(quality >= 2 ? 1 : 0); // switchable at runtime (graphics option "Volumetrie")
+  if (hStr > 0) {
     const a = vf.mul(2.2).add(1.0).mul(0.0017 * hStr), b = 0.032;
     const h0 = max(cameraPosition.y.sub(baseY), 0.0), h1 = max(positionWorld.y.sub(baseY), 0.0);
     const dh = h1.sub(h0), dhS = mix(min(dh, -0.002), max(dh, 0.002), step(0.0, dh)); // never 0, keeps the sign
@@ -39,8 +40,8 @@ export function applyAtmosphere(scene: THREE.Scene, theme: ThemeDef, density: nu
     const m = macroTexture(); const drift = vec2(time.mul(0.0052), time.mul(0.0031));
     const pA = cameraPosition.xz.add(toFrag.xz.mul(0.5)), pB = cameraPosition.xz.add(toFrag.xz.mul(0.86));
     const n = texture(m, pA.mul(0.0011).add(drift)).level(0).r.mul(0.62).add(texture(m, pB.mul(0.0027).sub(drift.mul(1.7))).level(0).g.mul(0.38));
-    const bank = quality >= 2 ? clamp(n.sub(0.5).mul(vf.mul(0.55).add(0.35).mul(2.2)).add(1.0), 0.25, 2.2) : 1.0;
-    fh = oneMinus(exp(rhoAvg.mul(dist).mul(bank as never).negate()));
+    const bank = mix(1.0, clamp(n.sub(0.5).mul(vf.mul(0.55).add(0.35).mul(2.2)).add(1.0), 0.25, 2.2), bankOn);
+    fh = oneMinus(exp(rhoAvg.mul(dist).mul(bank).negate())).mul(hOn);
     factor = clamp(fd.add(fh.mul(oneMinus(fd))), 0.0, 1.0);
   }
   const mu = max(dot(rd, sd), 0.0);
@@ -48,5 +49,5 @@ export function applyAtmosphere(scene: THREE.Scene, theme: ThemeDef, density: nu
   let sunAmt: any = pow(mu, 8.0).mul(0.3);
   if (fh) sunAmt = sunAmt.add(pow(mu, 40.0).mul(fh).mul(vf.mul(0.25).add(0.2)));
   (scene as unknown as { fogNode: unknown }).fogNode = fog(mix(fogCol, sunCol.mul(1.1), clamp(sunAmt, 0.0, 0.62)), factor);
-  return { color: fogCol, sunColor: sunCol, density: dens, volFog: vf, sunDir: sd } as { color: { value: THREE.Color }; sunColor: { value: THREE.Color }; density: { value: number }; volFog: { value: number }; sunDir: { value: THREE.Vector3 } };
+  return { color: fogCol, sunColor: sunCol, density: dens, volFog: vf, sunDir: sd, hOn, bankOn } as { hOn: { value: number }; bankOn: { value: number }; color: { value: THREE.Color }; sunColor: { value: THREE.Color }; density: { value: number }; volFog: { value: number }; sunDir: { value: THREE.Vector3 } };
 }

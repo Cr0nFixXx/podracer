@@ -51,6 +51,10 @@ let g: Game | null = null; let cur = -1;
       const S2 = sc.samples, a = view === 'x' ? S2[Math.max(0, S2.length - 45)] : W(sc.mainTo + (view === 'y' ? -32 : 4)), b = view === 'x' ? S2[S2.length - 8] : W(sc.mainTo + (view === 'y' ? 6 : 44));
       G.camera.position.set(a.x, a.y + 4.2, a.z); G.camera.lookAt(b.x, b.y + 0.5, b.z);
     }
+  } else if (view === 'u' || view === 'w') { // u = just inside the first main-path tunnel, w = inside the first zero-G tube
+    const S = G.td.main.samples, N = S.length; let k = S.findIndex((s, j) => j > 50 && (view === 'u' ? s.roof > 0 : s.zeroG)); if (k < 0) k = 100;
+    const a = S[(k + (view === 'u' ? -9 : 14)) % N], b = S[(k + 40) % N];
+    G.camera.position.set(a.x + a.rx * 2, a.y + (view === 'u' ? 4.5 : 7), a.z + a.rz * 2); G.camera.lookAt(b.x, b.y + (view === 'u' ? 4 : 7), b.z);
   } else if (view === 's') { // look from above the road towards the sun (lens flare / god-ray / glare check)
     const S = G.td.main.samples, a = S[Math.floor(S.length * 0.2)];
     G.camera.position.set(a.x, a.y + 6, a.z); G.camera.lookAt(a.x + G.sunDir.x * 100, a.y + 6 + G.sunDir.y * 60, a.z + G.sunDir.z * 100);
@@ -65,7 +69,7 @@ let g: Game | null = null; let cur = -1;
   if (location.search.includes('flash')) { G.sky.uniforms.flash.value = 0.9; G.hemi.intensity = 1.75; }
   if (location.search.includes('live')) { // live graphics switching: toggle everything that is switchable at runtime, render, toggle back
     const g0 = G.profile.gfx; G.render(0.016); await new Promise(r => setTimeout(r, 300));
-    G.applyLiveGfx({ ...g0, bloom: !g0.bloom, ao: !g0.ao, godRays: !g0.godRays, aa: g0.aa === 'fxaa' ? 'smaa' : 'fxaa', shadows: g0.shadows ? 0 : 2, particles: 0.5, drawDistance: 0.8, motionBlur: !g0.motionBlur });
+    G.applyLiveGfx({ ...g0, volumetrics: 0, anisotropy: 2, bloom: !g0.bloom, ao: !g0.ao, godRays: !g0.godRays, aa: g0.aa === 'fxaa' ? 'smaa' : 'fxaa', shadows: g0.shadows ? 0 : 2, particles: 0.5, drawDistance: 0.8, motionBlur: !g0.motionBlur });
     await new Promise(r => setTimeout(r, 1500)); G.render(0.016); await new Promise(r => setTimeout(r, 600));
     G.applyLiveGfx({ ...g0, shadows: 2, lensFx: false, cinematic: !g0.cinematic }); await new Promise(r => setTimeout(r, 1500));
     (window as unknown as Record<string, unknown>).coverInfo = 'live-switch ok';

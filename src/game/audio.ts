@@ -189,8 +189,8 @@ export class AudioFX {
     this.roarGain.gain.setTargetAtTime(throttle * 0.035 + (boost ? 0.11 : 0), t, 0.08);
     this.roarFilter.frequency.setTargetAtTime(500 + speed * 5 + (boost ? 900 : 0), t, 0.1);
     this.slideGain.gain.setTargetAtTime(x.slide * 0.09, t, 0.05); this.slideFilter.frequency.setTargetAtTime(1500 + speed * 6, t, 0.1);
-    this.rainGain.gain.setTargetAtTime(x.rain * (0.085 + 0.06 * x.rain) * (1 - x.enclosure * 0.6), t, 0.3);
-    this.howlGain.gain.setTargetAtTime(x.wind * 0.07, t, 0.25); this.howlFilter.frequency.setTargetAtTime(260 + x.wind * 320 + Math.sin(t * 0.7) * 70, t, 0.3);
+    this.rainGain.gain.setTargetAtTime(x.rain * (0.11 + 0.1 * x.rain) * (1 - x.enclosure * 0.6), t, 0.3);
+    this.howlGain.gain.setTargetAtTime(x.wind * 0.12, t, 0.25); this.howlFilter.frequency.setTargetAtTime(260 + x.wind * 320 + Math.sin(t * 0.7) * 70, t, 0.3);
     this.echoSend.gain.setTargetAtTime(x.enclosure * 0.5, t, 0.15);
 
     if (world) {

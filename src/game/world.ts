@@ -7,6 +7,7 @@ import { surfaceMaterial } from './materials';
 import { mulberry32, type Path, type Sample, type TrackData, type Obstacle } from './trackBuilder';
 import { addProps, type Emitter } from './props';
 import { addMechProps } from './mechProps';
+import { addSciFi } from './scifi';
 import { addTrackDetail } from './trackDetail';
 import { StaticBatcher } from './trackMesh';
 import { airshipGeometry, pylonGeometry, cactusGeometry, crystalClusterGeometry, jungleTreeGeometry, mesaGeometry, pineGeometry, rockGeometry, spireGeometry } from './decorGeo';
@@ -259,7 +260,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     }
 
     // ---- shortcut tunnels with structural support ribs & Oovo Zero-G containment tubes ----
-    if (path.id > 0) buildTunnel(path, group, wallMat, abutmentMetal, disposables, theme);
+    buildTunnel(path, group, wallMat, abutmentMetal, disposables, theme);
     if (td.def.theme === 'oovo') buildZeroGTubes(path, group, wallMat, abutmentMetal, disposables, theme);
   }
 
@@ -323,6 +324,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   // Session 15: objects are seated on the LOWEST ground point under their footprint (sampling only the centre left them floating on slopes)
   const groundMin = (x: number, z: number, r: number) => Math.min(heightAt(x, z), heightAt(x + r, z), heightAt(x - r, z), heightAt(x, z + r), heightAt(x, z - r));
   const props = addProps(td, theme, group, gfx, (x, z) => groundMin(x, z, 1.4), disposables, rng, roadClear, roadDispOff);
+  addSciFi(td, theme, group as never, disposables);
   const mech = addMechProps(td, theme, group, disposables, (x, z) => groundMin(x, z, 2.8), roadClear, waterY, gfx.detail);
   const setPieces = buildSetPieces(td, theme, group, disposables, wallMat);
   const landRock = surfaceMaterial(wallTex, {
@@ -408,30 +410,39 @@ function addViaductPiers(
 }
 
 function buildTunnel(path: Path, group: THREE.Group, mat: THREE.Material, ribMat: THREE.Material, disp: { dispose: () => void }[], theme: ThemeDef) {
+  // Session 16: one tunnel per run of roofed samples (shortcuts AND the new main-path tunnels). The cross-section is sheared with the
+  // road bank so banked corners stay inside the shell; both mouths get a heavy portal frame.
   const S = path.samples; const n = S.length;
-  const from = Math.floor(n * 0.25), to = Math.floor(n * 0.75);
+  const runs: [number, number][] = []; let a0 = -1;
+  for (let i = 0; i < n; i++) { const on = S[i].roof > 0; if (on && a0 < 0) a0 = i; if ((!on || i === n - 1) && a0 >= 0) { const b0 = on ? i : i - 1; if (b0 - a0 >= 6) runs.push([a0, b0]); a0 = -1; } }
+  if (!runs.length) return;
   const segA = 18; const pos: number[] = [], uv: number[] = [], ind: number[] = [];
   let v = 0; const lamps: THREE.Matrix4[] = [], ribs: THREE.BufferGeometry[] = [];
   const upV = new THREE.Vector3(0, 1, 0);
-  for (let i = from; i <= to; i += 2) {
-    const s = S[i];
-    for (let a = 0; a <= segA; a++) {
-      const ang = Math.PI * a / segA; const lat = Math.cos(ang) * (s.hw + 1.5); const up = Math.sin(ang) * 11 + 1;
-      const nz = (vnoise(i * 0.2, a * 0.7) - 0.5) * 1.5;
-      pos.push(s.x + s.rx * (lat + nz * Math.cos(ang)), s.y + up + nz * Math.sin(ang), s.z + s.rz * (lat + nz * Math.cos(ang)));
-      uv.push(s.s / 15, a / segA * 2.2);
+  const arch = (s: Sample, R: number, tube: number, H: number) => { // half torus in the track's cross-section, sheared with the bank (local x = -lat)
+    const rg = new THREE.TorusGeometry(R, tube, 8, 28, Math.PI); rg.scale(1, H / R, 1);
+    const p = rg.attributes.position as THREE.BufferAttribute; for (let k = 0; k < p.count; k++) p.setY(k, p.getY(k) + p.getX(k) * s.bank);
+    rg.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + s.ramp + 1, s.z), new THREE.Quaternion().setFromAxisAngle(upV, Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, 1, 1)));
+    const out = rg.toNonIndexed(); rg.dispose(); return out;
+  };
+  for (const [ra, rb] of runs) {
+    let first = true;
+    for (let i = ra; i <= rb; i = i === rb ? rb + 1 : Math.min(rb, i + 2)) {
+      const s = S[i], H = s.roof - 1, W = s.hw + 1.5;
+      for (let a = 0; a <= segA; a++) {
+        const ang = Math.PI * a / segA; const nz = (vnoise(i * 0.2, a * 0.7) - 0.5) * 1.5;
+        const lat = Math.cos(ang) * W + nz * Math.cos(ang), up = Math.sin(ang) * H + 1 + nz * Math.sin(ang);
+        pos.push(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + up, s.z + s.rz * lat);
+        uv.push(s.s / 15, a / segA * 2.2);
+      }
+      if (!first) for (let a = 0; a < segA; a++) { const p0 = v - (segA + 1) + a, p1 = v + a; ind.push(p0, p0 + 1, p1, p1, p0 + 1, p1 + 1); }
+      first = false; v += segA + 1;
+      if ((i - ra) % 12 === 0) {
+        lamps.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + s.ramp + s.roof - 0.6, s.z), new THREE.Quaternion().setFromAxisAngle(upV, Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, 1, 1)));
+        ribs.push(arch(s, s.hw + 1.3, 0.36, H - 0.2)); // structural steel rib
+      }
     }
-    if (i > from) for (let a = 0; a < segA; a++) { const p0 = v - (segA + 1) + a, p1 = v + a; ind.push(p0, p0 + 1, p1, p1, p0 + 1, p1 + 1); }
-    v += segA + 1;
-    const yaw = Math.atan2(s.tx, s.tz);
-    if (i % 12 === 0) {
-      lamps.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + 11.4, s.z), new THREE.Quaternion().setFromAxisAngle(upV, yaw), new THREE.Vector3(1, 1, 1)));
-      // Structural steel support arch rib along shortcut tunnel
-      const rg = new THREE.TorusGeometry(s.hw + 1.3, 0.36, 8, 28, Math.PI);
-      rg.scale(1, 10.8 / (s.hw + 1.3), 1);
-      rg.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + 1, s.z), new THREE.Quaternion().setFromAxisAngle(upV, yaw), new THREE.Vector3(1, 1, 1)));
-      ribs.push(rg.toNonIndexed()); rg.dispose();
-    }
+    for (const e of [ra, rb]) ribs.push(arch(S[e], S[e].hw + 2.3, 1.25, S[e].roof + 0.6)); // portal frames
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(ind); g.computeVertexNormals();
   const m2 = (mat as THREE.MeshStandardMaterial).clone(); m2.side = THREE.DoubleSide;
@@ -517,6 +528,7 @@ function addStartArea(td: TrackData, group: THREE.Group, theme: ThemeDef, disp: 
     for (const side of [-1, 1]) {
       const standM = new THREE.Matrix4().compose(new THREE.Vector3(side * (s.hw + 26), 0, -40), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), side * Math.PI / 2), new THREE.Vector3(1, 1, 1));
       for (let r = 0; r < 8; r++) put(r % 2 ? metal : dark, new THREE.BoxGeometry(72, 1.25, 2.25).translate(0, r * 1.2 + 0.6, r * 2.2), standM);
+      put(dark, new THREE.BoxGeometry(73, 18, 19).translate(0, -9.05, 8.4), standM); // foundation block down into the ground: the stand never floats on a slope
       for (const px of [-32, -16, 0, 16, 32]) {
         put(dark, new THREE.CylinderGeometry(0.45, 0.55, 17.5, 8).translate(px, 8.75, 16.8), standM);
         put(metal, new THREE.BoxGeometry(0.5, 0.65, 21).rotateX(-0.06).translate(px, 16.9, 7.2), standM);
@@ -753,9 +765,11 @@ function addArches(td: TrackData, group: THREE.Group, mat: THREE.Material, disp:
   const S = td.main.samples; const list: THREE.BufferGeometry[] = [];
   for (const idx of td.arches) {
     const s = S[idx]; const span = s.hw + 12;
+    if (s.roof > 0 || s.zeroG) continue;
     const feetOk = [-1, 1].every(sd => roadClear(s.x + s.rx * sd * span, s.z + s.rz * sd * span, 5, 0));
     if (!feetOk) continue;
-    const g = new THREE.TorusGeometry(span, 4.2 + rng() * 3.2, 20, 56, Math.PI);
+    const tube = 4.2 + rng() * 3.2;
+    const g = new THREE.TorusGeometry(span, tube, 20, 56, Math.PI);
     const p = g.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
@@ -765,7 +779,10 @@ function addArches(td: TrackData, group: THREE.Group, mat: THREE.Material, disp:
     }
     g.computeVertexNormals();
     const uv = g.attributes.uv as THREE.BufferAttribute; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 6, uv.getY(i) * 2.2);
-    g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y - 3, s.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, 1.2 + rng() * 0.8, 1)));
+    const syR = 1.2 + rng() * 0.8;
+    g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y - 3, s.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, syR, 1)));
+    // Session 16: rock arches are solid (the bulk of the "arches without collision")
+    (td.overheads ??= []).push({ idx, y0: 0, y1: 0, half: tube * 1.35, arch: { R: span, sy: 0.76 * syR, inner: tube * 1.3, yOff: -3, thick: tube * 2 * 0.76 * syR } });
     list.push(g);
   }
   if (!list.length) return;

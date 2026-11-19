@@ -47,6 +47,8 @@ function projectUV(g: THREE.BufferGeometry, tile: number) {
 }
 
 export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group, disp: Disp, field: TerrainField, rng: () => number, rock: THREE.Material, emitters: Emitter[], smokes: SmokeSrc[] = []): LandmarkFoot[] {
+  // Session 16: landmarks sit on the lowest ground point under their footprint (never floating on a slope)
+  const hMin = (x: number, z: number) => Math.min(field.heightAt(x, z), field.heightAt(x + 7, z), field.heightAt(x - 7, z), field.heightAt(x, z + 7), field.heightAt(x, z - 7));
   const S = td.main.samples, N = S.length;
   const std = (c: string, r: number, m: number, e?: string, ei = 0) => { const mt = new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, emissive: e ?? '#000000', emissiveIntensity: ei }); disp.push(mt); return mt; };
   const win = (() => {
@@ -78,7 +80,7 @@ export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group,
       const s = S[Math.floor(rng() * N)]; const side = rng() < 0.5 ? -1 : 1; const dd = minD + rng() * (maxD - minD);
       const x = s.x + s.rx * side * (s.hw + dd), z = s.z + s.rz * side * (s.hw + dd);
       if (!field.roadClear(x, z, r, 22) || placed.some(p => Math.hypot(p.x - x, p.z - z) < p.r + r + 60)) continue;
-      placed.push({ x, z, r }); return { x, z, y: field.heightAt(x, z), yaw: rng() * Math.PI * 2 };
+      placed.push({ x, z, r }); return { x, z, y: hMin(x, z), yaw: rng() * Math.PI * 2 };
     }
     return null;
   };
@@ -92,7 +94,7 @@ export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group,
       // Flared basal rock buttresses anchoring both feet
       for (const sd of [-1, 1]) {
         const bx = p.x + Math.cos(p.yaw) * sd * (span * 0.5), bz = p.z - Math.sin(p.yaw) * sd * (span * 0.5);
-        put(mat, deform(new THREE.ConeGeometry(th * 1.9, th * 2.6, 14), th * 0.3, 0.06, sd + 4), TRS(bx, field.heightAt(bx, bz) + th * 0.6, bz, rng() * 6));
+        put(mat, deform(new THREE.ConeGeometry(th * 1.9, th * 2.6, 14), th * 0.3, 0.06, sd + 4), TRS(bx, hMin(bx, bz) + th * 0.6, bz, rng() * 6));
       }
     },
     butte: (mat: THREE.Material) => {
@@ -121,19 +123,19 @@ export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group,
       put(M.metal, new THREE.CylinderGeometry(0.6, 1.4, 24, 10), TRS(p.x, p.y + 50, p.z));
       put(M.glow, new THREE.SphereGeometry(1.4, 10, 8), TRS(p.x, p.y + 62.5, p.z));
       for (let k = 0; k < 24; k++) {
-        const a = rng() * Math.PI * 2, d = 46 + rng() * 142, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = field.heightAt(x, z), r = 6 + rng() * 9, hb = 3.5 + rng() * 5.5;
+        const a = rng() * Math.PI * 2, d = 46 + rng() * 142, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = hMin(x, z), r = 6 + rng() * 9, hb = 3.5 + rng() * 5.5;
         put(M.adobe, new THREE.SphereGeometry(r, 18, 9, 0, Math.PI * 2, 0, Math.PI / 2), TRS(x, y + hb, z));
         put(M.adobe, new THREE.CylinderGeometry(r, r * 1.06, hb, 18), TRS(x, y + hb / 2, z));
         put(M.adobeDark, new THREE.BoxGeometry(r * 0.55, hb * 0.7, r * 0.5), TRS(x + Math.cos(a) * r * 0.9, y + hb * 0.35, z + Math.sin(a) * r * 0.9, -a + Math.PI / 2));
       }
       for (let k = 0; k < 9; k++) {
-        const a = rng() * Math.PI * 2, d = 32 + rng() * 125, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = field.heightAt(x, z), h = 24 + rng() * 32;
+        const a = rng() * Math.PI * 2, d = 32 + rng() * 125, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = hMin(x, z), h = 24 + rng() * 32;
         put(M.adobe, new THREE.CylinderGeometry(3.0, 4.4, h, 16), TRS(x, y + h / 2, z));
         put(M.adobeDark, new THREE.CylinderGeometry(4.2, 3.6, 2.2, 16), TRS(x, y + h * 0.78, z));
         put(M.adobe, new THREE.SphereGeometry(4, 14, 8), TRS(x, y + h, z));
       }
       for (let k = 0; k < 6; k++) {
-        const a = (k / 6) * Math.PI * 2 + rng() * 0.4, x = p.x + Math.cos(a) * 175, z = p.z + Math.sin(a) * 175, wy = field.heightAt(x, z);
+        const a = (k / 6) * Math.PI * 2 + rng() * 0.4, x = p.x + Math.cos(a) * 175, z = p.z + Math.sin(a) * 175, wy = hMin(x, z);
         put(M.adobe, new THREE.BoxGeometry(64 + rng() * 36, 8, 3.4), TRS(x, wy + 3.5, z, -a + Math.PI / 2));
         put(M.adobeDark, new THREE.CylinderGeometry(3.2, 3.8, 12, 12), TRS(x, wy + 5.5, z));
       }
@@ -155,7 +157,7 @@ export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group,
       ];
       for (let r = -10; r <= 6; r += 5) parts.push([M.rust, new THREE.TorusGeometry(16.8, 0.9, 6, 20, Math.PI * 1.3).rotateY(Math.PI / 2).translate(r, 1, 0)]);
       for (const [mt, g] of parts) put(mt, g, m0);
-      for (let k = 0; k < 12; k++) { const a = rng() * Math.PI * 2, d = 58 + rng() * 82, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d; put(k % 3 ? M.rust : M.metal, new THREE.BoxGeometry(4 + rng() * 9, 1.5 + rng() * 4, 4 + rng() * 11), TRS(x, field.heightAt(x, z) + 0.8, z, rng() * 6, rng() - 0.5, rng() - 0.5)); }
+      for (let k = 0; k < 12; k++) { const a = rng() * Math.PI * 2, d = 58 + rng() * 82, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d; put(k % 3 ? M.rust : M.metal, new THREE.BoxGeometry(4 + rng() * 9, 1.5 + rng() * 4, 4 + rng() * 11), TRS(x, hMin(x, z) + 0.8, z, rng() * 6, rng() - 0.5, rng() - 0.5)); }
       smokes.push({ x: p.x, y: p.y + 6, z: p.z, kind: 'dark', scale: 0.95 });
     },
     station: () => {
@@ -163,7 +165,7 @@ export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group,
       put(M.white, new THREE.SphereGeometry(18, 26, 13, 0, Math.PI * 2, 0, Math.PI / 2), TRS(p.x, p.y - 0.4, p.z));
       put(M.cyan, new THREE.TorusGeometry(18.1, 0.45, 6, 32).rotateX(Math.PI / 2), TRS(p.x, p.y + 1.2, p.z));
       for (let k = 1; k <= 3; k++) {
-        const a = k * 2.05, d = 28 + rng() * 12, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = field.heightAt(x, z), r = 9 + rng() * 5;
+        const a = k * 2.05, d = 28 + rng() * 12, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = hMin(x, z), r = 9 + rng() * 5;
         put(M.white, new THREE.SphereGeometry(r, 22, 11, 0, Math.PI * 2, 0, Math.PI / 2), TRS(x, y - 0.4, z));
         // Pressurized connecting corridor tube
         put(M.metal, new THREE.CylinderGeometry(2.2, 2.2, d - 14, 10).rotateZ(Math.PI / 2), TRS((p.x + x) / 2, (p.y + y) / 2 + 2.2, (p.z + z) / 2, -a));
@@ -176,19 +178,19 @@ export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group,
     refinery: () => {
       const p = spot(330, 1100, 95); if (!p) return;
       for (let k = 0; k < 5; k++) {
-        const a = rng() * Math.PI * 2, d = rng() * 58, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = field.heightAt(x, z), r = 9 + rng() * 7, h = 18 + rng() * 18;
+        const a = rng() * Math.PI * 2, d = rng() * 58, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = hMin(x, z), r = 9 + rng() * 7, h = 18 + rng() * 18;
         put(M.rust, new THREE.CylinderGeometry(r, r, h, 24), TRS(x, y + h / 2, z));
         put(M.rust, new THREE.SphereGeometry(r, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2), TRS(x, y + h, z));
         put(M.metal, new THREE.TorusGeometry(r + 0.3, 0.35, 6, 24).rotateX(Math.PI / 2), TRS(x, y + h * 0.65, z));
       }
       // Spherical Horton-sphere pressurized methane tanks on stilt legs
       for (const sd of [-1, 1]) {
-        const sx = p.x + sd * 48, sz = p.z - 28, sy = field.heightAt(sx, sz), sr = 12;
+        const sx = p.x + sd * 48, sz = p.z - 28, sy = hMin(sx, sz), sr = 12;
         put(M.white, new THREE.SphereGeometry(sr, 22, 16), TRS(sx, sy + sr + 6, sz));
         for (let l = 0; l < 4; l++) { const la = (l / 4) * Math.PI * 2; put(M.metal, new THREE.CylinderGeometry(0.6, 0.8, sr + 8, 8), TRS(sx + Math.cos(la) * sr * 0.78, sy + (sr + 6) / 2, sz + Math.sin(la) * sr * 0.78)); }
       }
       for (let k = 0; k < 3; k++) {
-        const x = p.x - 40 + k * 24, z = p.z + 50, y = field.heightAt(x, z), h = 72 + rng() * 32;
+        const x = p.x - 40 + k * 24, z = p.z + 50, y = hMin(x, z), h = 72 + rng() * 32;
         put(M.metal, new THREE.CylinderGeometry(2.1, 3.5, h, 14), TRS(x, y + h / 2, z));
         put(M.glow, new THREE.TorusGeometry(2.5, 0.55, 8, 16).rotateX(Math.PI / 2), TRS(x, y + h, z));
         emitters.push({ x, y: y + h + 2, z, type: 'smoke' }); smokes.push({ x, y: y + h + 1, z, kind: 'smoke', scale: 0.8 + rng() * 0.4 });
@@ -236,7 +238,7 @@ export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group,
       const sx = Math.sin(p.yaw), cz = Math.cos(p.yaw);
       put(M.stone, new THREE.BoxGeometry(15, 6, 66), TRS(p.x + sx * 38, p.y + 24, p.z + cz * 38, p.yaw, -0.66));
       for (const sd of [-1, 1]) {
-        const bx = p.x + sx * 56 + cz * sd * 12, bz = p.z + cz * 56 - sx * sd * 12, by = field.heightAt(bx, bz);
+        const bx = p.x + sx * 56 + cz * sd * 12, bz = p.z + cz * 56 - sx * sd * 12, by = hMin(bx, bz);
         put(M.stone, new THREE.CylinderGeometry(2.2, 2.8, 9, 8), TRS(bx, by + 4.5, bz));
         put(M.glow, new THREE.SphereGeometry(1.6, 10, 8), TRS(bx, by + 9.8, bz));
       }
@@ -253,7 +255,7 @@ export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group,
     },
     rig: () => {
       const p = spot(320, 1200, 65); if (!p) return; const deck = field.avgY + 40;
-      for (const [dx, dz] of [[-19, -19], [19, -19], [-19, 19], [19, 19]]) { const y0 = field.heightAt(p.x + dx, p.z + dz); put(M.metal, new THREE.CylinderGeometry(2.5, 3.4, deck - y0, 12), TRS(p.x + dx, (deck + y0) / 2, p.z + dz)); }
+      for (const [dx, dz] of [[-19, -19], [19, -19], [-19, 19], [19, 19]]) { const y0 = hMin(p.x + dx, p.z + dz); put(M.metal, new THREE.CylinderGeometry(2.5, 3.4, deck - y0, 12), TRS(p.x + dx, (deck + y0) / 2, p.z + dz)); }
       put(M.rust, new THREE.BoxGeometry(58, 8, 58), TRS(p.x, deck + 4, p.z, p.yaw));
       put(M.white, new THREE.BoxGeometry(20, 10, 16), TRS(p.x - 14, deck + 13, p.z - 10, p.yaw)); // crew quarters
       put(M.dark, new THREE.CylinderGeometry(11, 11, 1.2, 20), TRS(p.x - 18, deck + 9.5, p.z + 22)); // helipad
@@ -267,14 +269,14 @@ export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group,
       const p = spot(260, 900, 72); if (!p) return; const L = 74 + rng() * 32; const c = Math.cos(p.yaw), s = Math.sin(p.yaw);
       const pt = (t: number) => { const al = (t - 0.5) * L, off = Math.sin(t * Math.PI * 2.2) * 6.5; return [p.x + s * al + c * off, p.z + c * al - s * off]; };
       for (let i = 0; i <= 46; i++) {
-        const t = i / 46; const [x, z] = pt(t); const y = field.heightAt(x, z); const r = 0.72 + Math.sin(t * Math.PI) * 1.15;
+        const t = i / 46; const [x, z] = pt(t); const y = hMin(x, z); const r = 0.72 + Math.sin(t * Math.PI) * 1.15;
         put(M.bone, deform(new THREE.IcosahedronGeometry(r, 1), r * 0.25, 0.7, i), TRS(x, y + r * 0.22, z));
         if (i % 2 === 0 && t > 0.13 && t < 0.79) {
           const [x2, z2] = pt(t + 0.01); const yaw = Math.atan2(x2 - x, z2 - z); const rr = 2.6 + Math.sin(t * Math.PI) * 4.4;
           put(M.bone, new THREE.TorusGeometry(rr, 0.3 + rr * 0.03, 6, 16, Math.PI * 0.88), TRS(x, y - rr * 0.24, z, yaw, (rng() - 0.5) * 0.35, Math.PI * 0.075 + (rng() - 0.5) * 0.28));
         }
       }
-      const [hx, hz] = pt(1.0), [hx2, hz2] = pt(0.97); const hy = field.heightAt(hx, hz), hyaw = Math.atan2(hx - hx2, hz - hz2);
+      const [hx, hz] = pt(1.0), [hx2, hz2] = pt(0.97); const hy = hMin(hx, hz), hyaw = Math.atan2(hx - hx2, hz - hz2);
       const skull = deform(new THREE.SphereGeometry(1, 16, 12), 0.16, 1.2, 3); skull.scale(1.75, 1.35, 3.8); put(M.bone, skull, TRS(hx, hy + 1.15, hz, hyaw, 0.15));
       for (const sd of [-1, 1]) put(M.bone, new THREE.ConeGeometry(0.48, 3.8, 7), TRS(hx + Math.cos(hyaw) * sd * 1.3, hy + 2.9, hz - Math.sin(hyaw) * sd * 1.3, hyaw, -0.62, sd * 0.32));
     },
@@ -282,11 +284,11 @@ export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group,
       const p = spot(320, 900, 62); if (!p) return;
       put(M.adobe, new THREE.TorusGeometry(15, 2.4, 10, 36).rotateX(Math.PI / 2), TRS(p.x, p.y + 0.7, p.z));
       put(M.adobeDark, new THREE.CylinderGeometry(13.5, 13.5, 1.2, 28), TRS(p.x, p.y - 0.3, p.z));
-      const dx = p.x + 22, dz = p.z, dy = field.heightAt(dx, dz);
+      const dx = p.x + 22, dz = p.z, dy = hMin(dx, dz);
       put(M.adobe, new THREE.SphereGeometry(7, 22, 11, 0, Math.PI * 2, 0, Math.PI / 2), TRS(dx, dy - 0.3, dz));
       put(M.adobe, new THREE.CylinderGeometry(2.6, 2.6, 5, 12, 1, false, 0, Math.PI).rotateZ(Math.PI / 2), TRS(dx - 6.5, dy + 0.2, dz));
       for (let k = 0; k < 6; k++) {
-        const a = (k / 6) * Math.PI * 2 + rng() * 0.5, d = 30 + rng() * 25, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = field.heightAt(x, z);
+        const a = (k / 6) * Math.PI * 2 + rng() * 0.5, d = 30 + rng() * 25, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d, y = hMin(x, z);
         put(M.metal, new THREE.CylinderGeometry(0.35, 0.55, 6.5, 10), TRS(x, y + 3.25, z));
         put(M.metal, new THREE.CylinderGeometry(1.0, 1.0, 0.22, 14), TRS(x, y + 4.4, z));
         put(M.metal, new THREE.CylinderGeometry(0.75, 0.75, 0.16, 14), TRS(x, y + 5.5, z));
@@ -297,7 +299,7 @@ export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group,
     obelisks: () => {
       const p = spot(280, 900, 52); if (!p) return;
       for (let k = 0; k < 11; k++) {
-        const a = (k / 11) * Math.PI * 2, x = p.x + Math.cos(a) * 32, z = p.z + Math.sin(a) * 32, h = 16 + rng() * 13, oy = field.heightAt(x, z);
+        const a = (k / 11) * Math.PI * 2, x = p.x + Math.cos(a) * 32, z = p.z + Math.sin(a) * 32, h = 16 + rng() * 13, oy = hMin(x, z);
         put(M.stone, deform(new THREE.CylinderGeometry(1.7, 2.5, h, 5, 6), 0.35, 0.3, k), TRS(x, oy + h / 2 - 1, z, a, (rng() - 0.5) * 0.22, (rng() - 0.5) * 0.22));
       }
       put(M.stone, new THREE.CylinderGeometry(7, 8, 2.2, 18), TRS(p.x, p.y + 0.6, p.z));

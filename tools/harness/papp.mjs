@@ -69,6 +69,12 @@ const stored = await p.evaluate(() => JSON.parse(localStorage.getItem('podracer-
 console.log('rebind rollLeft →', bound, '| stored:', JSON.stringify(stored));
 await p.evaluate(() => document.querySelector('[data-action="rollLeft"]').scrollIntoView({ block: 'center' })); await sleep(200);
 await p.screenshot({ path: out + '_keys.png' });
+// gamepad mapping: fake pad, bind "Boost" to button 10 (L3)
+await p.evaluate(() => { const mk = on => ({ buttons: Array.from({ length: 16 }, (_, i) => ({ pressed: on && i === 10, value: on && i === 10 ? 1 : 0 })), axes: [0, 0, 0, 0] }); window.__mk = mk; window.__pad = mk(false); navigator.getGamepads = () => [window.__pad]; });
+await sleep(400); await p.evaluate(() => document.querySelector('[data-pad="boost"]').click()); await sleep(400);
+await p.evaluate(() => { window.__pad = window.__mk(true); }); await sleep(600);
+const padL = await p.evaluate(() => document.querySelector('[data-pad="boost"] kbd').textContent);
+console.log('gamepad rebind boost →', padL, padL === 'L3' ? 'ok' : 'FAIL'); if (padL !== 'L3') errs++;
 await click(p, 'Klassisch'); await sleep(300);
 console.log('classic preset left →', await p.evaluate(() => document.querySelector('[data-action="left"] kbd').textContent));
 if (bound !== 'Q') { errs++; console.log('[fail] rebind did not apply'); }

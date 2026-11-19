@@ -70494,11 +70494,12 @@ var THEMES = {
     hemiSky: "#d8e8c0",
     hemiGround: "#4a4a2a",
     exposure: 1,
-    road: "road",
+    road: "cityRoad",
     wall: "rock",
     ground: "jungle",
+    // Session 16: panelled metal race deck with light lines (methane refinery world)
     palette: { road: ["#4a4436", "#665e4a", "#8a8064"], wall: ["#3e3a2e", "#625a46", "#8e8466"], ground: ["#3a4422", "#566230", "#7a8240"] },
-    decor: ["rocks", "spires", "wrecks"],
+    decor: ["rocks", "spires", "wrecks", "pylons"],
     ambient: "spores",
     terrain: "jungle",
     barrierColor: "#c8ff3a"
@@ -72557,7 +72558,26 @@ function engineGeo(spec2, seg) {
   pb.add("glow", new CircleGeometry(0.5 * R, seg).rotateY(Math.PI).translate(0, 0, Z(0.07) - 0.01));
   pb.add("glow", torus(0.6 * R, 0.018 * R, 6, seg), M4.t(0, 0, Z(0.035)));
   const np = Math.max(10, Math.round(seg * 0.35));
-  pb.add("dark", radial(() => rbox(Math.PI * 2 * 0.72 * R / np * 0.92, 0.025 * R, 0.09 * L, 0.01).rotateX(-0.2).translate(0, 0.72 * R, Z(0) - 0.035 * L), np));
+  const petals = (() => {
+    const pos = [], pet = [], idx = [];
+    const zH = Z(0) + 0.012 * L, zT = Z(0) - 0.085 * L, rH = 0.745 * R, rT = 0.6 * R;
+    for (let q = 0; q < np; q++) {
+      const a0 = (q + 0.05) / np * Math.PI * 2, a1 = (q + 0.95) / np * Math.PI * 2, am = (a0 + a1) / 2, b = pos.length / 3;
+      for (const [a, z, r2, d] of [[a0, zH, rH, 0], [a1, zH, rH, 0], [a0, zT, rT, 0.42 * R], [a1, zT, rT, 0.42 * R]]) {
+        pos.push(Math.cos(a) * r2, Math.sin(a) * r2, z);
+        pet.push(Math.cos(am), Math.sin(am), d);
+      }
+      idx.push(b, b + 2, b + 1, b + 1, b + 2, b + 3);
+    }
+    const g = new BufferGeometry();
+    g.setAttribute("position", new Float32BufferAttribute(pos, 3));
+    g.setAttribute("aPet", new Float32BufferAttribute(pet, 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    const out2 = g.toNonIndexed();
+    g.dispose();
+    return out2;
+  })();
   pb.add("steel", torus(0.75 * R, 0.03 * R, 6, seg), M4.t(0, 0, Z(5e-3)));
   bandTs.forEach((tb, i) => {
     if (tb > bodyEnd - 0.04) return;
@@ -72663,6 +72683,7 @@ function engineGeo(spec2, seg) {
     fan,
     fanZ: faceZ + 0.06 * L * 0.5,
     flaps,
+    petals,
     flameOuter: flameGeo(rn, L * 0.75, Math.max(12, Math.round(seg * 0.5))),
     flameCore: flameGeo(rn * 0.42, L * 0.38, 12),
     flameZ: Z(0.07) - 0.02,
@@ -73558,6 +73579,7 @@ function carbonTexture() {
 // ../../src/game/podMaterials.ts
 var TSL = three_tsl_exports;
 var {
+  userData: userDataN,
   floor: floorN,
   abs: abs2,
   attribute: attribute2,
@@ -73829,6 +73851,17 @@ function cableFlexMaterial() {
   mat.userData.uLift = uLift;
   return mat;
 }
+var petalMat = null;
+function petalMaterial() {
+  if (petalMat) return petalMat;
+  const m = new MeshStandardNodeMaterial({ color: "#30333a", metalness: 0.86, roughness: 0.36, side: DoubleSide });
+  const A = attribute2("aPet", "vec3"), open = userDataN("open", "float");
+  m.positionNode = positionLocal2.add(vec32(A.x, A.y, 0).mul(A.z).mul(open));
+  m.emissiveNode = vec32(1, 0.42, 0.1).mul(open).mul(A.z).mul(0.9);
+  m.userData.shared = true;
+  petalMat = m;
+  return m;
+}
 
 // ../../src/game/podModel.ts
 var SHADOW_KEYS = /* @__PURE__ */ new Set(["hull", "steel", "dark", "chrome", "carbon"]);
@@ -74010,61 +74043,7 @@ function getOppGlow() {
 function getOppFarHull() {
   return sharedOppFarHull ?? (sharedOppFarHull = new MeshStandardMaterial({ vertexColors: true, metalness: 0.48, roughness: 0.34 }));
 }
-var numAtlas = null;
-var numMat = null;
-function numberPlate(L, num) {
-  if (!numAtlas) {
-    const cv = document.createElement("canvas");
-    cv.width = cv.height = 512;
-    const c = cv.getContext("2d");
-    c.fillStyle = "#15171c";
-    c.fillRect(0, 0, 512, 512);
-    for (let i = 0; i < 15; i++) {
-      const x = i % 4 * 128, y = Math.floor(i / 4) * 128;
-      c.fillStyle = "#f2efe6";
-      c.fillRect(x + 6, y + 6, 116, 116);
-      c.strokeStyle = "#15171c";
-      c.lineWidth = 7;
-      c.strokeRect(x + 12, y + 12, 104, 104);
-      c.fillStyle = "#15171c";
-      c.font = "bold 84px sans-serif";
-      c.textAlign = "center";
-      c.textBaseline = "middle";
-      c.fillText(String(i + 1), x + 64, y + 70);
-    }
-    numAtlas = new CanvasTexture(cv);
-    numAtlas.colorSpace = SRGBColorSpace;
-    numAtlas.anisotropy = 4;
-    numMat = new MeshStandardMaterial({ map: numAtlas, emissiveMap: numAtlas, emissive: "#ffffff", emissiveIntensity: 0.22, roughness: 0.55, metalness: 0.1 });
-  }
-  const cell = ((num - 1) % 15 + 15) % 15, u0 = cell % 4 / 4, v0 = 1 - (Math.floor(cell / 4) + 1) / 4;
-  const mk = (flip) => {
-    const g2 = new PlaneGeometry(0.86, 0.86);
-    const uv3 = g2.attributes.uv;
-    for (let i = 0; i < uv3.count; i++) uv3.setXY(i, u0 + uv3.getX(i) * 0.25, v0 + uv3.getY(i) * 0.25);
-    if (flip) g2.rotateY(Math.PI);
-    g2.translate(0, 0, flip ? -0.022 : 0.022);
-    return g2;
-  };
-  const post = new BoxGeometry(0.07, 0.6, 0.07);
-  {
-    const uv3 = post.attributes.uv;
-    for (let i = 0; i < uv3.count; i++) uv3.setXY(i, 0.88, 0.12);
-  }
-  post.translate(0, -0.7, 0);
-  const frame = new BoxGeometry(0.94, 0.94, 0.03);
-  {
-    const uv3 = frame.attributes.uv;
-    for (let i = 0; i < uv3.count; i++) uv3.setXY(i, 0.88, 0.12);
-  }
-  const g = mergeGeometries([mk(false), mk(true), post, frame], false);
-  const m = new Mesh(g, numMat);
-  m.position.set(0, L.cockpit.y + 1.75, L.cockpit.z - 1.55);
-  m.rotation.x = -0.12;
-  m.castShadow = false;
-  return m;
-}
-function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = false, num) {
+function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = false) {
   const seg = isOpponent ? quality >= 3 ? 18 : 14 : quality >= 3 ? 40 : quality === 2 ? 28 : 20;
   const texSize = texRes >= 2048 && !isOpponent ? 2048 : 1024;
   const L = podLayout(def);
@@ -74134,6 +74113,8 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       l.push(c);
     };
     let spanX = 4.6;
+    const oppPetals = [];
+    let oppOpen = 0;
     const oppPivots = [];
     for (const side of [-1, 1]) {
       const sideMs = L.engines.filter((e) => (e.x < 0 ? -1 : 1) === side);
@@ -74151,6 +74132,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       engines2.push(grp);
       const b = /* @__PURE__ */ new Map();
       const fls = [];
+      const pts = [];
       for (const em of sideMs) {
         const ox = em.x - piv.x, oy = em.y - piv.y, oz = em.z - piv.z;
         const eg = engineGeo(em.spec, seg);
@@ -74161,8 +74143,18 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
         const fo = eg.flameOuter.clone();
         fo.applyMatrix4(M4.t(ox, oy, oz + eg.flameZ));
         fls.push(fo);
+        pts.push(eg.petals.clone().translate(ox, oy, oz));
       }
       addBucket(b, grp);
+      if (pts.length) {
+        const pg = mergeGeometries(pts, false);
+        pts.forEach((x) => x.dispose());
+        ownedGeos.push(pg);
+        const pm2 = new Mesh(pg, petalMaterial());
+        pm2.userData.open = 0;
+        grp.add(pm2);
+        oppPetals.push(pm2);
+      }
       if (fls.length) {
         const fg = mergeGeometries(fls, false);
         fls.forEach((x) => x.dispose());
@@ -74226,7 +74218,6 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     farGrp.add(fhM);
     farGrp.add(new Mesh(far.dark, shared.dark));
     farGrp.add(new Mesh(fgGeo, oppGlow));
-    nearGrp.add(numberPlate(L, num ?? 1));
     const setDistance = (d, forceAll = false) => {
       if (forceAll) {
         nearGrp.visible = true;
@@ -74255,8 +74246,11 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
         binderMesh.rotation.z = Math.atan2(yR - yL, spanX);
       }
     };
-    const update2 = (t) => {
+    const update2 = (t, throttle = 0, boost = 0) => {
       podSharedTime.value = t;
+      oppOpen += (boost - oppOpen) * 0.14;
+      const o = 0.1 * throttle + 0.9 * oppOpen;
+      for (let i = 0; i < oppPetals.length; i++) oppPetals[i].userData.open = o;
     };
     const dispose2 = () => {
       ownedGeos.forEach((g) => g.dispose());
@@ -74288,6 +74282,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
   const engines = [];
   const fans = [];
   const flaps = [];
+  const petals = [];
   const flames = [];
   const sideGeos = [];
   const hc = new Color(), hot = new Color("#ff5a1a");
@@ -74328,6 +74323,14 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       fan.castShadow = false;
       engGrp.add(fan);
       fans.push(fan);
+      {
+        const pm2 = new Mesh(eg.petals, petalMaterial());
+        pm2.position.set(ox, oy, oz);
+        pm2.userData.open = 0;
+        pm2.castShadow = false;
+        engGrp.add(pm2);
+        petals.push(pm2);
+      }
       for (const f of eg.flaps) {
         const m = new Mesh(f.geo, hull);
         m.position.set(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z);
@@ -74449,7 +74452,6 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     if (binderU?.uLift) binderU.uLift.value.set(binderSwap ? yR : yL, binderSwap ? yL : yR);
   };
   let boostK = 0, flapT = 0;
-  body.add(numberPlate(L, num ?? 1));
   const update = (t, throttle, boost, airbrake, dmgL, dmgR, heat) => {
     podSharedTime.value = t;
     const fl = 0.35 + throttle * 0.75 + boost * 0.8;
@@ -74476,8 +74478,9 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     const dtF = Math.max(0, Math.min(0.1, t - flapT));
     flapT = t;
     boostK += (boost - boostK) * Math.min(1, dtF * (boost > boostK ? 9 : 4));
-    const open = boostK * (0.5 + 0.035 * Math.sin(t * 43));
-    for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (Math.max(airbrake * 1.05, open) + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
+    const open = 0.1 * throttle + 0.9 * boostK * (1 + 0.04 * Math.sin(t * 43));
+    for (let i = 0; i < petals.length; i++) petals[i].userData.open = open;
+    for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (airbrake * 1.05 + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
     const uL = hullL.userData.u, uR = hullR.userData.u;
     uL.uScorch.value = Math.min(1, (1 - dmgL) * 1.1 + Math.max(0, heat - 0.75) * 0.8);
     uL.uHeat.value = heat;
@@ -74827,7 +74830,7 @@ window.grid = async () => {
     }
     pod = buildPodModel(def, def.colors, 2, 1024);
     scene.add(pod.group);
-    pod.update(2, 1, 0, 0, 1, 1, 0.2);
+    pod.update(2, 1, location.search.includes("boost") ? 1 : 0, 0, 1, 1, 0.2);
     pod.group.updateMatrixWorld(true);
     const box = new Box3().setFromObject(pod.group);
     const size = box.getSize(new Vector3());

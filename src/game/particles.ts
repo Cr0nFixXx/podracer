@@ -246,7 +246,7 @@ export class Particles {
 
   /** `wind` (0..1) slants rain/snow/dust and speeds them up, `dense` scales the count (storms, gusts). */
   initAmbient(type: string, wind = 0, dense = 1) {
-    const n = Math.max(1, Math.min(2000, Math.floor(900 * this.amount * dense)));
+    const n = Math.max(1, Math.min(4200, Math.floor(1500 * this.amount * dense))); // Session 16: far denser weather
     const colors: Record<string, string> = { dust: '#e8c8a0', snow: '#ffffff', embers: '#ff7020', spores: '#d8ff9a', rain: '#cfdcee', sparkle: '#e0b0ff' };
     const vel: Record<string, [number, number, number]> = { dust: [8 + wind * 26, 0.5, 3 + wind * 10], snow: [2 + wind * 18, -4 - wind * 2, 1 + wind * 8], embers: [1 + wind * 6, 3, 0.5], spores: [0.5 + wind * 3, 0.4, 0.3], rain: [1 + wind * 16, -40, 0.5 + wind * 7], sparkle: [0.3, 0.6, 0.2] };
     const add = type === 'embers' || type === 'sparkle' || type === 'spores';
@@ -260,7 +260,7 @@ export class Particles {
     const wrapped = fract(seedPos.add(drift).sub(this.ambCam).div(span).add(0.5)).sub(0.5).mul(span).add(this.ambCam);
     const vz = positionView.z.negate();
     const rain = type === 'rain';
-    const baseSz = rain ? 1.2 : type === 'dust' ? 0.24 : type === 'snow' ? 0.2 + wind * 0.08 : 0.2;
+    const baseSz = rain ? 1.2 : type === 'dust' ? 0.24 : type === 'snow' ? 0.27 + wind * 0.13 : 0.2;
     const mat = new THREE.PointsNodeMaterial({
       transparent: true, depthWrite: false, alphaTest: 0.02,
       blending: add ? THREE.AdditiveBlending : THREE.NormalBlending, sizeAttenuation: true,
@@ -280,10 +280,10 @@ export class Particles {
       const dirV = varying(normalize(sdir.add(vec2(1e-4, 0.0)))), lenV = varying(lenW);
       mat.sizeNode = tslMin(lenW.mul(1.1), tslMax(vz.sub(2.0), float(0.0)).mul(0.14)).mul(step(float(2.2), vz));
       const q = uv().sub(0.5), along = dot(q, dirV), across = dot(q, vec2(dirV.y.negate(), dirV.x));
-      const wUv = float(0.034).div(lenV.mul(1.1));
+      const wUv = float(0.046).div(lenV.mul(1.1));
       const streak = oneMinus(smoothstep(wUv.mul(0.45), wUv, across.abs())).mul(oneMinus(smoothstep(0.3, 0.46, along.abs())));
-      mat.opacityNode = streak.mul(0.6).mul(smoothstep(2.5, 7.0, vz)).mul(this.ambFade);
-    } else mat.opacityNode = softDisc().mul(type === 'dust' ? 0.2 : 0.72).mul(smoothstep(2.5, 7.0, vz)).mul(this.ambFade);
+      mat.opacityNode = streak.mul(0.8).mul(smoothstep(2.5, 7.0, vz)).mul(this.ambFade);
+    } else mat.opacityNode = softDisc().mul(type === 'dust' ? 0.32 : 0.8).mul(smoothstep(2.5, 7.0, vz)).mul(this.ambFade);
     const sp = new THREE.Sprite(mat); sp.count = n; sp.frustumCulled = false;
     this.ambient = sp; this.ambN = n;
     this.group.add(sp);

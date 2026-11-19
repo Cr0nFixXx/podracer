@@ -196,9 +196,9 @@ export const THEMES: Record<string, ThemeDef> = {
   malastare: {
     id: 'malastare', name: 'Malastare', skyTop: '#4f6b5a', skyHorizon: '#e2cf96', sunColor: '#fff0c8', sunElev: 22, sunAz: 150, clouds: 0.55,
     fogColor: '#a8a880', fogDensity: 0.0008, sunIntensity: 3.4, hemiSky: '#d8e8c0', hemiGround: '#4a4a2a', exposure: 1.0,
-    road: 'road', wall: 'rock', ground: 'jungle',
+    road: 'cityRoad', wall: 'rock', ground: 'jungle', // Session 16: panelled metal race deck with light lines (methane refinery world)
     palette: { road: ['#4a4436', '#665e4a', '#8a8064'], wall: ['#3e3a2e', '#625a46', '#8e8466'], ground: ['#3a4422', '#566230', '#7a8240'] },
-    decor: ['rocks', 'spires', 'wrecks'], ambient: 'spores', terrain: 'jungle', barrierColor: '#c8ff3a',
+    decor: ['rocks', 'spires', 'wrecks', 'pylons'], ambient: 'spores', terrain: 'jungle', barrierColor: '#c8ff3a',
   },
   mesa: {
     id: 'mesa', name: 'Rote Tafelberge', skyTop: '#2a6ab0', skyHorizon: '#ffc890', sunColor: '#ffd8a0', sunElev: 12, sunAz: 270, clouds: 0.35,

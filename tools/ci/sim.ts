@@ -8,19 +8,20 @@ import { aiInputs, collidePods, podParams, respawn, stepPod, HOVER, type PodStat
 import { effectiveStats } from '../../src/game/settings';
 import { podEnvelope } from '../../src/game/podDesigns';
 
+if (process.env.NO_TUNNELS) (globalThis as { NO_TUNNELS?: boolean }).NO_TUNNELS = true;
 const SECS = Number(process.env.SECS ?? 45), ONLY = process.env.TRACK, GRIP = Number(process.env.GRIP ?? 1); // GRIP=0.9 ≈ storm/snow weather
 const LIMIT = { deaths: 3, wall: 0.6, clear: 0.2, minSpeed: 18, divePct: 1.5 }; // divePct: share of AI frames holding "dive"
 let seed = 1234567; Math.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; // deterministic runs
 const diff = (Object.values(DIFFICULTIES) as { skill: number; speed: number }[])[1];
 let failed = 0;
-console.log('track         deaths  NaN  wallPen  minClear  avgSpeed  slowest  airMax  rolls  slides  dive%  smashed  result');
+console.log('track         deaths  NaN  wallPen  minClear  avgSpeed  slowest  airMax  rolls  slides  dive%  smashed  startTouch  tunnels  result');
 for (const def of TRACKS) {
   if (ONLY && def.id !== ONLY) continue;
   const td = buildTrack(def); const S = td.main.samples, N = td.N;
   const pods: PodState[] = [];
   for (let g = 0; g < 11; g++) {
     const pd = PODS[g % PODS.length]; const row = Math.floor(g / 3), col = g % 3;
-    let idx = td.startIdx - 6 - row * 9; idx = td.main.closed ? ((idx % N) + N) % N : Math.max(0, idx);
+    let idx = td.startIdx - 6 - row * 13; idx = td.main.closed ? ((idx % N) + N) % N : Math.max(0, idx);
     const s = S[idx], lat = (col - 1) * s.hw * 0.55, eLat = Math.min(1, Math.abs(lat) / s.hw), gY = s.y - lat * s.bank + (1 - eLat * eLat) * 0.2 + 0.08;
     const pilot = PILOTS.find(p => p.id === pd.pilotId) ?? PILOTS[0], skill = diff.skill * (0.7 + 0.3 * pilot.skill);
     const pod: PodState = {
@@ -31,7 +32,7 @@ for (const def of TRACKS) {
       hpL: 100, hpR: 100, heat: 0, boosting: false, overheat: false, repairing: false, airbraking: false,
       lap: 0, passedMid: true, rel: 0, prog: 0, finished: false, finishTime: 0, lapStart: 0, lapTimes: [],
       dead: 0, invuln: 0, lastSafePath: 0, lastSafeIdx: idx, wrongWay: 0, roll: 0, pitch: 0, shake: 0, events: [], visual: null,
-      ai: { skill, speedF: diff.speed * (0.93 + 0.09 * pilot.skill), lineOff: Math.random() * 2 - 1, takeShortcut: Math.random() < skill * 0.75, boostUntil: 0, repairMode: false, noiseT: Math.random() * 100, rubber: 1 }, place: g + 1,
+      ai: { skill, speedF: diff.speed * (0.93 + 0.09 * pilot.skill), lineOff: Math.random() * 2 - 1, takeShortcut: Math.random() < skill * 0.75, boostUntil: 0, repairMode: false, noiseT: Math.random() * 100, rubber: 1, gridLat: process.env.NOGRID ? undefined : lat }, place: g + 1,
     };
     const rel = ((idx - td.startIdx) % N + N) % N; if (td.main.closed) { pod.rel = rel; pod.lap = rel > N / 2 ? -1 : 0; pod.prog = pod.lap * N + rel; }
     pods.push(pod);
@@ -39,9 +40,10 @@ for (const def of TRACKS) {
   // overhead self-test (boonta only): a deliberately low gantry 300 m after the start must knock pods down without NaN / tunnelling
   const ohIdx = def.id === 'boonta' ? (td.startIdx + 150) % N : -1;
   if (ohIdx >= 0) { const q = S[ohIdx]; (td.overheads ??= []).push({ idx: ohIdx, y0: q.y + 3.6, y1: q.y + 7, half: 1.2 }); }
-  const nBreakable = td.obstacles.filter(o => o.breakable).length;
+  const nBreakable = td.obstacles.filter(o => o.breakable).length; const touch = new Set<number>();
+  let tunnels = 0, tunLen = 0; for (let i = 1; i < N; i++) { if (S[i].roof > 0) { tunLen += 2; if (!(S[i - 1].roof > 0)) tunnels++; } }
   const prog0 = pods.map(p => p.prog); const wasDead = pods.map(() => false);
-  let deaths = 0, nan = 0, wall = 0, clear = 9, airMax = 0, rolls = 0, slides = 0, dives = 0, aiFrames = 0, breaks = 0, ohHits = 0, t = 0, worst = '', airDbg = '', air0 = 0, air0Dist = 0;
+  let deaths = 0, nan = 0, wall = 0, clear = 9, airMax = 0, rolls = 0, slides = 0, dives = 0, aiFrames = 0, breaks = 0, ohHits = 0, zgV = 0, zgN = 0, gV = 0, gN = 0, t = 0, worst = '', airDbg = '', air0 = 0, air0Dist = 0;
   const h = 1 / 120, frames = SECS * 60;
   for (let f = 0; f < frames; f++) {
     t += 1 / 60;
@@ -54,6 +56,11 @@ for (const def of TRACKS) {
       if (process.env.PITCH_AIR !== undefined) { p.input.roll = 0; p.input.pitch = p.grounded ? 0 : Number(process.env.PITCH_AIR); } // jump experiment: fixed airborne pitch for pod 0
       if (p.dead <= 0 && p.air > air0) { air0 = p.air; air0Dist = Math.hypot(p.vel.x, p.vel.z) * p.air; }
     }
+    if (t < 8) for (let a = 0; a < pods.length; a++) for (let b2 = a + 1; b2 < pods.length; b2++) { // start phase: which pairs touch?
+      const A = pods[a], B = pods[b2], R = (podParams(A).width + podParams(B).width) * 0.8;
+      if (Math.abs(A.pos.y - B.pos.y) < 3 && Math.hypot(A.pos.x - B.pos.x, A.pos.z - B.pos.z) < R * 1.01) touch.add(a * 16 + b2);
+    }
+    for (const p of pods) { if (p.dead > 0) continue; const v = Math.hypot(p.vel.x, p.vel.z); if (p.zeroG) { zgV += v; zgN++; } else if (t > 6) { gV += v; gN++; } }
     for (let k = 0; k < 2; k++) { for (const p of pods) stepPod(p, td, h, t, GRIP, false); collidePods(pods, t); }
     for (const hz of td.hazards) {
       const ph = (((t + hz.phase) % hz.period) + hz.period) % hz.period; hz.state = ph < hz.period * hz.duty ? 1 : ph > hz.period - 1 ? 0.5 : 0;
@@ -84,11 +91,12 @@ for (const def of TRACKS) {
   }
   const speeds = pods.map((p, i) => (p.prog - prog0[i]) * 2 / SECS); const avg = speeds.reduce((a, b) => a + b, 0) / speeds.length, slow = Math.min(...speeds);
   const divePct = dives / Math.max(1, aiFrames) * 100;
+  if (zgN > 200) console.log(`  zero-G: avg ${(zgV / zgN).toFixed(0)} m/s in the tubes vs ${(gV / Math.max(1, gN)).toFixed(0)} m/s outside`);
   if (ohIdx >= 0) console.log(`  overhead self-test: ${ohHits} hits registered (${ohHits > 0 ? 'ok' : 'FAIL'})`);
   const bad = (ohIdx >= 0 && ohHits === 0) || divePct > LIMIT.divePct || nan > 0 || deaths > LIMIT.deaths || wall > LIMIT.wall || clear < LIMIT.clear || slow < LIMIT.minSpeed;
   if (bad) failed++; if (process.env.PITCH_AIR !== undefined) console.log(`  pod0 airborne pitch ${process.env.PITCH_AIR}: longest flight ${air0.toFixed(2)} s ≈ ${air0Dist.toFixed(0)} m`);
   if (process.env.DEBUG) console.log('  worst:', worst, '\n  air:', airDbg, 'gap@idx', td.paths[0].samples.map((q, k) => q.gap ? k : -1).filter(k => k >= 0 && (k % 8 === 0)).join(','));
-  console.log(`${def.id.padEnd(13)} ${String(deaths).padStart(5)} ${String(nan).padStart(5)} ${wall.toFixed(2).padStart(7)}m ${clear.toFixed(2).padStart(7)}m ${avg.toFixed(0).padStart(6)}m/s ${slow.toFixed(0).padStart(5)}m/s ${airMax.toFixed(1).padStart(6)}s ${String(rolls).padStart(6)} ${String(slides).padStart(7)} ${divePct.toFixed(1).padStart(5)}% ${(breaks + '/' + nBreakable).padStart(8)}  ${bad ? 'FAIL' : 'ok'}`);
+  console.log(`${def.id.padEnd(13)} ${String(deaths).padStart(5)} ${String(nan).padStart(5)} ${wall.toFixed(2).padStart(7)}m ${clear.toFixed(2).padStart(7)}m ${avg.toFixed(0).padStart(6)}m/s ${slow.toFixed(0).padStart(5)}m/s ${airMax.toFixed(1).padStart(6)}s ${String(rolls).padStart(6)} ${String(slides).padStart(7)} ${divePct.toFixed(1).padStart(5)}% ${(breaks + '/' + nBreakable).padStart(8)} ${String(touch.size).padStart(10)} ${(tunnels + '×/' + tunLen + 'm').padStart(9)}  ${bad ? 'FAIL' : 'ok'}`);
 }
 console.log(failed ? `\n${failed} track(s) FAILED (limits: deaths ≤ ${LIMIT.deaths}, wallPen ≤ ${LIMIT.wall} m, minClear ≥ ${LIMIT.clear} m, slowest ≥ ${LIMIT.minSpeed} m/s)` : '\nAll tracks passed.');
 process.exit(failed ? 1 : 0);

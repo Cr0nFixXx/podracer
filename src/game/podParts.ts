@@ -9,6 +9,8 @@ export interface EngineGeo {
   parts: Map<MatKey, THREE.BufferGeometry>;
   fan: THREE.BufferGeometry; fanZ: number;
   flaps: FlapGeo[];
+  /** animated nozzle petals (attribute aPet), see petalMaterial() */
+  petals: THREE.BufferGeometry;
   flameOuter: THREE.BufferGeometry; flameCore: THREE.BufferGeometry; flameZ: number;
   exhaustZ: number; pylon: THREE.Vector3; frontZ: number; top: number; R: number; L: number;
 }
@@ -81,7 +83,18 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
   pb.add('glow', torus(0.6 * R, 0.018 * R, 6, seg), M4.t(0, 0, Z(0.035)));
   // iris petals around the nozzle exit
   const np = Math.max(10, Math.round(seg * 0.35));
-  pb.add('dark', radial(() => rbox((Math.PI * 2 * 0.72 * R / np) * 0.92, 0.025 * R, 0.09 * L, 0.01).rotateX(-0.2).translate(0, 0.72 * R, Z(0) - 0.035 * L), np));
+  // Session 16: the iris petals are a separate, animated geometry (they open when boosting). Each vertex carries its petal's outward
+  // direction (aPet.xy) and how far it swings out when fully open (aPet.z: 0 at the hinge, 0.42·R at the tip).
+  const petals = (() => {
+    const pos: number[] = [], pet: number[] = [], idx: number[] = []; const zH = Z(0) + 0.012 * L, zT = Z(0) - 0.085 * L, rH = 0.745 * R, rT = 0.6 * R;
+    for (let q = 0; q < np; q++) {
+      const a0 = (q + 0.05) / np * Math.PI * 2, a1 = (q + 0.95) / np * Math.PI * 2, am = (a0 + a1) / 2, b = pos.length / 3;
+      for (const [a, z, r, d] of [[a0, zH, rH, 0], [a1, zH, rH, 0], [a0, zT, rT, 0.42 * R], [a1, zT, rT, 0.42 * R]]) { pos.push(Math.cos(a) * r, Math.sin(a) * r, z); pet.push(Math.cos(am), Math.sin(am), d); }
+      idx.push(b, b + 2, b + 1, b + 1, b + 2, b + 3);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('aPet', new THREE.Float32BufferAttribute(pet, 3)); g.setIndex(idx); g.computeVertexNormals();
+    const out = g.toNonIndexed(); g.dispose(); return out;
+  })();
   pb.add('steel', torus(0.75 * R, 0.03 * R, 6, seg), M4.t(0, 0, Z(0.005)));
 
   // ---------------- band rings + bolts ----------------
@@ -186,7 +199,7 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
   const rn = 0.5 * R;
   const out: EngineGeo = {
     parts: pb.build(), fan, fanZ: faceZ + 0.06 * L * 0.5,
-    flaps, flameOuter: flameGeo(rn, L * 0.75, Math.max(12, Math.round(seg * 0.5))), flameCore: flameGeo(rn * 0.42, L * 0.38, 12), flameZ: Z(0.07) - 0.02,
+    flaps, petals, flameOuter: flameGeo(rn, L * 0.75, Math.max(12, Math.round(seg * 0.5))), flameCore: flameGeo(rn * 0.42, L * 0.38, 12), flameZ: Z(0.07) - 0.02,
     exhaustZ: Z(0) - 0.12 * L, pylon: new THREE.Vector3(0, py + 0.06, Z(0.58)), frontZ: Z(1.0), top: py, R, L,
   };
   cache.set(key, out);
