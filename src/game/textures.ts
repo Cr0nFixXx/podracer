@@ -162,13 +162,15 @@ export function generateTexture(kind: TexKind, palette: string[], size: number, 
         case 'rock': case 'basalt': {
           if (kind === 'basalt') {
             // Hexagonal-like columnar basalt + ropy pahoehoe skin + vesicular gas pores + glowing magma joints
-            N.worley(u, v, 10, w);
+            // Session 11: domain-warped cooling cells (no regular honeycomb) – joints glow only where the crust is thin
+            const bwx = (N.fbm(u + 0.31, v + 0.17, 4, 3) - 0.5) * 0.15, bwy = (N.fbm(u + 0.63, v + 0.49, 5, 3) - 0.5) * 0.12;
+            N.worley(u + bwx, v + bwy, 8, w);
             const edge = w[1] - w[0];
             const colTop = sstep(0.025, 0.11, edge);
             const bevel = sstep(0.015, 0.055, edge) * (1 - sstep(0.055, 0.12, edge));
             const ropy = Math.sin((u * 18 + v * 12 + N.fbm(u, v, 6, 3) * 4.5) * Math.PI * 2) * 0.5 + 0.5;
             N.worley(u, v, 68, w2); const pore = (1 - sstep(0.04, 0.16, w2[0])) * (w2[2] > 0.74 ? 1 : 0);
-            const magmaMask = sstep(0.34, 0.62, N.fbm(u, v, 4, 3));
+            const magmaMask = sstep(0.46, 0.7, N.fbm(u, v, 4, 3)) * (0.55 + 0.45 * sstep(0.3, 0.7, N.fbm(u + 0.5, v + 0.2, 9, 2)));
             const glow = (1 - sstep(0.0, 0.04, edge)) * magmaMask;
             const emberRim = (1 - sstep(0.02, 0.075, edge)) * magmaMask * 0.35;
             h = colTop * (0.52 + w[2] * 0.34) + ropy * 0.07 * (1 - w[3] * 0.5) + N.fbm(u, v, 16, 4) * 0.1 - pore * 0.14 - glow * 0.3 + grain * 0.04;
@@ -186,12 +188,18 @@ export function generateTexture(kind: TexKind, palette: string[], size: number, 
           const ledge = sstep(0.0, 0.11, bf) * (1 - sstep(0.84, 1.0, bf)) + subLedge;
           const rd = N.ridged(u, v, 4, 6);
           const varnish = sstep(0.42, 0.78, N.noise2(u, v, 56, 2) * 0.7 + N.noise2(u, v, 128, 4) * 0.3) * N.fbm(u, v, 4, 3);
-          N.worley(u, v, 9, w); const crack = 1 - sstep(0.0, 0.042, w[1] - w[0]);
-          N.worley(u, v, 24, w2); const joint = (1 - sstep(0.0, 0.03, w2[1] - w2[0])) * 0.55;
-          const blockTilt = (w[2] - 0.5) * 0.16 + (w2[2] - 0.5) * 0.08;
-          h = rd * 0.32 + ledge * 0.28 + bandId * 0.12 + blockTilt - crack * 0.34 - joint * 0.16 - varnish * 0.07 + fine * 0.07 + grain * 0.03;
-          t = bandId * 0.52 + rd * 0.28 + (w[3] - 0.5) * 0.14 + fine * 0.1 - varnish * 0.3 - crack * 0.28 - joint * 0.12;
-          r = 0.84 + grain * 0.1 + crack * 0.1 - varnish * 0.14;
+          // Natural jointing (Session 9): domain-warped fracture cells that only open where the rock is weak (no masonry/brick look),
+          // fine bedding laminations and tafoni weathering pits
+          const jw = (N.fbm(u + 0.37, v + 0.11, 5, 3) - 0.5) * 0.16, jw2 = (N.fbm(u + 0.71, v + 0.53, 7, 3) - 0.5) * 0.12;
+          const weak = sstep(0.4, 0.7, N.fbm(u + 0.9, v + 0.4, 3, 3));
+          N.worley(u + jw, v + jw2, 6, w); const crack = (1 - sstep(0.0, 0.03, w[1] - w[0])) * (0.3 + 0.7 * weak);
+          N.worley(u + jw2 * 0.6, v + jw * 0.6, 17, w2); const joint = (1 - sstep(0.0, 0.022, w2[1] - w2[0])) * 0.4 * weak;
+          const lam = Math.sin((bandPos * 7 + N.fbm(u, v, 9, 2) * 2.2) * Math.PI * 2) * 0.5 + 0.5;
+          N.worley(u, v, 44, w3); const pit = (1 - sstep(0.05, 0.2, w3[0])) * (w3[2] > 0.66 ? 1 : 0) * (1 - weak * 0.5);
+          const blockTilt = (w[2] - 0.5) * 0.1 + (w2[2] - 0.5) * 0.04;
+          h = rd * 0.34 + ledge * 0.3 + bandId * 0.13 + blockTilt + lam * 0.05 - crack * 0.26 - joint * 0.1 - pit * 0.16 - varnish * 0.07 + fine * 0.08 + grain * 0.035;
+          t = bandId * 0.5 + rd * 0.28 + (w[3] - 0.5) * 0.07 + fine * 0.1 + lam * 0.07 - varnish * 0.3 - crack * 0.2 - joint * 0.08 - pit * 0.12;
+          r = 0.84 + grain * 0.1 + crack * 0.08 + pit * 0.06 - varnish * 0.14;
           break;
         }
         case 'oovoRoad': case 'oovoWall': {

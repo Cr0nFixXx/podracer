@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.shot.jpg
+tools/harness/out/*.png
+tools/harness/out/*.jpg
+tools/ci/out/

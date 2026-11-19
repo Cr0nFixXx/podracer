@@ -1,7 +1,14 @@
 # TODO
 
+## 0. Direkt aus Session 12
+- [ ] **Hörtest + Probefahrt** auf echter Hardware: Sound-Balance, Bildrate (Nacht + Gewitter + Scheinwerfer), Hitzeflimmern-Stärke, Wetterfront-Übergang
+- [ ] **Gamepad-Belegung im Menü** (Tastatur ist umbelegbar, Gamepad noch fest) + Touch-Steuerung
+- [ ] **Scheinwerfer auf dunkler Fahrbahn** (Lava/Basalt) sichtbarer machen: z. B. projizierter Lichtkegel als Decal statt nur `SpotLight`
+- [ ] **Weitere Wetterverläufe:** aufklarend (Gewitter → klar), Staubsturm-Front, Tageszeit-Verlauf (Dämmerung → Nacht) – `Game.applyFront` ist dafür vorbereitet
+- [ ] **Regen-Aufschlagringe** auf der Fahrbahn verstärken; Blitz-Einschlag mit Bodenfunken in Streckennähe
+
 ## 1. Als Nächstes (Podracer & Ladezeit)
-- [ ] **Podracer-Aufwertung:** Livery-Vorlagen & Startnummern im Hangar, Triebwerks-Hitzeflimmern (TSL-Distortion hinter Düsen)
+- [ ] **Podracer-Aufwertung:** Livery-Vorlagen & Startnummern im Hangar; Hitzeflimmern auch für Gegner-Pods
 - [ ] **Schadensgeometrie & Pilot-Spezies:** sichtbare lose Klappen bei niedrigen HP, individuelle Pilotenköpfe im Cockpit
 - [ ] **Textur-Synthese im Web Worker:** `generateTexture` off-main-thread auslagern für verzögerungsfreien Ladebalken
 
@@ -11,9 +18,42 @@
 - [ ] **Mini-Karte erweitern:** Abkürzungen, Gefahrenzonen und Set-Pieces als Symbole auf dem gecachten Minimap-Layer
 
 ## 3. Performance & Tooling
-- [ ] **Partikel-Simulation als WebGPU-Compute:** dynamische Abgas-/Funken-Pools auf GPU-Compute heben
-- [ ] **Cascaded Shadow Maps (CSM):** zweite weite Schattenkaskade für ferne Schluchtwände
-- [ ] **Automatischer CI-Check:** 14-Strecken-Physik-Sim + 3D-Bodenfreiheits- & WGSL-Uniformity-Check als npm-Skript
+- [ ] **CSM standardmäßig auf „Ultra"** – erst nach FPS-Messung entscheiden (aktuell Opt-in)
+- [ ] **`npm run check` in GitHub Actions** (Push auf `B`), `check:gpu` als optionaler Job
+- [ ] **Harness:** WebGPU-Screenshots im headless Chrome reparieren (weiß; nur Konsolencheck möglich)
+- [ ] **Fern-LOD auch für Kiefern/Tafelberge**, falls die Messung es rechtfertigt
+
+## Erledigt (Session 12 – Tastenbelegung, HUD, Nachtlichter, Wetterfront)
+- [x] **Tastenbelegung im Menü** mit 2 Presets (Standard / Klassisch) und freiem Umbelegen
+- [x] **HUD:** Fluglage-Anzeige (Rolle, Anheben/Neigen, Slide-Ladung) + Wetter-/Tageszeit-Zeile
+- [x] **Nachtlichter:** Scheinwerfer, Positionslichter, Blitzlicht an allen Pods; Spot-Scheinwerfer am Spieler
+- [x] **Wetter „Aufziehendes Gewitter"** mit Laufzeit-Überblendung; Blitz-Einschlagglimmen
+- [x] **Hitzeflimmern** hinter den Düsen des Spieler-Pods
+- [x] **App-Smoke-Test** (`papp.mjs`), `npm run save` (Commit + Bundle, übersteht Sandbox-Resets)
+
+## Erledigt (Session 11 – Atmosphäre, Wetter, Sound, Mechanik)
+- [x] **5 Tageszeiten × 7 Wetterlagen** wählbar; jede Welt mit eigenem Standardwetter
+- [x] **Volumetrischer Höhennebel** mit driftenden Bänken; **Sonnenblendung/Lens-Flare**; God-Ray-Spiegelfehler behoben
+- [x] **Regen:** Linsentropfen, Streifen, Gischt; **Gewitter:** Blitz-Mesh, Wolkenleuchten, Donner; **Böen:** Schnee/Staub/Nebel
+- [x] **Sound:** Kompressor, Whine, Sub, Düsenrauschen, Slide, Regen, Wind, Donner, Echo
+- [x] **Mechanik:** Relaistürme mit gegenläufigen Ringen, Patrouillen-Drohnen
+- [x] **Strecken +18 % breiter**, Basalt-Textur, Nachtwolken, Slide-Fahne, Rollen-Kondensstreifen
+- [x] **Pod-zu-Pod-Kollision** rollbewusst + in der Node-Sim; lokales Git + Bundle-Sicherung
+
+## Erledigt (Session 10 – Performance, CI, Flugsteuerung, Steigungen & Schrägkurven)
+- [x] **TODO §3 komplett:** GPU-Partikel (Vertex-Shader-Simulation, 0 CPU-Schleife), Kaskaden-Schatten (Opt-in), CI `npm run check` + `npm run check:gpu`
+- [x] **Fern-LOD** für Bäume (1 347 → 368 Dreiecke) und Felsnadeln (1 078 → 539)
+- [x] **Neue Steuerung:** WASD, Leertaste Luftbremse/Slide, Pfeile = Rolle/Neigen/Anheben, Shift Boost
+- [x] **Flugphysik:** Handbrems-Slide, Anheben/Neigen (Sprungweite 102–324 m), 90°-Rolle mit schmaler Kollision, Triebwerke heben ohne Kippen, exakter Boden-Clamp
+- [x] **KI nutzt** Gleiten, Abtauchen, Hochkant-Rolle und Slides
+- [x] **Alle 14 Strecken:** Steigungen bis 11–17 %, Schrägkurven bis ≈ 21°
+
+## Erledigt (Session 9 – Landschafts-Assets, Fels-Textur, Startportal)
+- [x] `decorGeo.ts`: Brocken, Hoodoos, Tafelberge, Dschungelbäume, Schneekiefern, Kristall-/Eis-Cluster, Saguaros, Luftschiffe, Energiemasten
+- [x] Fels-Textur ohne Ziegelmuster (verzerrte Klüfte, Feinschichtung, Tafoni)
+- [x] Startportal mit Fachwerk-Traverse, kannelierten Türmen, Abspannseilen, Zeitentafel
+- [x] Stadt-Megablöcke/Türme mit Rücksprüngen und Decks, detailliertere Pod-Wracks
+- [x] Puppeteer-Harness `pshot.mjs` mit Kontaktbogen, `.gitignore`
 
 ## Erledigt (Session 8 – Start-Lag, Grafikfehler, Hindernisse, Sicht & Triebwerks-Physik)
 - [x] **Rennstart-Lag behoben:** volles GPU-Warmup (`scenePass.compileAsync` + 2 Pre-Render-Frames + `onSubmittedWorkDone` vor Countdown), geteilte Gegner-Pod-Pipelines (**64 → 11 TSL-Pipelines, 120 → 31 Materialien**), Kamera-Größenlimit auf Partikeln (kein Fullscreen-Overdraw), Half-Res-Bloom, 0-ms-`textShadow` im Countdown

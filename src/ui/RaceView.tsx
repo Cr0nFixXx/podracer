@@ -1,3 +1,4 @@
+import { keysLabel, normalizeKeys, type Action } from '../game/keymap';
 import { useEffect, useRef, useState } from 'react';
 import { Game, fmt, type HudState, type RaceResult } from '../game/Game';
 import { THEMES, TRACKS } from '../game/data';
@@ -42,6 +43,7 @@ export default function RaceView({ profile, onExit, onBest }: Props) {
   const restart = () => { setResults(null); setHud(null); setPaused(false); setLoading({ p: 0, msg: 'Starte neu …' }); setRunId(x => x + 1); };
   const theme = THEMES[track.theme];
   const h = hud;
+  const km = normalizeKeys(profile.keys); const kl = (a: Action) => keysLabel(km[a]);
 
   return (
     <div className="relative w-full h-full bg-black overflow-hidden select-none">
@@ -75,6 +77,8 @@ export default function RaceView({ profile, onExit, onBest }: Props) {
             <canvas ref={mapRef} width={176} height={144} className="w-full h-full" />
           </div>
 
+          {h.env && <div className="absolute top-[14.4rem] right-4 w-44 text-right text-[10px] tracking-[0.2em] text-sky-100/75 uppercase" style={{ textShadow: '0 1px 2px #000' }}>{h.env}</div>}
+
           {/* ===== engine damage (bottom left, original style) ===== */}
           <div className="absolute bottom-6 left-5 flex gap-3">
             {[{ v: h.hpL, label: 'L' }, { v: h.hpR, label: 'R' }].map((e, i) => (
@@ -85,6 +89,26 @@ export default function RaceView({ profile, onExit, onBest }: Props) {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* ===== flight attitude (roll / lift-dive / slide charge) ===== */}
+          <div className="absolute bottom-6 left-44 w-28">
+            <svg viewBox="0 0 112 96" className="w-full">
+              <circle cx="56" cy="44" r="35" fill="rgba(0,0,0,0.32)" stroke="rgba(125,211,252,0.6)" strokeWidth="2" />
+              <line x1="20" y1="44" x2="92" y2="44" stroke="rgba(255,255,255,0.22)" strokeWidth="1" />
+              <line x1="56" y1="12" x2="56" y2="18" stroke="rgba(255,255,255,0.4)" strokeWidth="2" />
+              <g transform={`rotate(${h.roll * 90} 56 44) translate(0 ${-h.pitch * 11})`}>
+                <line x1="32" y1="44" x2="80" y2="44" stroke={Math.abs(h.roll) > 0.5 ? '#fbbf24' : '#67e8f9'} strokeWidth="3" strokeLinecap="round" />
+                <circle cx="33" cy="44" r="6" fill="#0c4a6e" stroke="#7dd3fc" strokeWidth="2" />
+                <circle cx="79" cy="44" r="6" fill="#0c4a6e" stroke="#7dd3fc" strokeWidth="2" />
+                <circle cx="56" cy="49" r="4" fill="#fff" />
+              </g>
+              {h.pitch > 0.15 && <path d="M56 2 l-7 9 h14 z" fill="#86efac" />}
+              {h.pitch < -0.15 && <path d="M56 86 l-7 -9 h14 z" fill="#fca5a5" />}
+              <rect x="16" y="89" width="80" height="5" rx="2" fill="rgba(0,0,0,0.45)" />
+              <rect x="16" y="89" width={80 * h.slideCharge} height="5" rx="2" fill={h.slideCharge >= 0.28 ? '#fbbf24' : '#7dd3fc'} />
+            </svg>
+            <div className="text-center text-[9px] tracking-[0.3em] text-white/75 mt-0.5">{h.sliding ? 'SLIDE' : Math.abs(h.roll) > 0.5 ? 'ROLLE' : h.pitch > 0.15 ? (h.airborne ? 'GLEITEN' : 'ANHEBEN') : h.pitch < -0.15 ? (h.airborne ? 'ABTAUCHEN' : 'NEIGEN') : 'FLUGLAGE'}</div>
           </div>
 
           {/* ===== speed + boost gauge (bottom right) ===== */}
@@ -126,7 +150,7 @@ export default function RaceView({ profile, onExit, onBest }: Props) {
             <div className="font-display text-5xl text-amber-100 mb-8 tracking-widest">{track.name}</div>
             <div className="w-96 h-2 bg-white/10 overflow-hidden mx-auto"><div className="h-full bg-gradient-to-r from-amber-600 to-amber-300 transition-all" style={{ width: `${loading.p * 100}%` }} /></div>
             <div className="mt-3 text-stone-300 text-sm tracking-widest">{loading.msg}</div>
-            <div className="mt-10 text-stone-400 text-xs max-w-md mx-auto leading-relaxed">Tipp: Boost erhitzt die Triebwerke. Lass rechtzeitig los, bevor sie Feuer fangen – und nutze die Luftbremse (E) in Haarnadelkurven.</div>
+            <div className="mt-10 text-stone-400 text-xs max-w-md mx-auto leading-relaxed">Tipp: Boost erhitzt die Triebwerke. Lass rechtzeitig los, bevor sie Feuer fangen – {kl('airbrake')} = Luftbremse, mit Lenken ein Slide durch Haarnadeln. {kl('pitchUp')} anheben (weiter springen), {kl('pitchDown')} neigen (schneller landen), {kl('rollLeft')} / {kl('rollRight')} 90°-Rolle durch enge Lücken.</div>
             {error && <div className="mt-6 text-red-400 text-sm max-w-lg">Fehler: {error}<div className="mt-3"><Btn onClick={onExit}>Zurück</Btn></div></div>}
           </div>
         </div>

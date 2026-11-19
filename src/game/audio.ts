@@ -35,7 +35,10 @@ export class AudioFX {
     try {
       const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new Ctx(); this.ctx = ctx;
-      this.master = ctx.createGain(); this.master.gain.value = volume * 0.5; this.master.connect(ctx.destination);
+      this.master = ctx.createGain(); this.master.gain.value = volume * 0.5;
+      // Session 11: master bus compressor (glues the layers, prevents clipping when thunder + boost + hits overlap)
+      const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.knee.value = 18; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.22;
+      this.master.connect(comp); comp.connect(ctx.destination);
       const len = ctx.sampleRate * 2; this.noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
       const d = this.noiseBuf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
 
@@ -82,7 +85,52 @@ export class AudioFX {
       const cf = ctx.createBiquadFilter(); cf.type = 'lowpass'; cf.frequency.value = 115; cf.Q.value = 3;
       this.crawlGain = ctx.createGain(); this.crawlGain.gain.value = 0;
       this.crawlOsc.connect(cf); cf.connect(this.crawlGain); this.crawlGain.connect(this.master); this.crawlOsc.start();
+      this.initLayers(ctx);
     } catch { this.ctx = null; }
+  }
+
+  // ---- Session 11 layers: turbine whine, sub-bass, jet roar, slide hiss, rain, wind howl, canyon/tunnel slap-back echo ----
+  private whine!: OscillatorNode; private whineGain!: GainNode; private sub!: OscillatorNode; private subGain!: GainNode;
+  private roarGain!: GainNode; private roarFilter!: BiquadFilterNode; private slideGain!: GainNode; private slideFilter!: BiquadFilterNode;
+  private rainGain!: GainNode; private howlGain!: GainNode; private howlFilter!: BiquadFilterNode; private echoSend!: GainNode;
+  private ext = { slide: 0, enclosure: 0, rain: 0, wind: 0 };
+  private initLayers(ctx: AudioContext) {
+    const noise = (offset: number) => { const s = ctx.createBufferSource(); s.buffer = this.noiseBuf; s.loop = true; s.start(0, offset); return s; };
+    const filt = (type: BiquadFilterType, f: number, q: number) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; };
+    const gain = (v = 0) => { const g = ctx.createGain(); g.gain.value = v; return g; };
+    this.echoSend = gain(0); const dl = ctx.createDelay(0.5); dl.delayTime.value = 0.13; const fb = gain(0.38), lp = filt('lowpass', 1800, 0.5);
+    this.echoSend.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(this.master);
+    this.engGain.connect(this.echoSend);
+    this.whine = ctx.createOscillator(); this.whine.type = 'triangle'; this.whineGain = gain(0); const wf = filt('bandpass', 2400, 1.2);
+    this.whine.connect(wf); wf.connect(this.whineGain); this.whineGain.connect(this.master); this.whine.start();
+    this.sub = ctx.createOscillator(); this.sub.type = 'sine'; this.subGain = gain(0); this.sub.connect(this.subGain); this.subGain.connect(this.master); this.sub.start();
+    this.roarFilter = filt('bandpass', 700, 0.7); this.roarGain = gain(0); noise(0.7).connect(this.roarFilter); this.roarFilter.connect(this.roarGain); this.roarGain.connect(this.master); this.roarGain.connect(this.echoSend);
+    this.slideFilter = filt('bandpass', 1900, 2.5); this.slideGain = gain(0); noise(1.5).connect(this.slideFilter); this.slideFilter.connect(this.slideGain); this.slideGain.connect(this.master);
+    this.rainGain = gain(0); const rh = filt('highpass', 2600, 0.4), rl = filt('lowpass', 9000, 0.3); noise(0.2).connect(rh); rh.connect(rl); rl.connect(this.rainGain); this.rainGain.connect(this.master);
+    this.howlFilter = filt('bandpass', 320, 3.5); this.howlGain = gain(0); noise(1.2).connect(this.howlFilter); this.howlFilter.connect(this.howlGain); this.howlGain.connect(this.master);
+  }
+  /** Per-frame driving/weather state: slide 0..1, enclosure 0..1 (canyon/tunnel), rain 0..1, wind 0..1 */
+  setEnv(slide: number, enclosure: number, rain: number, wind: number) { const x = this.ext; x.slide = slide; x.enclosure = enclosure; x.rain = rain; x.wind = wind; }
+  /** Rolling thunder: low-passed noise burst sweeping down + sub rumble */
+  thunder(vol: number) {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    const ctx = this.ctx, t = ctx.currentTime, dur = 2.6 + Math.random() * 1.4;
+    const src = ctx.createBufferSource(); src.buffer = this.noiseBuf; src.loop = true;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(70, t + dur);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5 * vol, t + 0.03); g.gain.exponentialRampToValueAtTime(0.16 * vol, t + 0.5); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(f); f.connect(g); g.connect(this.master); g.connect(this.echoSend); src.start(t, Math.random()); src.stop(t + dur + 0.05);
+    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(52, t); o.frequency.exponentialRampToValueAtTime(30, t + dur);
+    const og = ctx.createGain(); og.gain.setValueAtTime(0.3 * vol, t); og.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.8);
+    o.connect(og); og.connect(this.master); o.start(t); o.stop(t + dur);
+  }
+  /** Air-rush sweep for the 90° roll */
+  whoosh() {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const src = ctx.createBufferSource(); src.buffer = this.noiseBuf;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.4; f.frequency.setValueAtTime(420, t); f.frequency.exponentialRampToValueAtTime(2600, t + 0.28);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16, t + 0.08); g.gain.exponentialRampToValueAtTime(0.001, t + 0.36);
+    src.connect(f); f.connect(g); g.connect(this.master); src.start(t, Math.random()); src.stop(t + 0.4);
   }
 
   resume() { this.ctx?.resume(); }
@@ -102,6 +150,16 @@ export class AudioFX {
     const og = nearestOther < 80 ? (1 - nearestOther / 80) * 0.12 : 0;
     this.othersGain.gain.setTargetAtTime(og, t, 0.1);
     this.others.frequency.setTargetAtTime(50 + otherSpeed * 0.8, t, 0.1);
+    const x = this.ext;
+    this.whine.frequency.setTargetAtTime(900 + speed * 14 + throttle * 300, t, 0.08);
+    this.whineGain.gain.setTargetAtTime(Math.min(0.034, 0.008 + speed / 6000) * (0.6 + throttle * 0.4), t, 0.1);
+    this.sub.frequency.setTargetAtTime(f * 0.5, t, 0.05); this.subGain.gain.setTargetAtTime(0.05 + throttle * 0.05, t, 0.1);
+    this.roarGain.gain.setTargetAtTime(throttle * 0.035 + (boost ? 0.11 : 0), t, 0.08);
+    this.roarFilter.frequency.setTargetAtTime(500 + speed * 5 + (boost ? 900 : 0), t, 0.1);
+    this.slideGain.gain.setTargetAtTime(x.slide * 0.09, t, 0.05); this.slideFilter.frequency.setTargetAtTime(1500 + speed * 6, t, 0.1);
+    this.rainGain.gain.setTargetAtTime(x.rain * 0.085 * (1 - x.enclosure * 0.6), t, 0.3);
+    this.howlGain.gain.setTargetAtTime(x.wind * 0.07, t, 0.25); this.howlFilter.frequency.setTargetAtTime(260 + x.wind * 320 + Math.sin(t * 0.7) * 70, t, 0.3);
+    this.echoSend.gain.setTargetAtTime(x.enclosure * 0.5, t, 0.15);
 
     if (world) {
       // Geyser / lava-vent / canyon waterfall roar

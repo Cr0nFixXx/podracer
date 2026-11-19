@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import { Game } from '../../src/game/Game';
 import { TRACKS } from '../../src/game/data';
-import { defaultProfile } from '../../src/game/settings';
+import { PRESETS, defaultProfile } from '../../src/game/settings';
 const div = document.createElement('div'); div.style.cssText = 'width:1280px;height:720px;position:fixed;left:0;top:0'; document.body.style.margin = '0'; document.body.appendChild(div);
 let g: Game | null = null; let cur = -1;
 (window as unknown as Record<string, unknown>).track = async (i: number, view: string) => {
   if (cur !== i) {
     g?.dispose(); cur = i;
-    const prof = defaultProfile(); prof.race.trackId = TRACKS[i].id; prof.race.opponents = 7; prof.gfx.texRes = 1024; if (location.search.includes('webgl')) prof.gfx.backend = 'webgl'; prof.gfx.renderScale = 0.6; prof.gfx.shadows = 1;
+    const prof = defaultProfile(); prof.race.trackId = TRACKS[i].id; prof.race.opponents = 7; prof.gfx.texRes = 1024; if (location.search.includes('webgl')) prof.gfx.backend = 'webgl'; if (location.search.includes('csm')) prof.gfx.csm = true;
+    { const qs = new URLSearchParams(location.search); if (qs.get('tod')) prof.race.timeOfDay = qs.get('tod') as never; if (qs.get('wx')) prof.race.weather = qs.get('wx') as never; if (qs.has('ultra')) Object.assign(prof.gfx, PRESETS.ultra, { preset: 'ultra', texRes: 1024 }); } prof.gfx.renderScale = 0.6; prof.gfx.shadows = 1;
     g = new Game(div, prof, { onHud: () => {}, onLoading: () => {}, onFinish: () => {}, onPause: () => {}, onReady: () => {} });
     await g.start(); g.paused = true; await new Promise(r => setTimeout(r, 400));
   }
@@ -40,11 +41,21 @@ let g: Game | null = null; let cur = -1;
     const sp = G.td.setPieces[Math.min(G.td.setPieces.length - 1, Number(view.slice(1)) || 0)]; const s = G.td.main.samples[sp.idx];
     G.world.setPieces.update(G.clock, 2.4, G.pods, 0.016, false);
     G.camera.position.set(sp.x - s.tx * 48 + s.rx * 6, sp.y + 8, sp.z - s.tz * 48 + s.rz * 6); G.camera.lookAt(sp.x, sp.y + 4, sp.z);
+  } else if (view === 'm') { // relay tower close-up (mechProps)
+    const tw = G.world.group.userData.mechTower as { x: number; y: number; z: number } | undefined;
+    if (tw) { const a = G.td.main.samples[0]; void a; G.camera.position.set(tw.x + 17, tw.y + 9, tw.z + 14); G.camera.lookAt(tw.x, tw.y + 10, tw.z); }
+  } else if (view === 's') { // look from above the road towards the sun (lens flare / god-ray / glare check)
+    const S = G.td.main.samples, a = S[Math.floor(S.length * 0.2)];
+    G.camera.position.set(a.x, a.y + 6, a.z); G.camera.lookAt(a.x + G.sunDir.x * 100, a.y + 6 + G.sunDir.y * 60, a.z + G.sunDir.z * 100);
+  } else if (view === 'r') { // 3.4 s of real racing (AI + player idle) so exhaust/dust particles, banking and engine heave are live
+    G.state = 'race'; (G as unknown as { keys: Set<string> }).keys.add('KeyW'); for (let k = 0; k < 170; k++) { G.update(1 / 60); if (k % 3 === 0) G.updateVisuals(); } G.updateCamera(0.5);
   } else { G.updateCamera(0.5); }
   G.camera.fov = 70; G.camera.updateProjectionMatrix(); G.sky.mesh.position.copy(G.camera.position);
   const fwd = G.camera.getWorldDirection(new THREE.Vector3()); const t = G.camera.position.clone().addScaledVector(fwd, 50);
   G.sun.target.position.copy(t); G.sun.position.copy(t).addScaledVector(G.sunDir, 400);
-  G.updateVisuals(); G.world.update(G.clock + 5, G.camera.position);
+  { const rt = new URLSearchParams(location.search).get('rt'); if (rt) { G.raceTime = +rt; G.applyFront(); } }
+  G.updateVisuals(); G.updateLights(); G.world.update(G.clock + 5, G.camera.position);
+  if (location.search.includes('flash')) { G.sky.uniforms.flash.value = 0.9; G.hemi.intensity = 1.75; }
   for (let k = 0; k < 3; k++) { G.render(0.016); await new Promise(r => setTimeout(r, 900)); }
   return `${(window as unknown as Record<string, unknown>).coverInfo ?? ''} ${G.backend} ${TRACKS[i].id}/${view} calls=${G.renderer.info.render.calls} tris=${G.renderer.info.render.triangles}`;
 };

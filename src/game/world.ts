@@ -6,8 +6,10 @@ import { detailKindForTheme, generateTexture } from './textures';
 import { surfaceMaterial } from './materials';
 import { mulberry32, type Path, type Sample, type TrackData } from './trackBuilder';
 import { addProps, type Emitter } from './props';
+import { addMechProps } from './mechProps';
 import { addTrackDetail } from './trackDetail';
 import { StaticBatcher } from './trackMesh';
+import { airshipGeometry, pylonGeometry, cactusGeometry, crystalClusterGeometry, jungleTreeGeometry, mesaGeometry, pineGeometry, rockGeometry, spireGeometry } from './decorGeo';
 import { addSkyline, buildTerrain, makeTerrainField } from './terrain';
 import { buildSetPieces, type SetPieceFx } from './setPieces';
 import { addLandmarks } from './landmarks';
@@ -88,7 +90,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     cloud: theme.clouds * 0.4, parallax: plx * 0.026, layers,
     wet: theme.ambient === 'rain' ? 0.85 : theme.road === 'mud' ? 0.14 : 0,
     puddles: theme.ambient === 'rain' ? 0.38 : 0.24, rain: theme.ambient === 'rain',
-    snow: theme.id === 'ice' ? 1 : 0, macro: 0.14, detail: 0.42, bump, displace: disp,
+    snow: theme.id === 'ice' ? 1 : theme.ambient === 'snow' ? 0.7 : 0, macro: 0.14, detail: 0.42, bump, displace: disp,
     micro: 0.92, microScale: [(2 * hwAvg) / 1.7, Math.max(24, hwAvg * 1.4) / 1.7],
     envMapIntensity: theme.road === 'ice' ? 1.6 : 0.65, emissive: theme.barrierColor, emissiveIntensity: 1.2,
   });
@@ -310,6 +312,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   addObstacles(td, group, theme, wallMat, disposables);
   progress(0.9, 'Platziere Streckendetails …'); await yield_();
   const props = addProps(td, theme, group, gfx, heightAt, disposables, rng, roadClear, roadDispOff);
+  const mech = addMechProps(td, theme, group, disposables, heightAt, roadClear, waterY, gfx.detail);
   const setPieces = buildSetPieces(td, theme, group, disposables, wallMat);
   const landRock = surfaceMaterial(wallTex, {
     strata: STRATA[theme.id], ledge: wallLedge, cloud: theme.clouds * 0.4,
@@ -347,11 +350,12 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
       cover.update(cam);
       for (let i = 0; i < decorCells.length; i++) {
         const dc = decorCells[i]; const dx = dc.x - cam.x, dz = dc.z - cam.z, d2 = dx * dx + dz * dz;
-        const vis = d2 < dc.view2; dc.mesh.visible = vis;
+        const vis = d2 < dc.view2;
+        if (dc.lod) { const near = d2 < dc.lod2!; dc.mesh.visible = vis && near; dc.lod.visible = vis && !near; } else dc.mesh.visible = vis;
         if (dc.sh2 > 0) dc.mesh.castShadow = vis && d2 < dc.sh2;
       }
     }
-    props.update(t); detail.update(t);
+    props.update(t); detail.update(t); mech.update(t);
   };
   return {
     group, heightAt, update, flashField: detail.flashField, nearAudio: life.nearAudio, cascades, timings,
@@ -443,23 +447,51 @@ function addStartArea(td: TrackData, group: THREE.Group, theme: ThemeDef, disp: 
       if (m) ng.applyMatrix4(m);
       let l = buckets.get(mat); if (!l) { l = []; buckets.set(mat, l); } l.push(ng);
     };
-    const pSpan = s.hw + 3.4;
+    // Session 9: fluted towers on stepped plinths with collar rings, braced buttress ladders & stay cables,
+    // Warren box-truss gantry, framed timing screen, visored start-light housings (all merged into the same material buckets)
+    const pSpan = s.hw + 3.4; const UPV = new THREE.Vector3(0, 1, 0), qS = new THREE.Quaternion(), dS = new THREE.Vector3();
+    const strut = (mat: THREE.Material, ax: number, ay: number, az: number, bx: number, by: number, bz: number, w: number, round = false) => {
+      dS.set(bx - ax, by - ay, bz - az); const len = dS.length(); dS.normalize();
+      const gg: THREE.BufferGeometry = round ? new THREE.CylinderGeometry(w * 0.5, w * 0.5, len, 8) : new THREE.BoxGeometry(w, len, w);
+      gg.applyQuaternion(qS.setFromUnitVectors(UPV, dS)); gg.translate((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2); put(mat, gg);
+    };
     for (const side of [-1, 1]) {
-      put(dark, new THREE.BoxGeometry(5.2, 3.2, 6.2).translate(side * pSpan, 0.4, 0));
-      put(metal, new THREE.CylinderGeometry(1.35, 2.2, 23, 16).rotateZ(side * 0.05).translate(side * pSpan, 12, 0));
-      put(dark, new THREE.BoxGeometry(0.7, 19, 0.9).rotateZ(side * 0.22).translate(side * (pSpan + 2.2), 9, 0));
-      put(metal, new THREE.SphereGeometry(2.3, 16, 10).translate(side * (pSpan - 0.6), 23.8, 0));
-      put(metal, new THREE.CylinderGeometry(0.12, 0.35, 7.5, 8).translate(side * (pSpan - 0.6), 28.5, 0));
-      put(lightOn, new THREE.SphereGeometry(0.42, 8, 6).translate(side * (pSpan - 0.6), 32.4, 0));
+      const px = side * pSpan;
+      put(dark, new THREE.BoxGeometry(6.6, 1.3, 7.6).translate(px, -0.25, 0));
+      put(metal, new THREE.BoxGeometry(5.3, 1.7, 6.3).translate(px, 1.15, 0));
+      put(accent, new THREE.BoxGeometry(5.5, 0.22, 6.5).translate(px, 2.05, 0));
+      const tower = new THREE.CylinderGeometry(1.3, 2.15, 22.4, 28, 6); const tp = tower.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < tp.count; i++) { const x = tp.getX(i), z = tp.getZ(i); const k = 1 - 0.07 * Math.pow(0.5 + 0.5 * Math.cos(Math.atan2(z, x) * 14), 2); tp.setX(i, x * k); tp.setZ(i, z * k); }
+      tower.computeVertexNormals(); put(metal, tower.translate(px, 12.9, 0));
+      for (const [cy, cr] of [[2.6, 2.4], [9.2, 2.02], [15.6, 1.76], [22.2, 1.52]]) put(dark, new THREE.TorusGeometry(cr, 0.24, 8, 28).rotateX(Math.PI / 2).translate(px, cy, 0));
+      strut(dark, px + side * 4.7, 0.4, 0, px + side * 1.55, 17.6, 0, 0.72);
+      for (let k = 0; k < 6; k++) { const y = 3.2 + k * 2.35, f = (y - 0.4) / 17.2; strut(dark, px + side * (4.7 - f * 3.15), y, 0, px + side * (2.1 - (y - 1.7) / 22.4 * 0.85), y, 0, 0.2, true); }
+      put(metal, new THREE.SphereGeometry(2.3, 22, 14).scale(1, 0.84, 1).translate(px, 25.2, 0));
+      put(dark, new THREE.TorusGeometry(2.33, 0.17, 8, 28).rotateX(Math.PI / 2).translate(px, 25.2, 0));
+      put(accent, new THREE.TorusGeometry(1.5, 0.12, 6, 24).rotateX(Math.PI / 2).translate(px, 26.55, 0));
+      put(metal, new THREE.CylinderGeometry(0.12, 0.35, 7.5, 8).translate(px, 30.6, 0));
+      put(lightOn, new THREE.SphereGeometry(0.42, 8, 6).translate(px, 34.5, 0));
+      strut(dark, px - side * 0.4, 26.8, 0, side * pSpan * 0.42, 21.0, 0, 0.14, true);
     }
-    put(dark, new THREE.BoxGeometry(pSpan * 2 + 2, 2.6, 2.2).translate(0, 19.2, 0));
-    put(accent, new THREE.BoxGeometry(pSpan * 2 + 2.4, 0.45, 2.5).translate(0, 20.65, 0));
-    put(metal, new THREE.BoxGeometry(11, 3.4, 4.2).translate(0, 22.5, 0));
-    put(glass, new THREE.BoxGeometry(9.6, 1.35, 4.35).translate(0, 22.7, 0));
+    const y0 = 18.1, y1 = 20.7, zh = 1.15, xe = pSpan - 1.0;
+    for (const z of [-zh, zh]) for (const y of [y0, y1]) strut(dark, -xe, y, z, xe, y, z, 0.44);
+    const bays = Math.max(8, Math.round(xe * 2 / 3.3)), bw = xe * 2 / bays;
+    for (let i = 0; i <= bays; i++) {
+      const x = -xe + i * bw;
+      for (const z of [-zh, zh]) { strut(metal, x, y0, z, x, y1, z, 0.2); if (i < bays) strut(metal, x, i % 2 ? y1 : y0, z, x + bw, i % 2 ? y0 : y1, z, 0.17); }
+      strut(metal, x, y1, -zh, x, y1, zh, 0.2); strut(metal, x, y0, -zh, x, y0, zh, 0.2);
+    }
+    put(accent, new THREE.BoxGeometry(xe * 2 + 0.6, 0.3, 2.8).translate(0, y1 + 0.42, 0));
+    put(metal, new THREE.BoxGeometry(12, 3.9, 3.0).translate(0, 23.15, 0));
+    for (const y of [21.1, 25.2]) put(dark, new THREE.BoxGeometry(12.7, 0.36, 3.5).translate(0, y, 0));
+    for (const x of [-6.2, 6.2]) put(dark, new THREE.BoxGeometry(0.4, 4.3, 3.5).translate(x, 23.15, 0));
+    put(glass, new THREE.BoxGeometry(10.6, 2.5, 3.12).translate(0, 23.2, 0));
     for (let i = 0; i < 10; i++) {
       const lx = -s.hw * 0.9 + i * (s.hw * 1.8 / 9);
-      put(dark, new THREE.BoxGeometry(1.1, 1.5, 0.9).translate(lx, 17.5, -0.8));
-      put(lightOn, new THREE.SphereGeometry(0.46, 10, 6).translate(lx, 17.4, -1.25));
+      strut(metal, lx, y0, -0.85, lx, 17.55, -0.85, 0.16);
+      put(dark, new THREE.BoxGeometry(1.2, 1.6, 1.0).translate(lx, 16.8, -0.85));
+      put(dark, new THREE.BoxGeometry(1.34, 0.12, 0.95).translate(lx, 17.62, -1.5));
+      put(lightOn, new THREE.SphereGeometry(0.46, 10, 6).translate(lx, 16.75, -1.38));
     }
 
     // Tiered grandstands merged into the same metal/dark/accent buckets + 1 ultra-lean instanced crowd draw (10k tris)
@@ -519,19 +551,7 @@ function addStartArea(td: TrackData, group: THREE.Group, theme: ThemeDef, disp: 
   if (!td.main.closed) mkGate(td.finishIdx, 'finish');
 }
 
-function rockGeo(detail: number, seed: number, stretch = 1) {
-  const g = new THREE.IcosahedronGeometry(1, detail);
-  const p = g.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-    // Crisp geological strata ledge modulation + ridged rock facets
-    const strata = Math.sin(y * 5.5 + seed) * 0.05;
-    const n = 0.72 + fbm(x * 1.55 + seed, y * 1.55 + z * 1.35, 4) * 0.62 + strata;
-    p.setXYZ(i, x * n, y * n * stretch, z * n);
-  }
-  g.computeVertexNormals();
-  return g;
-}
+function rockGeo(detail: number, seed: number, stretch = 1) { return rockGeometry(detail, seed, stretch); }
 
 function scatterDecor(
   theme: ThemeDef, group: THREE.Group, td: TrackData, heightAt: (x: number, z: number) => number,
@@ -545,9 +565,9 @@ function scatterDecor(
     emissiveIntensity: theme.id === 'lava' ? 1.35 : theme.id === 'crystal' ? 0.6 : 0,
   });
   disp.push(rockMat);
-  const decorCells: { mesh: THREE.InstancedMesh; x: number; z: number; view2: number; sh2: number }[] = [];
+  const decorCells: { mesh: THREE.InstancedMesh; x: number; z: number; view2: number; sh2: number; lod?: THREE.InstancedMesh; lod2?: number }[] = [];
   // Sector-chunked + distance/shadow-culled InstancedMesh placement: skips distant sectors & shadows beyond the shadow box!
-  const place = (geo: THREE.BufferGeometry, mat: THREE.Material, count: number, dMin: number, dMax: number, sMin: number, sMax: number, opts: { foot?: number; yOff?: number; tilt?: number; air?: number; shadow?: boolean; scaleY?: [number, number]; colors?: string[]; keepDry?: boolean; view?: number } = {}) => {
+  const place = (geo: THREE.BufferGeometry, mat: THREE.Material, count: number, dMin: number, dMax: number, sMin: number, sMax: number, opts: { foot?: number; yOff?: number; tilt?: number; air?: number; shadow?: boolean; scaleY?: [number, number]; colors?: string[]; keepDry?: boolean; view?: number; lod?: { geo: THREE.BufferGeometry; dist: number } } = {}) => {
     count = Math.floor(count * det); if (count <= 0) { geo.dispose(); return; }
     const SEC = dMax > 900 ? 900 : 340;
     const sectors = new Map<string, { m: THREE.Matrix4[]; c: THREE.Color[]; cx: number; cz: number }>();
@@ -566,7 +586,7 @@ function scatterDecor(
       const y = gy + (opts.yOff ?? 0) * size;
       const sy = opts.scaleY ? opts.scaleY[0] + rng() * (opts.scaleY[1] - opts.scaleY[0]) : 1;
       e.set((rng() - 0.5) * (opts.tilt ?? 0), rng() * Math.PI * 2, (rng() - 0.5) * (opts.tilt ?? 0)); q.setFromEuler(e);
-      const chunk = count > 80 && !opts.air;
+      const chunk = (count > 80 || !!opts.lod) && !opts.air;
       const sxI = Math.floor(x / SEC), szI = Math.floor(z / SEC);
       const key = chunk ? `${sxI},${szI}` : 'all';
       let sec = sectors.get(key); if (!sec) { sec = { m: [], c: [], cx: (sxI + 0.5) * SEC, cz: (szI + 0.5) * SEC }; sectors.set(key, sec); }
@@ -581,125 +601,54 @@ function scatterDecor(
       const im = new THREE.InstancedMesh(geo, mat, sec.m.length);
       for (let i = 0; i < sec.m.length; i++) { im.setMatrixAt(i, sec.m[i]); if (sec.c.length) im.setColorAt(i, sec.c[i]); }
       im.castShadow = cast && k === 'all'; im.receiveShadow = true; im.computeBoundingSphere(); group.add(im);
-      if (k !== 'all') decorCells.push({ mesh: im, x: sec.cx, z: sec.cz, view2: (viewD + pad) ** 2, sh2: cast ? (150 + pad) ** 2 : 0 });
+      if (k !== 'all') {
+        const cell: (typeof decorCells)[number] = { mesh: im, x: sec.cx, z: sec.cz, view2: (viewD + pad) ** 2, sh2: cast ? (150 + pad) ** 2 : 0 };
+        if (opts.lod) { // far-sector LOD twin: identical transforms/colours, ~1/4 of the triangles, never casts shadows
+          const lm = new THREE.InstancedMesh(opts.lod.geo, mat, sec.m.length);
+          for (let i = 0; i < sec.m.length; i++) { lm.setMatrixAt(i, sec.m[i]); if (sec.c.length) lm.setColorAt(i, sec.c[i]); }
+          lm.receiveShadow = true; lm.visible = false; lm.computeBoundingSphere(); group.add(lm);
+          cell.lod = lm; cell.lod2 = (opts.lod.dist + pad) ** 2;
+        }
+        decorCells.push(cell);
+      }
     }
-    disp.push(geo);
+    disp.push(geo); if (opts.lod) disp.push(opts.lod.geo);
   };
   const d1 = gq >= 2 ? 2 : 1; // detail=2 = 320 crisp faceted tris/rock (4× leaner than detail=3, identical with normal map)
   for (const kind of theme.decor) {
     switch (kind) {
-      case 'rocks': place(rockGeo(d1, 1, 0.72), rockMat, 480, 8, 320, 1.5, 7.2, { foot: 1.5, yOff: 0.18, tilt: 0.55 }); break;
-      case 'lavaRocks': place(rockGeo(d1, 4, 0.82), rockMat, 480, 8, 420, 2, 12.5, { foot: 1.5, yOff: 0.1, tilt: 0.5 }); break;
+      case 'rocks': for (let v = 0; v < 3; v++) place(rockGeo(d1, 1 + v * 5, 0.66 + v * 0.1), rockMat, 160, 8, 320, 1.5, 7.2, { foot: 1.5, yOff: 0.2, tilt: 0.45 }); break;
+      case 'lavaRocks': for (let v = 0; v < 3; v++) place(rockGeo(d1, 4 + v * 3, 0.74 + v * 0.1), rockMat, 160, 8, 420, 2, 12.5, { foot: 1.5, yOff: 0.14, tilt: 0.45 }); break;
       case 'spires': {
-        const g = new THREE.CylinderGeometry(0.42, 1.15, 1, 12, 12); g.translate(0, 0.5, 0);
-        const p = g.attributes.position as THREE.BufferAttribute;
-        for (let i = 0; i < p.count; i++) {
-          const y = p.getY(i), x = p.getX(i), z = p.getZ(i);
-          const hoodoo = 1 + Math.sin(y * Math.PI * 3.5) * 0.18 - Math.sin(y * Math.PI) * 0.16;
-          const n = (0.72 + fbm(y * 6.5, x * 2.2 + z, 3) * 0.65) * hoodoo;
-          p.setX(i, x * n); p.setZ(i, z * n);
-        }
-        g.computeVertexNormals();
-        place(g, rockMat, 160, 40, 920, 8, 22, { foot: 1.25, scaleY: [3.2, 7.2], yOff: -0.04 }); break;
+        // Stratified hoodoos (hard/soft ledges, flutes, talus skirt, caprock) – 3 seeded variants
+        const per = [64, 52, 44];
+        for (let v = 0; v < 3; v++) place(spireGeometry(11 + v * 7, gq >= 2 ? 22 : 14, gq >= 2 ? 11 : 8), rockMat, per[v], 40, 920, 8, 22, { foot: 1.6, scaleY: [2.3, 5.0], yOff: -0.02, lod: { geo: spireGeometry(11 + v * 7, gq >= 2 ? 11 : 9, gq >= 2 ? 11 : 8), dist: 430 } });
+        break;
       }
       case 'mesas': {
-        const g = new THREE.CylinderGeometry(0.92, 1.42, 1, 24, 12); g.translate(0, 0.5, 0);
-        const p = g.attributes.position as THREE.BufferAttribute;
-        for (let i = 0; i < p.count; i++) {
-          const x = p.getX(i), z = p.getZ(i), y = p.getY(i);
-          if (Math.hypot(x, z) > 0.45) {
-            const a = Math.atan2(z, x);
-            const tier = (Math.floor(y * 4) + sstep(0.2, 0.55, (y * 4) % 1)) / 4;
-            const n = (0.86 - tier * 0.12 + (y > 0.88 ? 0.05 : 0)) * (0.82 + fbm(a * 3.2, y * 3.5, 4) * 0.42);
-            p.setX(i, x * n); p.setZ(i, z * n);
-          }
-        }
-        g.computeVertexNormals();
-        place(g, rockMat, 42, 300, 2200, 52, 165, { foot: 1.45, scaleY: [0.5, 1.15], yOff: -0.05, shadow: false }); break;
+        for (let v = 0; v < 2; v++) place(mesaGeometry(3 + v * 5, gq >= 2 ? 48 : 30), rockMat, 21, 300, 2200, 52, 165, { foot: 1.65, scaleY: [0.5, 1.15], yOff: -0.03, shadow: false });
+        break;
       }
       case 'cacti': {
-        const g = mergeGeometries([
-          new THREE.CylinderGeometry(0.32, 0.4, 4.2, 8).translate(0, 2.1, 0),
-          new THREE.SphereGeometry(0.32, 8, 5).translate(0, 4.2, 0),
-          new THREE.CylinderGeometry(0.21, 0.25, 1.7, 6).translate(0.88, 2.75, 0),
-          new THREE.CylinderGeometry(0.22, 0.25, 0.85, 6).rotateZ(Math.PI / 2).translate(0.5, 1.95, 0),
-          new THREE.CylinderGeometry(0.19, 0.23, 1.35, 6).translate(-0.82, 3.1, 0),
-          new THREE.CylinderGeometry(0.2, 0.23, 0.8, 6).rotateZ(Math.PI / 2).translate(-0.46, 2.45, 0),
-        ].map(x => x.toNonIndexed()))!;
-        const cm = new THREE.MeshStandardMaterial({ color: '#486b2e', roughness: 0.82 }); disp.push(cm);
-        place(g, cm, 280, 10, 300, 0.8, 1.65, { foot: 1.5, keepDry: true }); break;
+        const cm = new THREE.MeshStandardMaterial({ color: '#4d7034', roughness: 0.8 }); disp.push(cm);
+        for (let v = 0; v < 2; v++) place(cactusGeometry(2 + v * 3), cm, 140, 10, 300, 0.8, 1.65, { foot: 1.5, keepDry: true, colors: ['#ffffff', '#dfe8c8', '#c8dcb0'] });
+        break;
       }
       case 'iceSpikes': {
-        const g = mergeGeometries([
-          new THREE.CylinderGeometry(0.12, 0.92, 0.82, 6).translate(0, 0.41, 0),
-          new THREE.ConeGeometry(0.12, 0.22, 6).translate(0, 0.92, 0),
-          new THREE.ConeGeometry(0.42, 0.58, 6).rotateZ(0.28).translate(0.45, 0.26, 0),
-          new THREE.ConeGeometry(0.34, 0.48, 6).rotateX(-0.26).translate(-0.2, 0.22, 0.42),
-        ].map(x => x.toNonIndexed()))!;
-        // Flicker-free glacial standard material (avoids dual-BRDF clearcoat fireflies)
-        const im = new THREE.MeshStandardMaterial({ color: '#a8dcff', roughness: 0.18, metalness: 0.12, emissive: '#2a6a9a', emissiveIntensity: 0.34 }); disp.push(im);
-        place(g, im, 380, 8, 500, 2, 8, { foot: 1.3, scaleY: [2, 6], tilt: 0.45 }); break;
+        // Faceted glacial shard clusters. Flicker-free standard material (avoids dual-BRDF clearcoat fireflies)
+        const im = new THREE.MeshStandardMaterial({ color: '#a8dcff', roughness: 0.16, metalness: 0.12, emissive: '#2a6a9a', emissiveIntensity: 0.3, flatShading: true }); disp.push(im);
+        for (let v = 0; v < 2; v++) place(crystalClusterGeometry(3 + v * 4, gq >= 2 ? 7 : 5, 1.0, 0.3, 2.3, 0.55), im, 190, 8, 500, 2, 8, { foot: 1.3, scaleY: [2, 6], tilt: 0.35, colors: ['#ffffff', '#d8f0ff', '#c0e4ff'] });
+        break;
       }
       case 'pines': {
-        const parts: THREE.BufferGeometry[] = [];
-        const addCol = (gg: THREE.BufferGeometry, fn: (y: number, ny: number) => [number, number, number]) => {
-          const ng = gg.index ? gg.toNonIndexed() : gg; ng.computeVertexNormals();
-          const p = ng.attributes.position, n = ng.attributes.normal; const c = new Float32Array(p.count * 3);
-          for (let i = 0; i < p.count; i++) { const [r, gr, b] = fn(p.getY(i), n.getY(i)); c[i * 3] = r; c[i * 3 + 1] = gr; c[i * 3 + 2] = b; }
-          ng.setAttribute('color', new THREE.BufferAttribute(c, 3)); parts.push(ng);
-        };
-        addCol(new THREE.CylinderGeometry(0.22, 0.38, 3.2, 6).translate(0, 1.6, 0), () => [0.24, 0.16, 0.11]);
-        for (let k = 0; k < 4; k++) {
-          const y0 = 2.6 + k * 1.9, r = 2.55 - k * 0.52, h = 3.1 - k * 0.25;
-          addCol(new THREE.ConeGeometry(r, h, 8).translate(0, y0 + h / 2, 0), (y, ny) =>
-            ny > 0.25 && y > y0 + h * 0.38 ? [0.84, 0.9, 0.96] : [0.11 + k * 0.015, 0.24 + k * 0.02, 0.18 + k * 0.015]);
-        }
-        const g = mergeGeometries(parts)!; parts.forEach(x => x.dispose());
         const pm = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.86 }); disp.push(pm);
-        place(g, pm, 860, 15, 720, 1.4, 3.1, { foot: 2.6, keepDry: true }); break;
+        place(pineGeometry(gq >= 2 ? 6 : 4, gq >= 2 ? 9 : 7, true), pm, 860, 15, 720, 1.4, 3.1, { foot: 2.6, keepDry: true, scaleY: [0.85, 1.25] }); break;
       }
       case 'trees': {
-        // Multi-branching rainforest tree with smooth canopy puffs (~4× fewer tris + sector-culled = 40× faster shadow pass!)
-        const parts: THREE.BufferGeometry[] = [];
-        const addCol = (gg: THREE.BufferGeometry, rgb: [number, number, number], smoothCrown = false) => {
-          const ng = gg.index ? gg.toNonIndexed() : gg;
-          const p = ng.attributes.position;
-          if (smoothCrown) {
-            // Smooth outward spherical crown normals (lush organic foliage look at 1/4 the triangle count!)
-            let cx = 0, cy = 0, cz = 0;
-            for (let i = 0; i < p.count; i++) { cx += p.getX(i); cy += p.getY(i); cz += p.getZ(i); }
-            cx /= p.count; cy /= p.count; cz /= p.count;
-            const nrm = new Float32Array(p.count * 3);
-            for (let i = 0; i < p.count; i++) {
-              const dx = p.getX(i) - cx, dy = (p.getY(i) - cy) * 1.25 + 0.6, dz = p.getZ(i) - cz;
-              const l = Math.hypot(dx, dy, dz) || 1;
-              nrm[i * 3] = dx / l; nrm[i * 3 + 1] = dy / l; nrm[i * 3 + 2] = dz / l;
-            }
-            ng.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
-          } else ng.computeVertexNormals();
-          const c = new Float32Array(p.count * 3);
-          for (let i = 0; i < p.count; i++) {
-            const k = smoothCrown ? 0.65 + 0.48 * Math.min(1, Math.max(0, (p.getY(i) - 10) / 8)) : 1;
-            c[i * 3] = rgb[0] * k; c[i * 3 + 1] = rgb[1] * k; c[i * 3 + 2] = rgb[2] * k;
-          }
-          ng.setAttribute('color', new THREE.BufferAttribute(c, 3)); parts.push(ng);
-        };
-        const bark: [number, number, number] = [0.3, 0.21, 0.13];
-        addCol(new THREE.CylinderGeometry(0.42, 0.95, 13.5, 7).translate(0, 6.75, 0), bark);
-        for (let b = 0; b < 3; b++) {
-          const a = (b / 3) * Math.PI * 2;
-          addCol(new THREE.ConeGeometry(0.45, 3.2, 5).rotateZ(0.48).rotateY(a).translate(Math.cos(a) * 0.7, 1.1, -Math.sin(a) * 0.7), bark);
-          addCol(new THREE.CylinderGeometry(0.18, 0.34, 4.5, 5).rotateZ(0.75).rotateY(a + 0.5).translate(Math.cos(a + 0.5) * 1.4, 11.8, -Math.sin(a + 0.5) * 1.4), bark);
-        }
-        for (let k = 0; k < 5; k++) {
-          const r = 3.0 + (k % 2) * 1.1, a = k * 1.45, d = k === 4 ? 0 : 2.6;
-          const crown = new THREE.IcosahedronGeometry(r, 1); crown.scale(1.18, 0.72, 1.18);
-          crown.translate(Math.cos(a) * d, 12.8 + (k % 3) * 1.3 + (k === 4 ? 2.1 : 0), Math.sin(a) * d);
-          addCol(crown, [0.36, 0.62, 0.22], true);
-        }
-        const g = mergeGeometries(parts)!; parts.forEach(x => x.dispose());
+        // Emergent rainforest trees (buttress roots, forked boughs, layered canopy lobes, lianas) – 2 seeded variants, sector-culled
         const tm = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.84 }); disp.push(tm);
-        place(g, tm, 1100, 10, 620, 1, 2.45, { foot: 6.5, keepDry: true, colors: ['#dce8cf', '#ffffff', '#e8f0c8', '#c8dec0'] }); break;
+        for (let v = 0; v < 2; v++) place(jungleTreeGeometry(5 + v * 8, gq), tm, 470, 10, 620, 1, 2.45, { foot: 6.5, keepDry: true, scaleY: [0.85, 1.2], colors: ['#dce8cf', '#ffffff', '#e8f0c8', '#c8dec0'], lod: { geo: jungleTreeGeometry(5 + v * 8, gq, true), dist: 240 } });
+        break;
       }
       case 'buildings': case 'towers': {
         const wc = document.createElement('canvas'); wc.width = 256; wc.height = 512; const ctx = wc.getContext('2d')!;
@@ -714,67 +663,70 @@ function scatterDecor(
         const wt = new THREE.CanvasTexture(wc); wt.colorSpace = THREE.SRGBColorSpace; wt.wrapS = wt.wrapT = THREE.RepeatWrapping; wt.repeat.set(1, 2); wt.anisotropy = 8;
         const bm = new THREE.MeshStandardMaterial({ color: '#3b4252', metalness: 0.78, roughness: 0.34, envMapIntensity: 0.85, map: wt, emissiveMap: wt, emissive: '#ffffff', emissiveIntensity: 0.85 });
         disp.push(bm, wt);
+        const B = (w: number, h: number, d: number, x: number, y: number, z: number) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
         if (kind === 'buildings') {
-          // Stepped Art-Deco Coruscant megablock with upper setback tier
-          const g = mergeGeometries([
-            new THREE.BoxGeometry(1, 0.78, 1).translate(0, 0.39, 0),
-            new THREE.BoxGeometry(0.74, 0.22, 0.74).translate(0, 0.89, 0),
+          // Session 9: Art-Deco megablocks with 4 setback tiers, corner buttress fins, sky-dock & roof mast (2 silhouettes)
+          const fins = [-1, 1].flatMap(sx => [-1, 1].map(sz => B(0.13, 0.68, 0.13, sx * 0.5, 0.34, sz * 0.5)));
+          const gA = mergeGeometries([
+            B(1, 0.6, 1, 0, 0.3, 0), B(0.82, 0.2, 0.82, 0, 0.7, 0), B(0.6, 0.14, 0.6, 0, 0.87, 0), B(0.36, 0.08, 0.36, 0, 0.98, 0), ...fins,
+            B(0.46, 0.012, 0.3, 0.66, 0.5, 0), B(0.05, 0.012, 0.05, 0.86, 0.494, 0),
+            new THREE.CylinderGeometry(0.012, 0.03, 0.24, 5).translate(0.07, 1.14, -0.05),
           ].map(x => x.toNonIndexed()))!;
-          place(g, bm, 700, 30, 2200, 25, 70, { foot: 0.75, scaleY: [3, 9] });
+          const gB = mergeGeometries([
+            B(1, 0.42, 0.72, 0, 0.21, 0), B(0.42, 0.56, 0.6, -0.27, 0.7, 0), B(0.36, 0.38, 0.5, 0.29, 0.61, 0), B(0.2, 0.05, 0.44, 0.01, 0.7, 0),
+            B(0.3, 0.1, 0.42, -0.27, 1.03, 0), B(0.26, 0.06, 0.36, 0.29, 0.83, 0),
+            new THREE.CylinderGeometry(0.01, 0.025, 0.2, 5).translate(-0.27, 1.18, 0), new THREE.CylinderGeometry(0.16, 0.16, 0.012, 10).translate(0.29, 0.87, 0),
+          ].map(x => x.toNonIndexed()))!;
+          place(gA, bm, 380, 30, 2200, 25, 70, { foot: 0.9, scaleY: [3, 9] });
+          place(gB, bm, 320, 30, 2200, 25, 70, { foot: 0.8, scaleY: [3, 8] });
         } else {
+          // Session 9: tapered spire tower with 4 buttress fins, two ring decks, crown & needle
           const g = mergeGeometries([
-            new THREE.CylinderGeometry(0.62, 1, 0.88, 12).translate(0, 0.44, 0),
-            new THREE.CylinderGeometry(1.38, 1.38, 0.04, 12).translate(0, 0.82, 0),
+            new THREE.CylinderGeometry(0.62, 1, 0.88, 14).translate(0, 0.44, 0),
+            ...[0, 1, 2, 3].map(k => B(0.1, 0.5, 0.62, 0, 0.25, 0.82).rotateY(k * Math.PI / 2)),
+            new THREE.CylinderGeometry(1.15, 0.9, 0.03, 14).translate(0, 0.52, 0),
+            new THREE.CylinderGeometry(1.38, 1.2, 0.04, 14).translate(0, 0.82, 0),
+            new THREE.TorusGeometry(1.36, 0.018, 4, 20).rotateX(Math.PI / 2).translate(0, 0.855, 0),
             new THREE.CylinderGeometry(0.38, 0.58, 0.2, 12).translate(0, 0.96, 0),
-            new THREE.ConeGeometry(0.18, 0.26, 8).translate(0, 1.19, 0),
+            new THREE.CylinderGeometry(0.5, 0.42, 0.03, 12).translate(0, 1.07, 0),
+            new THREE.ConeGeometry(0.2, 0.24, 8).translate(0, 1.2, 0),
+            new THREE.CylinderGeometry(0.008, 0.02, 0.26, 5).translate(0, 1.42, 0),
           ].map(x => x.toNonIndexed()))!;
           place(g, bm, 165, 60, 1800, 30, 60, { foot: 1.45, scaleY: [6, 11] });
         }
         break;
       }
       case 'crystals': {
-        const parts: THREE.BufferGeometry[] = [];
-        for (let k = 0; k < 6; k++) {
-          const h = 2.8 + k * 0.55, r = 0.36;
-          const body = new THREE.CylinderGeometry(r * 0.78, r, h * 0.74, 6).translate(0, h * 0.37, 0);
-          const tip = new THREE.ConeGeometry(r * 0.78, h * 0.26, 6).translate(0, h * 0.87, 0);
-          const rz = (k - 2.5) * 0.28, rx = (k % 2 - 0.5) * 0.38;
-          body.rotateZ(rz); body.rotateX(rx); tip.rotateZ(rz); tip.rotateX(rx);
-          parts.push(body.toNonIndexed(), tip.toNonIndexed());
-        }
-        const g = mergeGeometries(parts)!; parts.forEach(x => x.dispose());
-        const cm = new THREE.MeshStandardMaterial({ color: '#c8a0ff', roughness: 0.16, metalness: 0.14, emissive: '#8a3aff', emissiveIntensity: 0.72 }); disp.push(cm);
-        place(g, cm, 600, 6, 500, 1.5, 6, { foot: 1.4, tilt: 0.3, colors: ['#d0a0ff', '#90c0ff', '#ff90e0'] }); break;
+        const cm = new THREE.MeshStandardMaterial({ color: '#c8a0ff', roughness: 0.16, metalness: 0.14, emissive: '#8a3aff', emissiveIntensity: 0.72, flatShading: true }); disp.push(cm);
+        for (let v = 0; v < 2; v++) place(crystalClusterGeometry(9 + v * 6, gq >= 2 ? 8 : 5, 5.4, 0.44, 2.6, 0.6), cm, 300, 6, 500, 1.5, 6, { foot: 1.4, tilt: 0.25, colors: ['#d0a0ff', '#90c0ff', '#ff90e0'] });
+        break;
       }
       case 'wrecks': {
         // Crashed podracer turbine nacelle with cowling ring, intake cone & crumpled stabilizer fin
+        // Session 9: torn open-ended cowling with exposed frame ribs, bent intake spike, crumpled fin, snapped strut & loose hull plates
         const g = mergeGeometries([
-          new THREE.CylinderGeometry(0.95, 1.25, 6.2, 16).rotateZ(Math.PI / 2),
+          new THREE.CylinderGeometry(0.95, 1.25, 6.2, 16, 1, true).rotateZ(Math.PI / 2),
+          new THREE.CylinderGeometry(0.8, 1.05, 5.6, 12, 1, true).rotateZ(Math.PI / 2),
           new THREE.TorusGeometry(1.22, 0.18, 8, 16).rotateY(Math.PI / 2).translate(-2.9, 0, 0),
-          new THREE.ConeGeometry(0.65, 1.6, 12).rotateZ(Math.PI / 2).translate(-2.4, 0, 0),
-          new THREE.BoxGeometry(2.6, 0.22, 3.8).rotateX(0.28).translate(0.5, 0.95, 0.6),
+          new THREE.ConeGeometry(0.65, 1.9, 12).rotateZ(Math.PI / 2 + 0.22).translate(-2.5, 0.1, 0),
+          new THREE.BoxGeometry(2.6, 0.2, 3.8).rotateX(0.28).rotateZ(0.12).translate(0.5, 0.95, 0.6),
           new THREE.TorusGeometry(1.02, 0.15, 6, 16).rotateY(Math.PI / 2).translate(2.8, 0, 0),
+          ...[3.5, 4.3, 5.1].map((x, k) => new THREE.TorusGeometry(0.98 - k * 0.07, 0.07, 5, 12, Math.PI * (1.25 - k * 0.2)).rotateY(Math.PI / 2).rotateX(0.6 + k * 0.5).translate(x, 0, 0)),
+          new THREE.CylinderGeometry(0.09, 0.09, 3.4, 6).rotateZ(1.1).rotateY(0.5).translate(3.6, 0.3, -1.2),
+          new THREE.BoxGeometry(1.5, 0.08, 1.1).rotateZ(0.5).rotateY(0.7).translate(1.8, -0.55, -2.2),
+          new THREE.BoxGeometry(1.1, 0.08, 0.8).rotateZ(-0.35).rotateY(-0.4).translate(-1.2, -0.6, 2.1),
+          new THREE.CylinderGeometry(0.42, 0.5, 1.1, 10).rotateX(1.2).translate(4.4, -0.45, 1.5),
         ].map(x => x.toNonIndexed()))!;
-        const wm = new THREE.MeshStandardMaterial({ color: '#615044', metalness: 0.72, roughness: 0.56 }); disp.push(wm);
+        const wm = new THREE.MeshStandardMaterial({ color: '#615044', metalness: 0.72, roughness: 0.56, side: THREE.DoubleSide }); disp.push(wm);
         place(g, wm, 64, 10, 210, 0.85, 1.55, { foot: 3.5, tilt: 0.9, yOff: 0.28, keepDry: true }); break;
       }
       case 'balloons': {
-        const g = mergeGeometries([
-          new THREE.SphereGeometry(1, 20, 14).scale(1, 0.82, 2.25),
-          new THREE.BoxGeometry(0.12, 0.9, 0.9).translate(0, 0.5, -1.9), // tail fin
-          new THREE.BoxGeometry(0.65, 0.42, 1.3).translate(0, -1.05, 0),
-        ].map(x => x.toNonIndexed()))!;
         const bm = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.48, metalness: 0.22 }); disp.push(bm);
-        place(g, bm, 40, 60, 1200, 6, 14, { air: 120, shadow: false, colors: ['#d84a3a', '#e8c24a', '#4a8ad8', '#e8e0d0'] }); break;
+        place(airshipGeometry(), bm, 40, 60, 1200, 6, 14, { air: 120, shadow: false, colors: ['#d84a3a', '#e8c24a', '#4a8ad8', '#e8e0d0'] }); break;
       }
       case 'pylons': {
-        const g = mergeGeometries([
-          new THREE.CylinderGeometry(0.38, 1.05, 30, 6).translate(0, 15, 0),
-          new THREE.TorusGeometry(1.3, 0.14, 6, 16).rotateX(Math.PI / 2).translate(0, 24, 0),
-          new THREE.SphereGeometry(0.92, 10, 8).translate(0, 30.5, 0),
-        ].map(x => x.toNonIndexed()))!;
         const pm = new THREE.MeshStandardMaterial({ color: '#606878', metalness: 0.9, roughness: 0.28, emissive: theme.barrierColor, emissiveIntensity: 0.38 }); disp.push(pm);
-        place(g, pm, 90, 30, 900, 1, 2, { foot: 1.2 }); break;
+        place(pylonGeometry(), pm, 90, 30, 900, 1, 2, { foot: 3.2 }); break;
       }
     }
   }

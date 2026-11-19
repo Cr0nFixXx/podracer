@@ -3,7 +3,7 @@ import * as TSLmod from 'three/tsl';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
-const { color, cos, float, fract, hash, instanceIndex, instancedBufferAttribute, length, max: tslMax, min: tslMin, oneMinus, positionView, pow, sin, smoothstep, step, uniform, uv, vec3 } = TSL;
+const { clamp, color, cos, exp, float, fract, hash, instanceIndex, instancedBufferAttribute, length, max: tslMax, min: tslMin, mix, oneMinus, positionView, pow, sin, smoothstep, step, uniform, uv, varying, vec3, vec4 } = TSL;
 
 /** Soft round disc with early edge falloff (no square corners). */
 const softDisc = () => pow(tslMax(oneMinus(length(uv().sub(0.5)).mul(2.0)), 0.0), 1.7);
@@ -16,34 +16,39 @@ const softDisc = () => pow(tslMax(oneMinus(length(uv().sub(0.5)).mul(2.0)), 0.0)
  *  - Smooth camera near-fade (`2.5..8 m`) keeps driver visibility crystal-clear when drafting a rival.
  *  - Ambient weather runs 100% on the GPU (zero CPU loop, zero buffer upload).
  */
+/**
+ * Session 10 – GPU-simulated pool: the CPU only writes spawn records (ring buffer, partial uploads); the vertex shader integrates
+ * the closed-form trajectory `p(t) = p0 + v0·(1-e^-kt)/k - g·(t - (1-e^-kt)/k)/k` (same drag/gravity model as the old CPU loop),
+ * size/colour/alpha ramps and death. No per-frame CPU loop, no per-frame full-buffer upload. Works on WebGPU and WebGL2.
+ */
 class Pool {
-  max: number; count = 0;
-  pos: Float32Array; vel: Float32Array; life: Float32Array; maxLife: Float32Array;
-  s0: Float32Array; s1: Float32Array; c0: Float32Array; c1: Float32Array; a0: Float32Array; drag: Float32Array; grav: Float32Array;
-  posAttr: THREE.InstancedBufferAttribute; sizeAttr: THREE.InstancedBufferAttribute; colAttr: THREE.InstancedBufferAttribute;
+  max: number; head = 0; live = 0; time = 0;
+  private dirty = 0; private dirtyStart = 0;
+  aPos: THREE.InstancedBufferAttribute; aVel: THREE.InstancedBufferAttribute; aC0: THREE.InstancedBufferAttribute; aC1: THREE.InstancedBufferAttribute; aMisc: THREE.InstancedBufferAttribute;
+  private attrs: THREE.InstancedBufferAttribute[];
+  private uTime = uniform(0);
   sprite: THREE.Sprite; mat: THREE.PointsNodeMaterial;
   constructor(max: number, additive: boolean) {
     this.max = max;
-    this.pos = new Float32Array(max * 3); this.vel = new Float32Array(max * 3);
-    this.life = new Float32Array(max); this.maxLife = new Float32Array(max);
-    this.s0 = new Float32Array(max); this.s1 = new Float32Array(max);
-    this.c0 = new Float32Array(max * 3); this.c1 = new Float32Array(max * 3); this.a0 = new Float32Array(max);
-    this.drag = new Float32Array(max); this.grav = new Float32Array(max);
-    this.posAttr = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3); this.posAttr.setUsage(THREE.DynamicDrawUsage);
-    this.sizeAttr = new THREE.InstancedBufferAttribute(new Float32Array(max), 1); this.sizeAttr.setUsage(THREE.DynamicDrawUsage);
-    this.colAttr = new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4); this.colAttr.setUsage(THREE.DynamicDrawUsage);
+    const mk = () => { const at = new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4); at.setUsage(THREE.DynamicDrawUsage); return at; };
+    this.aPos = mk(); this.aVel = mk(); this.aC0 = mk(); this.aC1 = mk(); this.aMisc = mk(); // (p0,t0) (v0,life) (c0,alpha) (c1,drag) (s0,s1,grav,-)
+    this.attrs = [this.aPos, this.aVel, this.aC0, this.aC1, this.aMisc];
     const mat = new THREE.PointsNodeMaterial({
       transparent: true, depthWrite: false, alphaTest: 0.012,
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, sizeAttenuation: true,
     });
-    mat.positionNode = instancedBufferAttribute(this.posAttr);
+    const A = instancedBufferAttribute(this.aPos), B = instancedBufferAttribute(this.aVel), C0 = instancedBufferAttribute(this.aC0), C1 = instancedBufferAttribute(this.aC1), M = instancedBufferAttribute(this.aMisc);
+    const age = this.uTime.sub(A.w), life = tslMax(B.w, float(1e-4)), t = clamp(age.div(life), 0.0, 1.0);
+    const alive = step(float(0.0), age).mul(step(age, B.w.sub(1e-5)));
+    const k = tslMax(C1.w, float(0.02)), f1 = oneMinus(exp(k.negate().mul(age))).div(k);
+    mat.positionNode = A.xyz.add(B.xyz.mul(f1)).sub(vec3(0, 1, 0).mul(M.z.mul(age.sub(f1)).div(k)));
     // Strict camera-plane guard: zero size behind/at camera, max ~16% viewport height when close -> 0 overdraw lag!
     const vz = positionView.z.negate();
-    const rawSz = instancedBufferAttribute(this.sizeAttr).mul(1.45);
+    const rawSz = mix(M.x, M.y, t).mul(1.45).mul(alive);
     const maxWorldSz = tslMax(vz.sub(1.1), float(0.0)).mul(additive ? 0.16 : 0.14);
     mat.sizeNode = tslMin(rawSz, maxWorldSz).mul(step(float(1.2), vz));
     const nearFade = smoothstep(additive ? 2.0 : 4.5, additive ? 6.0 : 12.0, vz);
-    const c = instancedBufferAttribute(this.colAttr);
+    const c = varying(vec4(mix(C0.xyz, C1.xyz, t), C0.w.mul(tslMin(t.mul(8.0), float(1.0))).mul(oneMinus(t)).mul(alive)));
     mat.colorNode = c.xyz;
     mat.opacityNode = c.w.mul(softDisc()).mul(nearFade);
     this.mat = mat;
@@ -51,53 +56,34 @@ class Pool {
     this.sprite.renderOrder = additive ? 5 : 4;
   }
   spawn(p: THREE.Vector3, v: THREE.Vector3, life: number, s0: number, s1: number, c0: THREE.Color, c1: THREE.Color, a: number, drag: number, grav: number) {
-    if (this.count >= this.max) return;
-    const i = this.count++, i3 = i * 3;
-    this.pos[i3] = p.x; this.pos[i3 + 1] = p.y; this.pos[i3 + 2] = p.z;
-    this.vel[i3] = v.x; this.vel[i3 + 1] = v.y; this.vel[i3 + 2] = v.z;
-    this.life[i] = 0; this.maxLife[i] = life; this.s0[i] = s0; this.s1[i] = s1;
-    this.c0[i3] = c0.r; this.c0[i3 + 1] = c0.g; this.c0[i3 + 2] = c0.b;
-    this.c1[i3] = c1.r; this.c1[i3 + 1] = c1.g; this.c1[i3 + 2] = c1.b;
-    this.a0[i] = a; this.drag[i] = drag; this.grav[i] = grav;
-  }
-  kill(i: number) {
-    const j = --this.count; if (i === j) return;
-    const i3 = i * 3, j3 = j * 3;
-    this.pos[i3] = this.pos[j3]; this.pos[i3 + 1] = this.pos[j3 + 1]; this.pos[i3 + 2] = this.pos[j3 + 2];
-    this.vel[i3] = this.vel[j3]; this.vel[i3 + 1] = this.vel[j3 + 1]; this.vel[i3 + 2] = this.vel[j3 + 2];
-    this.c0[i3] = this.c0[j3]; this.c0[i3 + 1] = this.c0[j3 + 1]; this.c0[i3 + 2] = this.c0[j3 + 2];
-    this.c1[i3] = this.c1[j3]; this.c1[i3 + 1] = this.c1[j3 + 1]; this.c1[i3 + 2] = this.c1[j3 + 2];
-    this.life[i] = this.life[j]; this.maxLife[i] = this.maxLife[j]; this.s0[i] = this.s0[j]; this.s1[i] = this.s1[j];
-    this.a0[i] = this.a0[j]; this.drag[i] = this.drag[j]; this.grav[i] = this.grav[j];
+    const i4 = this.head * 4; this.head = (this.head + 1) % this.max;
+    if (this.dirty === 0) this.dirtyStart = i4 / 4; if (this.dirty < this.max) this.dirty++;
+    const P = this.aPos.array as Float32Array, V = this.aVel.array as Float32Array, A0 = this.aC0.array as Float32Array, A1 = this.aC1.array as Float32Array, M = this.aMisc.array as Float32Array;
+    P[i4] = p.x; P[i4 + 1] = p.y; P[i4 + 2] = p.z; P[i4 + 3] = this.time;
+    V[i4] = v.x; V[i4 + 1] = v.y; V[i4 + 2] = v.z; V[i4 + 3] = life;
+    A0[i4] = c0.r; A0[i4 + 1] = c0.g; A0[i4 + 2] = c0.b; A0[i4 + 3] = a;
+    A1[i4] = c1.r; A1[i4 + 1] = c1.g; A1[i4 + 2] = c1.b; A1[i4 + 3] = drag;
+    M[i4] = s0; M[i4 + 1] = s1; M[i4 + 2] = grav;
   }
   update(dt: number) {
-    const P = this.posAttr.array as Float32Array, S = this.sizeAttr.array as Float32Array, C = this.colAttr.array as Float32Array;
-    for (let i = this.count - 1; i >= 0; i--) {
-      const nl = this.life[i] + dt;
-      if (nl >= this.maxLife[i]) { this.kill(i); continue; }
-      this.life[i] = nl;
-      const d = 1 / (1 + this.drag[i] * dt);
-      const i3 = i * 3;
-      const vx = this.vel[i3] * d, vy = this.vel[i3 + 1] * d - this.grav[i] * dt, vz = this.vel[i3 + 2] * d;
-      this.vel[i3] = vx; this.vel[i3 + 1] = vy; this.vel[i3 + 2] = vz;
-      this.pos[i3] += vx * dt; this.pos[i3 + 1] += vy * dt; this.pos[i3 + 2] += vz * dt;
+    this.time += dt; this.uTime.value = this.time;
+    if (this.dirty > 0) {
+      const n = this.dirty, st = this.dirtyStart, wrap = st + n > this.max;
+      for (const at of this.attrs) {
+        at.clearUpdateRanges();
+        if (n >= this.max) at.addUpdateRange(0, this.max * 4);
+        else if (wrap) { at.addUpdateRange(st * 4, (this.max - st) * 4); at.addUpdateRange(0, (st + n - this.max) * 4); }
+        else at.addUpdateRange(st * 4, n * 4);
+        at.needsUpdate = true;
+      }
+      this.live = Math.min(this.max, wrap ? this.max : Math.max(this.live, st + n));
+      this.dirty = 0;
     }
-    const n = this.count;
-    for (let i = 0; i < n; i++) {
-      const t = this.life[i] / this.maxLife[i]; const i3 = i * 3, i4 = i * 4;
-      P[i3] = this.pos[i3]; P[i3 + 1] = this.pos[i3 + 1]; P[i3 + 2] = this.pos[i3 + 2];
-      S[i] = this.s0[i] + (this.s1[i] - this.s0[i]) * t;
-      C[i4] = this.c0[i3] + (this.c1[i3] - this.c0[i3]) * t;
-      C[i4 + 1] = this.c0[i3 + 1] + (this.c1[i3 + 1] - this.c0[i3 + 1]) * t;
-      C[i4 + 2] = this.c0[i3 + 2] + (this.c1[i3 + 2] - this.c0[i3 + 2]) * t;
-      C[i4 + 3] = this.a0[i] * Math.min(1, t * 8) * (1 - t);
-    }
-    this.sprite.count = n;
-    if (n > 0) {
-      this.posAttr.clearUpdateRanges(); this.posAttr.addUpdateRange(0, n * 3); this.posAttr.needsUpdate = true;
-      this.sizeAttr.clearUpdateRanges(); this.sizeAttr.addUpdateRange(0, n); this.sizeAttr.needsUpdate = true;
-      this.colAttr.clearUpdateRanges(); this.colAttr.addUpdateRange(0, n * 4); this.colAttr.needsUpdate = true;
-    }
+    this.sprite.count = this.live;
+  }
+  clear() {
+    (this.aVel.array as Float32Array).fill(0); this.aVel.clearUpdateRanges(); this.aVel.needsUpdate = true;
+    this.head = 0; this.live = 0; this.dirty = 0; this.sprite.count = 0;
   }
   dispose() { this.mat.dispose(); }
 }
@@ -220,29 +206,38 @@ export class Particles {
     this.sparks(p, UP_V, ZERO_V, 36);
   }
 
-  initAmbient(type: string) {
-    const n = Math.max(1, Math.min(1100, Math.floor(900 * this.amount)));
-    const colors: Record<string, string> = { dust: '#e8c8a0', snow: '#ffffff', embers: '#ff7020', spores: '#d8ff9a', rain: '#a0b0d0', sparkle: '#e0b0ff' };
-    const vel: Record<string, [number, number, number]> = { dust: [8, 0.5, 3], snow: [2, -4, 1], embers: [1, 3, 0.5], spores: [0.5, 0.4, 0.3], rain: [1, -40, 0.5], sparkle: [0.3, 0.6, 0.2] };
+  /** `wind` (0..1) slants rain/snow/dust and speeds them up, `dense` scales the count (storms, gusts). */
+  initAmbient(type: string, wind = 0, dense = 1) {
+    const n = Math.max(1, Math.min(2000, Math.floor(900 * this.amount * dense)));
+    const colors: Record<string, string> = { dust: '#e8c8a0', snow: '#ffffff', embers: '#ff7020', spores: '#d8ff9a', rain: '#cfdcee', sparkle: '#e0b0ff' };
+    const vel: Record<string, [number, number, number]> = { dust: [8 + wind * 26, 0.5, 3 + wind * 10], snow: [2 + wind * 18, -4 - wind * 2, 1 + wind * 8], embers: [1 + wind * 6, 3, 0.5], spores: [0.5 + wind * 3, 0.4, 0.3], rain: [1 + wind * 16, -40, 0.5 + wind * 7], sparkle: [0.3, 0.6, 0.2] };
     const add = type === 'embers' || type === 'sparkle' || type === 'spores';
     const v = vel[type] ?? [2, -2, 1];
-    const id = instanceIndex; const span = float(150.0);
+    // Rain needs density near the camera (thin streaks vanish beyond ~40 m) → smaller wrap volume; wind-driven snow likewise
+    const id = instanceIndex; const span = float(type === 'rain' ? 64.0 : type === 'snow' && wind > 0.3 ? 96.0 : 150.0);
     const seedPos = vec3(hash(id), hash(id.add(1999)), hash(id.add(4099))).mul(span);
     const ph = hash(id.add(7919)).mul(6.2832);
     const t = this.ambTime;
     const drift = vec3(t.mul(v[0]).add(sin(t.add(ph)).mul(0.6)), t.mul(v[1]), t.mul(v[2]).add(cos(t.mul(0.7).add(ph)).mul(0.6)));
     const wrapped = fract(seedPos.add(drift).sub(this.ambCam).div(span).add(0.5)).sub(0.5).mul(span).add(this.ambCam);
     const vz = positionView.z.negate();
-    const baseSz = type === 'rain' ? 0.11 : type === 'dust' ? 0.24 : 0.2;
+    const rain = type === 'rain';
+    const baseSz = rain ? 1.2 : type === 'dust' ? 0.24 : type === 'snow' ? 0.2 + wind * 0.08 : 0.2;
     const mat = new THREE.PointsNodeMaterial({
       transparent: true, depthWrite: false, alphaTest: 0.02,
       blending: add ? THREE.AdditiveBlending : THREE.NormalBlending, sizeAttenuation: true,
     });
     mat.positionNode = wrapped;
     // Never expand into giant screen-filling quads when ambient particles cross camera.position!
-    mat.sizeNode = tslMin(float(baseSz), tslMax(vz.sub(2.0), float(0.0)).mul(0.05)).mul(step(float(2.2), vz));
+    mat.sizeNode = tslMin(float(baseSz), tslMax(vz.sub(2.0), float(0.0)).mul(rain ? 0.1 : 0.05)).mul(step(float(2.2), vz));
     mat.colorNode = color(new THREE.Color(colors[type]).multiplyScalar(add ? 1.3 : 1));
-    mat.opacityNode = softDisc().mul(type === 'dust' ? 0.2 : 0.72).mul(smoothstep(2.5, 7.0, vz));
+    if (rain) {
+      // Rain as thin wind-slanted streaks (a 1.2 m sprite carries a ~4 cm line) instead of round dots
+      const q = uv().sub(0.5), sl = Math.sin(wind * 0.38), cl = Math.cos(wind * 0.38);
+      const qx = q.x.mul(cl).add(q.y.mul(sl)), qy = q.y.mul(cl).sub(q.x.mul(sl));
+      const streak = oneMinus(smoothstep(0.018, 0.06, qx.abs())).mul(oneMinus(smoothstep(0.22, 0.5, qy.abs())));
+      mat.opacityNode = streak.mul(0.62).mul(smoothstep(2.5, 7.0, vz));
+    } else mat.opacityNode = softDisc().mul(type === 'dust' ? 0.2 : 0.72).mul(smoothstep(2.5, 7.0, vz));
     const sp = new THREE.Sprite(mat); sp.count = n; sp.frustumCulled = false;
     this.ambient = sp;
     this.group.add(sp);
@@ -253,7 +248,7 @@ export class Particles {
     this.ambCam.value.copy(cam);
     this.ambTime.value = t;
   }
-  clear() { this.add.count = 0; this.alpha.count = 0; this.add.sprite.count = 0; this.alpha.sprite.count = 0; }
+  clear() { this.add.clear(); this.alpha.clear(); }
   dispose() { this.add.dispose(); this.alpha.dispose(); (this.ambient?.material as THREE.Material | undefined)?.dispose(); }
 }
 export { WHITE };

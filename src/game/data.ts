@@ -133,6 +133,7 @@ export interface ThemeDef {
   terrain: 'dunes' | 'mountains' | 'lava' | 'city' | 'jungle' | 'canyon' | 'prison' | 'ocean';
   emissiveGround?: string;
   barrierColor: string;
+  stars?: number; // 0..1 night starfield (set by environment.ts)
 }
 
 export const THEMES: Record<string, ThemeDef> = {

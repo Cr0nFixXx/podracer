@@ -41,7 +41,7 @@ export default function PodPreview({ podId, colors, className, autoRotate = true
       if (st.pod) {
         const sw = Math.sin(t * 1.4) * 0.24;
         st.pod.group.rotation.y = st.rot; st.pod.group.position.y = 0.45 + Math.sin(t * 2) * 0.12;
-        st.pod.setEngineMotion(sw, -sw, -sw * 0.08, sw * 0.08, 0);
+        st.pod.setEngineMotion(sw, -sw, 0, 0, 0);
         st.pod.update(t, 0.4, 0, 0, 1, 1, 0);
       }
       const def = PODS.find(p => p.id === st.podId) ?? PODS[0]; const dist = ((def.cable + def.engineLen) * 0.95 + 6) * st.zoom;

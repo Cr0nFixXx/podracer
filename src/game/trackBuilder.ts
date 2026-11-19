@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import type { TrackDef } from './data';
 
 export const DS = 2; // sample spacing in meters
+/** Session 11: global road width scale (+18 % – more room for slides, knife-edge passes and three-wide racing) */
+export const TRACK_WIDTH = 1.18;
 export const WIDTH_SCALE = 2.0; // global road width multiplier
 export const SC_HW = 12; // shortcut half width
 export const RAIL_INSET = 0.3; // guard-rail inner face, metres inside the road edge
@@ -85,7 +87,7 @@ function findStraight(S: Sample[], N: number, at: number, closed: boolean, taken
   return ((best % N) + N) % N;
 }
 
-function finalizeSamples(S: Sample[], closed: boolean) {
+function finalizeSamples(S: Sample[], closed: boolean, banked = false) {
   const n = S.length;
   const get = (i: number) => closed ? S[(i + n) % n] : S[Math.max(0, Math.min(n - 1, i))];
   for (let i = 0; i < n; i++) {
@@ -104,12 +106,14 @@ function finalizeSamples(S: Sample[], closed: boolean) {
     let s = 0, c = 0;
     for (let k = -W; k <= W; k++) { let j = i + k; if (closed) j = (j + n) % n; else if (j < 0 || j >= n) continue; s += raw[j]; c++; }
     S[i].curv = s / c;
-    const bl = Math.min(0.2, 2.4 / Math.max(1, S[i].hw)); S[i].bank = Math.max(-bl, Math.min(bl, S[i].curv * 14));
+    // Session 10: main circuits get real banked corners (up to ~21° / 6.2 m outer-edge rise); shortcuts keep the gentle camber
+    const bl = banked ? Math.min(0.39, 6.2 / Math.max(1, S[i].hw)) : Math.min(0.2, 2.4 / Math.max(1, S[i].hw));
+    S[i].bank = S[i].gap || S[i].zeroG ? 0 : Math.max(-bl, Math.min(bl, S[i].curv * (banked ? 46 : 14)));
   }
   // AI reference speeds
   for (let i = 0; i < n; i++) {
     let k = 0; for (let j = -6; j <= 6; j++) k = Math.max(k, Math.abs(get(i + j).curv));
-    S[i].vmax = Math.min(200, 1.35 / Math.max(k, 1e-4));
+    S[i].vmax = Math.min(200, 1.35 / Math.max(k, 1e-4) * (1 + Math.abs(S[i].bank) * 0.45));
     if (S[i].ramp > 0 || S[i].gap) S[i].vmax = 200;
   }
   for (let pass = 0; pass < 2; pass++) {
@@ -140,7 +144,7 @@ export function buildTrack(def: TrackDef): TrackData {
     const fi = u * (closed ? nP : nP - 1);
     const i0 = Math.floor(fi) % nP, i1 = (i0 + 1) % nP, f = fi - Math.floor(fi);
     const w = pts[i0].w + (pts[Math.min(i1, nP - 1)].w - pts[i0].w) * f;
-    samples.push(makeSample(p, w / 2, i * DS));
+    samples.push(makeSample(p, w / 2 * TRACK_WIDTH, i * DS));
   }
   // geometric centerline smoothing: removes curvature spikes from the spline, widens tight radii slightly
   for (let pass = 0; pass < 4; pass++) {
@@ -183,14 +187,43 @@ export function buildTrack(def: TrackDef): TrackData {
   const rngC = mulberry32(hashStr(def.id + '|cliff'));
   const canyonModes = def.canyons.map(([a, b], ci) => ({ a: Math.floor(a * N), b: Math.floor(b * N), mode: def.theme === 'oovo' && ci < 2 ? 3 : (() => { const r = rngC(); return r < 0.4 ? 0 : r < 0.7 ? 1 : 2; })() }));
   // ramps & gaps
-  const taken: number[] = [];
+  const taken: number[] = []; const rampSpans: [number, number][] = [];
   for (const r of def.ramps) {
     const i0 = findStraight(samples, N, r.at, closed, taken, Math.round((r.len + r.gap + 80) / DS)); taken.push(i0);
     const nr = Math.round(r.len / DS), ng = Math.round(r.gap / DS);
     for (let k = 0; k < nr; k++) { const t = (k + 1) / nr; samples[(i0 + k) % N].ramp = r.h * Math.pow(t, 1.7); }
     for (let k = 0; k < ng; k++) { const sm = samples[(i0 + nr + k) % N]; sm.gap = true; }
+    rampSpans.push([i0, nr + ng]);
   }
-  finalizeSamples(samples, closed);
+  // Session 10: rolling gradients on every map – two seeded long waves (±15 m / ±6.5 m → climbs & descents up to ~9 %),
+  // faded out at the grid, finish, ramps/gaps, zero-G tubes and wherever the track passes close to itself (over/underpasses keep their clearance)
+  {
+    const rh = mulberry32(hashStr(def.id + '|hills'));
+    const flat = new Float32Array(N).fill(1);
+    const damp = (c: number, half: number, fade: number) => {
+      for (let k = -half - fade; k <= half + fade; k++) {
+        let j = c + k; if (closed) j = ((j % N) + N) % N; else if (j < 0 || j >= N) continue;
+        const m = Math.abs(k) <= half ? 0 : (Math.abs(k) - half) / fade; flat[j] = Math.min(flat[j], m * m * (3 - 2 * m));
+      }
+    };
+    damp(closed ? 30 : 45, 60, 110);
+    if (!closed) damp(N - 30, 50, 110);
+    for (const [i0, len] of rampSpans) damp(i0 + Math.round(len / 2), Math.round(len / 2) + 50, 100);
+    for (let i = 0; i < N; i++) if (samples[i].zeroG && (i === 0 || !samples[i - 1].zeroG || i % 40 === 0)) damp(i, 40, 100);
+    const cell = 48, grid = new Map<string, number[]>();
+    for (let i = 0; i < N; i += 4) { const key = Math.floor(samples[i].x / cell) + ',' + Math.floor(samples[i].z / cell); let l = grid.get(key); if (!l) { l = []; grid.set(key, l); } l.push(i); }
+    for (let i = 0; i < N; i += 4) {
+      const a = samples[i], cx = Math.floor(a.x / cell), cz = Math.floor(a.z / cell); let near = false;
+      for (let gx = cx - 1; gx <= cx + 1 && !near; gx++) for (let gz = cz - 1; gz <= cz + 1 && !near; gz++) {
+        const l = grid.get(gx + ',' + gz); if (!l) continue;
+        for (const j of l) { const di = Math.abs(i - j), dIdx = closed ? Math.min(di, N - di) : di; if (dIdx < 110) continue; const b = samples[j]; if (Math.hypot(a.x - b.x, a.z - b.z) < a.hw + b.hw + 14) { near = true; break; } }
+      }
+      if (near) damp(i, 6, 110);
+    }
+    const TAU = Math.PI * 2, k1 = 2 + Math.floor(rh() * 2), k2 = 5 + Math.floor(rh() * 3), p1 = rh() * TAU, p2 = rh() * TAU;
+    for (let i = 0; i < N; i++) { const u = i / N * TAU; samples[i].y = samples[i].y * 1.2 + (15 * Math.sin(u * k1 + p1) + 6.5 * Math.sin(u * k2 + p2)) * flat[i]; }
+  }
+  finalizeSamples(samples, closed, true);
   const main: Path = { id: 0, samples, closed, length, mainFrom: 0, mainTo: N - 1, side: 0 };
   const paths: Path[] = [main];
 

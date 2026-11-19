@@ -1,3 +1,5 @@
+import { KeyBindings } from './KeyBindings';
+import { TIME_OPTIONS, WEATHER_OPTIONS, type TimeOfDay, type WeatherKind } from '../game/environment';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, STAT_LABELS, THEMES, TRACKS, type StatKey } from '../game/data';
 import { PRESETS, effectiveStats, type GfxSettings, type Profile } from '../game/settings';
@@ -118,6 +120,20 @@ export function RaceSetup({ profile, update, go, start }: { profile: Profile; up
             <Slider label="Gegner" value={r.opponents} min={0} max={10} step={1} onChange={v => set('opponents', v)} />
             <div className="text-[11px] uppercase tracking-widest text-stone-300 mb-2">Schwierigkeit</div>
             <div className="grid grid-cols-2 gap-2 mb-4">{DIFFICULTIES.map((d, i) => <Btn key={d.id} active={r.difficulty === i} onClick={() => set('difficulty', i)}>{d.name}</Btn>)}</div>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <div>
+                <div className="text-[11px] uppercase tracking-widest text-stone-300 mb-2">Tageszeit</div>
+                <select value={r.timeOfDay ?? 'auto'} onChange={e => set('timeOfDay', e.target.value as TimeOfDay)} className="w-full bg-black/60 border border-stone-600 text-amber-100 p-2 text-sm">
+                  {TIME_OPTIONS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+                </select>
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-widest text-stone-300 mb-2">Wetter</div>
+                <select value={r.weather ?? 'auto'} onChange={e => set('weather', e.target.value as WeatherKind)} className="w-full bg-black/60 border border-stone-600 text-amber-100 p-2 text-sm">
+                  {WEATHER_OPTIONS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+                </select>
+              </div>
+            </div>
             <div className="text-[11px] uppercase tracking-widest text-stone-300 mb-2">Startkamera</div>
             <select value={r.camera} onChange={e => set('camera', parseInt(e.target.value))} className="w-full bg-black/60 border border-stone-600 text-amber-100 p-2 mb-5 text-sm">
               {CAMERA_NAMES.map((c, i) => <option key={c} value={i}>{c}</option>)}
@@ -258,6 +274,8 @@ export function SettingsScreen({ profile, update, go }: { profile: Profile; upda
             <Toggle label="Parallax-Occlusion-Mapping" value={g.parallax} onChange={v => set('parallax', v)} />
             <Toggle label="Ambient Occlusion (GTAO)" value={g.ao} onChange={v => set('ao', v)} />
             <Toggle label="Screen Space Reflections" value={g.ssr} onChange={v => set('ssr', v)} />
+            <Toggle label="Linseneffekte (Sonnenblendung, Regentropfen)" value={g.lensFx ?? true} onChange={v => set('lensFx', v)} />
+            <Toggle label="Kaskaden-Schatten (weit, +1 Schattenpass)" value={!!g.csm} onChange={v => set('csm', v)} />
             <Toggle label="God Rays" value={g.godRays} onChange={v => set('godRays', v)} />
             <Slider label="Partikel" value={g.particles} min={0.2} max={1.5} step={0.1} onChange={v => set('particles', v)} fmt={v => Math.round(v * 100) + '%'} />
           </Panel>
@@ -272,12 +290,8 @@ export function SettingsScreen({ profile, update, go }: { profile: Profile; upda
             <Slider label="Lautstärke" value={profile.volume} min={0} max={1} step={0.05} onChange={v => update(p => ({ ...p, volume: v }))} fmt={v => Math.round(v * 100) + '%'} />
           </Panel>
           <Panel title="Steuerung" className="lg:col-span-3">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-              {[['W / ↑', 'Gas'], ['S / ↓', 'Bremse / Rückwärts'], ['A D / ← →', 'Lenken'], ['Shift / Leertaste', 'Boost (erzeugt Hitze)'], ['E / Q / Strg', 'Luftbremse (enge Kurven)'], ['R', 'Reparatur (langsamer)'], ['C', 'Kamera wechseln'], ['Esc / P', 'Pause']].map(([k, a]) => (
-                <div key={k} className="flex items-center gap-3 bg-black/40 border border-stone-800 p-2"><kbd className="font-display text-amber-300 text-xs bg-stone-800 px-2 py-1 min-w-[90px] text-center">{k}</kbd><span className="text-stone-300 text-xs">{a}</span></div>
-              ))}
-            </div>
-            <p className="text-[11px] text-stone-500 mt-3">Gamepad: RT Gas · LT Bremse · Linker Stick Lenken · A Boost · B/LB/RB Luftbremse · X Reparatur · Y Kamera</p>
+            <KeyBindings profile={profile} update={update} />
+            <p className="text-[11px] text-stone-500 mt-3">Gamepad: RT Schub · LT Bremse · Linker Stick lenken · Rechter Stick: ←/→ Rolle, ↑ Neigen, ↓ Anheben · A Boost · B/LB/RB Luftbremse/Slide · X Reparatur · Y Ansicht</p>
           </Panel>
         </div>
       </div>

@@ -9,7 +9,7 @@ import type { GfxSettings } from './settings';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
 const {
-  Fn, If, Loop, abs, clamp, convertToTexture, float, interleavedGradientNoise, ivec2,
+  Fn, If, Loop, abs, clamp, convertToTexture, dot, exp, float, floor, fract, sin, interleavedGradientNoise, ivec2,
   length, luminance, max, metalness, min, mix, mrt, normalView, oneMinus, output, packNormalToRGB, pass,
   perspectiveDepthToViewZ, pow, renderOutput, roughness, sample, screenCoordinate, screenUV, smoothstep, step,
   textureLoad, textureSize, uniform, unpackRGBToNormal, vec2, vec3, vec4,
@@ -39,9 +39,14 @@ export class PostFX {
   private scenePass: any;
   cine: { uniforms: { time: { value: number }; speed: { value: number }; boost: { value: number }; damage: { value: number }; flash: { value: number } } };
   godRays: { uniforms: { sunPos: { value: THREE.Vector2 }; intensity: { value: number } } } | null = null;
+  /** Session 11 lens effects: sun glare/flare strength, viewport aspect, rain droplets on the lens (0..1), sun colour */
+  lens!: { flare: { value: number }; aspect: { value: number }; rain: { value: number }; sunColor: { value: THREE.Color } | null };
+  /** Session 12 heat haze behind the player's two engine nozzles: screen positions (uv, origin top-left), radius (uv), strength 0..1 */
+  heat: { a: { value: THREE.Vector2 }; b: { value: THREE.Vector2 }; radius: { value: number }; strength: { value: number } } | null = null;
   private disposables: { dispose?: () => void }[] = [];
 
-  constructor(renderer: THREE.WebGPURenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, gfx: GfxSettings) {
+  constructor(renderer: THREE.WebGPURenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, gfx: GfxSettings, env: { rain?: number; flare?: boolean } = {}) {
+    const lensOn = gfx.lensFx ?? true; const flareOn = lensOn && !!env.flare; const rainOn = lensOn && (env.rain ?? 0) > 0.05;
     const u = { time: uniform(0), speed: uniform(0), boost: uniform(0), damage: uniform(0), flash: uniform(0) };
     this.cine = { uniforms: u };
     const scenePass = pass(scene, camera);
@@ -67,7 +72,7 @@ export class PostFX {
     }
 
     const sceneColor = scenePass.getTextureNode('output');
-    const needDepth = gfx.ao || gfx.ssr || gfx.godRays;
+    const needDepth = gfx.ao || gfx.ssr || gfx.godRays || flareOn;
     const depthNode = needDepth ? scenePass.getTextureNode('depth') : null;
     const depthTex: THREE.Texture | null = needDepth ? scenePass.getTexture('depth') : null;
 
@@ -161,12 +166,16 @@ export class PostFX {
 
     // ---- Lightweight depth-occluded sun shafts (textureLoad inside If/Loop = 100% WGSL valid, 0 ms off-sun) ----
     let sunPosU: N = null, sunIntU: N = null, sunColU: N = null;
-    if (gfx.godRays && depthTex) {
+    const flareU = uniform(0), aspectU = uniform(camera.aspect), rainU = uniform(env.rain ?? 0);
+    if ((gfx.godRays || flareOn) && depthTex) {
       sunPosU = uniform(new THREE.Vector2(0.5, 0.5));
       sunIntU = uniform(0);
       sunColU = uniform(new THREE.Color(1.0, 0.9, 0.72));
       this.godRays = { uniforms: { sunPos: sunPosU, intensity: sunIntU } };
     }
+    this.lens = { flare: flareU, aspect: aspectU, rain: rainU, sunColor: sunColU };
+    const heatA = uniform(new THREE.Vector2(-1, -1)), heatB = uniform(new THREE.Vector2(-1, -1)), heatR = uniform(0.05), heatS = uniform(0);
+    if (lensOn) this.heat = { a: heatA, b: heatB, radius: heatR, strength: heatS };
 
     // ---- Single-pass cinematic grading + speed blur + god rays (ZERO film grain) ----
     const src = convertToTexture(col);
@@ -174,7 +183,40 @@ export class PostFX {
     const hasRays = !!(gfx.godRays && depthTex);
     const cinematic = Fn(() => {
       const uvv = screenUV; const c = uvv.sub(0.5); const r = length(c);
-      const base = vec3(src.sample(uvv).level(0).rgb).toVar();
+      // ---- Rain on the lens: swelling/evaporating beads + running drops with wet trails; each drop refracts the scene (screen y is down) ----
+      let uvS: N = uvv, dropM: N = null;
+      if (rainOn) {
+        const h21 = (p: N) => fract(sin(dot(p, vec2(127.1, 311.7))).mul(43758.5453));
+        const asp = vec2(aspectU, 1.0);
+        const p1 = uvv.mul(asp).mul(9.0); const id1 = floor(p1); const f1 = fract(p1).sub(0.5);
+        const rn = h21(id1), rn2 = h21(id1.add(17.3));
+        const life = fract(u.time.mul(0.11).mul(rn2.mul(0.8).add(0.6)).add(rn));
+        const rad = rn2.mul(0.14).add(0.09).mul(smoothstep(0.0, 0.08, life)).mul(ssInv(1.0, 0.55, life)).add(0.0005);
+        const dv1 = f1.sub(vec2(rn, rn2).sub(0.5).mul(0.5));
+        const m1 = oneMinus(smoothstep(rad.mul(0.55), rad, length(dv1))).mul(step(rn, rainU.mul(0.9)));
+        const p2 = vec2(uvv.x.mul(aspectU).mul(14.0), uvv.y.mul(2.2));
+        const rc = h21(vec2(floor(p2.x), 3.7));
+        const s2 = fract(p2.y.sub(u.time.mul(rc.mul(0.5).add(0.35))).add(rc.mul(7.0)));
+        const fx2 = fract(p2.x).sub(0.5).add(sin(p2.y.mul(9.0).add(rc.mul(20.0))).mul(0.12));
+        const dvh = vec2(fx2, s2.sub(0.8).mul(6.36));
+        const on2 = step(rc, rainU.mul(0.75));
+        const m2 = oneMinus(smoothstep(0.08, 0.16, length(dvh))).mul(on2);
+        const trail = oneMinus(smoothstep(0.02, 0.06, abs(fx2))).mul(smoothstep(0.2, 0.8, s2)).mul(step(s2, 0.8)).mul(on2).mul(0.45);
+        const off = dv1.div(asp).div(9.0).mul(m1).mul(2.2)
+          .add(vec2(dvh.x.div(aspectU.mul(14.0)), dvh.y.div(14.0)).mul(m2).mul(2.0))
+          .add(vec2(fx2.div(aspectU.mul(14.0)), 0.0).mul(trail).mul(1.5));
+        uvS = clamp(uvv.sub(off), vec2(0.001), vec2(0.999));
+        dropM = max(max(m1, m2), trail);
+      }
+      // ---- Heat haze: shimmering refraction in the exhaust plume of both engines (pure UV offset, no extra taps, no control flow) ----
+      if (lensOn) {
+        const asp2 = vec2(aspectU, 1.0);
+        const fall = (pos: N) => { const dd = uvv.sub(pos).mul(asp2).div(heatR); return exp(dot(dd, dd).negate()); };
+        const amt = fall(heatA).add(fall(heatB)).mul(heatS);
+        const wob = vec2(sin(uvv.y.mul(240.0).add(u.time.mul(31.0))).add(sin(uvv.y.mul(97.0).sub(u.time.mul(17.0)))), sin(uvv.x.mul(210.0).sub(u.time.mul(26.0))));
+        uvS = clamp(uvS.add(wob.mul(amt).mul(0.0016)), vec2(0.001), vec2(0.999));
+      }
+      const base = vec3(src.sample(uvS).level(0).rgb).toVar();
       if (motion) {
         const bs = u.speed.mul(smoothstep(0.2, 0.65, r)).mul(0.028);
         If(bs.greaterThan(0.0015), () => {
@@ -223,6 +265,32 @@ export class PostFX {
           g.addAssign(sunColU.mul(occSum.div(14.0)).mul(fall).mul(1.3));
         });
       }
+      // ---- Sun glare + lens flare: soft veil, core glow, anamorphic streak and 4 ghosts on the sun→centre axis.
+      // Sun visibility = 9 depth taps at the sun's pixel (identical for every fragment → uniform control flow). Peak add < 0.85, no overexposure.
+      if (flareOn && depthTex && sunPosU) {
+        const dSz = vec2(textureSize(textureLoad(depthTex)));
+        const maxPx = ivec2(dSz.sub(vec2(1.0)));
+        let vis: N = float(0.0);
+        const taps: [number, number][] = [[0, 0], [0.009, 0], [-0.009, 0], [0, 0.016], [0, -0.016], [0.006, 0.011], [-0.006, 0.011], [0.006, -0.011], [-0.006, -0.011]];
+        for (const [ox, oy] of taps) {
+          const q = sunPosU.add(vec2(ox, oy));
+          const inScr = step(0.0, q.x).mul(step(q.x, 1.0)).mul(step(0.0, q.y)).mul(step(q.y, 1.0));
+          vis = vis.add(step(0.99995, float(textureLoad(depthTex, clamp(ivec2(q.mul(dSz)), ivec2(0), maxPx)))).mul(inScr));
+        }
+        const I = flareU.mul(vis.div(taps.length));
+        const asp = vec2(aspectU, 1.0);
+        const dS = uvv.sub(sunPosU).mul(asp); const dl = length(dS);
+        let fl: N = sunColU.mul(exp(dl.mul(-3.4)).mul(0.2).add(exp(dl.mul(-24.0)).mul(0.42)));
+        fl = fl.add(vec3(0.55, 0.75, 1.0).mul(exp(abs(dS.y).mul(-110.0)).mul(exp(abs(dS.x).mul(-2.6))).mul(0.2)));
+        const axis = vec2(0.5).sub(sunPosU);
+        const ghosts: [number, number, number, number, number, number][] = [[0.45, 0.035, 1.0, 0.7, 0.4, 0.07], [0.9, 0.06, 0.5, 0.9, 0.6, 0.05], [1.35, 0.022, 0.6, 0.7, 1.0, 0.08], [1.8, 0.1, 0.9, 0.6, 1.0, 0.035]];
+        for (const [k, gr, cr, cg, cb, ga] of ghosts) {
+          const gd = length(uvv.sub(sunPosU.add(axis.mul(k))).mul(asp));
+          fl = fl.add(vec3(cr, cg, cb).mul(oneMinus(smoothstep(gr * 0.72, gr, gd))).mul(smoothstep(0.0, gr, gd).mul(0.7).add(0.3)).mul(ga));
+        }
+        g = g.add(fl.mul(I));
+      }
+      if (dropM) g = g.mul(dropM.mul(0.1).add(1.0));
       g = g.mul(oneMinus(pow(r.mul(1.2), 2.6).mul(vignette * 0.7)));
       return vec4(max(min(g.add(vec3(1.0, 0.9, 0.8).mul(u.flash)), vec3(12.0)), vec3(0.0)), 1.0);
     })();

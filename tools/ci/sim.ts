@@ -1,0 +1,87 @@
+// Headless CI check (no browser, no GPU): `npm run check`
+// 14 tracks × 11 AI pods × SECS seconds of real physics (stepPod + aiInputs + hazards). Pod 0 additionally stress-tests the
+// manual controls (90° roll, lift/dive, handbrake slide). Fails (exit 1) on NaN, wall tunnelling, ground clipping, mass deaths or stuck pods.
+import * as THREE from 'three';
+import { DIFFICULTIES, PILOTS, PODS, TRACKS } from '../../src/game/data';
+import { buildTrack, roadSurfaceAt } from '../../src/game/trackBuilder';
+import { aiInputs, collidePods, podParams, respawn, stepPod, HOVER, type PodState } from '../../src/game/physics';
+import { effectiveStats } from '../../src/game/settings';
+import { podEnvelope } from '../../src/game/podDesigns';
+
+const SECS = Number(process.env.SECS ?? 45), ONLY = process.env.TRACK, GRIP = Number(process.env.GRIP ?? 1); // GRIP=0.9 ≈ storm/snow weather
+const LIMIT = { deaths: 3, wall: 0.6, clear: 0.2, minSpeed: 18 };
+let seed = 1234567; Math.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; // deterministic runs
+const diff = (Object.values(DIFFICULTIES) as { skill: number; speed: number }[])[1];
+let failed = 0;
+console.log('track         deaths  NaN  wallPen  minClear  avgSpeed  slowest  airMax  rolls  slides  result');
+for (const def of TRACKS) {
+  if (ONLY && def.id !== ONLY) continue;
+  const td = buildTrack(def); const S = td.main.samples, N = td.N;
+  const pods: PodState[] = [];
+  for (let g = 0; g < 11; g++) {
+    const pd = PODS[g % PODS.length]; const row = Math.floor(g / 3), col = g % 3;
+    let idx = td.startIdx - 6 - row * 9; idx = td.main.closed ? ((idx % N) + N) % N : Math.max(0, idx);
+    const s = S[idx], lat = (col - 1) * s.hw * 0.55, eLat = Math.min(1, Math.abs(lat) / s.hw), gY = s.y - lat * s.bank + (1 - eLat * eLat) * 0.2 + 0.08;
+    const pilot = PILOTS.find(p => p.id === pd.pilotId) ?? PILOTS[0], skill = diff.skill * (0.7 + 0.3 * pilot.skill);
+    const pod: PodState = {
+      id: g, isPlayer: false, def: pd, pilot, stats: effectiveStats(pd.id, undefined), name: pilot.name, color: pilot.color,
+      pos: new THREE.Vector3(s.x + s.rx * lat, gY + HOVER, s.z + s.rz * lat), vel: new THREE.Vector3(), yaw: Math.atan2(s.tx, s.tz), yawRate: 0, steer: 0,
+      path: 0, idx, lat, grounded: true, zeroG: false, air: 0, groundY: gY, prevGroundY: gY, engYL: 0, engYR: 0, engVL: 0, engVR: 0, engPL: 0, engPR: 0,
+      input: { throttle: 0, brake: 0, steer: 0, boost: false, airbrake: false, repair: false },
+      hpL: 100, hpR: 100, heat: 0, boosting: false, overheat: false, repairing: false, airbraking: false,
+      lap: 0, passedMid: true, rel: 0, prog: 0, finished: false, finishTime: 0, lapStart: 0, lapTimes: [],
+      dead: 0, invuln: 0, lastSafePath: 0, lastSafeIdx: idx, wrongWay: 0, roll: 0, pitch: 0, shake: 0, events: [], visual: null,
+      ai: { skill, speedF: diff.speed * (0.93 + 0.09 * pilot.skill), lineOff: Math.random() * 2 - 1, takeShortcut: Math.random() < skill * 0.75, boostUntil: 0, repairMode: false, noiseT: Math.random() * 100, rubber: 1 }, place: g + 1,
+    };
+    const rel = ((idx - td.startIdx) % N + N) % N; if (td.main.closed) { pod.rel = rel; pod.lap = rel > N / 2 ? -1 : 0; pod.prog = pod.lap * N + rel; }
+    pods.push(pod);
+  }
+  const prog0 = pods.map(p => p.prog); const wasDead = pods.map(() => false);
+  let deaths = 0, nan = 0, wall = 0, clear = 9, airMax = 0, rolls = 0, slides = 0, t = 0, worst = '', airDbg = '', air0 = 0, air0Dist = 0;
+  const h = 1 / 120, frames = SECS * 60;
+  for (let f = 0; f < frames; f++) {
+    t += 1 / 60;
+    for (const p of pods) { aiInputs(p, td, pods, t, null); if (p.input.roll) rolls++; }
+    { // pod 0: scripted manual-control stress on top of the AI line
+      const p = pods[0], ph = t % 8;
+      if (ph > 5 && ph < 6.2) p.input.roll = Math.floor(t / 8) % 2 ? 1 : -1;
+      if (ph > 2 && ph < 3) p.input.pitch = 1; else if (ph > 3.4 && ph < 4.2) p.input.pitch = -1;
+      if (ph > 6.6 && ph < 7.3 && Math.abs(p.input.steer) > 0.2) p.input.airbrake = true;
+      if (process.env.PITCH_AIR !== undefined) { p.input.roll = 0; p.input.pitch = p.grounded ? 0 : Number(process.env.PITCH_AIR); } // jump experiment: fixed airborne pitch for pod 0
+      if (p.dead <= 0 && p.air > air0) { air0 = p.air; air0Dist = Math.hypot(p.vel.x, p.vel.z) * p.air; }
+    }
+    for (let k = 0; k < 2; k++) { for (const p of pods) stepPod(p, td, h, t, GRIP, false); collidePods(pods, t); }
+    for (const hz of td.hazards) {
+      const ph = (((t + hz.phase) % hz.period) + hz.period) % hz.period; hz.state = ph < hz.period * hz.duty ? 1 : ph > hz.period - 1 ? 0.5 : 0;
+      if (hz.state < 1) continue;
+      for (const p of pods) { if (p.dead > 0) continue; const dx = p.pos.x - hz.x, dz = p.pos.z - hz.z; if (dx * dx + dz * dz > hz.r ** 2 || p.pos.y > hz.y + 18) continue; const P = podParams(p); if (p.invuln <= 0) { p.hpL -= 12 / 60 * P.sturdy; p.hpR -= 12 / 60 * P.sturdy; } p.heat = Math.min(1, p.heat + 0.55 / 60); p.vel.y += 28 / 60; }
+    }
+    pods.forEach((p, i) => {
+      p.events.length = 0;
+      if (!isFinite(p.pos.x + p.pos.y + p.pos.z + p.vel.x + p.vel.y + p.vel.z + p.yaw + p.roll + p.pitch)) nan++;
+      if (p.dead > 0) { if (!wasDead[i]) deaths++; wasDead[i] = true; p.dead -= 1 / 60; if (p.dead <= 0) respawn(p, td); return; }
+      wasDead[i] = false; if (p.sliding) slides++;
+      if (p.air > airMax) { airMax = p.air; if (process.env.DEBUG) airDbg = `pod${i} t=${t.toFixed(1)} air=${p.air.toFixed(1)} idx=${p.idx} path=${p.path} h=${(p.pos.y - p.groundY).toFixed(1)} vy=${p.vel.y.toFixed(1)} lat=${p.lat.toFixed(1)} pitchIn=${p.input.pitch} zeroG=${p.zeroG}`; }
+      const path = td.paths[p.path], s = path.samples[p.idx]; const lat = (p.pos.x - s.x) * s.rx + (p.pos.z - s.z) * s.rz;
+      if (!s.gap) wall = Math.max(wall, Math.abs(lat) - (lat > 0 ? s.wallR : s.wallL));
+      if (p.grounded && !p.zeroG && !s.gap) { // 3D ground clearance of cockpit + both engines (same envelope the game clamps)
+        const env = podEnvelope(p.def), cy = Math.cos(p.yaw), sy = Math.sin(p.yaw), sinP = Math.sin(p.pitch), sinR = Math.sin(p.roll);
+        const at = (lx: number, lz: number) => roadSurfaceAt(path, p.idx, p.pos.x + lx * cy + lz * sy, p.pos.z - lx * sy + lz * cy);
+        const ck = at(0, env.cockpit.z); if (!ck.gap) clear = Math.min(clear, p.pos.y + env.cockpit.minY - env.cockpit.z * sinP - ck.y);
+        for (const [e, ey] of [[env.engL, p.engYL ?? 0], [env.engR, p.engYR ?? 0]] as const) {
+          const a = at(e.outerX, e.frontZ), b = at(e.outerX, e.backZ); if (a.gap || b.gap) continue;
+          // lowest point under roll: engine barrel (radius = -minY) or the outboard wing tip (at axis height once rolled)
+          const base = p.pos.y + ey + Math.min(e.x * sinR + e.minY, e.outerX * sinR + e.minY * Math.abs(Math.cos(p.roll)));
+          const cl = Math.min(base - e.frontZ * sinP - a.y, base - e.backZ * sinP - b.y); if (cl < clear) { clear = cl; if (process.env.DEBUG) worst = `pod${i} t=${t.toFixed(1)} roll=${p.roll.toFixed(2)} pitch=${p.pitch.toFixed(2)} rollCtl=${(p.rollCtl ?? 0).toFixed(2)} h=${(p.pos.y - p.groundY).toFixed(2)} bank=${s.bank.toFixed(2)} lat=${lat.toFixed(1)} hw=${s.hw.toFixed(1)} engY=${ey.toFixed(2)} ex=${e.x.toFixed(1)}/${e.outerX.toFixed(1)} minY=${e.minY.toFixed(2)} fz=${e.frontZ.toFixed(1)} bz=${e.backZ.toFixed(1)} ramp=${s.ramp.toFixed(1)} idx=${p.idx} vy=${p.vel.y.toFixed(1)}`; }
+        }
+      }
+    });
+  }
+  const speeds = pods.map((p, i) => (p.prog - prog0[i]) * 2 / SECS); const avg = speeds.reduce((a, b) => a + b, 0) / speeds.length, slow = Math.min(...speeds);
+  const bad = nan > 0 || deaths > LIMIT.deaths || wall > LIMIT.wall || clear < LIMIT.clear || slow < LIMIT.minSpeed;
+  if (bad) failed++; if (process.env.PITCH_AIR !== undefined) console.log(`  pod0 airborne pitch ${process.env.PITCH_AIR}: longest flight ${air0.toFixed(2)} s ≈ ${air0Dist.toFixed(0)} m`);
+  if (process.env.DEBUG) console.log('  worst:', worst, '\n  air:', airDbg, 'gap@idx', td.paths[0].samples.map((q, k) => q.gap ? k : -1).filter(k => k >= 0 && (k % 8 === 0)).join(','));
+  console.log(`${def.id.padEnd(13)} ${String(deaths).padStart(5)} ${String(nan).padStart(5)} ${wall.toFixed(2).padStart(7)}m ${clear.toFixed(2).padStart(7)}m ${avg.toFixed(0).padStart(6)}m/s ${slow.toFixed(0).padStart(5)}m/s ${airMax.toFixed(1).padStart(6)}s ${String(rolls).padStart(6)} ${String(slides).padStart(7)}  ${bad ? 'FAIL' : 'ok'}`);
+}
+console.log(failed ? `\n${failed} track(s) FAILED (limits: deaths ≤ ${LIMIT.deaths}, wallPen ≤ ${LIMIT.wall} m, minClear ≥ ${LIMIT.clear} m, slowest ≥ ${LIMIT.minSpeed} m/s)` : '\nAll tracks passed.');
+process.exit(failed ? 1 : 0);

@@ -5,7 +5,7 @@ import { macroTexture } from './textures';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
-const { atan, cameraProjectionMatrix, cross, dot, exp, floor, fract, length, max, mix, modelViewMatrix, normalize, oneMinus, positionLocal, pow, sin, smoothstep, step, texture, uniform, vec2, vec3, vec4 } = TSL;
+const { atan, cameraProjectionMatrix, cross, dot, exp, float, floor, fract, length, max, mix, modelViewMatrix, normalize, oneMinus, positionLocal, pow, sin, smoothstep, step, texture, uniform, vec2, vec3, vec4 } = TSL;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type N = any;
 const ssInv = (a: number, b: number, x: N) => oneMinus(smoothstep(b, a, x));
@@ -37,6 +37,7 @@ export function makeSky(theme: ThemeDef, forEnv = false) {
     clouds: uniform(theme.clouds),
     time: uniform(0),
     sunDir2: uniform(sunDirection2(theme)),
+    flash: uniform(0), // lightning: lights the cloud deck from inside (weather.ts)
   };
 
   const d = normalize(positionLocal);
@@ -46,15 +47,27 @@ export function makeSky(theme: ThemeDef, forEnv = false) {
   // Smooth solar corona; omit pinpoint 12× HDR disc in PMREM so reflections stay silky & flicker-free
   col = col.add(uniforms.sunColor.mul(pow(sd, 6.0).mul(0.35).add(pow(sd, forEnv ? 24.0 : 64.0).mul(forEnv ? 0.45 : 0.75))));
 
+  // Night starfield (twinkle-free hash stars, hidden by clouds and near the horizon)
+  if ((theme.stars ?? 0) > 0 && !isPrison && !forEnv) {
+    const h21s = (p: N) => fract(sin(dot(p, vec2(127.1, 311.7))).mul(43758.5453));
+    const cellS = floor(d.mul(210.0)); const sh = h21s(cellS.xy.add(cellS.z.mul(vec2(17.31, 41.7))));
+    col = col.add(vec3(0.8, 0.88, 1.0).mul(step(0.9955, sh)).mul(sh.sub(0.9955).mul(180.0).add(0.25)).mul(smoothstep(0.02, 0.35, d.y)).mul(theme.stars ?? 0));
+  }
+  let covN: N = float(0.0);
   if (theme.clouds > 0.001) {
     const m = macroTexture();
     const cuv = d.xz.div(max(d.y, 0.0).add(0.1)).mul(0.26).add(vec2(uniforms.time.mul(0.0025), uniforms.time.mul(0.0014)));
     const cn = texture(m, cuv).r.mul(0.65).add(texture(m, cuv.mul(2.3).add(0.37)).g.mul(0.35));
     const cov = smoothstep(oneMinus(uniforms.clouds), oneMinus(uniforms.clouds).add(0.34), cn);
-    let cc = mix(uniforms.horizon.mul(1.08), vec3(1), 0.48).mul(pow(sd, 4.0).mul(0.45).add(0.75));
+    // Cloud albedo is lit by the ambient sky level: white by day, dark at night / under ash skies (was a constant 48 % white)
+    const hc = new THREE.Color(theme.skyHorizon), tc = new THREE.Color(theme.skyTop);
+    const lit = Math.min(1, (0.2126 * hc.r + 0.7152 * hc.g + 0.0722 * hc.b) * 2.4 + (0.2126 * tc.r + 0.7152 * tc.g + 0.0722 * tc.b) * 0.8);
+    let cc = mix(uniforms.horizon.mul(1.08), vec3(lit), 0.48).mul(pow(sd, 4.0).mul(0.45).add(0.75));
     cc = mix(cc, uniforms.sunColor.mul(1.3), pow(sd, 12.0).mul(0.55));
     col = mix(col, cc, cov.mul(smoothstep(0.0, 0.16, d.y)).mul(0.85));
+    covN = cov;
   }
+  if (!forEnv) col = col.add(vec3(0.5, 0.6, 0.85).mul(uniforms.flash).mul(covN.mul(0.75).add(0.25)).mul(smoothstep(-0.05, 0.3, d.y)));
 
   if (!forEnv) {
     col = col.add(uniforms.sunColor.mul(smoothstep(0.9992, 0.9997, sd).mul(8.5)));

@@ -6,7 +6,12 @@
 - Never hand-edit `package.json` / `vite.config.ts`. Add deps with `npm install <pkg>`.
 - Finish with `npm run build` → `dist/index.html` (single file). Archived unrelated HTML stays in `.archiv/`.
 - Spec don'ts: **no film grain, no excessive bloom / overexposure.**
-- **Sandbox persistence:** if `.git` or `src/assets/menu-bg.jpg` vanished after a reset, restore via `git clone https://github.com/Cr0nFixXx/podracer.git /tmp/rc && cp -r /tmp/rc/.git . && mkdir -p src/assets && cp /tmp/rc/src/assets/menu-bg.jpg src/assets/ && chmod +x tools/harness/run.sh`.
+- **Sandbox persistence:** if `.git` or `src/assets/menu-bg.jpg` vanished after a reset, restore via `git clone --branch B https://github.com/Cr0nFixXx/podracer.git /tmp/rc && cp -r /tmp/rc/.git . && mkdir -p src/assets && cp -n /tmp/rc/src/assets/menu-bg.jpg src/assets/` (working tree stays, shows as modified vs. `B`).
+- **Commit everything locally** (user request): after each finished task run `npm run save -- "message"` (stages all except `.archiv/git`, commits, writes `.archiv/git/podracer-B.bundle`). Never `git add -A` by hand (would commit the bundle), never push unless asked. **This sandbox drops `.git` and every git-ignored file between sessions** – so the bundle must never be added to `.gitignore`. Session start: if `.git` is missing, restore from the bundle; if both are missing, clone branch `B` from GitHub, copy `.git`, then `npm run save` (see `HANDOFF.md` → „Git-Stand").
+- **Before finishing: `npm run check` must be green** (typecheck + 14-track node physics sim). Add npm scripts only with `npm pkg set scripts.<name>=…`.
+
+## Repo
+- Root = Klon von `https://github.com/Cr0nFixXx/podracer.git`, Branch **`B`**. `.archiv/` enthält fremde Alt-Dateien (nicht anfassen, nicht ins Spiel einbinden).
 
 ## Stack
 React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto WebGL2 fallback) · **TSL** · TypeScript strict. Typecheck: `npx tsc --noEmit -p .`.
@@ -23,5 +28,51 @@ React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto 
 - **Obstacles & set pieces (`trackBuilder.ts`, `setPieces.ts`, `world.ts`):** ~7.5 spaced obstacles/track (`≥ 52 m` apart, clear of ramps/landings) marked with glowing ground rings + top strobe beacons; 6 `SetPiece` types (`rotor`, `gate`, `arch`, `icefall`, `boulder`, `bridge`); corridor AI (`aiInputs`) evaluates 27+ lanes with exact ETA timing.
 - **Landscape (`world.ts`):** `terrain` → `waterfalls` → `landmarks` (`LandmarkFoot[]`) → `smoke` → `groundCover` (non-overlapping dome LOD) → `wildlife` (landmark avoidance, fleeing herds, perching birds, `nearAudio`) → `trackDetail` (reactive energy barrier) → `batcher.build`.
 
+## Controls, flight physics & track profile (Session 10)
+- **Key map (`Game.readInput`):** `W` thrust, `S` brake/reverse, `A`/`D` steer, `Shift` boost, `Space` air brake / slide, `↑` dive (`pitch = -1`), `↓` lift (`pitch = +1`), `←`/`→` 90° roll (`roll = ∓1`), `R` repair, `C` view. Arrows never steer. Update `screens.tsx` + `RaceView.tsx` + `README.md` together when changing keys.
+- **`Inputs.pitch` / `Inputs.roll` are optional** (old call sites keep compiling). Smoothed states live in `PodState.pitchCtl / rollCtl`; `p.roll = rollBase·(1-knife) + rollCtl·π/2`.
+- **Engines never tilt on their own:** `engPL/engPR` stay `0`, `setEngineMotion(yL, yR, 0, 0, 0)`. Steering = pure vertical heave (outer +1.1 m, inner −0.22 m). Whole-pod pitch only from road slope + pitch key.
+- **Ground clamp is exact per point** (front tip vs. road under the tip, tail vs. road under the tail; roll uses barrel-or-wingtip). Never go back to `max(front, back)` floors – on gradients it lifts pods off the road (`grounded = false`, half steering). Clamp range grows with `knife·halfSpan` and lift.
+- **Slide** = `airbraking && |steer| > 0.25 && grounded`. AI adds brake while sliding too fast; keep that when retuning grip (`0.24`).
+- **Track profile (`trackBuilder.ts`):** banking via `finalizeSamples(S, closed, banked = true)` for the main path only; hills are added after ramps are placed and are damped to 0 at grid/finish/ramps/gaps/zero-G and wherever the track comes within `hwA + hwB + 14 m` of itself. Do not add height elsewhere (jump tuning + over/underpass clearance depend on it).
+- **Particles (`particles.ts`):** stateless GPU simulation. `Pool.spawn` writes one record (5 × vec4) into a ring buffer; the vertex shader integrates drag/gravity in closed form. No per-frame CPU loop – never reintroduce `pos/vel` arrays. Colour/alpha travel as one `varying(vec4)`.
+- **Decor LOD:** `place(geo, …, { lod: { geo, dist } })` builds a far twin per sector (forces sector chunking); LOD geometry must come from the same seed (`jungleTreeGeometry(seed, gq, true)`, `spireGeometry(seed, halfRadial, sameStrata)`).
+- **CSM** is opt-in (`gfx.csm`): `CSMShadowNode` on `sun.shadow.shadowNode`; call `csm.updateFrustums()` only after `csm.camera` exists (first render).
+
+## Input, HUD, lights, weather front (Session 12)
+- **Keys:** `keymap.ts` is the single source (`ACTIONS`, `KEY_PRESETS`, `normalizeKeys`, `bindKey`). `Game.readInput` / `onKey` only use `this.keymap`; never hard-code `KeyboardEvent.code` again. UI = `ui/KeyBindings.tsx`. New action → add to `Action`, `ACTIONS`, both presets, `readInput`.
+- **HUD:** new fields go into `HudState` + `Game.hud()` + `RaceView.tsx`. HUD refreshes at ~12 Hz – no per-frame animation there.
+- **Lights:** `EnvFx.dark` (0..1, from resolved sky brightness) > 0.45 → `navLights` (one `InstancedMesh`, 5 instances per pod, colours > 1 for gentle bloom) + one player `SpotLight`. No more real lights (every lit material pays per light).
+- **Weather front:** `resolveEnvironment(..., 'front')` returns the END state plus `from`. Compile-time features (rain shader, wet road, bolt mesh, ambient type) come from the end state; `Game.applyFront()` blends everything else through uniforms / light props. To add a blended parameter: add it to `EnvSnap` + `snapEnv` + `applyFront`. Fog values are uniforms (`this.fog`).
+- **Heat haze:** `post.heat` (2 screen positions, radius, strength), set in `Game.render`. UV offset only – keep it free of extra samples and control flow.
+- **Real-app test:** `tools/harness/papp.mjs` (Puppeteer). Match UI text via `textContent` (CSS uppercases `innerText`). Software rendering runs the game ~16× slow: wait for the `LOS!` message instead of fixed times.
+
+## Atmosphere pipeline (Session 11)
+- **One entry point:** `resolveEnvironment(THEMES[id], race.timeOfDay, race.weather)` in `Game.start()` → `{ theme, fx }`. Pass only the resolved `theme` on; never read `THEMES[...]` again for visuals. New weather/time presets = edit `environment.ts` only. `theme.id` stays unchanged (texture caches, `STRATA`, `HEIGHT_FOG` keep working).
+- **Blend colours in sRGB** (`mixHex`, `overcast`). A linear-space lerp left night skies mid-grey.
+- **Sky (`sky.ts`):** cloud albedo scales with the sky light level (`lit`) – no constant white. `uniforms.flash` = lightning. Stars only when `theme.stars` is set.
+- **Fog node (`atmosphere.ts`):** analytic height fog + 2 noise taps with `.level(0)` (valid in any control flow). It binds `macroTexture` in every fogged material: +1 sampler → keep material texture counts ≤ 14.
+- **`screenUV` origin is top-left on WebGPU *and* WebGL2.** Any NDC → screen conversion must flip y (`0.5 - ndc.y * 0.5`). The old god-ray code did not.
+- **Lens effects (`post.ts`):** compiled in only when needed (`env.rain > 0.05`, `env.flare`), gated by `gfx.lensFx`. Flare peak add < 0.85; do not raise (spec: no overexposure). Lightning must not use the full-screen `flash` uniform.
+- **Weather runtime (`weather.ts`):** gust sheets go through `particles.alpha.spawn` (stay ≤ 12 spawns/frame); the bolt is one pre-allocated ribbon mesh rebuilt per strike.
+- **Audio (`audio.ts`):** new continuous layers are created in `initLayers`, driven by `setEnv(slide, enclosure, rain, wind)` + `update`. One-shots: `thunder`, `whoosh`. Everything goes through the master compressor.
+- **Mechanical props (`mechProps.ts`):** instanced only, no shadows; animated parts via per-frame instance matrices (≤ ~70). Towers stand `wall + 10.5 m` outside the road and are skipped at cliffs, gaps, tunnels, water.
+- **Track width:** change only `TRACK_WIDTH`; rerun `npm run check`.
+- **Pod contact** lives in `physics.ts → collidePods` (game + CI share it).
+
+## Landscape assets (`decorGeo.ts`, Session 9)
+- All scatter decor geometry lives in `src/game/decorGeo.ts` (pure functions, seeded, **no materials**). `world.ts → scatterDecor` only calls builders and `place(...)`.
+- Variants = call the builder with different seeds and split the instance count (rocks 3, spires 3, mesas 2, trees 2). Keep the total count unchanged.
+- Helpers: `ringSurface` (welded lathe grid, outward normals), `tube`, `paint` (vertex colours), `flat` / `smooth`, `merge`. Merged parts need identical attributes (`position, normal, uv` + `color` for trees/pines).
+- Keep unit sizes: spire/mesa height `0..1` (scaled by `scaleY`), tree ≈ 19 m, pine ≈ 11 m, crystal cluster `h` param. `foot` in `place` must cover the base radius.
+- Triangle budget per instance (gq 2): tree ≤ 1 400, spire ≤ 1 100, mesa ≤ 1 050, pine ≤ 300, rock 180. Check with a node script before raising.
+- `rock` texture: never re-add un-warped Worley block cracks (reads as brick wall).
+- Start gate: add parts only through `put(mat, geo)` / `strut(...)` in `mkGate` (5 merged buckets).
+
 ## Testing
+- **`npm run check`** (≈ 25 s, node only): `tools/ci/sim.ts` – fails on NaN, deaths > 3, wall penetration > 0.6 m, ground clearance < 0.2 m, pod slower than 18 m/s. `DEBUG=1`, `TRACK=<id>`, `SECS=<n>`, `PITCH_AIR=1|0|-1` (jump experiment).
+- **App smoke test:** `node papp.mjs <dist/index.html> <out prefix> '<profile json>'` after `npm run build`. Harness extras: `?ultra`, `?rt=<race seconds>`, `wx=front`.
+- **Weather in tests:** harness query `?webgl&tod=night&wx=storm` (`flash`, `csm` optional), views `s` (towards the sun) and `m` (relay tower). `GRIP=0.88 npm run check` = storm grip.
+- **`npm run check:gpu`**: `tools/ci/gpu.mjs` – WebGPU console check (`PUPPETEER_DIR`, `TRACKS=0,5`, `QUERY='?csm'`). Harness view `r` = 2.8 s of real racing (live particles/banking).
+- **No Playwright?** Use Puppeteer: `tools/harness/pshot.mjs` (setup + commands in `HANDOFF.md` → "Test-Setup"). Screenshots need `?webgl`; WebGPU run = console-error check only (white screenshots in headless Chrome 148).
 Headless WebGPU: `tools/harness/run.sh game "t0:a,t5:c,t3:c"` and `"s9:30"`. Track indices: 0 boonta, 1 frost, 2 neon, 3 magma, 4 dunepass, 5 jungle, 6 aquilaris, 7 oovo, 8 crystal, 9 malastare, 10 mosespa, 11 howler, 12 methane, 13 executioner.

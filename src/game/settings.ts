@@ -1,5 +1,8 @@
 import { PODS, STAT_KEYS, type StatKey } from './data';
 
+import type { TimeOfDay, WeatherKind } from './environment';
+import { defaultKeys, normalizeKeys, type KeyMap } from './keymap';
+
 export interface GfxSettings {
   preset: 'low' | 'medium' | 'high' | 'ultra' | 'custom';
   renderScale: number;
@@ -11,6 +14,8 @@ export interface GfxSettings {
   bloomStrength: number; // 0..1.5
   godRays: boolean;
   ssr: boolean;
+  lensFx?: boolean; // sun glare / lens flare + rain droplets on the lens (default on)
+  csm?: boolean; // opt-in 2-cascade sun shadows (near 0–105 m + far 105–520 m) – costs one extra shadow pass
   motionBlur: boolean;
   cinematic: boolean;
   particles: number;
@@ -48,6 +53,8 @@ export interface RaceConfig {
   opponents: number;
   difficulty: number;
   camera: number;
+  timeOfDay?: TimeOfDay; // 'auto' = the world's own lighting
+  weather?: WeatherKind;  // 'auto' = the world's own weather
 }
 
 export interface Profile {
@@ -57,6 +64,7 @@ export interface Profile {
   gfx: GfxSettings;
   volume: number;
   best: Record<string, number>;
+  keys?: KeyMap; // rebindable keyboard controls (keymap.ts)
 }
 
 const KEY = 'podracer-profile-v1';
@@ -64,7 +72,7 @@ const KEY = 'podracer-profile-v1';
 export function defaultProfile(): Profile {
   const custom: Record<string, PodCustom> = {};
   for (const p of PODS) custom[p.id] = { colors: [...p.colors] as [string, string, string], tuning: Object.fromEntries(STAT_KEYS.map(k => [k, 0])) as Record<StatKey, number> };
-  return { podId: PODS[0].id, custom, race: { trackId: 'boonta', laps: 3, opponents: 7, difficulty: 1, camera: 0 }, gfx: defaultGfx(), volume: 0.6, best: {} };
+  return { podId: PODS[0].id, custom, race: { trackId: 'boonta', laps: 3, opponents: 7, difficulty: 1, camera: 0, timeOfDay: 'auto', weather: 'auto' }, gfx: defaultGfx(), volume: 0.6, best: {}, keys: defaultKeys() };
 }
 
 export function loadProfile(): Profile {
@@ -73,7 +81,7 @@ export function loadProfile(): Profile {
     const raw = localStorage.getItem(KEY);
     if (!raw) return d;
     const p = JSON.parse(raw) as Partial<Profile>;
-    return { ...d, ...p, custom: { ...d.custom, ...(p.custom || {}) }, race: { ...d.race, ...(p.race || {}) }, gfx: { ...d.gfx, ...(p.gfx || {}) }, best: { ...(p.best || {}) } };
+    return { ...d, ...p, custom: { ...d.custom, ...(p.custom || {}) }, race: { ...d.race, ...(p.race || {}) }, gfx: { ...d.gfx, ...(p.gfx || {}) }, best: { ...(p.best || {}) }, keys: normalizeKeys(p.keys) };
   } catch { return d; }
 }
 export function saveProfile(p: Profile) { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* ignore */ } }
