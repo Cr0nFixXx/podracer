@@ -1,11 +1,11 @@
 # TODO
 
-## 0. Direkt aus Session 15
-- [ ] **Probefahrt:** Drift-Stärke, Rollen-Lenkung, Staubfahnen-Dichte, Spiegelungen bei Regen, Live-Umschalten der Grafik
-- [ ] **Boost-Klappen auch bei Gegnern** (GPU-Vertexanimation im geteilten Gegner-Material) + Pilotenköpfe
-- [ ] **Restliche Grafik-Optionen live** (Volumetrie, Kaskaden-Schatten, Anisotropie) – brauchen Material-Neuaufbau
-- [ ] **Tribünen/Landmarken am Hang** auf tiefsten Standpunkt setzen (Dekor/Props/Türme sind erledigt)
-- [ ] **Gamepad-Belegung im Menü** + Touch-Steuerung
+## 0. Direkt aus Session 16
+- [ ] **Probefahrt:** Heck-Drift, Schwerelosigkeit (Tempo, Schweben), Start im Feld, Tunnel von außen, Wetterstärke
+- [ ] **Kaskaden-Schatten live schalten** (braucht Neuaufbau des Schatten-Knotens + aller beleuchteten Materialien) – einzige verbliebene Neustart-Option neben SSR/Texturen/Geometrie
+- [ ] **Tunnel-Außenhülle ans Gelände anbinden** (Erdwall/Felsmantel bei frei stehenden Tunneln), Tunnel-Varianten je Welt (Glasröhre Aquilaris, Eisgrotte Ando Prime)
+- [ ] **Start weiter entzerren** (Ø 2,6 streifende Paare) – z. B. versetzte Startaufstellung
+- [ ] **Pilotenköpfe**, Touch-Steuerung
 
 ## 1. Als Nächstes (Podracer & Ladezeit)
 - [ ] **Podracer-Aufwertung:** Livery-Vorlagen & Startnummern im Hangar; Hitzeflimmern auch für Gegner-Pods
@@ -17,10 +17,18 @@
 - [ ] **Mini-Karte erweitern:** Abkürzungen, Gefahrenzonen und Set-Pieces als Symbole auf dem gecachten Minimap-Layer
 
 ## 3. Performance & Tooling
-- [ ] **CSM standardmäßig auf „Ultra"** – erst nach FPS-Messung entscheiden (aktuell Opt-in)
 - [ ] **`npm run check` in GitHub Actions** (Push auf `B`), `check:gpu` als optionaler Job
 - [ ] **Harness:** WebGPU-Screenshots im headless Chrome reparieren (weiß; nur Konsolencheck möglich)
 - [ ] **Fern-LOD auch für Kiefern/Tafelberge**, falls die Messung es rechtfertigt
+
+## Erledigt (Session 16 – Klappen, Bögen, Start, Tunnel, Sci-Fi, Zero-G, Wetter, Gamepad)
+- [x] **Düsenklappen** öffnen beim Boost (Spieler + Gegner); Bremsklappen nur bei Luftbremse; **Startnummern entfernt**
+- [x] **Kollision für Felsbögen und Einsturz-Bögen**; Tunnel-Decken
+- [x] **KI-Start-Disziplin** (Berührungen Ø 8,3 → 2,6), Startreihen weiter auseinander
+- [x] **Heck-Drift**, **Schwerelosigkeit** (frei schweben, +28 % Tempo), **stärkeres Wetter**
+- [x] **Tunnel auf allen Strecken** (2–4), **Sci-Fi-Ausstattung** (Leitstreifen, Holo-Tafeln, Baken, Energieleitungen, Metall-Deck auf Malastare)
+- [x] **Gamepad-Belegung im Menü**, **Volumetrie + Textur-Filter live**, **Tribünen-Fundament / Landmarken am Hang**
+- [x] CSM ist im Ultra-Preset aktiv (seit Session 14)
 
 ## Erledigt (Session 15 – Bugfixes, Drift, Staub, Live-Grafik)
 - [x] **Schmier-Textur behoben** (Fahrbahn-UV segmentweise), **Trümmer deckend** (Eis, Bogen-Deckel, solide Brocken)

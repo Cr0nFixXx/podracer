@@ -35,6 +35,24 @@ Schwarz/Dunkelbraun, Glas-Panels, Amber-Akzent (`#ffb040`), Orbitron + Rajdhani,
 | Vulkanwelt | `lava` (Pahoehoe-Stricke + Schlackeporen) | Basaltsäulen, Lavakrusten, treibendes Magmameer, glühende Schlucht-Lavafälle |
 | Kristall / Aquilaris | `crystal` / `beach` | Kristall-Spaltstufen / Atoll-Inseln, Felsnadeln, Uferschaum, Küsten-Wasserfälle |
 
+## Sci-Fi-Sprache, Tunnel, Schwerelosigkeit (Session 16)
+Leitidee: **Technik leuchtet schmal und bewegt sich.** Futuristisch wirkt nicht die Menge an Teilen, sondern Licht in Linien, das mit der Fahrtrichtung läuft.
+
+| Element | Gestaltung |
+|---|---|
+| Licht-Leitstreifen | 0,5 m breit an beiden Fahrbahnrändern, Farbe = `barrierColor`, Grundhelligkeit 55 %, Lichtpuls alle 28 m läuft mit ~42 m/s voraus |
+| Holo-Tafel | 8,4 × 3,5 m, additiv, Rahmen + umschaltende Glyphen-Blöcke, Scanlines, leichtes Flackern; auf schlankem Projektormast, 20° zur Fahrbahn gedreht |
+| Schwebe-Bake | kleiner Leuchtkörper mit Ring auf dünnem Stiel, paarweise alle 50 m |
+| Energieleitung | Rohr Ø 1,6 m neben der Strecke, Halter zur Fahrbahnkante, Leuchtmuffen; wechselt alle ~520 m die Seite |
+| Tunnel | Halbellipse über die ganze Breite, 12 m hoch, Stahlrippen alle 24 m, Deckenlampen, Leitstreifen, wuchtige Portalrahmen; folgt der Kurvenüberhöhung |
+| Düsenklappen | 8–12 Lamellen am Triebwerksausgang, klappen beim Boost nach außen, Spitzen glühen orange |
+| Schwerelosigkeit | nichts hält den Pod: langsames Taumeln, Triebwerke wippen einzeln, weiteres Sichtfeld, Sternenstaub; Tempo spürbar höher |
+| Malastare | Metall-Renndeck mit Lichtlinien statt Schotter – Industrie-/Raffineriewelt |
+| Unwetter | Sicht darf deutlich einbrechen, aber Leitstreifen, Baken und Barrieren bleiben als Orientierung sichtbar |
+
+- **Keine Schilder am Pod** (Startnummern wirkten aufgesetzt): Identität über Lackierung und Triebwerksglühen.
+- **Start:** Feld bleibt die ersten Sekunden in Formation und fächert erst dann auf.
+
 ## Einheitliche Oberfläche, Drift, Staub, Spiegelungen (Session 15)
 - **Eine Schriftgröße überall:** virtuelle Leinwand 1180 × 720 (bei breiteren Fenstern breiter), ein Skalierungsfaktor für Menü, Streckenwahl, Hangar, Einstellungen, Pause und Ergebnis. Jede Ansicht füllt die Leinwand: Kopfzeile (Titel links, Aktionen rechts), darunter drei Spalten mit Panels; die mittlere Spalte ist die Bühne (Karte, Pod-Vorschau) und nimmt den Restplatz.
 - **Kompakte Bausteine:** Panel-Innenabstand 16 px, Regler 2-zeilig (Beschriftung + Wert, darunter Schieber), Schalter einzeilig, Listenzeilen einzeilig mit Farbstreifen.

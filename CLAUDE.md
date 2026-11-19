@@ -39,6 +39,18 @@ React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto 
 - **Decor LOD:** `place(geo, …, { lod: { geo, dist } })` builds a far twin per sector (forces sector chunking); LOD geometry must come from the same seed (`jungleTreeGeometry(seed, gq, true)`, `spireGeometry(seed, halfRadial, sameStrata)`).
 - **CSM** is opt-in (`gfx.csm`): `CSMShadowNode` on `sun.shadow.shadowNode`; call `csm.updateFrustums()` only after `csm.camera` exists (first render).
 
+## Session 16 rules
+- **Boost opens the nozzle petals, never the side flaps.** Petals = `EngineGeo.petals` (attribute `aPet`: outward dir xy + swing z), ONE shared `petalMaterial()`; opening per mesh via `mesh.userData.open` (TSL `userData`). Hero: `petals[]` in `update()`; rivals: `oppPetals` in the opponent `update(t, throttle, boost)`. Side flaps = air brake (+ damage rattle) only.
+- **No number plates / signs on pods** (user dislikes them).
+- **Everything that spans the road is solid:** push an `Overhead` (`{ idx, y0, y1, half }` or `arch: { R, sy, inner?, yOff?, thick?, sp? }`) to `td.overheads` when building it (gantries, start portal, checkpoint gates, rock arches, set-piece arches). Never place such structures on samples with `roof > 0` or `zeroG`.
+- **Tunnels:** `sample.roof > 0` (main path: placed at the end of `buildTrack`, shortcuts: middle half). `buildTunnel` builds one shell per roof run, sheared with `bank`. Physics ceiling, rain cover, lamp strips follow `roof` automatically.
+- **AI start discipline:** `ai.gridLat` (grid lane) is held for ~4.5 s, blended out until 7.5 s; no lateral dodging and lift-off when tailgating during that phase. CI column `startTouch`.
+- **Zero-G** (`p.zeroG`): free vertical thrusters (`pc·30`), weak centring, `vmax ×1.28`, thrust ×1.35, no drag, grip ×0.34; guided down 26 samples before the tube ends. CI prints tube vs. ground speed.
+- **Sci-fi dressing** lives in `scifi.ts` (`SCIFI_THEMES`); edge light strips also light every tunnel. Animated in the shader only.
+- **Weather intensity** numbers live in `environment.ts` (fog/sun/wind per weather), `particles.initAmbient` (count, streak width/opacity), `weather.ts` (gusts, lightning rate), `Game.applyEnv` (flash).
+- **Gamepad:** `PadMap` in `keymap.ts` (`padValue`, `readPadBind`, `bindPad`); `Game.readInput` reads only `this.padmap`; UI `PadBindings`. Start (button 9) = pause, fixed.
+- **Live graphics now also:** volumetrics (`fog.hOn` / `fog.bankOn` uniforms – the fog branch is always compiled) and anisotropy (`setTextureAnisotropy`). CSM and SSR stay restart-only.
+
 ## Session 15 rules
 - **Texture coordinates along the track must be integrated per segment** (`vAcc += ds / tile(width)`), never `distance / tile(width)` – the latter smears the texture wherever the width changes (worse the further along the track).
 - **Set-piece materials are opaque.** Broken-out arch/ice blocks are capped torus segments; flying chunks are real meshes (`debris.ts → DebrisPool`), not sprites.
@@ -108,6 +120,7 @@ React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto 
 
 ## Testing
 - **`npm run check`** (≈ 25 s, node only): `tools/ci/sim.ts` – fails on NaN, deaths > 3, wall penetration > 0.6 m, ground clearance < 0.2 m, pod slower than 18 m/s. `DEBUG=1`, `TRACK=<id>`, `SECS=<n>`, `PITCH_AIR=1|0|-1` (jump experiment).
+- **Session 16 tests:** harness views `u` (first main tunnel), `w` (zero-G tube); pods harness `?boost`; `NOGRID=1 npm run check` = old start behaviour for A/B; `papp.mjs` fakes a gamepad and rebinds Boost.
 - **Session 15 tests:** `pui.mjs` prints scale + content height per screen and fails on non-uniform scale / emergency shrink; harness query `live` (runtime graphics switching), `ssr`, `wetnow`; views `x`/`y`/`z` = shortcut exit.
 - **Session 14 tests:** `pui.mjs` (layout, 5 window sizes), `papp.mjs` (HUD sides, pause audio, pause graphics menu; `TWICE=1 LOAD_ONLY=1` = cache timing), CI overhead self-test + `smashed` column. Test handle in the browser: `window.__podracer`.
 - **Session 13 test hooks:** harness `tod=sunset|sunrise|cycle`, `wx=front|clearing|changing`, `rt=<s>`; pshot items `audio` (level test via analyser) and `tex:1024` (worker benchmark, needs `out/texWorker.js`); `papp.mjs` env `LOAD_ONLY=1`, `QUERY='?noworkers'` → `[load]` line.

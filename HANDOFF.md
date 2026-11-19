@@ -1,7 +1,7 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-`npm run dev` → Boonta-Kessel → **Leertaste + A/D** in einer Kurve halten: driftet der Pod jetzt weit genug? Danach `→` halten und mit `↓`/`↑` lenken (Rolle). Stellwerte: `physics.ts`, Kommentar „Session 15: more drift" (Haftung 3,5 %, Rückkehr 0,7 s) und `(1 + 0.45 * knife)` (≈ 5 Min.).
+`npm run dev` → **Oovo-IV-Gefängnis** starten und in die erste Röhre fliegen: `↓`/`↑` schieben den Pod dort frei nach oben/unten. Fühlt sich das schwerelos und schnell genug an? Danach auf Boonta **Leertaste + A/D**: bricht das Heck weit genug aus? (≈ 5 Min.) Stellwerte: `physics.ts`, Kommentare „Session 16".
 
 ## Git-Stand (wichtig)
 - Lokales Repo im Projekt-Root, Branch **`B`**, Remote `origin` = `https://github.com/Cr0nFixXx/podracer.git`. **Pushen:** `git push origin B`.
@@ -10,6 +10,45 @@
 - **Committen immer mit `npm run save -- "Nachricht"`** (`tools/save.sh`): committet alles außer `.archiv/repo-sicherung`, schreibt die Textkopie neu und testet sie durch Probe-Wiederherstellung. Nie von Hand `git add -A`.
 - **Sitzungsbeginn ohne `.git`:** `npm run restore-git` (Textkopie → sonst GitHub; im zweiten Fall sind ungepushte Einzel-Commits weg, dann `npm run save`).
 - Commit-Autor ist der Platzhalter „Podracer Dev".
+
+## Stand: 2026-11-19 (Session 16) – Düsenklappen, Bogen-Kollision, Start-Disziplin, Tunnel, Sci-Fi, Schwerelosigkeit, Wetter, Gamepad
+
+### Erledigt in Session 16
+**Bugs**
+1. **Boost öffnete die Bremsklappen:** mein Fehler aus Session 15. Jetzt öffnen sich die **Düsenklappen am Triebwerksausgang** (`podParts.ts → petals`, Attribut `aPet`; ein gemeinsames Material `petalMaterial()`, Öffnung je Mesh über `mesh.userData.open`). Seitliche Bremsklappen reagieren wieder nur auf die Luftbremse (+ Klappern bei Schaden).
+2. **Bögen ohne Kollision:** die 6–10 **Felsbögen** je Strecke (`addArches`) und der **Einsturz-Bogen/Eisbogen** (Set-Piece; nach dem Einsturz nur noch die Stümpfe) sind jetzt massiv (`Overhead.arch` mit `inner`, `yOff`, `thick`, `sp`). Checkpoint-Bögen, Traversen, Startportal waren es schon. Tunnel haben Deckenkollision.
+3. **Gegner fahren am Start ineinander:** KI hält die ersten ~4,5 s ihre Startspur und fädelt bis 7,5 s auf die Ideallinie ein; kein seitliches Ausweichen in der Startphase; wer dicht auffährt, nimmt Gas weg. Startreihen 26 m statt 18 m auseinander (Pods sind bis 22 m lang).
+
+**Soll**
+4. **Startnummern-Schilder entfernt.**
+5. **Drift mit Heck-Ausbruch:** im Slide +60 % Gier-Wirkung, Gierrate baut sich träge auf und schwingt nach (weich), Begrenzer erst bei ~60° Schräglauf.
+6. **Wetter stärker:** bis 4 200 Wetterpartikel (vorher 2 000), dickere/deckendere Regenstreifen, größere Schneeflocken, Nebel/Sichtweite deutlich dichter je Wetter, Regenböen auch bei normalem Regen, Böen-Schwaden +60 % und deckender, Blitze ~40 % häufiger und heller, Sturmböen rütteln an der Kamera, Regen/Wind lauter, doppelt so viele Aufschlag-Spritzer.
+7. **Sci-Fi (`scifi.ts`, neu):** laufende **Licht-Leitstreifen** an beiden Fahrbahnrändern (Oovo, Aquilaris, Malastare, Ökumenopolis: ganze Strecke; alle Welten: in Tunneln), **Holo-Tafeln** auf Projektormasten, **Schwebe-Baken**, **Energieleitungen** mit Leuchtmuffen neben der Strecke. Malastare hat jetzt ein getäfeltes Metall-Renndeck (`cityRoad`) und Energiemasten.
+8. **Tunnel auf allen Strecken (`trackBuilder.ts`):** 2 je Strecke, 3–4 auf Aquilaris, Oovo IV, Ando Prime, Malastare (je 120–240 m, gesamt 280–660 m je Strecke). Bevorzugt in Schluchten; nie an Start, Rampen, Lücken, Zero-G, Abkürzungs-Einmündungen, Set-Pieces, Geysiren. Tunnelbau generalisiert (`buildTunnel`: je Dach-Abschnitt, mit Querneigung geschert, Portale, Rippen, Deckenlampen).
+9. **Schwerelosigkeit:** keine Feder mehr zur Röhrenmitte – der Pod driftet frei, `↑`/`↓` sind Schubdüsen nach unten/oben, Impuls bleibt; +28 % Höchsttempo, mehr Schub, kein Luftwiderstand; seitlich schwebend aber steuerbar; Pod und Triebwerke taumeln/wippen langsam; Sichtfeld +8°; Sternenstaub zieht vorbei. Kurz vor dem Röhrenende wird der Pod sanft auf Schwebehöhe geführt.
+
+**TODO-Punkte**
+10. **Boost-Klappen bei Gegnern:** erledigt (gleiches Material, pro Mesh `userData.open`).
+11. **Grafik live:** zusätzlich **Volumetrie** (Nebel-Schichten per Uniform, Lichtkegel) und **Textur-Filter**. Weiter nur per Neustart: Texturauflösung, Geometrie/Detaildichte, Tessellation, Material-Optionen, SSR, **Kaskaden-Schatten** (nicht umgesetzt: Schatten-Knoten ist in alle beleuchteten Materialien kompiliert; nach der SSR-Erfahrung nicht riskiert), Renderer.
+12. **Tribünen/Landmarken am Hang:** Tribünen haben einen 18 m tiefen Fundamentblock; Landmarken sitzen auf dem tiefsten Punkt (5 Höhenproben).
+13. **Gamepad-Belegung im Menü** (`keymap.ts → PadMap`, `ui/KeyBindings.tsx → PadBindings`): Aktion anklicken, Taste drücken oder Stick bewegen; Trigger/Sticks bleiben analog; „Standard" setzt zurück.
+14. **CSM auf Ultra:** ist seit Session 14 im Ultra-Preset eingeschaltet (TODO-Eintrag war veraltet).
+
+### Verifiziert
+- `npm run check` (14/14): 0 Abstürze, 0 NaN, 0 m Wand-Durchdringung. **Start-Berührungen** (Paare in den ersten 8 s): vorher Ø 8,3 (2–15), jetzt Ø 2,6 (0–5). **Zero-G:** Ø 147 m/s (Oovo) bzw. 160 m/s (Henker) in den Röhren gegenüber 123 / 113 m/s außerhalb. **Tunnel:** 2–4 je Strecke.
+- Standbilder (WebGL2): Malastare-Tunnel mit Portal, Lampen, Leitstreifen und Metall-Deck; Malastare im Gewitter (dichte Regenstreifen); Oovo Zero-G-Röhre und Tunnel; Aquilaris im Sturm mit Leitstreifen und Energieleitung; Pod mit Düsenklappen.
+- **WebGPU-Konsolencheck** (0 Fehler): Oovo IV + Malastare inkl. Live-Umschalten (Volumetrie aus, Textur-Filter, Bloom, AO, AA, Schatten …), Aquilaris bei Gewitter/Nacht. WebGL2: Ando Prime mit Live-Umschalten fehlerfrei.
+- **Layout-Test:** 1280×720, 1920×1080, 800×1000 – einheitliche Skalierung, keine Scrollbalken, auch mit dem neuen Gamepad-Abschnitt.
+- **App-Smoke-Test** (gebaute App, Oovo IV): Rennen, HUD, stumme Pause, Grafik im Pausemenü, Taste umbelegen und **Gamepad-Umbelegen** (simuliertes Pad: Boost → „L3") bestanden.
+
+### Nicht verifiziert
+- **Fahrgefühl:** Heck-Drift, Schwerelosigkeit, Start (Mensch + 10 Gegner; die Simulation hat keinen Spieler-Pod mit menschlichem Verhalten).
+- Düsenklappen in geöffnetem Zustand, Holo-Tafeln, Blitz/Böen-Stärke und Sternenstaub nicht in Bewegung gesehen.
+- Bogen-Kollision: nur die gerade Test-Traverse per Selbsttest; Felsbögen liegen meist so hoch (≥ 12 m am Rand), dass die KI sie nie berührt.
+- Tunnel: frei stehende Tunnel (ohne Schlucht) von außen nicht gesichtet; Gelände kann die Röhre schneiden.
+- Start-Berührungen sind nicht null (Ø 2,6 Paare streifen sich beim Einfädeln).
+
+---
 
 ## Stand: 2026-11-19 (Session 15) – Bugfixes (UV-Schmieren, UI-Skalierung, Trümmer, SSR), Drift, Staubfahnen, Live-Grafik
 
