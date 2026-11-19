@@ -9,11 +9,11 @@ import { effectiveStats } from '../../src/game/settings';
 import { podEnvelope } from '../../src/game/podDesigns';
 
 const SECS = Number(process.env.SECS ?? 45), ONLY = process.env.TRACK, GRIP = Number(process.env.GRIP ?? 1); // GRIP=0.9 ≈ storm/snow weather
-const LIMIT = { deaths: 3, wall: 0.6, clear: 0.2, minSpeed: 18 };
+const LIMIT = { deaths: 3, wall: 0.6, clear: 0.2, minSpeed: 18, divePct: 1.5 }; // divePct: share of AI frames holding "dive"
 let seed = 1234567; Math.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; // deterministic runs
 const diff = (Object.values(DIFFICULTIES) as { skill: number; speed: number }[])[1];
 let failed = 0;
-console.log('track         deaths  NaN  wallPen  minClear  avgSpeed  slowest  airMax  rolls  slides  result');
+console.log('track         deaths  NaN  wallPen  minClear  avgSpeed  slowest  airMax  rolls  slides  dive%  result');
 for (const def of TRACKS) {
   if (ONLY && def.id !== ONLY) continue;
   const td = buildTrack(def); const S = td.main.samples, N = td.N;
@@ -37,11 +37,11 @@ for (const def of TRACKS) {
     pods.push(pod);
   }
   const prog0 = pods.map(p => p.prog); const wasDead = pods.map(() => false);
-  let deaths = 0, nan = 0, wall = 0, clear = 9, airMax = 0, rolls = 0, slides = 0, t = 0, worst = '', airDbg = '', air0 = 0, air0Dist = 0;
+  let deaths = 0, nan = 0, wall = 0, clear = 9, airMax = 0, rolls = 0, slides = 0, dives = 0, aiFrames = 0, t = 0, worst = '', airDbg = '', air0 = 0, air0Dist = 0;
   const h = 1 / 120, frames = SECS * 60;
   for (let f = 0; f < frames; f++) {
     t += 1 / 60;
-    for (const p of pods) { aiInputs(p, td, pods, t, null); if (p.input.roll) rolls++; }
+    for (const p of pods) { aiInputs(p, td, pods, t, null); if (p.input.roll) rolls++; aiFrames++; if ((p.input.pitch ?? 0) < 0) dives++; }
     { // pod 0: scripted manual-control stress on top of the AI line
       const p = pods[0], ph = t % 8;
       if (ph > 5 && ph < 6.2) p.input.roll = Math.floor(t / 8) % 2 ? 1 : -1;
@@ -78,10 +78,11 @@ for (const def of TRACKS) {
     });
   }
   const speeds = pods.map((p, i) => (p.prog - prog0[i]) * 2 / SECS); const avg = speeds.reduce((a, b) => a + b, 0) / speeds.length, slow = Math.min(...speeds);
-  const bad = nan > 0 || deaths > LIMIT.deaths || wall > LIMIT.wall || clear < LIMIT.clear || slow < LIMIT.minSpeed;
+  const divePct = dives / Math.max(1, aiFrames) * 100;
+  const bad = divePct > LIMIT.divePct || nan > 0 || deaths > LIMIT.deaths || wall > LIMIT.wall || clear < LIMIT.clear || slow < LIMIT.minSpeed;
   if (bad) failed++; if (process.env.PITCH_AIR !== undefined) console.log(`  pod0 airborne pitch ${process.env.PITCH_AIR}: longest flight ${air0.toFixed(2)} s ≈ ${air0Dist.toFixed(0)} m`);
   if (process.env.DEBUG) console.log('  worst:', worst, '\n  air:', airDbg, 'gap@idx', td.paths[0].samples.map((q, k) => q.gap ? k : -1).filter(k => k >= 0 && (k % 8 === 0)).join(','));
-  console.log(`${def.id.padEnd(13)} ${String(deaths).padStart(5)} ${String(nan).padStart(5)} ${wall.toFixed(2).padStart(7)}m ${clear.toFixed(2).padStart(7)}m ${avg.toFixed(0).padStart(6)}m/s ${slow.toFixed(0).padStart(5)}m/s ${airMax.toFixed(1).padStart(6)}s ${String(rolls).padStart(6)} ${String(slides).padStart(7)}  ${bad ? 'FAIL' : 'ok'}`);
+  console.log(`${def.id.padEnd(13)} ${String(deaths).padStart(5)} ${String(nan).padStart(5)} ${wall.toFixed(2).padStart(7)}m ${clear.toFixed(2).padStart(7)}m ${avg.toFixed(0).padStart(6)}m/s ${slow.toFixed(0).padStart(5)}m/s ${airMax.toFixed(1).padStart(6)}s ${String(rolls).padStart(6)} ${String(slides).padStart(7)} ${divePct.toFixed(1).padStart(5)}%  ${bad ? 'FAIL' : 'ok'}`);
 }
 console.log(failed ? `\n${failed} track(s) FAILED (limits: deaths ≤ ${LIMIT.deaths}, wallPen ≤ ${LIMIT.wall} m, minClear ≥ ${LIMIT.clear} m, slowest ≥ ${LIMIT.minSpeed} m/s)` : '\nAll tracks passed.');
 process.exit(failed ? 1 : 0);

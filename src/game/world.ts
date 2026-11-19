@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { ThemeDef } from './data';
 import type { GfxSettings } from './settings';
-import { detailKindForTheme, generateTexture } from './textures';
+import { detailKindForTheme, generateTexture, generateTextures, type TexSpec } from './textures';
 import { surfaceMaterial } from './materials';
 import { mulberry32, type Path, type Sample, type TrackData } from './trackBuilder';
 import { addProps, type Emitter } from './props';
@@ -51,33 +51,38 @@ export interface World {
 
 const yield_ = () => new Promise(r => setTimeout(r, 0));
 
+/** The large texture sets a world needs – exported so Game can start synthesising them before the renderer is even initialised. */
+export function worldTextureSpecs(theme: ThemeDef, gfx: GfxSettings): TexSpec[] {
+  const P = theme.palette, texRes = gfx.texRes, TL = layersFor(theme.id), lres = Math.min(1024, texRes);
+  const specs: TexSpec[] = [
+    { kind: theme.road, palette: P.road, size: texRes, seed: 11 }, { kind: theme.wall, palette: P.wall, size: texRes, seed: 22 },
+    { kind: theme.ground, palette: P.ground, size: texRes, seed: 33, emissive: theme.emissiveGround },
+    { kind: 'gravel', palette: TL.gravel, size: lres, seed: 57 }, { kind: 'cracked', palette: TL.basin, size: lres, seed: 68, emissive: TL.basinEmissive },
+  ];
+  if (TL.cliff) specs.push({ kind: 'rock', palette: TL.cliff, size: texRes, seed: 79 });
+  return specs;
+}
+
 export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSettings, progress: (p: number, msg: string) => void): Promise<World> {
   const tStart = performance.now();
   const group = new THREE.Group();
   const rng = mulberry32(1234 + td.N);
   const geoQ = gfx.geometry;
-  const texRes = gfx.texRes;
   const aniso = gfx.anisotropy ?? 8;
   const disposables: { dispose: () => void }[] = [];
   const glossy: THREE.Mesh[] = [];
-  const P = theme.palette;
 
   progress(0.05, 'Generiere UHD-Texturen …'); await yield_();
   const tTex0 = performance.now();
-  const roadTex = generateTexture(theme.road, P.road, texRes, 11, aniso);
-  await yield_();
-  const wallTex = generateTexture(theme.wall, P.wall, texRes, 22, aniso);
-  await yield_();
-  const groundTex = generateTexture(theme.ground, P.ground, texRes, 33, aniso, theme.emissiveGround);
-  await yield_();
-  const TL = layersFor(theme.id); const lres = Math.min(1024, texRes);
-  const gravelTex = generateTexture('gravel', TL.gravel, lres, 57, aniso);
-  const basinTex = generateTexture('cracked', TL.basin, lres, 68, aniso, TL.basinEmissive);
-  const cliffTex = TL.cliff ? generateTexture('rock', TL.cliff, texRes, 79, aniso) : wallTex;
+  // Session 13: all large texture sets are synthesised in parallel workers while the main thread already builds the terrain field
+  const TL = layersFor(theme.id);
+  const specs = worldTextureSpecs(theme, gfx);
+  const texJob = generateTextures(specs, aniso);
+  const field = makeTerrainField(td, theme); const { heightAt, nearest, roadClear, avgY } = field;
+  const [roadTex, wallTex, groundTex, gravelTex, basinTex, cliffT] = await texJob; const cliffTex = cliffT ?? wallTex;
   const texMs = Math.round(performance.now() - tTex0);
   await yield_();
 
-  const field = makeTerrainField(td, theme); const { heightAt, nearest, roadClear, avgY } = field;
   const T = theme.terrain;
   const waterY = T === 'lava' ? Math.min(avgY - 14, td.bounds.minY - 8) : (T === 'jungle' || theme.id === 'ice') ? Math.min(avgY - 12, td.bounds.minY - 12) : T === 'ocean' ? avgY - 26 : -1e9;
 

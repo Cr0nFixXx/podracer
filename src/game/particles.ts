@@ -3,7 +3,7 @@ import * as TSLmod from 'three/tsl';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
-const { clamp, color, cos, exp, float, fract, hash, instanceIndex, instancedBufferAttribute, length, max: tslMax, min: tslMin, mix, oneMinus, positionView, pow, sin, smoothstep, step, uniform, uv, varying, vec3, vec4 } = TSL;
+const { cameraViewMatrix, dot, normalize, vec2, clamp, color, cos, exp, float, fract, hash, instanceIndex, instancedBufferAttribute, length, max: tslMax, min: tslMin, mix, oneMinus, positionView, pow, sin, smoothstep, step, uniform, uv, varying, vec3, vec4 } = TSL;
 
 /** Soft round disc with early edge falloff (no square corners). */
 const softDisc = () => pow(tslMax(oneMinus(length(uv().sub(0.5)).mul(2.0)), 0.0), 1.7);
@@ -101,12 +101,14 @@ const C_VSPK0 = new THREE.Color(1.4, 1.0, 1.9), C_VSPK1 = new THREE.Color(0.6, 0
 const C_EXP0 = new THREE.Color(2.4, 1.35, 0.45), C_EXP1 = new THREE.Color(0.95, 0.15, 0.03);
 const C_EXPS0 = new THREE.Color(0.16, 0.14, 0.13), C_EXPS1 = new THREE.Color(0.32, 0.32, 0.32);
 const UP_V = new THREE.Vector3(0, 1, 0), ZERO_V = new THREE.Vector3();
+const C_SPRAY = new THREE.Color(0.74, 0.8, 0.86), C_SPLASH = new THREE.Color(0.86, 0.9, 0.95), C_AB0 = new THREE.Color(2.2, 2.3, 2.6);
 
 export class Particles {
   add: Pool; alpha: Pool; amount: number; rateScale = 1;
   ambient: THREE.Sprite | null = null;
   private ambCam = uniform(new THREE.Vector3());
   private ambTime = uniform(0);
+  private ambVel = uniform(new THREE.Vector3()); private prevCam = new THREE.Vector3(); private camSet = false; private ambN = 1;
   group = new THREE.Group();
   constructor(amount: number) {
     this.amount = amount;
@@ -126,6 +128,22 @@ export class Particles {
     this.add.update(0.001); this.alpha.update(0.001);
   }
 
+  /** 0..1 share of the ambient weather particles that is drawn (rain getting heavier, snow easing off …). */
+  setAmbientAmount(f: number) { if (this.ambient) this.ambient.count = Math.max(1, Math.round(this.ambN * Math.max(0, Math.min(1, f)))); }
+
+  /** Rooster tail of fine spray thrown up from a wet road – taller and denser with speed. */
+  spray(p: THREE.Vector3, vel: THREE.Vector3, speed: number, alphaScale = 1) {
+    const want = Math.min(3, 0.5 + speed * 0.013) * this.amount * this.rateScale;
+    const n = Math.floor(want) + (Math.random() < (want % 1) ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      _v.set((Math.random() - 0.5) * 7, 1.6 + Math.random() * 3 + speed * 0.022, (Math.random() - 0.5) * 7).addScaledVector(vel, 0.32);
+      _p.set(p.x + (Math.random() - 0.5) * 3.2, p.y, p.z + (Math.random() - 0.5) * 3.2);
+      this.alpha.spawn(_p, _v, 0.55 + Math.random() * 0.5, 0.9, 3.6 + speed * 0.028 + Math.random() * 2.5, C_SPRAY, C_SPRAY, 0.085 * alphaScale, 1.5, 5);
+    }
+  }
+  /** Tiny short-lived splash crown where a rain drop hits the road. */
+  splash(p: THREE.Vector3) { _v.set(0, 1.3, 0); this.alpha.spawn(p, _v, 0.13 + Math.random() * 0.09, 0.06, 0.46, C_SPLASH, C_SPLASH, 0.36, 0.5, 6); }
+
   /** Clean plasma exhaust sparks (no blinding grey smoke behind healthy pods!). */
   exhaust(p: THREE.Vector3, back: THREE.Vector3, baseVel: THREE.Vector3, col: THREE.Color, power: number, boost: number, scale = 1) {
     const want = (0.55 + boost * 1.25) * this.amount * this.rateScale * scale;
@@ -134,6 +152,11 @@ export class Particles {
       _p.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
       _v.copy(back).multiplyScalar(18 + power * 26 + Math.random() * 8).add(baseVel).addScaledVector(_p, 3.2);
       this.add.spawn(p, _v, 0.08 + Math.random() * 0.07 + boost * 0.05, 0.45 + boost * 0.38, 0.1, col, C_EXH1, 0.36, 2.2, 0);
+    }
+    // afterburner: a white-hot core jet while boosting
+    if (boost > 0 && Math.random() < 0.7 * this.rateScale * scale) {
+      _v.copy(back).multiplyScalar(62 + Math.random() * 16).add(baseVel);
+      this.add.spawn(p, _v, 0.13 + Math.random() * 0.05, 0.62, 0.14, C_AB0, col, 0.5, 1.2, 0);
     }
   }
 
@@ -232,19 +255,31 @@ export class Particles {
     mat.sizeNode = tslMin(float(baseSz), tslMax(vz.sub(2.0), float(0.0)).mul(rain ? 0.1 : 0.05)).mul(step(float(2.2), vz));
     mat.colorNode = color(new THREE.Color(colors[type]).multiplyScalar(add ? 1.3 : 1));
     if (rain) {
-      // Rain as thin wind-slanted streaks (a 1.2 m sprite carries a ~4 cm line) instead of round dots
-      const q = uv().sub(0.5), sl = Math.sin(wind * 0.38), cl = Math.cos(wind * 0.38);
-      const qx = q.x.mul(cl).add(q.y.mul(sl)), qy = q.y.mul(cl).sub(q.x.mul(sl));
-      const streak = oneMinus(smoothstep(0.018, 0.06, qx.abs())).mul(oneMinus(smoothstep(0.22, 0.5, qy.abs())));
-      mat.opacityNode = streak.mul(0.62).mul(smoothstep(2.5, 7.0, vz));
+      // Session 13: each drop is motion-blurred along its SCREEN-SPACE velocity relative to the camera (rain velocity − pod velocity):
+      // standing → near-vertical wind-slanted lines; fast → long streaks rushing past the edges, short dots straight ahead.
+      const vRel = vec3(v[0], v[1], v[2]).sub(this.ambVel);
+      const pV = cameraViewMatrix.mul(vec4(wrapped, 1.0)).xyz, vV = cameraViewMatrix.mul(vec4(vRel, 0.0)).xyz;
+      const sdir = pV.xy.mul(vV.z).sub(vV.xy.mul(pV.z));                 // d/dt of the projected position (up to a positive factor)
+      const rHat = normalize(pV), vPerp = vV.sub(rHat.mul(dot(vV, rHat)));
+      const lenW = clamp(length(vPerp).mul(0.021), 0.35, 3.4);            // streak length in metres (≈ 21 ms exposure)
+      const dirV = varying(normalize(sdir.add(vec2(1e-4, 0.0)))), lenV = varying(lenW);
+      mat.sizeNode = tslMin(lenW.mul(1.1), tslMax(vz.sub(2.0), float(0.0)).mul(0.14)).mul(step(float(2.2), vz));
+      const q = uv().sub(0.5), along = dot(q, dirV), across = dot(q, vec2(dirV.y.negate(), dirV.x));
+      const wUv = float(0.034).div(lenV.mul(1.1));
+      const streak = oneMinus(smoothstep(wUv.mul(0.45), wUv, across.abs())).mul(oneMinus(smoothstep(0.3, 0.46, along.abs())));
+      mat.opacityNode = streak.mul(0.6).mul(smoothstep(2.5, 7.0, vz));
     } else mat.opacityNode = softDisc().mul(type === 'dust' ? 0.2 : 0.72).mul(smoothstep(2.5, 7.0, vz));
     const sp = new THREE.Sprite(mat); sp.count = n; sp.frustumCulled = false;
-    this.ambient = sp;
+    this.ambient = sp; this.ambN = n;
     this.group.add(sp);
   }
 
   update(dt: number, cam: THREE.Vector3, t: number) {
     this.add.update(dt); this.alpha.update(dt);
+    if (dt > 1e-4) { // smoothed camera velocity → rain streak direction/length
+      if (this.camSet) { _v.copy(cam).sub(this.prevCam).divideScalar(dt); if (_v.lengthSq() < 300 * 300) this.ambVel.value.lerp(_v, Math.min(1, dt * 8)); }
+      this.prevCam.copy(cam); this.camSet = true;
+    }
     this.ambCam.value.copy(cam);
     this.ambTime.value = t;
   }

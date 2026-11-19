@@ -1,5 +1,5 @@
 import { KeyBindings } from './KeyBindings';
-import { TIME_OPTIONS, WEATHER_OPTIONS, type TimeOfDay, type WeatherKind } from '../game/environment';
+import { sanitizeEnv, timeOptionsFor, weatherOptionsFor, type TimeOfDay, type WeatherKind } from '../game/environment';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, STAT_LABELS, THEMES, TRACKS, type StatKey } from '../game/data';
 import { PRESETS, effectiveStats, type GfxSettings, type Profile } from '../game/settings';
@@ -8,6 +8,14 @@ import { CAMERA_NAMES, fmt } from '../game/Game';
 import { Btn, Panel, Slider, StatBar, Toggle } from './common';
 import PodPreview from './PodPreview';
 import bg from '../assets/menu-bg.jpg';
+
+/** Livery presets (primary, secondary, engine glow) */
+const LIVERIES: { name: string; colors: [string, string, string] }[] = [
+  { name: 'Boonta Gold', colors: ['#d8a21c', '#2a2622', '#ffd24a'] }, { name: 'Tarnkappe', colors: ['#1c1f26', '#3a4250', '#4ad2ff'] },
+  { name: 'Hutt-Kartell', colors: ['#5a7a2a', '#c9a24a', '#b4ff5a'] }, { name: 'Imperial', colors: ['#d9dde3', '#20242c', '#ff4a4a'] },
+  { name: 'Mos Espa Rost', colors: ['#a8502a', '#d8c8a8', '#ff9a3a'] }, { name: 'Neon-Nacht', colors: ['#3a1c6a', '#ff3ad0', '#c87aff'] },
+  { name: 'Gletscher', colors: ['#cfe8f8', '#2d6fd6', '#7fe8ff'] }, { name: 'Rennrot', colors: ['#c21c1c', '#f0ece4', '#ffb347'] },
+];
 
 type Upd = (fn: (p: Profile) => Profile) => void;
 
@@ -123,14 +131,14 @@ export function RaceSetup({ profile, update, go, start }: { profile: Profile; up
             <div className="grid grid-cols-2 gap-2 mb-4">
               <div>
                 <div className="text-[11px] uppercase tracking-widest text-stone-300 mb-2">Tageszeit</div>
-                <select value={r.timeOfDay ?? 'auto'} onChange={e => set('timeOfDay', e.target.value as TimeOfDay)} className="w-full bg-black/60 border border-stone-600 text-amber-100 p-2 text-sm">
-                  {TIME_OPTIONS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+                <select value={sanitizeEnv(track.theme, r.timeOfDay, r.weather)[0]} onChange={e => set('timeOfDay', e.target.value as TimeOfDay)} className="w-full bg-black/60 border border-stone-600 text-amber-100 p-2 text-sm">
+                  {timeOptionsFor(track.theme).map(([v, n]) => <option key={v} value={v}>{n}</option>)}
                 </select>
               </div>
               <div>
                 <div className="text-[11px] uppercase tracking-widest text-stone-300 mb-2">Wetter</div>
-                <select value={r.weather ?? 'auto'} onChange={e => set('weather', e.target.value as WeatherKind)} className="w-full bg-black/60 border border-stone-600 text-amber-100 p-2 text-sm">
-                  {WEATHER_OPTIONS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+                <select value={sanitizeEnv(track.theme, r.timeOfDay, r.weather)[1]} onChange={e => set('weather', e.target.value as WeatherKind)} className="w-full bg-black/60 border border-stone-600 text-amber-100 p-2 text-sm">
+                  {weatherOptionsFor(track.theme).map(([v, n]) => <option key={v} value={v}>{n}</option>)}
                 </select>
               </div>
             </div>
@@ -200,7 +208,17 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
                   </div>
                 ))}
               </div>
-              <div className="mt-3"><Btn onClick={() => setCustom({ ...custom, colors: [...pod.colors] as [string, string, string] })}>Werkslackierung</Btn></div>
+              <div className="text-[11px] uppercase tracking-widest text-stone-300 mt-4 mb-2">Lackierungs-Vorlagen</div>
+              <div className="flex flex-wrap gap-2">
+                {LIVERIES.map(l => (
+                  <button key={l.name} onClick={() => setCustom({ ...custom, colors: [...l.colors] as [string, string, string] })} title={l.name}
+                    className={`flex items-center gap-2 px-2 py-1.5 border text-[11px] ${custom.colors.join() === l.colors.join() ? 'border-amber-400 text-amber-200' : 'border-stone-700 text-stone-300 hover:border-stone-400'}`}>
+                    <span className="flex">{l.colors.map((c, i) => <span key={i} className="w-3.5 h-3.5 border border-black/50" style={{ background: c }} />)}</span>{l.name}
+                  </button>
+                ))}
+                <button onClick={() => setCustom({ ...custom, colors: [...pod.colors] as [string, string, string] })}
+                  className={`px-2 py-1.5 border text-[11px] ${custom.colors.join() === pod.colors.join() ? 'border-amber-400 text-amber-200' : 'border-stone-700 text-stone-300 hover:border-stone-400'}`}>Werkslackierung</button>
+              </div>
             </Panel>
           </div>
           <div className="flex flex-col gap-5">

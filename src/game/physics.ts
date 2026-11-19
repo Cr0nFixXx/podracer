@@ -27,7 +27,7 @@ export interface PodState {
   place: number;
 }
 
-export interface AIState { stuck?: number; lastT?: number; prevLat?: number; skill: number; speedF: number; lineOff: number; takeShortcut: boolean; boostUntil: number; repairMode: boolean; noiseT: number; rubber: number; }
+export interface AIState { dive?: boolean; diveT?: number; diveRoll?: number; stuck?: number; lastT?: number; prevLat?: number; skill: number; speedF: number; lineOff: number; takeShortcut: boolean; boostUntil: number; repairMode: boolean; noiseT: number; rubber: number; }
 
 export const GRAVITY = 34;
 /** Generous repulsor hover altitude + hard per-engine/cockpit floor gap so no pod part EVER clips into the road! */
@@ -793,8 +793,17 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
   if (!p.grounded && !p.zeroG) {
     let gapNear = at(0).gap; for (let k = 3; k < 30 && !gapNear; k += 3) if (at(k).gap) gapNear = true;
     if (gapNear) pitchIn = p.vel.y < 8 ? 0.6 + 0.4 * ai.skill : 0;
-    else if (p.air > 0.16 && p.pos.y > p.groundY + HOVER + 1.4) pitchIn = -(0.5 + 0.5 * ai.skill);
-  } else if (ai.skill > 0.55 && speed > 45 && !p.zeroG) {
+    else {
+      // Session 13 fix: the AI used to hold "dive" on every crest and for the whole second half of every jump. Now it is a rare,
+      // deliberate manoeuvre: only good pilots, only on ~30 % of the big jumps (> 9 m above the road, descending, airborne ≥ 0.9 s),
+      // released 4 m above the road, at most once every 6 s, and never at full deflection.
+      const h = p.pos.y - (p.groundY + HOVER);
+      if (ai.dive) { if (h < 4) { ai.dive = false; ai.diveT = time + 6; } }
+      else if (p.air < 0.1) ai.diveRoll = Math.random();               // decided once per take-off: most jumps are simply flown out
+      else if (ai.skill > 0.62 && (ai.diveRoll ?? 1) < 0.3 && p.air > 0.9 && h > 9 && p.vel.y < -2 && time > (ai.diveT ?? 0)) ai.dive = true;
+      if (ai.dive) pitchIn = -Math.min(0.6, 0.25 + 0.3 * ai.skill);
+    }
+  } else if ((ai.dive ? ((ai.dive = false), (ai.diveT = time + 6), false) : false) || (ai.skill > 0.55 && speed > 45 && !p.zeroG)) {
     const bk = td.obstaclesByPath[p.path], b0 = Math.floor(p.idx / 10);
     for (let bb = b0; bb <= b0 + 4 && !rollIn; bb++) {
       const l = bk.get(bb); if (!l) continue;

@@ -10,9 +10,9 @@ let errs = 0;
 const open = async () => {
   const p = await b.newPage(); await p.setViewport({ width: 1280, height: 720 });
   p.on('pageerror', e => { errs++; console.log('[pageerror]', e.message.slice(0, 300)); });
-  p.on('console', m => { if (m.type() === 'error' && !/fonts\.g|GPU stall|ERR_/.test(m.text())) { errs++; console.log('[console]', m.text().slice(0, 300)); } });
+  p.on('console', m => { if (m.text().startsWith('[load]')) console.log(m.text()); if (m.type() === 'error' && !/fonts\.g|GPU stall|ERR_/.test(m.text())) { errs++; console.log('[console]', m.text().slice(0, 300)); } });
   await p.evaluateOnNewDocument(pr => { try { localStorage.setItem('podracer-profile-v1', JSON.stringify(pr)); } catch { /* */ } }, prof);
-  await p.goto('file://' + dist); return p;
+  await p.goto('file://' + dist + (process.env.QUERY ?? '')); return p;
 };
 const click = (p, text) => p.evaluate(t => { const el = [...document.querySelectorAll('button')].find(x => x.textContent.includes(t)); if (!el) throw new Error('button not found: ' + t); el.click(); }, text);
 const has = (p, text, timeout = 240000) => p.waitForFunction(t => document.body.textContent.includes(t), { timeout, polling: 500 }, text);
@@ -24,6 +24,7 @@ await has(p, 'Rennen starten'); await click(p, 'Rennen starten');
 await has(p, 'Wetter'); await p.screenshot({ path: out + '_setup.png' });
 await click(p, '▶ Start');
 await has(p, 'FLUGLAGE'); console.log('HUD up');
+if (process.env.LOAD_ONLY) { await b.close(); process.exit(0); } // only the [load] timing line is wanted
 await has(p, 'LOS!', 600000); console.log('race started'); // software rendering runs the countdown in slow motion
 await p.keyboard.down('KeyW'); await sleep(Number(process.env.DRIVE_MS ?? 15000));
 await p.keyboard.down('ArrowRight'); await sleep(4000);

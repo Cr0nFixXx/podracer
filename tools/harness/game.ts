@@ -10,7 +10,7 @@ let g: Game | null = null; let cur = -1;
     const prof = defaultProfile(); prof.race.trackId = TRACKS[i].id; prof.race.opponents = 7; prof.gfx.texRes = 1024; if (location.search.includes('webgl')) prof.gfx.backend = 'webgl'; if (location.search.includes('csm')) prof.gfx.csm = true;
     { const qs = new URLSearchParams(location.search); if (qs.get('tod')) prof.race.timeOfDay = qs.get('tod') as never; if (qs.get('wx')) prof.race.weather = qs.get('wx') as never; if (qs.has('ultra')) Object.assign(prof.gfx, PRESETS.ultra, { preset: 'ultra', texRes: 1024 }); } prof.gfx.renderScale = 0.6; prof.gfx.shadows = 1;
     g = new Game(div, prof, { onHud: () => {}, onLoading: () => {}, onFinish: () => {}, onPause: () => {}, onReady: () => {} });
-    await g.start(); g.paused = true; await new Promise(r => setTimeout(r, 400));
+    const tLoad = performance.now(); await g.start(); (window as unknown as Record<string, unknown>).loadInfo = `load=${Math.round(performance.now() - tLoad)}ms ` + JSON.stringify(g.world.timings) + ' ' + JSON.stringify((g as unknown as { loadMs?: unknown }).loadMs ?? {}); g.paused = true; await new Promise(r => setTimeout(r, 400));
   }
   const G = g!; G.paused = true;
   if (view === 'b') {
@@ -53,11 +53,11 @@ let g: Game | null = null; let cur = -1;
   G.camera.fov = 70; G.camera.updateProjectionMatrix(); G.sky.mesh.position.copy(G.camera.position);
   const fwd = G.camera.getWorldDirection(new THREE.Vector3()); const t = G.camera.position.clone().addScaledVector(fwd, 50);
   G.sun.target.position.copy(t); G.sun.position.copy(t).addScaledVector(G.sunDir, 400);
-  { const rt = new URLSearchParams(location.search).get('rt'); if (rt) { G.raceTime = +rt; G.applyFront(); } }
+  { const rt = new URLSearchParams(location.search).get('rt'); if (rt) { G.raceTime = +rt; G.applyEnv(0, true); } }
   G.updateVisuals(); G.updateLights(); G.world.update(G.clock + 5, G.camera.position);
   if (location.search.includes('flash')) { G.sky.uniforms.flash.value = 0.9; G.hemi.intensity = 1.75; }
   for (let k = 0; k < 3; k++) { G.render(0.016); await new Promise(r => setTimeout(r, 900)); }
-  return `${(window as unknown as Record<string, unknown>).coverInfo ?? ''} ${G.backend} ${TRACKS[i].id}/${view} calls=${G.renderer.info.render.calls} tris=${G.renderer.info.render.triangles}`;
+  return `${(window as unknown as Record<string, unknown>).loadInfo ?? ''} ${(window as unknown as Record<string, unknown>).coverInfo ?? ''} ${G.backend} ${TRACKS[i].id}/${view} calls=${G.renderer.info.render.calls} tris=${G.renderer.info.render.triangles}`;
 };
 /** Physics/collision stress test without rendering: AI opponents race `secs` seconds. */
 (window as unknown as Record<string, unknown>).sim = async (i: number, secs: number) => {
@@ -90,4 +90,24 @@ let g: Game | null = null; let cur = -1;
   const SS = G.td.main.samples; const ramps: number[] = []; for (let k = 1; k < SS.length; k++) if (SS[k].ramp > 0 && SS[k - 1].ramp === 0) ramps.push(k);
   (window as unknown as Record<string, unknown>).dbg = `deaths=[${deathAt.join(' ')}] ramps=[${ramps.join(',')}] hz=[${G.td.hazards.map(h => h.idx).join(',')}] sp=[${G.td.setPieces.map(q => q.type[0] + q.idx).join(',')}] N=${SS.length}`;
   return `${TRACKS[i].id}: ${secs}s avgProg=${Math.round(prog.reduce((a, b) => a + b, 0) / prog.length)} minProg=${Math.min(...prog)} deaths~${deaths} NaN=${nan} centreBeyondWall=${maxPen.toFixed(2)}m hazards=${G.td.hazards.length} eruptFrames=${geyser} setPieces=[${G.td.setPieces.map(sp => sp.type + ':' + sp.state).join(' ')}] obstacles=${G.td.obstacles.length} dmg=[${dmg.join(',')}] ${(window as unknown as Record<string, unknown>).dbg}`;
+};
+/** Audio check without speakers: taps the master bus with an analyser and reports the peak level of rivals and thunder. */
+(window as unknown as Record<string, unknown>).audioTest = async () => {
+  const { AudioFX } = await import('../../src/game/audio');
+  const a = new AudioFX(0.6); if (!a.ctx) return 'audio: no AudioContext';
+  await a.ctx.resume(); const an = a.ctx.createAnalyser(); an.fftSize = 2048; a.master.connect(an); const buf = new Float32Array(an.fftSize);
+  const peak = async (ms: number, tick: () => void) => { let pk = 0; const t0 = performance.now(); while (performance.now() - t0 < ms) { tick(); an.getFloatTimeDomainData(buf); for (const v of buf) pk = Math.max(pk, Math.abs(v)); await new Promise(r => setTimeout(r, 40)); } return pk; };
+  const idle = await peak(900, () => a.update(60, 0.5, false, 1e9, 0, undefined, 0.04));
+  a.setRivals(20, 3); const rival = await peak(900, () => a.update(60, 0.5, false, 12, 110, undefined, 0.04));
+  a.setRivals(0, 0); await peak(500, () => a.update(60, 0.5, false, 1e9, 0, undefined, 0.04));
+  a.thunder(1); const thunder = await peak(1500, () => a.update(60, 0.5, false, 1e9, 0, undefined, 0.04));
+  return `audio state=${a.ctx.state} peak idle=${idle.toFixed(3)} rivalNear=${rival.toFixed(3)} thunder=${thunder.toFixed(3)}`;
+};
+/** Texture synthesis benchmark without any rendering: main thread vs. worker pool (out/texWorker.js). */
+(window as unknown as Record<string, unknown>).texBench = async (size = 1024) => {
+  const T = await import('../../src/game/textures');
+  const mk = (seedOff: number) => [['mud', 11], ['rock', 22], ['jungle', 33], ['gravel', 57], ['cracked', 68], ['sand', 79]].map(([kind, seed]) => ({ kind: kind as never, palette: ['#4a3a24', '#6a5434', '#8a7048'], size, seed: (seed as number) + seedOff }));
+  T.setTextureWorkerFactory(null); let t0 = performance.now(); await T.generateTextures(mk(1000), 8); const sync = Math.round(performance.now() - t0);
+  T.setTextureWorkerFactory(() => new Worker('./texWorker.js')); t0 = performance.now(); await T.generateTextures(mk(2000), 8); const par = Math.round(performance.now() - t0);
+  return `texBench ${size}px ×6: main thread ${sync} ms · ${T.textureStats.workers} workers ${par} ms (jobs ${T.textureStats.jobMs.join('/')} ms) · cores=${navigator.hardwareConcurrency}`;
 };

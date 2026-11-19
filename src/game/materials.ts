@@ -2,6 +2,9 @@ import * as THREE from 'three/webgpu';
 import * as TSLmod from 'three/tsl';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
+/** Session 13: global runtime weather level for all surface materials. `wet` 0..1 scales puddles, darkening and gloss of every material
+ *  compiled with `wet > 0` (dynamic rain → the road gets wet and dries again). Keep it at 1 on worlds without dynamic rain. */
+export const WEATHER: { wet: { value: number } } = { wet: TSL.uniform(1) };
 const {
   Break, Fn, If, Loop, abs, clamp, color, cross, dFdx, dFdy, dot, float, inverseSqrt, length, materialColor, materialRoughness, max, mix,
   normalLocal, normalView, normalViewGeometry, normalWorldGeometry, normalize, positionLocal, positionView, positionWorld, pow,
@@ -131,12 +134,12 @@ export function surfaceMaterial(set: TexSet, o: SurfaceOpts = {}) {
   const macro = macroTexture();
 
   // ---- weather masks (world space, ripple-faded with distance so rain puddles never strobe!) ----
-  const wpos = positionWorld.xz; const wetAmt = o.wet ?? 0, snowAmt = o.snow ?? 0;
+  const wpos = positionWorld.xz; const wetAmt = o.wet ?? 0, snowAmt = o.snow ?? 0; const wetU = WEATHER.wet as unknown as N;
   let puddle: N = float(0), snowM: N = float(0), ripple: N = vec2(0, 0);
   if (wetAmt > 0) {
     const pv = texture(macro, wpos.mul(1 / 70)).b.mul(0.6).add(texture(macro, wpos.mul(1 / 19).add(0.37)).r.mul(0.4));
     const cover = o.puddles ?? 0.3;
-    puddle = smoothstep(1 - cover, 1 - cover + 0.08, pv.add(float(0.5).sub(baseSample.a).mul(0.3))).mul(wetAmt);
+    puddle = smoothstep(1 - cover, 1 - cover + 0.08, pv.add(float(0.5).sub(baseSample.a).mul(0.3))).mul(wetU.mul(wetAmt));
     if (o.rain) {
       const ripFade = ssInv(42.0, 6.0, dist);
       const g = wpos.mul(0.6), cell = floor(g), f = fract(g);
@@ -178,7 +181,7 @@ export function surfaceMaterial(set: TexSet, o: SurfaceOpts = {}) {
     ledgeM = smoothstep(0.46, 0.78, nw.y.add(baseSample.a.sub(0.5).mul(0.28)).add(macroV.sub(0.5).mul(0.2))).mul(o.ledge.amount);
     col = mix(col, color(o.ledge.color).mul(mix(float(0.82), float(1.12), macroV)), ledgeM);
   }
-  if (wetAmt > 0) col = col.mul(1 - 0.36 * wetAmt).mul(mix(float(1), float(0.74), puddle));
+  if (wetAmt > 0) col = col.mul(oneMinus(wetU.mul(0.36 * wetAmt))).mul(mix(float(1), float(0.74), puddle));
   if (snowAmt > 0) col = mix(col, vec3(0.9, 0.94, 1.0), snowM);
   if (o.cloud) col = col.mul(cloudShade(o.cloud));
   mat.colorNode = col;
@@ -211,7 +214,7 @@ export function surfaceMaterial(set: TexSet, o: SurfaceOpts = {}) {
   // ---- roughness with distance specular anti-aliasing (kills wet/ice/metal horizon strobing) ----
   let rough: N = normSample.a.mul(materialRoughness);
   if (o.ledge && o.ledge.amount > 0) rough = mix(rough, float(o.ledge.rough ?? 0.8), ledgeM);
-  if (wetAmt > 0) rough = mix(rough.mul(1 - 0.35 * wetAmt), float(0.11), puddle);
+  if (wetAmt > 0) rough = mix(rough.mul(oneMinus(wetU.mul(0.35 * wetAmt))), float(0.11), puddle);
   if (snowAmt > 0) rough = mix(rough, float(0.65), snowM);
   rough = mix(rough, max(rough, float(0.36)), smoothstep(48.0, 220.0, dist));
   mat.roughnessNode = clamp(rough, 0.11, 1.0);

@@ -9,7 +9,7 @@ import type { GfxSettings } from './settings';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
 const {
-  Fn, If, Loop, abs, clamp, convertToTexture, dot, exp, float, floor, fract, sin, interleavedGradientNoise, ivec2,
+  Fn, If, Loop, abs, atan, clamp, convertToTexture, dot, exp, float, floor, fract, sin, interleavedGradientNoise, ivec2,
   length, luminance, max, metalness, min, mix, mrt, normalView, oneMinus, output, packNormalToRGB, pass,
   perspectiveDepthToViewZ, pow, renderOutput, roughness, sample, screenCoordinate, screenUV, smoothstep, step,
   textureLoad, textureSize, uniform, unpackRGBToNormal, vec2, vec3, vec4,
@@ -37,7 +37,7 @@ export class PostFX {
   pipeline: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private scenePass: any;
-  cine: { uniforms: { time: { value: number }; speed: { value: number }; boost: { value: number }; damage: { value: number }; flash: { value: number } } };
+  cine: { uniforms: { time: { value: number }; speed: { value: number }; boost: { value: number }; damage: { value: number }; flash: { value: number }; flow: { value: number } } };
   godRays: { uniforms: { sunPos: { value: THREE.Vector2 }; intensity: { value: number } } } | null = null;
   /** Session 11 lens effects: sun glare/flare strength, viewport aspect, rain droplets on the lens (0..1), sun colour */
   lens!: { flare: { value: number }; aspect: { value: number }; rain: { value: number }; sunColor: { value: THREE.Color } | null };
@@ -47,7 +47,7 @@ export class PostFX {
 
   constructor(renderer: THREE.WebGPURenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, gfx: GfxSettings, env: { rain?: number; flare?: boolean } = {}) {
     const lensOn = gfx.lensFx ?? true; const flareOn = lensOn && !!env.flare; const rainOn = lensOn && (env.rain ?? 0) > 0.05;
-    const u = { time: uniform(0), speed: uniform(0), boost: uniform(0), damage: uniform(0), flash: uniform(0) };
+    const u = { time: uniform(0), speed: uniform(0), boost: uniform(0), damage: uniform(0), flash: uniform(0), flow: uniform(0) }; // flow = accumulated airstream phase for lens drops
     this.cine = { uniforms: u };
     const scenePass = pass(scene, camera);
     this.scenePass = scenePass;
@@ -188,25 +188,40 @@ export class PostFX {
       if (rainOn) {
         const h21 = (p: N) => fract(sin(dot(p, vec2(127.1, 311.7))).mul(43758.5453));
         const asp = vec2(aspectU, 1.0);
+        const spd = clamp(u.speed, 0.0, 1.0);                                   // 0 = standing … 1 = 150 m/s
+        const wG = oneMinus(smoothstep(0.2, 0.6, spd)), wR = smoothstep(0.15, 0.55, spd);
+        // (1) beads: swell, sit, evaporate – fewer as the airstream blows them off
         const p1 = uvv.mul(asp).mul(9.0); const id1 = floor(p1); const f1 = fract(p1).sub(0.5);
         const rn = h21(id1), rn2 = h21(id1.add(17.3));
         const life = fract(u.time.mul(0.11).mul(rn2.mul(0.8).add(0.6)).add(rn));
         const rad = rn2.mul(0.14).add(0.09).mul(smoothstep(0.0, 0.08, life)).mul(ssInv(1.0, 0.55, life)).add(0.0005);
         const dv1 = f1.sub(vec2(rn, rn2).sub(0.5).mul(0.5));
-        const m1 = oneMinus(smoothstep(rad.mul(0.55), rad, length(dv1))).mul(step(rn, rainU.mul(0.9)));
+        const m1 = oneMinus(smoothstep(rad.mul(0.55), rad, length(dv1))).mul(step(rn, rainU.mul(0.9).mul(oneMinus(spd.mul(0.6)))));
+        // (2) slow: drops run down the lens under gravity and leave a wet trail
         const p2 = vec2(uvv.x.mul(aspectU).mul(14.0), uvv.y.mul(2.2));
         const rc = h21(vec2(floor(p2.x), 3.7));
         const s2 = fract(p2.y.sub(u.time.mul(rc.mul(0.5).add(0.35))).add(rc.mul(7.0)));
         const fx2 = fract(p2.x).sub(0.5).add(sin(p2.y.mul(9.0).add(rc.mul(20.0))).mul(0.12));
         const dvh = vec2(fx2, s2.sub(0.8).mul(6.36));
-        const on2 = step(rc, rainU.mul(0.75));
+        const on2 = step(rc, rainU.mul(0.75)).mul(wG);
         const m2 = oneMinus(smoothstep(0.08, 0.16, length(dvh))).mul(on2);
         const trail = oneMinus(smoothstep(0.02, 0.06, abs(fx2))).mul(smoothstep(0.2, 0.8, s2)).mul(step(s2, 0.8)).mul(on2).mul(0.45);
+        // (3) fast: the airstream drives drops radially outwards from the screen centre; tails get longer with speed
+        const cc = uvv.sub(0.5).mul(asp); const rr = length(cc).add(1e-4); const er = cc.div(rr), et = vec2(er.y.negate(), er.x);
+        const aa = atan(cc.y, cc.x).div(6.2832).add(0.5).mul(30.0);
+        const rc3 = h21(vec2(floor(aa), 9.1));
+        const s3 = fract(rr.mul(2.6).sub(u.flow.mul(rc3.mul(0.6).add(0.7))).add(rc3.mul(5.0)));
+        const tx = fract(aa).sub(0.5).mul(rr.mul(6.2832 / 30.0)), ry = s3.sub(0.8).div(2.6); // tangential / radial offset from the drop head
+        const on3 = step(rc3, rainU.mul(0.85)).mul(wR).mul(smoothstep(0.1, 0.24, rr));
+        const m3 = oneMinus(smoothstep(0.007, 0.014, length(vec2(tx, ry)))).mul(on3);
+        const tail3 = oneMinus(smoothstep(0.0015, 0.005, abs(tx))).mul(smoothstep(float(0.65).sub(spd.mul(0.4)), 0.8, s3)).mul(step(s3, 0.8)).mul(on3).mul(0.5);
         const off = dv1.div(asp).div(9.0).mul(m1).mul(2.2)
           .add(vec2(dvh.x.div(aspectU.mul(14.0)), dvh.y.div(14.0)).mul(m2).mul(2.0))
-          .add(vec2(fx2.div(aspectU.mul(14.0)), 0.0).mul(trail).mul(1.5));
+          .add(vec2(fx2.div(aspectU.mul(14.0)), 0.0).mul(trail).mul(1.5))
+          .add(et.mul(tx).add(er.mul(ry)).div(asp).mul(m3).mul(2.4))
+          .add(et.mul(tx).div(asp).mul(tail3).mul(1.6));
         uvS = clamp(uvv.sub(off), vec2(0.001), vec2(0.999));
-        dropM = max(max(m1, m2), trail);
+        dropM = max(max(max(m1, m2), trail), max(m3, tail3));
       }
       // ---- Heat haze: shimmering refraction in the exhaust plume of both engines (pure UV offset, no extra taps, no control flow) ----
       if (lensOn) {
@@ -214,7 +229,7 @@ export class PostFX {
         const fall = (pos: N) => { const dd = uvv.sub(pos).mul(asp2).div(heatR); return exp(dot(dd, dd).negate()); };
         const amt = fall(heatA).add(fall(heatB)).mul(heatS);
         const wob = vec2(sin(uvv.y.mul(240.0).add(u.time.mul(31.0))).add(sin(uvv.y.mul(97.0).sub(u.time.mul(17.0)))), sin(uvv.x.mul(210.0).sub(u.time.mul(26.0))));
-        uvS = clamp(uvS.add(wob.mul(amt).mul(0.0016)), vec2(0.001), vec2(0.999));
+        uvS = clamp(uvS.add(wob.mul(amt).mul(0.00065)), vec2(0.001), vec2(0.999)); // subtle: < 0.15 % of the image width
       }
       const base = vec3(src.sample(uvS).level(0).rgb).toVar();
       if (motion) {

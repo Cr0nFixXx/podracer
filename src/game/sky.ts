@@ -38,6 +38,7 @@ export function makeSky(theme: ThemeDef, forEnv = false) {
     time: uniform(0),
     sunDir2: uniform(sunDirection2(theme)),
     flash: uniform(0), // lightning: lights the cloud deck from inside (weather.ts)
+    stars: uniform(theme.stars ?? 0), cloudLit: uniform(1), // runtime-blended by the environment timeline
   };
 
   const d = normalize(positionLocal);
@@ -48,10 +49,10 @@ export function makeSky(theme: ThemeDef, forEnv = false) {
   col = col.add(uniforms.sunColor.mul(pow(sd, 6.0).mul(0.35).add(pow(sd, forEnv ? 24.0 : 64.0).mul(forEnv ? 0.45 : 0.75))));
 
   // Night starfield (twinkle-free hash stars, hidden by clouds and near the horizon)
-  if ((theme.stars ?? 0) > 0 && !isPrison && !forEnv) {
+  if (theme.stars !== undefined && !isPrison && !forEnv) {
     const h21s = (p: N) => fract(sin(dot(p, vec2(127.1, 311.7))).mul(43758.5453));
     const cellS = floor(d.mul(210.0)); const sh = h21s(cellS.xy.add(cellS.z.mul(vec2(17.31, 41.7))));
-    col = col.add(vec3(0.8, 0.88, 1.0).mul(step(0.9955, sh)).mul(sh.sub(0.9955).mul(180.0).add(0.25)).mul(smoothstep(0.02, 0.35, d.y)).mul(theme.stars ?? 0));
+    col = col.add(vec3(0.8, 0.88, 1.0).mul(step(0.9955, sh)).mul(sh.sub(0.9955).mul(180.0).add(0.25)).mul(smoothstep(0.02, 0.35, d.y)).mul(uniforms.stars));
   }
   let covN: N = float(0.0);
   if (theme.clouds > 0.001) {
@@ -62,7 +63,8 @@ export function makeSky(theme: ThemeDef, forEnv = false) {
     // Cloud albedo is lit by the ambient sky level: white by day, dark at night / under ash skies (was a constant 48 % white)
     const hc = new THREE.Color(theme.skyHorizon), tc = new THREE.Color(theme.skyTop);
     const lit = Math.min(1, (0.2126 * hc.r + 0.7152 * hc.g + 0.0722 * hc.b) * 2.4 + (0.2126 * tc.r + 0.7152 * tc.g + 0.0722 * tc.b) * 0.8);
-    let cc = mix(uniforms.horizon.mul(1.08), vec3(lit), 0.48).mul(pow(sd, 4.0).mul(0.45).add(0.75));
+    uniforms.cloudLit.value = lit;
+    let cc = mix(uniforms.horizon.mul(1.08), vec3(uniforms.cloudLit), 0.48).mul(pow(sd, 4.0).mul(0.45).add(0.75));
     cc = mix(cc, uniforms.sunColor.mul(1.3), pow(sd, 12.0).mul(0.55));
     col = mix(col, cc, cov.mul(smoothstep(0.0, 0.16, d.y)).mul(0.85));
     covN = cov;

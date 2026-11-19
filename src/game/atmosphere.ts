@@ -47,5 +47,5 @@ export function applyAtmosphere(scene: THREE.Scene, theme: ThemeDef, density: nu
   let sunAmt: any = pow(mu, 8.0).mul(0.3);
   if (fh) sunAmt = sunAmt.add(pow(mu, 40.0).mul(fh).mul(vf.mul(0.25).add(0.2)));
   (scene as unknown as { fogNode: unknown }).fogNode = fog(mix(fogCol, sunCol.mul(1.1), clamp(sunAmt, 0.0, 0.62)), factor);
-  return { color: fogCol, sunColor: sunCol, density: dens, volFog: vf } as { color: { value: THREE.Color }; sunColor: { value: THREE.Color }; density: { value: number }; volFog: { value: number } };
+  return { color: fogCol, sunColor: sunCol, density: dens, volFog: vf, sunDir: sd } as { color: { value: THREE.Color }; sunColor: { value: THREE.Color }; density: { value: number }; volFog: { value: number }; sunDir: { value: THREE.Vector3 } };
 }
