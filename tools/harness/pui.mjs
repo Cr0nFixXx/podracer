@@ -3,7 +3,7 @@
 // Usage (from a dir with puppeteer): node pui.mjs <abs path to dist/index.html> <abs out prefix>
 import puppeteer from 'puppeteer';
 const [,, dist, out] = process.argv;
-const sizes = [[1280, 720], [1920, 1080], [1024, 600], [800, 1000], [2560, 1440]];
+const sizes = [[1280, 720], [1920, 1080], [1024, 600], [800, 1000], [2560, 1440]].filter(s => !process.env.SIZES || process.env.SIZES.split(',').includes(String(s[0])));
 const b = await puppeteer.launch({ headless: 'new', protocolTimeout: 600000, args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--allow-file-access-from-files'] });
 let bad = 0; const shots = [];
 const click = (p, text) => p.evaluate(t => { const el = [...document.querySelectorAll('button')].find(x => x.textContent.includes(t)); if (!el) throw new Error('button not found: ' + t); el.click(); }, text);
@@ -28,10 +28,11 @@ for (const [w, h] of sizes) {
     const issues = await audit(p); if (issues.length) bad++;
     console.log(`${w}x${h} ${name.padEnd(8)} ${issues.length ? 'FAIL ' + issues.slice(0, 3).join(' | ') : 'ok'}`);
     if ((w === 1280 || w === 800 || w === 1024) && name !== 'menu') shots.push([`${w}x${h} ${name}`, 'data:image/jpeg;base64,' + Buffer.from(await p.screenshot({ type: 'jpeg', quality: 70 })).toString('base64'), w, h]);
+    if (name === 'settings') { await click(p, 'Steuerung'); await sleep(500); const i2 = await audit(p); if (i2.length) bad++; console.log(`${w}x${h} keys     ${i2.length ? 'FAIL ' + i2.slice(0, 3).join(' | ') : 'ok'}`); }
     if (btn) { await click(p, 'Zurück'); await sleep(500); }
   }
   // planet filter
-  if (w === 1280) { await click(p, 'Rennen starten'); await sleep(600); const before = await p.evaluate(() => document.body.textContent.includes('Neon-Spirale')); await click(p, 'Tatooine'); await sleep(400); const after = await p.evaluate(() => document.body.textContent.includes('Neon-Spirale')); console.log('planet filter: Neon-Spirale listed before/after "Tatooine":', before, after, before && !after ? 'ok' : 'FAIL'); if (!(before && !after)) bad++; }
+  if (w === 1280) { await click(p, 'Rennen starten'); await sleep(600); const before = await p.evaluate(() => document.body.textContent.includes('Neon-Spirale')); await p.select('select[aria-label="Planet"]', 'Tatooine'); await sleep(400); const after = await p.evaluate(() => document.body.textContent.includes('Neon-Spirale')); console.log('planet filter: Neon-Spirale listed before/after "Tatooine":', before, after, before && !after ? 'ok' : 'FAIL'); if (!(before && !after)) bad++; }
   await p.close();
 }
 const g = await b.newPage(); await g.setViewport({ width: 1500, height: 1000 });

@@ -1,17 +1,63 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-`npm run dev` → Renneinstellungen → Strecke **Dschungelfluss-Sprint**, Wetter **„Wechselhaft"**, Tageszeit **„Sonnenuntergang"** → 2 Minuten fahren. Prüfen: Donner hörbar und laut genug, Gegner hörbar, Regen wird stärker und lässt nach, Lichter gehen an (≈ 5 Min.).
+`npm run dev` → Boonta-Kessel → in einer Kurve **Leertaste + A/D halten** (Slide), dann auf der Geraden **→ halten und mit ↑/↓ lenken** (Rolle). Fühlt sich der Slide jetzt weich genug an? (≈ 5 Min.) Werte zum Nachstellen: `physics.ts`, Block „Handbrake slide (Session 14 retune)".
 
 ## Git-Stand (wichtig)
 - Lokales Repo im Projekt-Root, Branch **`B`**, Remote `origin` = `https://github.com/Cr0nFixXx/podracer.git`. **Pushen:** `git push origin B`.
-- **Der Ordner `.git` fehlt im Download und nach jedem Sandbox-Neustart.** Deshalb liegt das Repository zusätzlich dreifach in **`.archiv/repo-sicherung/`** (mit `LIESMICH.txt`):
-  1. `git-ordner/` – Kopie von `.git` (in den Projektordner kopieren, in `.git` umbenennen)
-  2. `podracer-B.bundle` – eine Datei (`git clone -b B podracer-B.bundle`)
-  3. `podracer-git.tar.gz.b64.txt` – `.git` als Base64-Text (übersteht Binärfilter)
-- **Committen immer mit `npm run save -- "Nachricht"`** (`tools/save.sh`): committet alles außer `.archiv/repo-sicherung` und schreibt die drei Kopien neu. Nie von Hand `git add -A`.
-- **Sitzungsbeginn ohne `.git`:** `npm run restore-git` (`tools/restore-git.sh`: Kopie → Bundle → Base64 → GitHub). Fällt es auf GitHub zurück, sind die lokalen Einzel-Commits weg; der Arbeitsstand bleibt und wird mit `npm run save` als ein Commit gesichert. So bereits dreimal passiert (zuletzt zu Beginn von Session 13: auch das alte Bundle in `.archiv/git/` war fort).
-- Offen: ob `.archiv/repo-sicherung/` einen Neustart übersteht, zeigt erst die nächste Sitzung. Commit-Autor ist der Platzhalter „Podracer Dev".
+- **Der Ordner `.git` fehlt im Download und nach jedem Sandbox-Neustart – ebenso Binärdateien ohne bekannte Endung** (Git-Packs, Bundles). Zu Beginn von Session 14 geprüft: Ordner-Kopie war ohne Packs (kaputt), das Bundle fehlte, **die Base64-Textdatei war intakt und hat alle Commits wiederhergestellt.**
+- Deshalb gibt es nur noch **eine** Kopie, als Text: **`.archiv/repo-sicherung/podracer-git.tar.gz.b64.txt`** (+ `LIESMICH.txt`, `wiederherstellen.sh`, `wiederherstellen.ps1`).
+- **Committen immer mit `npm run save -- "Nachricht"`** (`tools/save.sh`): committet alles außer `.archiv/repo-sicherung`, schreibt die Textkopie neu und testet sie durch Probe-Wiederherstellung. Nie von Hand `git add -A`.
+- **Sitzungsbeginn ohne `.git`:** `npm run restore-git` (Textkopie → sonst GitHub; im zweiten Fall sind ungepushte Einzel-Commits weg, dann `npm run save`).
+- Commit-Autor ist der Platzhalter „Podracer Dev".
+
+## Stand: 2026-11-19 (Session 14) – Bugfixes, responsive UI, Rollen-Steuerung, zerstörbare Hindernisse, Textur-Cache
+
+### Erledigt in Session 14
+**Bugs**
+1. **Hand-/Luftbremse zu hart (`physics.ts`):** progressiver Slide über `slideK` (0→1 in ~0,3 s). Gier-Verstärkung ×1,2–1,47 statt ×1,7–2,4, Seitenhaftung fällt auf 8,5 % (Pod driftet auf seinem Schwung), Bremswirkung im Slide 30 %, Schräglaufwinkel-Begrenzer ab ~35° (kein Eindrehen), Haftung kehrt nach dem Loslassen über ~0,45 s zurück.
+2. **Schadensanzeige L/R vertauscht:** intern ist „L" = lokales x < 0 = im Verfolgerbild das **rechte** Triebwerk. `Game.hud()` tauscht jetzt.
+3. **Klappen klappern im Hangar/am Start:** mein Fehler aus Session 13 (`update()` bekommt Gesundheits-, nicht Schadenswerte). Klappern jetzt nur unter 45 % Triebwerkszustand.
+4. **Steuerleitungen durchs Triebwerk (`podModel.ts → buildFlexCables`):** die Leitung lief in gerader Linie vom Cockpit zum Pylon bei 58 % der Gondellänge, also durch die hintere Gondelhälfte. Jetzt: frei hängender Bogen bis zu einem Sattel knapp über/hinter dem Gondelheck, dann mit zwei Schellen auf der Gondeloberseite zum Pylon.
+5. **Ton im Pausemenü:** `onKey` rief nach jedem Tastendruck `audio.resume()` – auch direkt nach dem Pausieren. Jetzt nur, wenn nicht pausiert; zusätzlich wird in der Pause der Master-Pegel auf 0 gesetzt.
+6. **Banner zu niedrig, ohne Kollision:** Sponsoren-Traversen von 11 m auf 21 m (Banner-Unterkante ~17,7 m). Neu `TrackData.overheads` (Traversen + Startportal): wer hineinfliegt, wird nach unten (oder oben) abgewiesen, verliert 10 % Tempo und 5–18 Schaden. Checkpoint-Bögen 46 % höher (ohne Kollision).
+
+**Soll**
+7. **Responsive UI ohne Scrollbalken (`ui/Fit.tsx`):** Inhalt wird bei virtueller Breite gesetzt, gemessen und so skaliert, dass er in beide Richtungen passt (klein und groß); überschüssige Breite verbreitert das Layout. Breakpoints sind Container-Queries (`@3xl:`, `@5xl:`), nicht mehr Viewport-Queries. Einstellungen haben Reiter „Grafik & Ton" / „Steuerung", die Streckenliste ist einzeilig-kompakt, das HUD skaliert mit dem Fenster (Referenz 1280 × 720).
+8. **Planeten-Filter** in der Streckenwahl (Auswahlfeld, kombiniert mit Rundkurs/Sprint).
+9. **„Ultra" = alles Maximum** außer Sichtfeld und Bloom-Stärke (Render-Skalierung 150 %, Texturen 2048, SSR, Kaskaden-Schatten, Partikel 150 %, Sichtweite 150 % …). Alle Presets setzen jetzt jede Option (kein Liegenbleiben alter Werte).
+10. **Energiekopplung (`podMaterials.ts → boltLook`):** weißer Kern, zwei wandernde Gabel-Bögen, 24-Hz-Flackern, laufende Pulse, breiteres Band, stärkeres Zucken.
+11. **Rollen-Steuerung:** im gerollten Zustand lenken **Anheben/Neigen** (zieht zur Pod-Oberseite, also zur Rollseite hin), **Links/Rechts** bewegt den Pod auf/ab. Überblendet mit dem Rollwinkel. Die KI rechnet ihre Lenkung entsprechend um.
+12. **Trümmer verschwinden:** von den drei herabgefallenen Bogen-/Eisblöcken zerbröseln zwei nach 11–19 s, der mittlere bleibt als Schikane.
+13. **Zerstörbare Hindernisse:** Frachtkisten und kleine Felsen (r < 2,9 m) zerplatzen bei > 38 m/s; kostet 9–12 Schaden und 7 % Tempo. Trümmerpartikel, Instanzen werden aus den Meshes entfernt.
+14. **Boost-Anzeige im HUD:** Hitzebalken mit schraffierter Gefahrenzone (80–100 %), „MAX" = Überhitzung, nach Überhitzung Marke „BEREIT" bei 55 %.
+15. **Neue Grafik-Optionen:** LOD-Distanz (Landschaft), Gegner-Pod-Detail-Sichtweite, Wetter-Effekte (Aus/Reduziert/Voll), Volumetrie (Aus/Einfach/Voll).
+16. **Grafik im Pausemenü:** gleiche Panels wie in den Einstellungen (`ui/GfxPanels.tsx`). Sofort wirksam: Sichtfeld, Render-Skalierung, LOD, Pod-Detail, Wetter-Effekte, FPS, Lautstärke (`Game.applyLiveGfx`). Alles andere: Schaltfläche „Übernehmen & neu starten".
+
+**TODO-Punkte**
+17. **Regen unter Dächern:** in Tunneln/überdachten Abkürzungen blenden Regenpartikel, Linsentropfen, Aufschlag-Spritzer, Gischt und Regengeräusch aus (`Game.cover`).
+18. **Persistenter Textur-Cache (`texStore.ts`, IndexedDB):** fertige Textursätze werden gespeichert; Folgestarts lesen sie statt zu rechnen. Schlüssel enthält einen Hash des Synthese-Codes (Änderungen an `texCore.ts` verwerfen alte Einträge automatisch). Obergrenze 420 MB, älteste zuerst gelöscht. `?nocache` schaltet ab.
+
+### Verifiziert
+- `npm run check`: 14/14 Strecken, 0 NaN, 0 m Wand-Durchdringung, max. 1 Ausfall je Strecke; Banner-Selbsttest (künstlich niedrige Traverse auf Boonta): 11 Treffer registriert; KI zertrümmert 0–3 Hindernisse je Strecke; KI-„Neigen" ≤ 1,3 %.
+- **UI-Layout-Test** (`tools/harness/pui.mjs`): 5 Fenstergrößen (1280×720, 1920×1080, 1024×600, 800×1000, 2560×1440) × 5 Ansichten → keine scrollbaren Elemente, nichts außerhalb des Fensters. Screenshots gesichtet (1280, 1024, 800).
+- Pod-Nahaufnahmen (3 Pods): Leitungen laufen über die Gondel.
+- **App-Smoke-Test** (`papp.mjs`, gebaute App): HUD-Schaden auf der richtigen Seite (intern L = 32 % → rechte Box), Boost-Balken sichtbar; **Pause: Audio-Kontext `suspended`, Master-Pegel 0 – auch nach Tastendrücken**, nach „Weiter" wieder 0,3; Grafik-Menü in der Pause öffnet, 0 scrollbare Elemente; Tasten umbelegen ok; 0 Seitenfehler.
+- **Textur-Cache** (Dschungel, 1024 px, gleiche Browser-Sitzung): erster Start Texturen 8 006 ms, zweiter Start **244 ms (5 Sätze aus dem Cache)**; Weltaufbau 13,5 s → 5,4 s, Laden gesamt 18,9 s → 11,8 s.
+- **Ultra-Preset** (Texturen im Test auf 1024, Render-Skalierung 0,6): WebGL2 Dschungel bei Gewitter/Nacht ohne Shader-Fehler (Textur-Limit hält), WebGPU Boonta mit Wetterfront 0 Konsolenfehler. Standard-Einstellungen WebGPU: Vulkan + Dschungel 0 Fehler.
+
+### Nicht verifiziert
+- **Fahrgefühl** von Slide und Rollen-Steuerung (nur per Simulation, nicht von Hand gefahren).
+- Energieblitz, Trümmer-Zerfall, zerplatzende Hindernisse, Boost-Balken unter Last und Tunnel-Ausblendung nicht in Bewegung gesehen.
+- Checkpoint-Bögen haben weiterhin keine Kollision.
+- „Ultra" auf echter Hardware (Render-Skalierung 150 % + SSR + CSM ist sehr teuer).
+
+### Befehle (neu)
+1. `node pui.mjs <dist/index.html> /tmp/t/ui` – UI-Layout-Test (`SIZES=1280,800` wählt Größen).
+2. `TWICE=1 LOAD_ONLY=1 node papp.mjs <dist/index.html> /tmp/t/tw '{"race":{"trackId":"jungle"}}'` – Ladezeit erster/zweiter Start (Cache).
+3. `papp.mjs` prüft jetzt zusätzlich: HUD-Seiten, Ton in der Pause, Grafik im Pausemenü. Debug-Zugriff im Browser: `window.__podracer`.
+
+---
 
 ## Stand: 2026-11-19 (Session 13) – Umwelt-Zeitleiste, Regen/Gewitter, Lichtkegel, Sound, Ladezeit, KI-Fix
 

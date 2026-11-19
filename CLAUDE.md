@@ -7,7 +7,7 @@
 - Finish with `npm run build` → `dist/index.html` (single file). Archived unrelated HTML stays in `.archiv/`.
 - Spec don'ts: **no film grain, no excessive bloom / overexposure.**
 - **Sandbox persistence:** if `.git` or `src/assets/menu-bg.jpg` vanished after a reset, restore via `git clone --branch B https://github.com/Cr0nFixXx/podracer.git /tmp/rc && cp -r /tmp/rc/.git . && mkdir -p src/assets && cp -n /tmp/rc/src/assets/menu-bg.jpg src/assets/` (working tree stays, shows as modified vs. `B`).
-- **Commit with `npm run save -- "message"` after every finished task** (user request). It commits everything except `.archiv/repo-sicherung` and rewrites the three repository copies there (`git-ordner/`, `podracer-B.bundle`, `podracer-git.tar.gz.b64.txt` + `LIESMICH.txt`) – the user's download and every sandbox restart drop `.git`. Never `git add -A` by hand, never add the copies to `.gitignore`, never push unless asked. **Session start: `npm run restore-git`** if `.git` is missing, then `npm run save` if it fell back to GitHub.
+- **Commit with `npm run save -- "message"` after every finished task** (user request). It commits everything except `.archiv/repo-sicherung` and rewrites the repository copy there as **base64 text** (`podracer-git.tar.gz.b64.txt` + restore scripts), then test-restores it. Background: the user's download and every sandbox restart drop `.git` **and extension-less/unknown binary files** (packs, bundles) – only the text copy survived (verified Session 14). Never `git add -A` by hand, never git-ignore the copy, never push unless asked. **Session start: `npm run restore-git`.**
 - **Before finishing: `npm run check` must be green** (typecheck + 14-track node physics sim). Add npm scripts only with `npm pkg set scripts.<name>=…`.
 
 ## Repo
@@ -38,6 +38,20 @@ React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto 
 - **Particles (`particles.ts`):** stateless GPU simulation. `Pool.spawn` writes one record (5 × vec4) into a ring buffer; the vertex shader integrates drag/gravity in closed form. No per-frame CPU loop – never reintroduce `pos/vel` arrays. Colour/alpha travel as one `varying(vec4)`.
 - **Decor LOD:** `place(geo, …, { lod: { geo, dist } })` builds a far twin per sector (forces sector chunking); LOD geometry must come from the same seed (`jungleTreeGeometry(seed, gq, true)`, `spireGeometry(seed, halfRadial, sameStrata)`).
 - **CSM** is opt-in (`gfx.csm`): `CSMShadowNode` on `sun.shadow.shadowNode`; call `csm.updateFrustums()` only after `csm.camera` exists (first render).
+
+## UI layout, controls, obstacles, cache (Session 14)
+- **No scrollbars, ever.** Every menu/overlay lives inside `<Fit>` (`ui/Fit.tsx`): virtual width → measure → scale to fit both axes. Inside `Fit` use **container-query variants** (`@3xl:` ≈ md, `@5xl:` ≈ lg), never viewport variants (`md:`/`lg:`) and never `vh`/`vw` units or `overflow-auto`. Keep views flat (tabs, compact lists) – a tall view gets scaled down. Run `tools/harness/pui.mjs` after UI changes (fails on any scrollable element).
+- **HUD** is a scaled layer (reference 1280 × 720, `hs` in `RaceView`). Position with absolute px inside it.
+- **Graphics panels** are one component (`ui/GfxPanels.tsx`) used by the settings screen and the pause menu. New option → field in `GfxSettings`, value in **all four** `PRESETS` (ultra = maximum), slider/toggle in `GfxPanels`, and – if it can change at runtime – in `Game.LIVE_GFX` + `Game.applyLiveGfx`.
+- **HUD left/right:** internal `hpL` / `engL` = local x < 0 = screen-RIGHT in the chase view. Only `Game.hud()` swaps; do not "fix" it anywhere else.
+- **`podModel.update(…, dmgL, dmgR, …)` receives HEALTH fractions** (1 = intact) despite the names.
+- **Slide** (`physics.ts`): state `slideK` 0..1; all slide effects scale with it (grip, yaw boost, decel, body lean). No hard on/off switches.
+- **Knife-edge controls:** `stepPod` mixes steer/pitch by the roll amount (`steerMix`, `pitchMix`); `aiInputs` applies the inverse so the AI keeps thinking in turn/pitch. Any new input consumer must read the mixed values.
+- **Overheads:** `td.overheads` (filled by `trackDetail` gantries and the start portal) are solid in `stepPod`. New overhead structure → push `{ idx, y0, y1, half }`. Keep banner undersides ≥ 16 m above the road.
+- **Breakable / vanished obstacles:** `o.breakable` (crates, rocks r < 2.9). A broken or despawned obstacle gets `broken = true` and is moved to x/z = 1e9, lat = 1e6 – every consumer ignores it without extra checks. Visual removal: `world.breakObstacle(o)`.
+- **Roof cover:** `Game.cover` (player under `sample.roof > 0`) fades rain particles, lens drops, splashes, spray, rain audio.
+- **Audio pause:** only `setPaused` may resume the context; never call `audio.resume()` from input handlers while paused.
+- **Texture cache:** `texStore.ts` (IndexedDB), enabled only by `main.tsx`. Keys include a hash of the synthesis source – helper functions used by `computeTexture` must be part of that hash (`storeKey` in `textures.ts`) or stale textures survive code changes.
 
 ## Environment timeline, rain, storm, lights, loading (Session 13)
 - **`environment.ts` owns everything about time of day and weather.** `resolveEnvironment(theme, tod, wx)` → `{ theme, fx, build, timeline, label }`. `theme`/`fx` = state at t = 0, `build` = union of everything the timeline can reach (rain road shader, lens rain, bolt mesh, stars, lights, ambient particle type, brightest sky for the PMREM). Anything that must exist at compile time has to come from `build`, never from the start state.
@@ -83,6 +97,7 @@ React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto 
 
 ## Testing
 - **`npm run check`** (≈ 25 s, node only): `tools/ci/sim.ts` – fails on NaN, deaths > 3, wall penetration > 0.6 m, ground clearance < 0.2 m, pod slower than 18 m/s. `DEBUG=1`, `TRACK=<id>`, `SECS=<n>`, `PITCH_AIR=1|0|-1` (jump experiment).
+- **Session 14 tests:** `pui.mjs` (layout, 5 window sizes), `papp.mjs` (HUD sides, pause audio, pause graphics menu; `TWICE=1 LOAD_ONLY=1` = cache timing), CI overhead self-test + `smashed` column. Test handle in the browser: `window.__podracer`.
 - **Session 13 test hooks:** harness `tod=sunset|sunrise|cycle`, `wx=front|clearing|changing`, `rt=<s>`; pshot items `audio` (level test via analyser) and `tex:1024` (worker benchmark, needs `out/texWorker.js`); `papp.mjs` env `LOAD_ONLY=1`, `QUERY='?noworkers'` → `[load]` line.
 - **App smoke test:** `node papp.mjs <dist/index.html> <out prefix> '<profile json>'` after `npm run build`. Harness extras: `?ultra`, `?rt=<race seconds>`, `wx=front`.
 - **Weather in tests:** harness query `?webgl&tod=night&wx=storm` (`flash`, `csm` optional), views `s` (towards the sun) and `m` (relay tower). `GRIP=0.88 npm run check` = storm grip.

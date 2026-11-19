@@ -1,11 +1,11 @@
 # TODO
 
-## 0. Direkt aus Session 13
-- [ ] **Hörtest + Probefahrt auf echter Hardware:** Donner-/Gegner-Lautstärke, Regen in Fahrt, Lichtkegel-Stärke, Bildrate, Ladezeit mit Workern (Zeile `[load]` in der Konsole)
-- [ ] **Startnummern** auf den Pods (Textur-Atlas, eine gemeinsame Material-Pipeline) + Pilotenköpfe
-- [ ] **Persistenter Textur-Cache** (IndexedDB) für Folgestarts; 2048-px-Texturen in Kacheln rechnen
-- [ ] **Gamepad-Belegung im Menü** + Touch-Steuerung
-- [ ] **Wetter auf Abkürzungen/Tunneln:** Regen und Spritzer unter Dächern ausblenden
+## 0. Direkt aus Session 14
+- [ ] **Probefahrt:** Slide-Gefühl, Rollen-Steuerung, Banner-Kollision, Hindernisse zertrümmern, Ultra-Preset auf echter Hardware
+- [ ] **Kollision für Checkpoint-Bögen** (bogenförmig, seitenabhängige Höhe) und für Set-Piece-Türme
+- [ ] **Gamepad-Belegung im Menü** + Touch-Steuerung (Tastatur ist umbelegbar)
+- [ ] **Startnummern** auf den Pods + Pilotenköpfe
+- [ ] **Grafik-Optionen live schalten**, die heute einen Neustart brauchen (Schatten, AA, Bloom) – PostFX zur Laufzeit neu aufbauen
 
 ## 1. Als Nächstes (Podracer & Ladezeit)
 - [ ] **Podracer-Aufwertung:** Livery-Vorlagen & Startnummern im Hangar; Hitzeflimmern auch für Gegner-Pods
@@ -21,6 +21,15 @@
 - [ ] **`npm run check` in GitHub Actions** (Push auf `B`), `check:gpu` als optionaler Job
 - [ ] **Harness:** WebGPU-Screenshots im headless Chrome reparieren (weiß; nur Konsolencheck möglich)
 - [ ] **Fern-LOD auch für Kiefern/Tafelberge**, falls die Messung es rechtfertigt
+
+## Erledigt (Session 14 – Bugfixes, UI, Steuerung, Hindernisse, Cache)
+- [x] **Bugs:** Slide weicher/progressiv, HUD-Schaden L/R, Klappen-Klappern, Leitungen durchs Triebwerk, Ton in der Pause, Banner zu niedrig + Kollision
+- [x] **Responsive UI ohne Scrollbalken** (`Fit`, Container-Queries, Reiter, kompakte Streckenliste, skalierendes HUD)
+- [x] **Planeten-Filter**, **Ultra = alles Maximum**, neue Grafik-Optionen (LOD, Pod-Detail, Wetter, Volumetrie), **Grafik im Pausemenü**
+- [x] **Rollen-Steuerung** (Anheben/Neigen lenkt, Links/Rechts = auf/ab), **stärkerer Energieblitz**
+- [x] **Zerstörbare Hindernisse**, **Trümmer verschwinden teilweise**, **Boost-/Überhitzungsanzeige**
+- [x] **Regen unter Dächern aus**, **persistenter Textur-Cache** (IndexedDB)
+- [x] Git-Sicherung als Textkopie (einzige Variante, die Download/Neustart übersteht)
 
 ## Erledigt (Session 13 – Zeitleiste, Regen/Gewitter, Licht, Sound, Ladezeit, KI)
 - [x] **Tag-Nacht-Übergänge** (Sonnenuntergang, Sonnenaufgang, Zeitraffer) und **Wetterwechsel im Rennen** (Aufziehend, Aufklarend, Wechselhaft)

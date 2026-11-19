@@ -24,18 +24,43 @@ await has(p, 'Rennen starten'); await click(p, 'Rennen starten');
 await has(p, 'Wetter'); await p.screenshot({ path: out + '_setup.png' });
 await click(p, '▶ Start');
 await has(p, 'FLUGLAGE'); console.log('HUD up');
-if (process.env.LOAD_ONLY) { await b.close(); process.exit(0); } // only the [load] timing line is wanted
+if (process.env.TWICE) { // persistent texture cache: wait for the deferred write, then load the same race again in a fresh page
+  await sleep(9000); await p.close(); p = await open();
+  await has(p, 'Rennen starten'); await click(p, 'Rennen starten'); await has(p, 'Wetter'); await click(p, '▶ Start'); await has(p, 'FLUGLAGE'); console.log('second load done');
+}
+if (process.env.LOAD_ONLY) { await b.close(); process.exit(0); } // only the [load] timing line(s) wanted
 await has(p, 'LOS!', 600000); console.log('race started'); // software rendering runs the countdown in slow motion
 await p.keyboard.down('KeyW'); await sleep(Number(process.env.DRIVE_MS ?? 15000));
 await p.keyboard.down('ArrowRight'); await sleep(4000);
 const txt = await p.evaluate(() => document.body.textContent);
 console.log('HUD label ROLLE:', txt.includes('ROLLE'), '| env label:', (txt.match(/(NACHT|MITTAG|DÄMMERUNG|GEWITTER|REGEN|SCHNEE|STAUB|NEBEL|KLAR)[^\n]*/i) ?? ['-'])[0]);
 await p.screenshot({ path: out + '_race.png' });
-await p.keyboard.up('ArrowRight'); await p.keyboard.up('KeyW'); await p.close();
+await p.keyboard.up('ArrowRight');
+// HUD sides: damage the internal "L" engine (= screen-RIGHT in the chase view) and heat up the boost gauge for the screenshot
+await p.evaluate(() => { const g = window.__podracer; g.player.hpL = 32; g.player.heat = 0.86; });
+await sleep(2500); await p.screenshot({ path: out + '_hud.png' });
+const hudSide = await p.evaluate(() => { const g = window.__podracer, h = g.hud(); return { internalL: Math.round(g.player.hpL), internalR: Math.round(g.player.hpR), hudLeftBox: Math.round(h.hpL), hudRightBox: Math.round(h.hpR) }; });
+console.log('HUD damage sides:', JSON.stringify(hudSide), hudSide.hudRightBox < hudSide.hudLeftBox ? 'ok (damaged screen-right engine shown right)' : 'FAIL');
+if (!(hudSide.hudRightBox < hudSide.hudLeftBox)) errs++;
+await p.keyboard.up('KeyW');
+// pause: audio must be silent and stay silent when keys are pressed; graphics settings must be reachable and fit
+await p.keyboard.press('Escape'); await sleep(900);
+const au = () => p.evaluate(() => { const g = window.__podracer; return { paused: g.paused, ctx: g.audio.ctx ? g.audio.ctx.state : 'none', gain: g.audio.master ? g.audio.master.gain.value : -1 }; });
+const a1 = await au(); await p.keyboard.press('KeyW'); await p.keyboard.press('KeyD'); await sleep(600); const a2 = await au();
+console.log('pause audio:', JSON.stringify(a1), '| after key presses:', JSON.stringify(a2), a1.gain === 0 && a2.gain === 0 && a2.ctx !== 'running' ? 'ok' : 'FAIL');
+if (!(a1.gain === 0 && a2.gain === 0 && a2.ctx !== 'running')) errs++;
+await click(p, 'Grafik-Einstellungen'); await has(p, 'LOD-Distanz', 8000); await sleep(500);
+const sc = await p.evaluate(() => [...document.querySelectorAll('*')].filter(el => { const cs = getComputedStyle(el); return /(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 1; }).length);
+console.log('pause graphics menu: open, scrollable elements =', sc, sc === 0 ? 'ok' : 'FAIL'); if (sc) errs++;
+await p.screenshot({ path: out + '_pause.png' });
+await click(p, 'Zurück'); await sleep(300); await click(p, 'Weiter'); await sleep(700);
+const a3 = await au(); console.log('after resume:', JSON.stringify(a3), a3.gain > 0 ? 'ok' : 'FAIL'); if (!(a3.gain > 0)) errs++;
+await p.close();
 
 // ---- 2. settings: rebind a key, apply the classic preset ----
 p = await open();
 await has(p, 'Einstellungen'); await click(p, 'Einstellungen');
+await has(p, 'Grafik & Ton'); await click(p, 'Steuerung');
 await has(p, 'Rolle nach links');
 await p.evaluate(() => document.querySelector('[data-action="rollLeft"]').click());
 await has(p, 'Taste drücken', 5000); await p.keyboard.press('KeyQ'); await sleep(300);

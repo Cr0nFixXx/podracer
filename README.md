@@ -33,13 +33,15 @@ npm run build    # erzeugt dist/index.html (alles inline, offline lauffähig)
 **Anzeige im Rennen:** unten links zeigt ein Pod-Symbol die Fluglage (dreht sich bei der Rolle, Pfeil für Anheben/Neigen). Der Balken darunter füllt sich im Slide – ist er gelb, gibt es beim Loslassen den Extra-Schub. Unter der Karte stehen Tageszeit und Wetter.
 
 ### Flugmanöver
-1. **Slide:** `Leertaste` halten und lenken – das Heck bricht aus, der Pod dreht scharf ein und verliert kaum Tempo. Nach einem langen Slide loslassen und Schub geben: kurzer Extra-Schub.
+1. **Slide:** `Leertaste` halten und lenken – die Haftung lässt weich nach, das Heck kommt herum und der Pod driftet auf seinem Schwung weiter. Gegenlenken fängt ihn ab; nach dem Loslassen greift er über etwa eine halbe Sekunde wieder. Nach einem langen Slide loslassen und Schub geben: kurzer Extra-Schub (Balken unter der Fluglage-Anzeige wird gelb).
 2. **Weiter springen:** auf der Rampe und in der Luft `↓` halten – der Pod hebt die Nase und gleitet (etwa doppelte Sprungweite, kostet etwas Tempo).
 3. **Schneller landen:** in der Luft `↑` halten – der Pod taucht ab. Am Boden drückt `↑` den Pod tiefer und gibt mehr Haftung.
-4. **Hochkant durch Lücken:** `←` oder `→` halten – der Pod rollt 90° und ist nur noch ein Viertel so breit; dafür lenkt er träger.
+4. **Hochkant durch Lücken:** `←` oder `→` halten – der Pod rollt 90° und ist nur noch ein Viertel so breit. **Im gerollten Zustand ist die Steuerung mitgedreht:** `↓` (Anheben) zieht den Pod zur Rollseite hin, `↑` (Neigen) von ihr weg; `A`/`D` bewegen ihn auf und ab.
 5. Cockpit und Triebwerke neigen sich nur gemeinsam und nur, solange `↑`/`↓` gedrückt ist. Beim Lenken hebt sich das äußere Triebwerk als Ganzes, ohne zu kippen.
 
-Boost erhitzt die Triebwerke – rechtzeitig loslassen. **Hangar:** Pod mit der Maus drehen, Mausrad zoomt. Leuchtende blaue **Reparaturbuchten** mit Tesla-Spulen markieren schnelle Service-Abschnitte.
+**Boost-Anzeige:** Der Balken unter dem Tacho zeigt die Triebwerkshitze. Im schraffierten Bereich (ab 80 %) wird es kritisch, bei „MAX" überhitzen die Triebwerke und nehmen Schaden; der Boost ist dann gesperrt, bis die Hitze unter die Marke „BEREIT" gefallen ist.
+
+**Hindernisse:** Frachtkisten und kleine Felsen lassen sich mit Tempo zertrümmern – das kostet etwas Triebwerkszustand und Tempo. Säulen und große Felsen bleiben hart. Sponsoren-Traversen und das Startportal sind massiv: nicht hineinfliegen.
 
 ## Tageszeit & Wetter
 
@@ -91,6 +93,8 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 ## Landschaft & Atmosphäre
 
 - **Steigungen & Schrägkurven (neu):** jede der 14 Strecken hat lange Anstiege und Gefälle (bis 11–17 %) mit Kuppen zum Abheben sowie überhöhte Kurven (bis ca. 21°), die spürbar mehr Haftung geben.
+- **Bedienoberfläche:** passt sich jeder Fenstergröße an und kommt ohne Scrollbalken aus. In der Streckenwahl filtert ein Auswahlfeld nach Planet.
+- **Schnellere Folgestarts:** berechnete Texturen werden im Browser gespeichert (IndexedDB); ab dem zweiten Start einer Welt entfällt die Berechnung. `?nocache` an der Adresse schaltet das ab.
 - **Hangar (neu):** 8 Lackierungs-Vorlagen (z. B. „Boonta Gold", „Tarnkappe", „Neon-Nacht") neben der freien Farbwahl.
 - **Breitere Pisten & Renntechnik (neu):** alle Strecken sind 18 % breiter. Am Rand stehen Repulsor-Relaistürme mit gegenläufig drehenden Ringen, Patrouillen-Drohnen begleiten das Feld.
 - **Offene Welten & Schluchten:** Barchan-Dünen und Kies-Wadis (Tatooine), Gletschergrate (Ando Prime), Karsthügel und Flussläufe (Dschungel/Malastare), glühende Lavarinnen (Vulkanwelt), Atolle und Felsnadeln (Aquilaris), dreistufige Horizont-Silhouetten, Talnebel und **ziehende Wolkenschatten**.
@@ -103,6 +107,10 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 - **Landmarken & Rauch:** Krayt-Drachen-Skelett, Feuchtfarm, Mos Espa, zerbrochene Raumschiffwracks, verbundene Forschungsstationen, Raffinerien mit Kugeltanks, Vulkane mit Lavastrom und Aschesäule, Stufentempel mit Feuerschalen, Steinkreis, Bohrinseln mit Helipad, gestreifte Leuchttürme, Gefängnistürme sowie wandernde Staub-, Schnee- und Methanteufel.
 
 ## Grafik-Einstellungen (Auswahl)
+
+- **Erreichbar** über „Einstellungen → Grafik & Ton" und im Rennen über **Pause (`Esc`) → Grafik-Einstellungen**. Sofort wirksam sind Sichtfeld, Render-Skalierung, LOD-Distanz, Gegner-Pod-Detail, Wetter-Effekte, FPS-Anzeige und Lautstärke; alles andere über „Übernehmen & neu starten".
+- **Voreinstellung „Ultra":** stellt jede Option auf ihr Maximum (nur Sichtfeld und Bloom-Stärke bleiben). Sehr leistungshungrig.
+- **Neu:** LOD-Distanz (ab wann ferne Bäume/Felsen vereinfacht werden), Gegner-Pod-Detail (bis zu welcher Entfernung Gegner voll detailliert sind), Wetter-Effekte (Aus/Reduziert/Voll), Volumetrie (Nebelbänke und Lichtkegel).
 
 - **Kaskaden-Schatten (neu, optional):** zweite, weite Schattenstufe bis 520 m für ferne Schluchtwände. Kostet einen zusätzlichen Schattenpass – nur bei Leistungsreserve einschalten.
 
@@ -119,13 +127,13 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 
 Alle Änderungen sind lokal committet (Branch `B`, Remote `origin` = `github.com/Cr0nFixXx/podracer`).
 
-**Der versteckte Ordner `.git` fehlt im Download.** Deshalb liegt das komplette Repository zusätzlich in **`.archiv/repo-sicherung/`**:
+**Der versteckte Ordner `.git` fehlt im Download.** Er steckt deshalb als Textdatei in **`.archiv/repo-sicherung/podracer-git.tar.gz.b64.txt`**. Wiederherstellen (im Projektordner ausführen):
 
-1. `git-ordner/` – in den Projektordner kopieren und in `.git` umbenennen. Danach funktionieren `git log` und `git push origin B`.
-2. `podracer-B.bundle` – Alternative als einzelne Datei: `git clone -b B podracer-B.bundle podracer`.
-3. `podracer-git.tar.gz.b64.txt` – dieselben Daten als Textdatei. Anleitung in `LIESMICH.txt` im selben Ordner.
+1. Windows: `powershell -ExecutionPolicy Bypass -File .archiv\repo-sicherung\wiederherstellen.ps1`
+2. Linux/macOS: `sh .archiv/repo-sicherung/wiederherstellen.sh`
+3. Danach: `git log --oneline` und `git push origin B`.
 
-Neue Änderungen sichern: `npm run save -- "Beschreibung"` (committet und erneuert alle drei Kopien).
+Neue Änderungen sichern: `npm run save -- "Beschreibung"` (committet und erneuert die Kopie).
 
 ## Für Entwickler: Prüfbefehle
 

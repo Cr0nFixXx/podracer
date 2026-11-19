@@ -44,6 +44,7 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
       },
     });
     gameRef.current = g; startGfx.current = profile.gfx;
+    (window as unknown as { __podracer?: Game }).__podracer = g; // debug / test handle
     g.start().catch(e => { console.error(e); setError(String(e?.message ?? e)); });
     return () => { g.dispose(); gameRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,7 +139,7 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
               <span className="text-3xl font-black italic text-cyan-300 tabular-nums">{h.speed}</span>
             </div>
             {/* boost heat: fills while boosting, hatched zone = danger, MAX = overheat; after overheating boost is locked until the READY mark */}
-            <div className="absolute left-3 right-3 -bottom-3">
+            <div className="absolute left-3 right-3 bottom-0">
               <div className="flex justify-between text-[9px] tracking-[0.25em] mb-0.5">
                 <span className={h.overheat ? 'text-red-400 animate-pulse' : h.boosting ? 'text-cyan-200' : 'text-white/70'}>{h.overheat ? 'ÜBERHITZT' : h.boosting ? 'BOOST' : 'BOOST-HITZE'}</span>
                 <span className="text-white/70 tabular-nums">{Math.round(Math.min(1, h.heat) * 100)}%</span>

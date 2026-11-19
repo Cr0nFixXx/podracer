@@ -107,15 +107,19 @@ export function RaceSetup({ profile, update, go, start }: { profile: Profile; up
         <div className="grid grid-cols-1 @5xl:grid-cols-[360px_1fr_340px] gap-5">
           <Panel title="Strecken">
             <div className="flex gap-2 mb-4">{(['all', 'circuit', 'sprint'] as const).map(f => <Btn key={f} active={filter === f} onClick={() => setFilter(f)}>{f === 'all' ? 'Alle' : f === 'circuit' ? 'Rundkurs' : 'Sprint'}</Btn>)}</div>
-            <div className="flex flex-wrap gap-1.5 mb-4">{['all', ...planets].map(pl => <button key={pl} onClick={() => setPlanet(pl)} className={`px-2 py-1 text-[10px] uppercase tracking-widest border ${planet === pl ? 'border-amber-400 text-amber-200 bg-amber-900/30' : 'border-stone-700 text-stone-400 hover:border-stone-500'}`}>{pl === 'all' ? 'Alle Planeten' : pl}</button>)}</div>
-            <div className="flex flex-col gap-2">
+            <select value={planet} onChange={e => setPlanet(e.target.value)} aria-label="Planet" className="w-full bg-black/60 border border-stone-600 text-amber-100 p-2 mb-3 text-sm">
+              <option value="all">Alle Planeten</option>
+              {planets.map(pl => <option key={pl} value={pl}>{pl}</option>)}
+            </select>
+            <div className="flex flex-col gap-1">
               {TRACKS.filter(t => (filter === 'all' || t.type === filter) && (planet === 'all' || t.planet === planet)).map(t => (
-                <button key={t.id} onClick={() => set('trackId', t.id)} className={`text-left p-3 border transition clip-corner ${t.id === r.trackId ? 'border-amber-300 bg-amber-400/15' : 'border-stone-700 bg-black/30 hover:border-amber-500/60'}`}>
-                  <div className="flex justify-between items-center">
-                    <span className="font-display text-amber-100 tracking-wider">{t.name}</span>
-                    <span className={`text-[10px] px-2 py-0.5 uppercase tracking-widest ${t.type === 'circuit' ? 'bg-cyan-500/20 text-cyan-300' : 'bg-rose-500/20 text-rose-300'}`}>{t.type === 'circuit' ? 'Rundkurs' : 'Sprint'}</span>
-                  </div>
-                  <div className="text-[11px] text-stone-400 mt-1 flex justify-between"><span>{t.planet}</span><span className="text-amber-400">{'◆'.repeat(t.difficulty)}<span className="text-stone-700">{'◆'.repeat(5 - t.difficulty)}</span></span></div>
+                <button key={t.id} onClick={() => set('trackId', t.id)} title={t.planet} className={`text-left px-3 py-1.5 border transition flex items-center gap-2 ${t.id === r.trackId ? 'border-amber-300 bg-amber-400/15' : 'border-stone-700 bg-black/30 hover:border-amber-500/60'}`}>
+                  <span className={`w-1.5 h-5 shrink-0 ${t.type === 'circuit' ? 'bg-cyan-400' : 'bg-rose-400'}`} title={t.type === 'circuit' ? 'Rundkurs' : 'Sprint'} />
+                  <span className="flex-1 min-w-0">
+                    <span className="block font-display text-amber-100 tracking-wider text-sm truncate">{t.name}</span>
+                    <span className="block text-[10px] text-stone-400 leading-tight truncate">{t.planet} · {t.type === 'circuit' ? 'Rundkurs' : 'Sprint'}</span>
+                  </span>
+                  <span className="text-amber-400 text-[11px] shrink-0">{'◆'.repeat(t.difficulty)}<span className="text-stone-700">{'◆'.repeat(5 - t.difficulty)}</span></span>
                 </button>
               ))}
             </div>
@@ -202,7 +206,7 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
             </div>
           </Panel>
           <div className="flex flex-col gap-5">
-            <div className="relative h-[560px] border border-amber-500/20 bg-black/40 clip-corner overflow-hidden">
+            <div className="relative h-[350px] border border-amber-500/20 bg-black/40 clip-corner overflow-hidden">
               <PodPreview podId={sel} colors={custom.colors} className="absolute inset-0" />
               <div className="absolute top-4 left-5 pointer-events-none">
                 <div className="font-display text-3xl text-amber-100">{pod.name}</div>
@@ -265,6 +269,7 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
 }
 
 export function SettingsScreen({ profile, update, go }: { profile: Profile; update: Upd; go: (s: string) => void }) {
+  const [tab, setTab] = useState<'gfx' | 'keys'>('gfx');
   return (
     <div className="relative w-full h-full overflow-hidden">
       <Background dim={0.8} />
@@ -272,14 +277,14 @@ export function SettingsScreen({ profile, update, go }: { profile: Profile; upda
       <div className="relative z-10 p-6 @3xl:p-10 max-w-[1300px] mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-display text-3xl text-amber-200 tracking-[0.3em]">EINSTELLUNGEN</h2>
-          <Btn onClick={() => go('menu')}>‹ Zurück</Btn>
+          <div className="flex gap-2"><Btn active={tab === 'gfx'} onClick={() => setTab('gfx')}>Grafik &amp; Ton</Btn><Btn active={tab === 'keys'} onClick={() => setTab('keys')}>Steuerung</Btn><Btn onClick={() => go('menu')}>‹ Zurück</Btn></div>
         </div>
         <div className="grid grid-cols-1 @5xl:grid-cols-3 gap-5">
-          <GfxPanels profile={profile} update={update} />
-          <Panel title="Steuerung" className="@5xl:col-span-3">
+          {tab === 'gfx' && <GfxPanels profile={profile} update={update} />}
+          {tab === 'keys' && <Panel title="Steuerung" className="@5xl:col-span-3">
             <KeyBindings profile={profile} update={update} />
             <p className="text-[11px] text-stone-500 mt-3">Gamepad: RT Schub · LT Bremse · Linker Stick lenken · Rechter Stick: ←/→ Rolle, ↑ Neigen, ↓ Anheben · A Boost · B/LB/RB Luftbremse/Slide · X Reparatur · Y Ansicht</p>
-          </Panel>
+          </Panel>}
         </div>
       </div>
       </Fit>

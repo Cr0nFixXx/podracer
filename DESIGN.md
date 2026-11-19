@@ -35,6 +35,22 @@ Schwarz/Dunkelbraun, Glas-Panels, Amber-Akzent (`#ffb040`), Orbitron + Rajdhani,
 | Vulkanwelt | `lava` (Pahoehoe-Stricke + Schlackeporen) | Basaltsäulen, Lavakrusten, treibendes Magmameer, glühende Schlucht-Lavafälle |
 | Kristall / Aquilaris | `crystal` / `beach` | Kristall-Spaltstufen / Atoll-Inseln, Felsnadeln, Uferschaum, Küsten-Wasserfälle |
 
+## Bedienoberfläche & Rückmeldungen (Session 14)
+Leitidee: **Alles auf einen Blick, in jedem Fenster.** Kein Scrollen, keine abgeschnittenen Elemente; lieber Reiter und kompakte Zeilen als lange Seiten.
+
+| Thema | Regel |
+|---|---|
+| Layout | Inhalt wird als Ganzes skaliert (0,3× bis 2×) und zentriert; drei Spalten ab ~1024 px virtueller Breite, Hochformat zweispaltig |
+| Streckenliste | eine Zeile je Strecke: Farbstreifen (Cyan = Rundkurs, Rosa = Sprint), Name, Planet · Typ klein darunter, Schwierigkeits-Rauten rechts |
+| Filter | Typ als Schaltflächen, Planet als Auswahlfeld (eine Zeile statt Chip-Wolke) |
+| Einstellungen | Reiter „Grafik & Ton" / „Steuerung"; im Pausemenü dieselben Grafik-Panels, mit Hinweis was sofort wirkt |
+| Boost-Balken | unter dem Tacho; Cyan → Amber → Rot, Gefahrenzone schraffiert ab 80 %, „MAX" rechts, nach Überhitzung weiße Marke „BEREIT" bei 55 % |
+| Schadensanzeige | linke Box = im Bild linkes Triebwerk, rechte Box = rechtes |
+| Energiekopplung | weißer Kern + zwei wandernde Gabel-Bögen + Flackern; deutlich heller als die Triebwerksflamme, aber schmal |
+| Zerstörbares | nur Kleines (Kisten, Felsen bis ~2,9 m): Trümmerwolke in Bodenfarbe, Funken, dumpfer Schlag; Großes bleibt hart |
+| Trümmer | zerbröseln langsam (schrumpfen + sinken über ~3 s), nie plötzliches Verschwinden; eine Schikane bleibt |
+| Banner | Unterkante ≥ 16 m über der Fahrbahn; Traversen sind massiv |
+
 ## Umwelt-Verläufe, Regen, Gewitter, Licht (Session 13)
 Leitidee: **Jede Welt hat ihr eigenes Klima, und es lebt.** Wetter und Tageszeit ändern sich langsam (rund eine Minute je Übergang), werden einmal angesagt und bleiben fair.
 
