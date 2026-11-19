@@ -55,6 +55,11 @@ let g: Game | null = null; let cur = -1;
     const S = G.td.main.samples, N = S.length; let k = S.findIndex((s, j) => j > 50 && (view === 'u' ? s.roof > 0 : s.zeroG)); if (k < 0) k = 100;
     const a = S[(k + (view === 'u' ? -9 : 14)) % N], b = S[(k + 40) % N];
     G.camera.position.set(a.x + a.rx * 2, a.y + (view === 'u' ? 4.5 : 7), a.z + a.rz * 2); G.camera.lookAt(b.x, b.y + (view === 'u' ? 4 : 7), b.z);
+  } else if (view === 'v' || view === 'k') { // v = inside the first tunnel (window / cave view), k = on the drivable deck of the first standard tunnel
+    const S = G.td.main.samples, N = S.length; let a0 = S.findIndex((s, j) => j > 50 && s.roof > 0 && (view === 'v' || s.tun === 1)); if (a0 < 0) a0 = 100;
+    let e0 = a0; while (e0 < N - 1 && S[e0 + 1].roof > 0) e0++;
+    if (view === 'v') { const a = S[Math.floor((a0 + e0) / 2) - 12], b = S[Math.floor((a0 + e0) / 2) + 14]; G.camera.position.set(a.x, a.y + 4, a.z); G.camera.lookAt(b.x + b.rx * b.hw * 0.9, b.y + 4.5, b.z + b.rz * b.hw * 0.9); }
+    else { const a = S[Math.max(0, a0 - 34)], b = S[a0 + 30]; G.camera.position.set(a.x + a.rx * 6, a.y + a.roof + 22, a.z + a.rz * 6); G.camera.lookAt(b.x, b.y + b.roof, b.z); }
   } else if (view === 's') { // look from above the road towards the sun (lens flare / god-ray / glare check)
     const S = G.td.main.samples, a = S[Math.floor(S.length * 0.2)];
     G.camera.position.set(a.x, a.y + 6, a.z); G.camera.lookAt(a.x + G.sunDir.x * 100, a.y + 6 + G.sunDir.y * 60, a.z + G.sunDir.z * 100);

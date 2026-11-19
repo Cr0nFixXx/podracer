@@ -9,6 +9,8 @@ export interface PodLayout {
   engines: EngineMount[];
   cockpit: { style: CockpitStyle; hw: number; len: number; y: number; z: number; pilot: number };
   binder: [number, number] | null;
+  /** several energy binders (engine index pairs), e.g. the X of the Quadra Lumber; falls back to `binder` */
+  binders?: [number, number][];
   livery: number;
   extras?: (pb: PartBuilder, L: PodLayout) => void;
 }
@@ -41,9 +43,11 @@ export function podLayout(def: PodDef): PodLayout {
         extras: (pb) => { for (const sd of [-1, 1]) { pb.add('steel', tube([V(sd * 1.6, 0.7, 3.4), V(sd * 2.05, 1.3, 3.7), V(sd * 2.5, 2.1, 4)], 0.07, 12, 8)); pb.add('steel', tube([V(sd * 3.4, 0.7, 3.4), V(sd * 2.95, 1.3, 3.7), V(sd * 2.5, 2.1, 4)], 0.07, 12, 8)); } } };
     }
     case 'bomquad': {
-      const s = spec(5.5, 1.1, 'ring', 4, 14);
-      return { engines: [{ spec: s, x: -2.4, y: 0, z: 1 }, { spec: s, x: 2.4, y: 0, z: 1 }, { spec: s, x: -1.6, y: 0.35, z: 7.2 }, { spec: s, x: 1.6, y: 0.35, z: 7.2 }], cockpit: { style: 'saucer', hw: 1.0, len: 2.4, y: 0.2, z: -6, pilot: 0.95 }, binder: [2, 3], livery: 3,
-        extras: (pb) => { for (const sd of [-1, 1]) pb.add('rubber', tube([V(sd * 2.4, 1.7, 1.9), V(sd * 2.0, 1.2, 3.6), V(sd * 1.6, 2.0, 5.4)], 0.045, 16, 6)); } };
+      // Session 17: four slim engines stacked 2 × 2 (upper pair directly above the lower pair), coupled by an X of energy binders
+      const s = spec(7.6, 0.66, 'ring', 5, 12);
+      return { engines: [{ spec: s, x: -2.3, y: -0.35, z: 3 }, { spec: s, x: 2.3, y: -0.35, z: 3 }, { spec: s, x: -2.3, y: 2.05, z: 3 }, { spec: s, x: 2.3, y: 2.05, z: 3 }],
+        cockpit: { style: 'saucer', hw: 1.0, len: 2.4, y: 0.2, z: -6, pilot: 0.95 }, binder: [0, 3], binders: [[0, 3], [2, 1]], livery: 3,
+        extras: (pb) => { for (const sd of [-1, 1]) for (const z of [1.0, 4.8]) pb.add('steel', tube([V(sd * 2.3, 0.35, z), V(sd * 2.3, 1.35, z)], 0.08, 4, 6)); } };
     }
     case 'mavik': {
       const s = spec(8, 0.62, 'needle', 6, 10);

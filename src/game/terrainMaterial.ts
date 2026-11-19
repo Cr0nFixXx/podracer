@@ -182,7 +182,7 @@ export function terrainMaterial(o: TerrainMatOpts) {
 }
 
 /** Flicker-free, derivative-free TSL water surface (ocean, jungle rivers, glacial meltwater). */
-export function waterMaterial(themeId: string, normTex: THREE.Texture, cloud: number) {
+export function waterMaterial(themeId: string, normTex: THREE.Texture, cloud: number, hole?: { tex: THREE.Texture; x0: number; z0: number; sx: number; sz: number }) {
   const mat = new THREE.MeshStandardNodeMaterial({ polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
   const wp = positionWorld.xz; const dist = length(positionView); const m = macroTexture();
   const deep = color(themeId === 'ice' ? '#3f6e8e' : themeId === 'jungle' ? '#12362d' : '#0f5072');
@@ -202,6 +202,10 @@ export function waterMaterial(themeId: string, normTex: THREE.Texture, cloud: nu
   const baseR = mix(float(themeId === 'ice' ? 0.2 : 0.14), float(0.52), whitecap);
   mat.roughnessNode = mix(baseR, float(0.38), smoothstep(45.0, 320.0, dist));
   mat.metalness = 0.16; mat.envMapIntensity = 1.05;
+  if (hole) { // Session 17: no water where an underwater tunnel breaks through the surface (otherwise the plane would cut through its interior)
+    const hv = texture(hole.tex, positionWorld.xz.sub(vec2(hole.x0, hole.z0)).div(vec2(hole.sx, hole.sz))).r;
+    mat.opacityNode = oneMinus(smoothstep(0.45, 0.55, hv)); mat.alphaTest = 0.5;
+  }
   return mat;
 }
 

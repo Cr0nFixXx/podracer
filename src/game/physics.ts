@@ -21,6 +21,9 @@ export interface PodState {
   engYL?: number; engYR?: number; engVL?: number; engVR?: number; engPL?: number; engPR?: number;
   /** Session 10 manual attitude: smoothed pitch (-1 dive .. +1 lift) & roll (-1 .. +1 = ∓90°) controls, handbrake slide state, banked-road grip */
   pitchCtl?: number; rollCtl?: number; rollBase?: number; sliding?: boolean; slideT?: number; slideK?: number; bankGrip?: number;
+  /** Session 17: on the drivable deck above a tunnel / inside a roofed section; boost overdrive seconds used (max 3); cockpit pendulum (visual) */
+  upper?: boolean; inRoof?: boolean; overT?: number;
+  ckX?: number; ckY?: number; ckZ?: number; ckVX?: number; ckVY?: number; ckVZ?: number; ckPv?: number;
   events: { type: 'wall' | 'obstacle' | 'land' | 'explode' | 'pod' | 'fall' | 'field' | 'break'; strength: number; x: number; y: number; z: number; nx: number; nz: number; ref?: Obstacle }[];
   visual: PodVisual | null;
   ai: AIState | null;
@@ -32,6 +35,8 @@ export interface AIState { /** grid lane held for the first seconds (start disci
 export const GRAVITY = 34;
 /** Generous repulsor hover altitude + hard per-engine/cockpit floor gap so no pod part EVER clips into the road! */
 export const HOVER = 2.85;
+/** height of the drivable deck above a tunnel's ceiling */
+export const TUNNEL_DECK = 1.2;
 const MIN_ROAD_CLEAR = 0.68;
 
 export function podParams(p: PodState) {
@@ -97,8 +102,14 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   const wantBoost = inp.boost && inp.throttle > 0.5 && vf > 35 && !p.overheat && !frozen && !p.repairing;
   p.boosting = wantBoost;
   if (p.boosting) p.heat += P.heatRate * dt; else p.heat -= P.cool * dt * (p.repairing ? 1.5 : 1);
-  if (p.heat >= 1) { p.heat = 1; p.overheat = true; }
-  if (p.overheat) { p.hpL -= 7 * dt * P.sturdy; p.hpR -= 7 * dt * P.sturdy; if (p.heat < 0.55) p.overheat = false; }
+  // Session 17 – overdrive: at the heat limit the boost can be held for up to 3 more seconds at the cost of slow engine damage.
+  // After 3 s the engines cut out (lock-out until they have cooled to 55 %). Releasing early cools down normally; the used time recovers below 90 %.
+  if (p.heat >= 1) {
+    p.heat = 1;
+    if (p.boosting && (p.overT ?? 0) < 3) { p.overT = (p.overT ?? 0) + dt; p.hpL -= 3.2 * dt * P.sturdy; p.hpR -= 3.2 * dt * P.sturdy; }
+    if ((p.overT ?? 0) >= 3) { p.overheat = true; p.boosting = false; }
+  } else if (!p.boosting && (p.overT ?? 0) > 0 && p.heat < 0.9) p.overT = Math.max(0, p.overT! - dt * 1.5);
+  if (p.overheat && p.heat < 0.55) { p.overheat = false; p.overT = 0; }
   p.heat = Math.max(0, p.heat);
   if (p.repairing) { p.hpL = Math.min(100, p.hpL + P.repair * dt); p.hpR = Math.min(100, p.hpR + P.repair * dt); }
 
@@ -132,7 +143,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   } else vf *= Math.exp(-3 * dt);
   vf *= Math.exp(-(p.zeroG ? (inp.throttle > 0 ? 0 : 0.05) : inp.throttle > 0 ? 0.04 : 0.28) * dt);
   const attGrip = (p.bankGrip ?? 1) * (pc < 0 ? 1 - 0.14 * pc : 1 - 0.2 * pc);
-  vr *= Math.exp(-P.grip * gripMul * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.035 * sk) * (p.grounded ? 1 : p.zeroG ? 0.34 : 0.15)); // zero-G: the pod floats sideways, but stays steerable
+  vr *= Math.exp(-P.grip * gripMul * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.035 * sk) * (p.grounded ? 1 : p.zeroG ? 0.6 : 0.15)); // zero-G: the pod floats sideways, but stays steerable
   const fx2 = Math.sin(p.yaw), fz2 = Math.cos(p.yaw), rx2 = -fz2, rz2 = fx2;
   p.vel.x = fx2 * vf + rx2 * vr; p.vel.z = fz2 * vf + rz2 * vr;
 
@@ -158,6 +169,19 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   }
   p.lat = fr.lat;
   const S = fr.s;
+  // Session 17 – tunnels carry a drivable deck. A pod that arrives ABOVE the portal (jumped over it) lands on the deck and drives across the
+  // top; it is no longer pushed down into the tube. The decision is made once, when entering the roofed section. (Underwater tubes: no deck.)
+  if (S.roof > 0 && !fr.gap) {
+    if (!p.inRoof) {
+      p.inRoof = true; p.upper = S.tun !== 2 && p.pos.y > fr.groundY + S.roof - 1;
+      if (p.upper && p.pos.y < fr.groundY + S.roof + 2.4 && p.invuln <= 0) { // clipped the portal lip on the way up
+        const dmg = 5 * P.sturdy; p.hpL -= dmg; p.hpR -= dmg; p.shake = Math.min(1, p.shake + 0.4);
+        p.events.push({ type: 'wall', strength: 16, x: p.pos.x, y: p.pos.y, z: p.pos.z, nx: 0, nz: 0 });
+      }
+    }
+  } else { p.inRoof = false; p.upper = false; }
+  const upOff = p.upper ? S.roof + TUNNEL_DECK : 0;
+  if (upOff) fr.groundY += upOff;
   if (!path.closed && p.idx >= path.samples.length - 2 && fr.along > 0 && path.id === 0) {
     p.pos.x -= S.tx * fr.along; p.pos.z -= S.tz * fr.along;
     const vt = p.vel.x * S.tx + p.vel.z * S.tz; if (vt > 0) { p.vel.x -= S.tx * vt; p.vel.z -= S.tz * vt; }
@@ -179,8 +203,8 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
     // lift/dive are vertical thrusters, momentum carries. Shortly before the tube ends it is guided down to hover height (soft landing).
     let exit = false; const nS = path.samples.length;
     for (let k = 6; k <= 26 && !exit; k += 5) { const j = path.closed ? (p.idx + k) % nS : Math.min(nS - 1, p.idx + k); if (!path.samples[j].zeroG) exit = true; }
-    const tubeY = fr.groundY + (exit ? HOVER + 0.8 : 7), kC = exit ? 3.2 : 0.5, dC = exit ? 2.2 : 0.45;
-    p.vel.y += ((tubeY - p.pos.y) * kC - p.vel.y * dC + pc * 30) * dt;
+    const tubeY = fr.groundY + (exit ? HOVER + 0.8 : 7), kC = exit ? 3.2 : 2.6, dC = exit ? 2.2 : 1.4; // Session 17: centred on the tube axis again
+    p.vel.y += ((tubeY - p.pos.y) * kC - p.vel.y * dC + pc * 14) * dt;
     p.grounded = false;
   } else if (!gap && p.pos.y <= targetY + 1.05) {
     const k = 155, c = 22;
@@ -212,7 +236,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
     p.events.push({ type: 'land', strength: imp, x: p.pos.x, y: fr.groundY, z: p.pos.z, nx: 0, nz: 0 });
   }
   // tunnel ceilings & zero-G tubes
-  if (S.roof > 0 && !fr.gap) {
+  if (S.roof > 0 && !fr.gap && !p.upper) {
     const l = Math.min(1, Math.abs(fr.lat) / (fr.hw + 1.5));
     const ceil = fr.groundY + 1 + (S.roof - 1) * Math.sqrt(1 - l * l) - 1.1;
     if (p.pos.y > ceil) {
@@ -332,7 +356,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   // ---- Dynamic steering turbine articulation + 5-point ground collision protection ----
   const env = podEnvelope(p.def);
   const cyA = Math.cos(p.yaw), syA = Math.sin(p.yaw);
-  const samplePt = (lx: number, lz: number) => roadSurfaceAt(path, p.idx, p.pos.x + lx * cyA + lz * syA, p.pos.z - lx * syA + lz * cyA);
+  const samplePt = (lx: number, lz: number) => { const r = roadSurfaceAt(path, p.idx, p.pos.x + lx * cyA + lz * syA, p.pos.z - lx * syA + lz * cyA); if (upOff) r.y += upOff; return r; };
 
   let roadSlope = 0, floorL = -1e9, floorR = -1e9, floorCk = -1e9, fLF = -1e9, fLB = -1e9, fRF = -1e9, fRB = -1e9;
   if (!gap && !p.zeroG) {
@@ -358,7 +382,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   // And Three.js rotation.z = +roll maps (x, 0, 0) -> (x*cos, x*sin, 0): so roll > 0 dips x < 0 (RIGHT/inner) and lifts x > 0 (LEFT/outer)!
   // Steering no longer tilts the pod (engines heave instead): only a hint of lean, the road bank and the manual 90° roll remain
   const zg = p.zeroG ? 1 : 0; // weightless: the pod banks freely into turns and slowly tumbles
-  const rawRoll = p.steer * (0.07 + 0.34 * zg) + zg * Math.sin(time * 0.6 + p.id * 1.3) * 0.13 + vr * 0.004 + p.steer * 0.12 * sk + (p.grounded ? Math.atan(S.bank) * 0.92 : 0);
+  const rawRoll = p.steer * (0.07 + 0.34 * zg) + zg * Math.sin(time * 0.6 + p.id * 1.3) * 0.06 + vr * 0.004 + p.steer * 0.12 * sk + (p.grounded ? Math.atan(S.bank) * 0.92 : 0);
   const targetRoll = Math.max(-0.5, Math.min(0.5, rawRoll));
   p.rollBase = (p.rollBase ?? 0) + (targetRoll - (p.rollBase ?? 0)) * Math.min(1, dt * 7);
   p.roll = p.rollBase * (1 - knife) + rollA;
@@ -366,7 +390,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
 
   const hs = Math.max(12, Math.hypot(p.vel.x, p.vel.z));
   const flightPitch = -Math.atan2(p.vel.y, hs) * 0.72;
-  const targetPitch = Math.max(-0.42, Math.min(0.42, (p.grounded ? -roadSlope * 0.92 : flightPitch) + (p.boosting ? -0.045 : 0) + (p.airbraking ? 0.065 : 0))) - pc * (p.grounded ? 0.2 : 0.34) + zg * Math.sin(time * 0.47 + p.id * 2.1) * 0.06;
+  const targetPitch = Math.max(-0.42, Math.min(0.42, (p.grounded ? -roadSlope * 0.92 : flightPitch) + (p.boosting ? -0.045 : 0) + (p.airbraking ? 0.065 : 0))) - pc * (p.grounded ? 0.2 : 0.34) + zg * Math.sin(time * 0.47 + p.id * 2.1) * 0.03;
   p.pitch += (targetPitch - p.pitch) * Math.min(1, dt * 8);
 
   // Dynamic independent vertical heave & pitch of the two turbine assemblies when steering!
@@ -383,9 +407,10 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   // Asymmetric travel: outer turbine climbs prominently (+0.92 m), inner turbine tucks crisply (-0.50 m) into the apex
   const driveA = -turn, driveB = turn;
   // Pure vertical travel: the outer turbine lifts as a whole (+1.1 m), the inner one settles slightly (-0.22 m) – no engine pitch/roll
-  const flA = zg * Math.sin(time * 1.1 + p.id) * 0.42, flB = zg * Math.sin(time * 0.9 + p.id + 2.4) * 0.42; // engines bob independently in zero-G
-  const tgtA = (driveA >= 0 ? driveA * 1.1 : driveA * 0.22) + oscA + boostLift + sagA + flA;
-  const tgtB = (driveB >= 0 ? driveB * 1.1 : driveB * 0.22) + oscB + boostLift + sagB + flB;
+  const flA = zg * Math.sin(time * 1.1 + p.id) * 0.22, flB = zg * Math.sin(time * 0.9 + p.id + 2.4) * 0.22; // engines bob independently in zero-G
+  // Session 17: more travel – outer engine +1.5 m, inner one -0.5 m, livelier idle bob
+  const tgtA = (driveA >= 0 ? driveA * 1.5 : driveA * 0.5) + oscA * 1.5 + boostLift + sagA + flA;
+  const tgtB = (driveB >= 0 ? driveB * 1.5 : driveB * 0.5) + oscB * 1.5 + boostLift + sagB + flB;
 
   let yA = p.engYL ?? 0, yB = p.engYR ?? 0, vA = p.engVL ?? 0, vB = p.engVR ?? 0;
   if (landImpulse > 0) { const j = -Math.min(5.2, landImpulse * 0.18); vA += j; vB += j; }
@@ -413,7 +438,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
       const base = p.pos.y + yA + Math.min(env.engL.x * sinR + env.engL.minY, env.engL.outerX * sinR + env.engL.minY * cosRa) - Math.abs(sinR) * 0.15;
       const pen = Math.max(fLF + MIN_ROAD_CLEAR - (base - env.engL.frontZ * sinP), fLB + MIN_ROAD_CLEAR - (base - env.engL.backZ * sinP));
       if (pen > 0) {
-        const lift = Math.min(pen, Math.max(0, 1.45 - yA));
+        const lift = Math.min(pen, Math.max(0, 1.95 - yA));
         yA += lift; if (vA < 0) vA *= 0.15;
         if (pen > lift) { p.pos.y += pen - lift; p.vel.y = Math.max(p.vel.y, slopeVy); p.grounded = true; p.air = 0; }
       }
@@ -424,15 +449,30 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
       const base = p.pos.y + yB + Math.min(env.engR.x * sinR + env.engR.minY, env.engR.outerX * sinR + env.engR.minY * cosRa) - Math.abs(sinR) * 0.15;
       const pen = Math.max(fRF + MIN_ROAD_CLEAR - (base - env.engR.frontZ * sinP), fRB + MIN_ROAD_CLEAR - (base - env.engR.backZ * sinP));
       if (pen > 0) {
-        const lift = Math.min(pen, Math.max(0, 1.45 - yB));
+        const lift = Math.min(pen, Math.max(0, 1.95 - yB));
         yB += lift; if (vB < 0) vB *= 0.15;
         if (pen > lift) { p.pos.y += pen - lift; p.vel.y = Math.max(p.vel.y, slopeVy); p.grounded = true; p.air = 0; }
       }
     }
   }
-  p.engYL = Math.max(-0.9, Math.min(1.45, yA));
-  p.engYR = Math.max(-0.9, Math.min(1.45, yB));
+  p.engYL = Math.max(-1.1, Math.min(1.95, yA));
+  p.engYR = Math.max(-1.1, Math.min(1.95, yB));
   p.engVL = vA; p.engVR = vB;
+  // Session 17 – cockpit pendulum (visual only): the cockpit hangs on its cables. It swings outward in turns and slides, lags back
+  // under thrust and surges forward when braking, bounces on landings and rough ground. Under-damped springs, clamped travel.
+  {
+    const acc = (vf - (p.ckPv ?? vf)) / dt; p.ckPv = vf;
+    const tx = Math.max(-1.7, Math.min(1.7, p.yawRate * Math.max(0, vf) * 0.011 + vr * 0.035));   // local +x = outside of a right turn
+    const tz = Math.max(-1.2, Math.min(0.9, -acc * 0.03));
+    const w = p.zeroG ? 2.6 : 5.2, zx = 0.3, wz = p.zeroG ? 3 : 6.2;
+    let x = p.ckX ?? 0, y = p.ckY ?? 0, z = p.ckZ ?? 0, vx = p.ckVX ?? 0, vy = p.ckVY ?? 0, vz = p.ckVZ ?? 0;
+    vx += ((tx - x) * w * w - vx * 2 * zx * w) * dt; x += vx * dt;
+    vz += ((tz - z) * wz * wz - vz * 2 * 0.45 * wz) * dt; z += vz * dt;
+    if (landImpulse > 0) vy -= Math.min(6, landImpulse * 0.2);
+    vy += ((p.grounded ? Math.sin(time * 9 + p.id) * 0.03 * Math.min(1, sp / 60) : 0) - y) * 64 * dt - vy * 2 * 0.38 * 8 * dt; y += vy * dt;
+    p.ckX = Math.max(-1.9, Math.min(1.9, x)); p.ckY = Math.max(-0.35, Math.min(0.8, y)); p.ckZ = Math.max(-1.3, Math.min(1.0, z));
+    p.ckVX = vx; p.ckVY = vy; p.ckVZ = vz;
+  }
   p.shake *= Math.exp(-dt * 3);
 }
 
@@ -584,6 +624,7 @@ export function respawn(p: PodState, td: TrackData) {
   p.path = path.id; p.idx = idx;
   p.pos.set(s.x, s.y + HOVER + 1.2, s.z); p.yaw = Math.atan2(s.tx, s.tz); p.yawRate = 0; p.steer = 0;
   p.engYL = 0; p.engYR = 0; p.engVL = 0; p.engVR = 0; p.engPL = 0; p.engPR = 0;
+  p.upper = false; p.inRoof = false; p.overT = 0; p.ckX = 0; p.ckY = 0; p.ckZ = 0; p.ckVX = 0; p.ckVY = 0; p.ckVZ = 0;
   p.vel.set(s.tx * 35, 0, s.tz * 35);
   p.hpL = Math.max(p.hpL, 55); p.hpR = Math.max(p.hpR, 55); p.heat = 0; p.overheat = false;
   p.dead = 0; p.invuln = 2.2; p.grounded = false; p.groundY = s.y; p.prevGroundY = s.y;

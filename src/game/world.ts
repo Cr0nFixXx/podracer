@@ -7,7 +7,8 @@ import { surfaceMaterial } from './materials';
 import { mulberry32, type Path, type Sample, type TrackData, type Obstacle } from './trackBuilder';
 import { addProps, type Emitter } from './props';
 import { addMechProps } from './mechProps';
-import { addSciFi } from './scifi';
+import { addSciFi, oceanWindowMaterial } from './scifi';
+import { TUNNEL_DECK } from './physics';
 import { addTrackDetail } from './trackDetail';
 import { StaticBatcher } from './trackMesh';
 import { airshipGeometry, pylonGeometry, cactusGeometry, crystalClusterGeometry, jungleTreeGeometry, mesaGeometry, pineGeometry, rockGeometry, spireGeometry } from './decorGeo';
@@ -86,7 +87,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   await yield_();
 
   const T = theme.terrain;
-  const waterY = T === 'lava' ? Math.min(avgY - 14, td.bounds.minY - 8) : (T === 'jungle' || theme.id === 'ice') ? Math.min(avgY - 12, td.bounds.minY - 12) : T === 'ocean' ? avgY - 26 : -1e9;
+  const waterY = T === 'lava' ? Math.min(avgY - 14, td.bounds.minY - 8) : (T === 'jungle' || theme.id === 'ice') ? Math.min(avgY - 12, td.bounds.minY - 12) : T === 'ocean' ? (td.seaY ?? avgY - 26) : -1e9;
 
   const plx = gfx.parallax && (gfx.shaderDetail ?? 1) > 0 ? 1 : 0; const layers = (gfx.shaderDetail ?? 1) >= 2 ? 14 : 8;
   const bump = gfx.bumpMapping ?? true; const disp = (gfx.tessellation ?? 0) > 0 ? ((gfx.tessellation ?? 0) >= 2 ? 0.4 : 0.22) : 0;
@@ -260,7 +261,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     }
 
     // ---- shortcut tunnels with structural support ribs & Oovo Zero-G containment tubes ----
-    buildTunnel(path, group, wallMat, abutmentMetal, disposables, theme);
+    buildTunnel(path, group, wallMat, roadMat, abutmentMetal, disposables, theme, waterY);
     if (td.def.theme === 'oovo') buildZeroGTubes(path, group, wallMat, abutmentMetal, disposables, theme);
   }
 
@@ -303,7 +304,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     disposables.push(lm, pg);
   } else if (T === 'jungle' || theme.id === 'ice' || T === 'ocean') {
     const wt = generateTexture('snow', ['#8899aa', '#99aabb', '#aabbcc'], 512, T === 'ocean' ? 44 : 55, 8);
-    const wm = waterMaterial(theme.id, wt.normalMap, theme.clouds * 0.35);
+    const wm = waterMaterial(theme.id, wt.normalMap, theme.clouds * 0.35, T === 'ocean' ? tunnelWaterMask(td, waterY, disposables) : undefined);
     const pg = new THREE.PlaneGeometry(W, D);
     const wp = new THREE.Mesh(pg, wm); wp.rotation.x = -Math.PI / 2; wp.position.set(cxm, waterY, czm); wp.receiveShadow = true; group.add(wp); glossy.push(wp);
     disposables.push(wm, pg);
@@ -409,16 +410,39 @@ function addViaductPiers(
   }
 }
 
-function buildTunnel(path: Path, group: THREE.Group, mat: THREE.Material, ribMat: THREE.Material, disp: { dispose: () => void }[], theme: ThemeDef) {
-  // Session 16: one tunnel per run of roofed samples (shortcuts AND the new main-path tunnels). The cross-section is sheared with the
-  // road bank so banked corners stay inside the shell; both mouths get a heavy portal frame.
+/** Top-down mask (1 = no water) over the footprints of underwater tunnels where the tube rises above sea level. */
+function tunnelWaterMask(td: TrackData, seaY: number, disp: { dispose: () => void }[]) {
+  const S = td.main.samples; if (!S.some(s => s.tun === 2)) return undefined;
+  const R = 1024, b = td.bounds, x0 = b.minX - 80, z0 = b.minZ - 80, sx = b.maxX - b.minX + 160, sz = b.maxZ - b.minZ + 160;
+  const data = new Uint8Array(R * R * 4);
+  for (const s of S) {
+    if (s.tun !== 2 || s.y + s.roof + TUNNEL_DECK < seaY - 0.6) continue;
+    const rad = s.hw + 1.5 + 5, cx = (s.x - x0) / sx * R, cz = (s.z - z0) / sz * R, rx = rad / sx * R, rz = rad / sz * R;
+    for (let j = Math.max(0, Math.floor(cz - rz)); j <= Math.min(R - 1, Math.ceil(cz + rz)); j++) for (let i = Math.max(0, Math.floor(cx - rx)); i <= Math.min(R - 1, Math.ceil(cx + rx)); i++) {
+      const dx = (i + 0.5 - cx) / rx, dz = (j + 0.5 - cz) / rz; if (dx * dx + dz * dz <= 1) data[(j * R + i) * 4] = 255;
+    }
+  }
+  const tex = new THREE.DataTexture(data, R, R, THREE.RGBAFormat); tex.magFilter = tex.minFilter = THREE.LinearFilter; tex.needsUpdate = true; disp.push(tex);
+  return { tex, x0, z0, sx, sz };
+}
+
+function buildTunnel(path: Path, group: THREE.Group, mat: THREE.Material, roadMat: THREE.Material, ribMat: THREE.Material, disp: { dispose: () => void }[], theme: ThemeDef, seaY: number) {
+  // Session 17: one tunnel per run of roofed samples, three kinds (Sample.tun):
+  //  1 standard – inner shell + earth berm + DRIVABLE DECK on top (physics: PodState.upper) with glowing edge lines,
+  //  2 underwater tube – steel caisson, ocean-view windows where the tube is below sea level,
+  //  3 cave – rough rock shell with stalactites, same berm + deck.
+  // Cross-sections are sheared with the road bank; both mouths get a portal frame and a closed portal face.
   const S = path.samples; const n = S.length;
   const runs: [number, number][] = []; let a0 = -1;
   for (let i = 0; i < n; i++) { const on = S[i].roof > 0; if (on && a0 < 0) a0 = i; if ((!on || i === n - 1) && a0 >= 0) { const b0 = on ? i : i - 1; if (b0 - a0 >= 6) runs.push([a0, b0]); a0 = -1; } }
   if (!runs.length) return;
-  const segA = 18; const pos: number[] = [], uv: number[] = [], ind: number[] = [];
-  let v = 0; const lamps: THREE.Matrix4[] = [], ribs: THREE.BufferGeometry[] = [];
+  type Buf = { pos: number[]; uv: number[]; ind: number[] };
+  const mk = (): Buf => ({ pos: [], uv: [], ind: [] });
+  const shell = mk(), deck = mk(), berm = mk(), steel = mk(), glowB = mk(); const winInd: number[] = [];
+  const segA = 18, DECK = TUNNEL_DECK; const lamps: THREE.Matrix4[] = [], ribs: THREE.BufferGeometry[] = [], tites: THREE.Matrix4[] = [];
   const upV = new THREE.Vector3(0, 1, 0);
+  const put = (b: Buf, s: Sample, lat: number, up: number, u: number, v: number) => { b.pos.push(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + up, s.z + s.rz * lat); b.uv.push(u, v); };
+  const strip = (b: Buf, r0: number, r1: number, cols: number) => { for (let a = 0; a < cols; a++) b.ind.push(r0 + a, r0 + a + 1, r1 + a, r0 + a + 1, r1 + a + 1, r1 + a); };
   const arch = (s: Sample, R: number, tube: number, H: number) => { // half torus in the track's cross-section, sheared with the bank (local x = -lat)
     const rg = new THREE.TorusGeometry(R, tube, 8, 28, Math.PI); rg.scale(1, H / R, 1);
     const p = rg.attributes.position as THREE.BufferAttribute; for (let k = 0; k < p.count; k++) p.setY(k, p.getY(k) + p.getX(k) * s.bank);
@@ -426,31 +450,71 @@ function buildTunnel(path: Path, group: THREE.Group, mat: THREE.Material, ribMat
     const out = rg.toNonIndexed(); rg.dispose(); return out;
   };
   for (const [ra, rb] of runs) {
-    let first = true;
+    const kind = S[ra].tun ?? 1, sea = kind === 2, cave = kind === 3, amp = cave ? 3.0 : sea ? 0 : 1.5;
+    let pRing = -1, pDeck = -1, pBerm = -1, pSteel = -1, pGlow = -1, pUnder = false, vAcc = 0, last = ra;
     for (let i = ra; i <= rb; i = i === rb ? rb + 1 : Math.min(rb, i + 2)) {
-      const s = S[i], H = s.roof - 1, W = s.hw + 1.5;
-      for (let a = 0; a <= segA; a++) {
-        const ang = Math.PI * a / segA; const nz = (vnoise(i * 0.2, a * 0.7) - 0.5) * 1.5;
-        const lat = Math.cos(ang) * W + nz * Math.cos(ang), up = Math.sin(ang) * H + 1 + nz * Math.sin(ang);
-        pos.push(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + up, s.z + s.rz * lat);
-        uv.push(s.s / 15, a / segA * 2.2);
+      const s = S[i], H = s.roof - 1, Wd = s.hw + 1.5, D = s.roof + DECK;
+      const under = sea && s.y + D < seaY - 0.5;
+      vAcc += (i - last) * 2 / Math.max(24, s.hw * 1.4); last = i;
+      const noise = (a: number) => amp ? (vnoise(i * 0.2, a * 0.7) - 0.5) * amp : 0;
+      // inner shell (windows on both flanks of the underwater tube)
+      const ring = shell.pos.length / 3;
+      for (let a = 0; a <= segA; a++) { const ang = Math.PI * a / segA, nz = noise(a); put(shell, s, Math.cos(ang) * (Wd + nz), Math.sin(ang) * (H + nz) + 1, s.s / 15, a / segA * 2.2); }
+      if (pRing >= 0) for (let a = 0; a < segA; a++) { const p0 = pRing + a, p1 = ring + a; ((pUnder && under && ((a >= 2 && a <= 6) || (a >= 11 && a <= 15))) ? winInd : shell.ind).push(p0, p0 + 1, p1, p1, p0 + 1, p1 + 1); }
+      pRing = ring; pUnder = under;
+      if (sea) { // steel caisson: wall – top slab – wall
+        const dw = Wd + 12, r = steel.pos.length / 3;
+        put(steel, s, -dw, -8, 0, s.s / 12); put(steel, s, -dw, D, 0.3, s.s / 12); put(steel, s, dw, D, 0.7, s.s / 12); put(steel, s, dw, -8, 1, s.s / 12);
+        if (pSteel >= 0) strip(steel, pSteel, r, 3); pSteel = r;
+      } else {      // drivable deck (road material) + earth berm down to the terrain + glowing edge lines
+        const dw = s.hw + 1, fw = s.hw + 19, r = deck.pos.length / 3;
+        put(deck, s, -dw, D, 0, vAcc); put(deck, s, dw, D, 1, vAcc);
+        if (pDeck >= 0) strip(deck, pDeck, r, 1); pDeck = r;
+        const rb2 = berm.pos.length / 3;
+        put(berm, s, -fw, -4, s.s / 18, 0); put(berm, s, -dw, D - 0.05, s.s / 18, 1.4); put(berm, s, dw, D - 0.05, s.s / 18, 1.4); put(berm, s, fw, -4, s.s / 18, 0);
+        if (pBerm >= 0) { for (const a of [0, 2]) berm.ind.push(pBerm + a, pBerm + a + 1, rb2 + a, pBerm + a + 1, rb2 + a + 1, rb2 + a); } pBerm = rb2;
+        const rg2 = glowB.pos.length / 3;
+        for (const sd of [-1, 1]) { put(glowB, s, sd * (s.hw - 0.9), D + 0.14, 0, 0); put(glowB, s, sd * (s.hw - 0.5), D + 0.14, 1, 0); }
+        if (pGlow >= 0) for (const a of [0, 2]) glowB.ind.push(pGlow + a, pGlow + a + 1, rg2 + a, pGlow + a + 1, rg2 + a + 1, rg2 + a); pGlow = rg2;
       }
-      if (!first) for (let a = 0; a < segA; a++) { const p0 = v - (segA + 1) + a, p1 = v + a; ind.push(p0, p0 + 1, p1, p1, p0 + 1, p1 + 1); }
-      first = false; v += segA + 1;
-      if ((i - ra) % 12 === 0) {
-        lamps.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + s.ramp + s.roof - 0.6, s.z), new THREE.Quaternion().setFromAxisAngle(upV, Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, 1, 1)));
-        ribs.push(arch(s, s.hw + 1.3, 0.36, H - 0.2)); // structural steel rib
+      const every = sea ? 6 : 12;
+      if ((i - ra) % every === 0) {
+        if ((i - ra) % 12 === 0) lamps.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + s.ramp + s.roof - 0.6 - (cave ? 1.6 : 0), s.z), new THREE.Quaternion().setFromAxisAngle(upV, Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, 1, 1)));
+        if (!cave) ribs.push(arch(s, s.hw + 1.3, sea ? 0.3 : 0.36, H - 0.2)); // structural rib / window mullion
+      }
+      if (cave && i > ra + 2 && i < rb - 2) { // stalactites hanging from the ceiling
+        const ang = (0.28 + h2(i, 5) * 0.44) * Math.PI, len = 0.9 + h2(i, 9) * 1.7, rr = 0.35 + h2(i, 3) * 0.5, nz = noise(Math.round(ang / Math.PI * segA));
+        const lat = Math.cos(ang) * (Wd + nz), up = Math.sin(ang) * (H + nz) + 1.15;
+        tites.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + up - len / 2, s.z + s.rz * lat), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI), new THREE.Vector3(rr, len, rr)));
       }
     }
-    for (const e of [ra, rb]) ribs.push(arch(S[e], S[e].hw + 2.3, 1.25, S[e].roof + 0.6)); // portal frames
+    for (const e of [ra, rb]) { // portal frame + closed portal face between the arch and the outline of the berm / caisson
+      const s = S[e], H = s.roof - 1, Wd = s.hw + 1.5, D = s.roof + DECK, dw = sea ? Wd + 12 : s.hw + 1, fw = sea ? dw : s.hw + 19, fy = sea ? -8 : -4;
+      ribs.push(arch(s, s.hw + 2.3, 1.25, s.roof + 0.6));
+      const b = sea ? steel : berm, r0 = b.pos.length / 3;
+      for (let a = 0; a <= segA; a++) {
+        const ang = Math.PI * a / segA, c = Math.cos(ang), sn = Math.sin(ang), nz = amp ? (vnoise(e * 0.2, a * 0.7) - 0.5) * amp : 0;
+        put(b, s, c * (Wd + nz), sn * (H + nz) + 1, c * 0.4 + 0.5, sn * 0.5);
+        const t = Math.min(1, sn / 0.62), ox = sn < 0.62 ? Math.sign(c) * (fw + (dw - fw) * t) : dw * c / 0.785, oy = fy + (D - fy) * t;
+        put(b, s, ox, oy, ox / 40 + 0.5, oy / 30 + 0.3);
+      }
+      for (let a = 0; a < segA; a++) { const k = r0 + a * 2; b.ind.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+    }
   }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(ind); g.computeVertexNormals();
-  const m2 = (mat as THREE.MeshStandardMaterial).clone(); m2.side = THREE.DoubleSide;
-  const m = new THREE.Mesh(g, m2); m.castShadow = true; m.receiveShadow = true; group.add(m); disp.push(g, m2);
+  const geo = (b: Buf, ind = b.ind) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2)); g.setIndex(ind); g.computeVertexNormals(); disp.push(g); return g; };
+  const add = (g: THREE.BufferGeometry, m: THREE.Material, cast = false) => { const o = new THREE.Mesh(g, m); o.castShadow = cast; o.receiveShadow = true; group.add(o); return o; };
+  const m2 = (mat as THREE.MeshStandardMaterial).clone(); m2.side = THREE.DoubleSide; disp.push(m2);
+  const sg = geo(shell); add(sg, m2, true);
+  if (winInd.length) { const wg = new THREE.BufferGeometry(); wg.setAttribute('position', sg.attributes.position); wg.setAttribute('uv', sg.attributes.uv); wg.setIndex(winInd); const wm = oceanWindowMaterial(seaY); add(wg, wm as unknown as THREE.Material); disp.push(wg, wm as unknown as { dispose: () => void }); }
+  if (deck.ind.length) add(geo(deck), roadMat);
+  if (berm.ind.length) add(geo(berm), m2, true);
+  if (steel.ind.length) { const sm = (ribMat as THREE.MeshStandardMaterial).clone(); sm.side = THREE.DoubleSide; disp.push(sm); add(geo(steel), sm, true); }
+  const lm = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.5), side: THREE.DoubleSide }); disp.push(lm);
+  if (glowB.ind.length) add(geo(glowB), lm);
   if (ribs.length) { const rg = mergeGeometries(ribs)!; ribs.forEach(x => x.dispose()); const rm = new THREE.Mesh(rg, ribMat); rm.receiveShadow = true; group.add(rm); disp.push(rg); }
-  const lg = new THREE.BoxGeometry(1.3, 0.28, 3.4);
-  const lm = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.5) });
-  if (lamps.length) { const im = new THREE.InstancedMesh(lg, lm, lamps.length); lamps.forEach((mm, i) => im.setMatrixAt(i, mm)); group.add(im); disp.push(lg, lm); }
+  const lg = new THREE.BoxGeometry(1.3, 0.28, 3.4); disp.push(lg);
+  if (lamps.length) { const im = new THREE.InstancedMesh(lg, lm, lamps.length); lamps.forEach((mm, i) => im.setMatrixAt(i, mm)); group.add(im); }
+  if (tites.length) { const tg = new THREE.ConeGeometry(1, 1, 6); disp.push(tg); const im = new THREE.InstancedMesh(tg, mat, tites.length); tites.forEach((mm, i) => im.setMatrixAt(i, mm)); im.receiveShadow = true; group.add(im); }
 }
 
 function addStartArea(td: TrackData, group: THREE.Group, theme: ThemeDef, disp: { dispose: () => void }[], rng: () => number, dOff = 0) {

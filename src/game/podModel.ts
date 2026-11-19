@@ -23,6 +23,9 @@ export interface PodVisual {
   setEngineMotion: (yL: number, yR: number, pitchL: number, pitchR: number, rollBank: number) => void;
   /** Switches automatic distance LOD & shadow casting on opponent pods (use forceAll=true for shader warmup) */
   setDistance: (dist: number, forceAll?: boolean) => void;
+  /** hero pod: cockpit pendulum offset in body space (cables follow) / hide the cockpit in the first-person view */
+  setCockpitSway?: (x: number, y: number, z: number) => void;
+  setCockpitVisible?: (v: boolean) => void;
   dispose: () => void;
 }
 
@@ -127,7 +130,7 @@ function bakeSolidColor(g: THREE.BufferGeometry, col: THREE.Color) {
 
 function makeBinderGeo(a: THREE.Vector3, b: THREE.Vector3, vertCol?: THREE.Color) {
   const pos = new Float32Array(BINDER_PTS * 4 * 3), uv = new Float32Array(BINDER_PTS * 4 * 2);
-  const idx: number[] = []; const w = 0.3; const tmp = new THREE.Vector3(); // wider ribbon: room for the forked side arcs
+  const idx: number[] = []; const w = 0.4; const tmp = new THREE.Vector3(); // wide ribbon = room for several fine arcs
   for (let i = 0; i < BINDER_PTS; i++) {
     const f = i / (BINDER_PTS - 1); tmp.copy(a).lerp(b, f);
     for (let k = 0; k < 4; k++) { uv[(i * 4 + k) * 2] = f; uv[(i * 4 + k) * 2 + 1] = k % 2 === 0 ? 1 : 0; }
@@ -285,16 +288,17 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
       for (const [k, g] of cabPB.build()) { pushB(b, k, g); g.dispose(); }
       addBucket(b, nearGrp);
     }
-    let binderMesh: THREE.Mesh | null = null, binderBaseY = 0;
-    if (L.binder) {
-      const A = L.engines[L.binder[0]], B = L.engines[L.binder[1]];
+    const binderMeshes: { m: THREE.Mesh; y: number }[] = [];
+    for (const [ia, ib] of (L.binders ?? (L.binder ? [L.binder] : [])) as [number, number][]) {
+      let A = L.engines[ia], B = L.engines[ib]; if (A.x > B.x) { const t = A; A = B; B = t; }
       const ea = engineGeo(A.spec, seg), eb = engineGeo(B.spec, seg);
-      const pa = new THREE.Vector3(A.x + Math.sign(B.x - A.x) * ea.R * 0.97, 0, A.z + ea.L * 0.12);
-      const pb = new THREE.Vector3(B.x + Math.sign(A.x - B.x) * eb.R * 0.97, 0, B.z + eb.L * 0.12);
+      const dyh = ((B.y + eb.R * 0.2) - (A.y + ea.R * 0.2)) * 0.5; // diagonal binders: the two ends sit at different heights around the mesh origin
+      const pa = new THREE.Vector3(A.x + ea.R * 0.97, -dyh, A.z + ea.L * 0.12);
+      const pb = new THREE.Vector3(B.x - eb.R * 0.97, dyh, B.z + eb.L * 0.12);
       spanX = Math.max(1.5, Math.abs(pb.x - pa.x));
-      binderBaseY = (A.y + ea.R * 0.2 + B.y + eb.R * 0.2) * 0.5;
+      const baseY = (A.y + ea.R * 0.2 + B.y + eb.R * 0.2) * 0.5;
       const bg = makeBinderGeo(pa, pb, glowCol); ownedGeos.push(bg);
-      binderMesh = new THREE.Mesh(bg, oppBinder); binderMesh.position.y = binderBaseY; binderMesh.renderOrder = 3; nearGrp.add(binderMesh);
+      const bm = new THREE.Mesh(bg, oppBinder); bm.position.y = baseY; bm.renderOrder = 3; nearGrp.add(bm); binderMeshes.push({ m: bm, y: baseY });
     }
 
     // Far LOD (> 48 m): 3 shared-material draws, ~380 tris!
@@ -319,7 +323,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
       if (!nearGrp.visible) return;
       if (engines[0]) { engines[0].position.y = oppPivots[0].y + yL; engines[0].rotation.set(pitchL, 0, rollBank * 0.22); }
       if (engines[1]) { engines[1].position.y = oppPivots[1].y + yR; engines[1].rotation.set(pitchR, 0, rollBank * 0.22); }
-      if (binderMesh) { binderMesh.position.y = binderBaseY + (yL + yR) * 0.5; binderMesh.rotation.z = Math.atan2(yR - yL, spanX); }
+      for (const b of binderMeshes) { b.m.position.y = b.y + (yL + yR) * 0.5; b.m.rotation.z = Math.atan2(yR - yL, spanX); }
     };
     const update = (t: number, throttle = 0, boost = 0) => { // rivals: nozzle petals open with boost (shared material, per-mesh userData)
       podSharedTime.value = t; oppOpen += (boost - oppOpen) * 0.14;
@@ -332,12 +336,14 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
   // ==================== FULL HERO PLAYER / HANGAR POD ====================
   const hullL = hullMaterial(colors[0], colors[1], colors[2], L.livery, texSize);
   const hullR = hullMaterial(colors[0], colors[1], colors[2], L.livery, texSize);
+  const hullC = hullMaterial(colors[0], colors[1], colors[2], L.livery, texSize); // cockpit: own instance (no engine heat glow)
+  const ckGrp = new THREE.Group(); // cockpit hangs on its cables and sways (setCockpitSway)
   const glow = new THREE.MeshBasicMaterial({ color: glowCol.clone().multiplyScalar(1.2) });
   const flameL = flameMaterial(glowCol, false), coreL = flameMaterial(glowCol, true);
   const flameR = flameMaterial(glowCol, false), coreR = flameMaterial(glowCol, true);
   const cabMat = cableFlexMaterial();
-  const cabLift = cabMat.userData.uLift as { value: THREE.Vector2 };
-  const own: THREE.Material[] = [hullL, hullR, glow, flameL, coreL, flameR, coreR, cabMat];
+  const cabLift = cabMat.userData.uLift as { value: THREE.Vector2 }; const cabCk = cabMat.userData.uCk as { value: THREE.Vector3 };
+  const own: THREE.Material[] = [hullL, hullR, hullC, glow, flameL, coreL, flameR, coreR, cabMat];
   const matFor = (k: string, hull: THREE.Material) => (k === 'hull' ? hull : k === 'glow' ? glow : k === 'suit' ? suit : shared[k]);
 
   const addMeshes = (parts: Map<string, THREE.BufferGeometry>, parent: THREE.Object3D, hull: THREE.Material) => {
@@ -422,24 +428,25 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
       const mg = mergeGeometries(list, false); list.forEach(x => x.dispose());
       if (mg) { mg.computeBoundingSphere(); mergedBody.set(k, mg); sideGeos.push(mg); }
     }
-    addMeshes(mergedBody, body, hullL);
+    body.add(ckGrp); addMeshes(mergedBody, ckGrp, hullC);
 
     const cabGeo = buildFlexCables(L, seg, ckBuilt.info.anchors); sideGeos.push(cabGeo);
     const cabMesh = new THREE.Mesh(cabGeo, cabMat); cabMesh.castShadow = false; cabMesh.receiveShadow = true; body.add(cabMesh);
   }
 
-  let binderGeo: THREE.BufferGeometry | null = null, binderU: FxU | null = null, binderSwap = false;
-  if (L.binder) {
-    const A = L.engines[L.binder[0]], B = L.engines[L.binder[1]];
-    binderSwap = A.x > B.x;
-    const ea = engineGeo(A.spec, seg), eb = engineGeo(B.spec, seg);
-    binderGeo = makeBinderGeo(
-      new THREE.Vector3(A.x + Math.sign(B.x - A.x) * ea.R * 0.97, A.y + ea.R * 0.2, A.z + ea.L * 0.12),
-      new THREE.Vector3(B.x + Math.sign(A.x - B.x) * eb.R * 0.97, B.y + eb.R * 0.2, B.z + eb.L * 0.12),
-    );
+  const binderGeos: THREE.BufferGeometry[] = []; let binderU: FxU | null = null; const binderSwap = false;
+  const BL: [number, number][] = L.binders ?? (L.binder ? [L.binder] : []);
+  if (BL.length) { // one material, one mesh per binder (X on the Quadra Lumber)
     const bMat = binderMaterial(glowCol); own.push(bMat); binderU = bMat.userData.u as FxU;
-    const bm = new THREE.Mesh(binderGeo, bMat); bm.renderOrder = 3; body.add(bm);
+    for (const [ia, ib] of BL) {
+      let A = L.engines[ia], B = L.engines[ib]; if (A.x > B.x) { const t = A; A = B; B = t; } // A = left-hand engine (uLift.x)
+      const ea = engineGeo(A.spec, seg), eb = engineGeo(B.spec, seg);
+      const g = makeBinderGeo(new THREE.Vector3(A.x + ea.R * 0.97, A.y + ea.R * 0.2, A.z + ea.L * 0.12), new THREE.Vector3(B.x - eb.R * 0.97, B.y + eb.R * 0.2, B.z + eb.L * 0.12));
+      binderGeos.push(g); const bm = new THREE.Mesh(g, bMat); bm.renderOrder = 3; body.add(bm);
+    }
   }
+  const setCockpitSway = (x: number, y: number, z: number) => { ckGrp.position.set(x, y, z); ckGrp.rotation.z = -x * 0.14; ckGrp.rotation.x = z * 0.07; cabCk.value.set(x, y, z); };
+  const setCockpitVisible = (v: boolean) => { ckGrp.visible = v; };
 
   const setEngineMotion = (yL: number, yR: number, pitchL: number, pitchR: number, rollBank: number) => {
     if (engines[0]) { engines[0].position.y = heroPivots[0].y + yL; engines[0].rotation.set(pitchL, 0, rollBank * 0.22); }
@@ -448,7 +455,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     if (binderU?.uLift) binderU.uLift.value.set(binderSwap ? yR : yL, binderSwap ? yL : yR);
   };
 
-  let boostK = 0, flapT = 0;
+  let boostK = 0, flapT = 0, glowH = 0;
   const update = (t: number, throttle: number, boost: number, airbrake: number, dmgL: number, dmgR: number, heat: number) => {
     podSharedTime.value = t;
     const fl = 0.35 + throttle * 0.75 + boost * 0.8;
@@ -475,14 +482,17 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     const open = 0.1 * throttle + 0.9 * boostK * (1 + 0.04 * Math.sin(t * 43));
     for (let i = 0; i < petals.length; i++) petals[i].userData.open = open;
     for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (airbrake * 1.05 + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
-    const uL = hullL.userData.u as HullU, uR = hullR.userData.u as HullU;
-    uL.uScorch.value = Math.min(1, (1 - dmgL) * 1.1 + Math.max(0, heat - 0.75) * 0.8); uL.uHeat.value = heat; uL.uWear.value = 0.28 + (1 - dmgL) * 0.35;
-    uR.uScorch.value = Math.min(1, (1 - dmgR) * 1.1 + Math.max(0, heat - 0.75) * 0.8); uR.uHeat.value = heat; uR.uWear.value = 0.28 + (1 - dmgR) * 0.35;
+    // The hull glow lags the heat value (metal warms up slowly and stays hot for a while) – a readable overheating indicator
+    glowH += (heat - glowH) * Math.min(1, dtF * (heat > glowH ? 1.5 : 0.55));
+    const uL = hullL.userData.u as HullU, uR = hullR.userData.u as HullU, uC = hullC.userData.u as HullU;
+    uL.uScorch.value = Math.min(1, (1 - dmgL) * 1.1 + Math.max(0, heat - 0.75) * 0.8); uL.uHeat.value = glowH; uL.uWear.value = 0.28 + (1 - dmgL) * 0.35;
+    uR.uScorch.value = Math.min(1, (1 - dmgR) * 1.1 + Math.max(0, heat - 0.75) * 0.8); uR.uHeat.value = glowH; uR.uWear.value = 0.28 + (1 - dmgR) * 0.35;
+    uC.uScorch.value = Math.min(0.6, (1 - Math.min(dmgL, dmgR)) * 0.6); uC.uWear.value = 0.28 + (1 - Math.min(dmgL, dmgR)) * 0.3;
     if (binderU) {
       binderU.uTime.value = t; binderU.uColor.value.copy(hc);
       binderU.uPower.value = (0.55 + throttle * 0.35 + boost * 0.6) * Math.min(1, Math.min(dmgL, dmgR) * 3);
     }
   };
-  const dispose = () => { own.forEach(m => m.dispose()); sideGeos.forEach(g => g.dispose()); binderGeo?.dispose(); };
-  return { group, body, engines, exhaustLocal, eye, hood, update, setEngineMotion, setDistance: () => {}, dispose };
+  const dispose = () => { own.forEach(m => m.dispose()); sideGeos.forEach(g => g.dispose()); binderGeos.forEach(g => g.dispose()); };
+  return { group, body, engines, exhaustLocal, eye, hood, update, setEngineMotion, setDistance: () => {}, setCockpitSway, setCockpitVisible, dispose };
 }

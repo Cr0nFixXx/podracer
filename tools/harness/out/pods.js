@@ -70190,12 +70190,12 @@ var PODS = [
     id: "bomquad",
     name: "Quadra Lumber",
     pilotId: "bom",
-    desc: "Vier Triebwerke an langen Seilen. Wild, aber schnell.",
+    desc: "Vier schlanke Triebwerke im Quadrat, gekoppelt \xFCber ein X aus Energieblitzen. Wild, aber schnell.",
     stats: { topSpeed: 0.85, accel: 0.55, turn: 0.4, traction: 0.4, airbrake: 0.45, cooling: 0.8, repair: 0.7 },
     engine: "ring",
-    engineLen: 6,
-    engineRad: 1.35,
-    spread: 5.6,
+    engineLen: 7.6,
+    engineRad: 0.7,
+    spread: 4.6,
     cable: 12,
     cockpit: "saucer",
     colors: ["#c9b23a", "#5d4a2c", "#fff07a"]
@@ -72750,14 +72750,15 @@ function podLayout(def) {
       };
     }
     case "bomquad": {
-      const s = spec(5.5, 1.1, "ring", 4, 14);
+      const s = spec(7.6, 0.66, "ring", 5, 12);
       return {
-        engines: [{ spec: s, x: -2.4, y: 0, z: 1 }, { spec: s, x: 2.4, y: 0, z: 1 }, { spec: s, x: -1.6, y: 0.35, z: 7.2 }, { spec: s, x: 1.6, y: 0.35, z: 7.2 }],
+        engines: [{ spec: s, x: -2.3, y: -0.35, z: 3 }, { spec: s, x: 2.3, y: -0.35, z: 3 }, { spec: s, x: -2.3, y: 2.05, z: 3 }, { spec: s, x: 2.3, y: 2.05, z: 3 }],
         cockpit: { style: "saucer", hw: 1, len: 2.4, y: 0.2, z: -6, pilot: 0.95 },
-        binder: [2, 3],
+        binder: [0, 3],
+        binders: [[0, 3], [2, 1]],
         livery: 3,
         extras: (pb) => {
-          for (const sd of [-1, 1]) pb.add("rubber", tube([V(sd * 2.4, 1.7, 1.9), V(sd * 2, 1.2, 3.6), V(sd * 1.6, 2, 5.4)], 0.045, 16, 6));
+          for (const sd of [-1, 1]) for (const z of [1, 4.8]) pb.add("steel", tube([V(sd * 2.3, 0.35, z), V(sd * 2.3, 1.35, z)], 0.08, 4, 6));
         }
       };
     }
@@ -73685,7 +73686,10 @@ function hullMaterial(c1, c2, glow, livery, texSize) {
   mat.metalnessNode = mix2(materialMetalness2, float2(0.95), hWear).mul(oneMinus2(hScorch.mul(0.7))).mul(oneMinus2(hGrime.mul(0.3)));
   mat.clearcoatNode = float2(0.82).mul(oneMinus2(hWear)).mul(oneMinus2(hGrime.mul(0.7))).mul(oneMinus2(hScorch));
   mat.normalNode = safeHullNormal(tex.normal, tuv, 0.85);
-  mat.emissiveNode = u.uGlowCol.mul(hDec.b.mul(1.3)).add(vec32(1, 0.32, 0.06).mul(hScorch).mul(u.uHeat).mul(1.25).mul(ssInv(0.35, 0, a)));
+  const hT = clamp3(u.uHeat.mul(1.3).sub(a.mul(1.45)), 0, 1.3);
+  const hCol = mix2(mix2(vec32(0.5, 0.03, 0), vec32(1, 0.3, 0.04), smoothstep2(0.1, 0.5, hT)), vec32(1, 0.88, 0.4), smoothstep2(0.55, 1.05, hT));
+  const hGlow = hCol.mul(smoothstep2(0, 0.35, hT).mul(0.85).add(pow5(hT, 3).mul(1.5))).mul(hMask.a.mul(0.35).add(0.65));
+  mat.emissiveNode = u.uGlowCol.mul(hDec.b.mul(1.3)).add(hGlow);
   return mat;
 }
 var oppHullCache = /* @__PURE__ */ new Map();
@@ -73735,15 +73739,17 @@ function sharedOpponentFlameMaterial() {
 var oppBinderCache = null;
 function boltLook(f, y, t) {
   const c = y.mul(2).sub(1), ac = oneMinus2(abs2(c));
-  const core = pow5(ac, 7), halo = pow5(ac, 1.5).mul(0.5);
-  const w12 = sin2(f.mul(21).add(t.mul(33))).mul(0.34).add(sin2(f.mul(47).sub(t.mul(58))).mul(0.14));
-  const w22 = cos2(f.mul(17).sub(t.mul(41))).mul(0.4).add(sin2(f.mul(61).add(t.mul(77))).mul(0.1));
-  const arc1 = pow5(oneMinus2(clamp3(abs2(c.sub(w12)), 0, 1)), 18);
-  const arc2 = pow5(oneMinus2(clamp3(abs2(c.sub(w22)), 0, 1)), 26).mul(0.75);
-  const strobe = fract2(sin2(floorN(t.mul(24)).mul(91.7)).mul(43758.5)).mul(0.55).add(0.6);
-  const pulse = pow5(sin2(f.mul(9).sub(t.mul(24))).mul(0.5).add(0.5), 6).mul(0.9);
+  const core = pow5(ac, 26).mul(0.85), halo = pow5(ac, 2.6).mul(0.13);
+  let arcs = float2(0);
+  const A = [[21, 33, 47, 58, 0.5], [17, -41, 61, 77, 0.62], [29, 52, 39, -66, 0.72], [13, -27, 71, 93, 0.8]];
+  A.forEach(([f1, s1, f2, s2, amp], k) => {
+    const wv = sin2(f.mul(f1).add(t.mul(s1)).add(k * 1.7)).mul(amp * 0.7).add(sin2(f.mul(f2).sub(t.mul(s2))).mul(amp * 0.3));
+    const on = step2(0.28, fract2(sin2(floorN(t.mul(17 + k * 3)).add(k * 7.1).mul(91.7)).mul(43758.5)));
+    arcs = arcs.add(pow5(oneMinus2(clamp3(abs2(c.sub(wv)), 0, 1)), 48).mul(on));
+  });
+  const pulse = pow5(sin2(f.mul(9).sub(t.mul(24))).mul(0.5).add(0.5), 6).mul(0.8);
   const ends = smoothstep2(0, 0.05, f).mul(ssInv(1, 0.95, f));
-  return [clamp3(core.add(arc1).add(arc2).mul(0.9), 0, 1), core.add(halo).add(arc1).add(arc2).mul(strobe.add(pulse)).mul(ends)];
+  return [clamp3(core.add(arcs).mul(0.9), 0, 1), core.add(halo).add(arcs.mul(0.95)).mul(pulse.add(0.75)).mul(ends)];
 }
 function sharedOpponentBinderMaterial() {
   if (oppBinderCache) return oppBinderCache;
@@ -73846,7 +73852,9 @@ function cableFlexMaterial() {
   const uLift = uniform2(new Vector2(0, 0));
   const L = attribute2("aLiv", "vec3");
   const lift = mix2(uLift.x, uLift.y, L.x).mul(L.y);
-  mat.positionNode = positionLocal2.add(vec32(0, lift, 0));
+  const uCk = uniform2(new Vector3());
+  mat.positionNode = positionLocal2.add(vec32(0, lift, 0)).add(uCk.mul(oneMinus2(clamp3(L.y, 0, 1))));
+  mat.userData.uCk = uCk;
   mat.normalNode = safeHullNormal(braid, uv2().mul(vec22(26, 6)), 0.65);
   mat.userData.uLift = uLift;
   return mat;
@@ -73973,7 +73981,7 @@ function bakeSolidColor(g, col) {
 function makeBinderGeo(a, b, vertCol) {
   const pos = new Float32Array(BINDER_PTS * 4 * 3), uv3 = new Float32Array(BINDER_PTS * 4 * 2);
   const idx = [];
-  const w = 0.3;
+  const w = 0.4;
   const tmp3 = new Vector3();
   for (let i = 0; i < BINDER_PTS; i++) {
     const f = i / (BINDER_PTS - 1);
@@ -74190,20 +74198,27 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       }
       addBucket(b, nearGrp);
     }
-    let binderMesh = null, binderBaseY = 0;
-    if (L.binder) {
-      const A = L.engines[L.binder[0]], B2 = L.engines[L.binder[1]];
+    const binderMeshes = [];
+    for (const [ia, ib] of L.binders ?? (L.binder ? [L.binder] : [])) {
+      let A = L.engines[ia], B2 = L.engines[ib];
+      if (A.x > B2.x) {
+        const t = A;
+        A = B2;
+        B2 = t;
+      }
       const ea = engineGeo(A.spec, seg), eb = engineGeo(B2.spec, seg);
-      const pa = new Vector3(A.x + Math.sign(B2.x - A.x) * ea.R * 0.97, 0, A.z + ea.L * 0.12);
-      const pb = new Vector3(B2.x + Math.sign(A.x - B2.x) * eb.R * 0.97, 0, B2.z + eb.L * 0.12);
+      const dyh = (B2.y + eb.R * 0.2 - (A.y + ea.R * 0.2)) * 0.5;
+      const pa = new Vector3(A.x + ea.R * 0.97, -dyh, A.z + ea.L * 0.12);
+      const pb = new Vector3(B2.x - eb.R * 0.97, dyh, B2.z + eb.L * 0.12);
       spanX = Math.max(1.5, Math.abs(pb.x - pa.x));
-      binderBaseY = (A.y + ea.R * 0.2 + B2.y + eb.R * 0.2) * 0.5;
+      const baseY = (A.y + ea.R * 0.2 + B2.y + eb.R * 0.2) * 0.5;
       const bg = makeBinderGeo(pa, pb, glowCol);
       ownedGeos.push(bg);
-      binderMesh = new Mesh(bg, oppBinder);
-      binderMesh.position.y = binderBaseY;
-      binderMesh.renderOrder = 3;
-      nearGrp.add(binderMesh);
+      const bm = new Mesh(bg, oppBinder);
+      bm.position.y = baseY;
+      bm.renderOrder = 3;
+      nearGrp.add(bm);
+      binderMeshes.push({ m: bm, y: baseY });
     }
     const farGrp = new Group();
     farGrp.visible = false;
@@ -74241,9 +74256,9 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
         engines2[1].position.y = oppPivots[1].y + yR;
         engines2[1].rotation.set(pitchR, 0, rollBank * 0.22);
       }
-      if (binderMesh) {
-        binderMesh.position.y = binderBaseY + (yL + yR) * 0.5;
-        binderMesh.rotation.z = Math.atan2(yR - yL, spanX);
+      for (const b of binderMeshes) {
+        b.m.position.y = b.y + (yL + yR) * 0.5;
+        b.m.rotation.z = Math.atan2(yR - yL, spanX);
       }
     };
     const update2 = (t, throttle = 0, boost = 0) => {
@@ -74259,12 +74274,15 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
   }
   const hullL = hullMaterial(colors[0], colors[1], colors[2], L.livery, texSize);
   const hullR = hullMaterial(colors[0], colors[1], colors[2], L.livery, texSize);
+  const hullC = hullMaterial(colors[0], colors[1], colors[2], L.livery, texSize);
+  const ckGrp = new Group();
   const glow = new MeshBasicMaterial({ color: glowCol.clone().multiplyScalar(1.2) });
   const flameL = flameMaterial(glowCol, false), coreL = flameMaterial(glowCol, true);
   const flameR = flameMaterial(glowCol, false), coreR = flameMaterial(glowCol, true);
   const cabMat = cableFlexMaterial();
   const cabLift = cabMat.userData.uLift;
-  const own = [hullL, hullR, glow, flameL, coreL, flameR, coreR, cabMat];
+  const cabCk = cabMat.userData.uCk;
+  const own = [hullL, hullR, hullC, glow, flameL, coreL, flameR, coreR, cabMat];
   const matFor = (k, hull) => k === "hull" ? hull : k === "glow" ? glow : k === "suit" ? suit : shared[k];
   const addMeshes = (parts, parent, hull) => {
     for (const [k, g] of parts) {
@@ -74415,7 +74433,8 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
         sideGeos.push(mg);
       }
     }
-    addMeshes(mergedBody, body, hullL);
+    body.add(ckGrp);
+    addMeshes(mergedBody, ckGrp, hullC);
     const cabGeo = buildFlexCables(L, seg, ckBuilt.info.anchors);
     sideGeos.push(cabGeo);
     const cabMesh = new Mesh(cabGeo, cabMat);
@@ -74423,22 +74442,38 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     cabMesh.receiveShadow = true;
     body.add(cabMesh);
   }
-  let binderGeo = null, binderU = null, binderSwap = false;
-  if (L.binder) {
-    const A = L.engines[L.binder[0]], B2 = L.engines[L.binder[1]];
-    binderSwap = A.x > B2.x;
-    const ea = engineGeo(A.spec, seg), eb = engineGeo(B2.spec, seg);
-    binderGeo = makeBinderGeo(
-      new Vector3(A.x + Math.sign(B2.x - A.x) * ea.R * 0.97, A.y + ea.R * 0.2, A.z + ea.L * 0.12),
-      new Vector3(B2.x + Math.sign(A.x - B2.x) * eb.R * 0.97, B2.y + eb.R * 0.2, B2.z + eb.L * 0.12)
-    );
+  const binderGeos = [];
+  let binderU = null;
+  const binderSwap = false;
+  const BL = L.binders ?? (L.binder ? [L.binder] : []);
+  if (BL.length) {
     const bMat = binderMaterial(glowCol);
     own.push(bMat);
     binderU = bMat.userData.u;
-    const bm = new Mesh(binderGeo, bMat);
-    bm.renderOrder = 3;
-    body.add(bm);
+    for (const [ia, ib] of BL) {
+      let A = L.engines[ia], B2 = L.engines[ib];
+      if (A.x > B2.x) {
+        const t = A;
+        A = B2;
+        B2 = t;
+      }
+      const ea = engineGeo(A.spec, seg), eb = engineGeo(B2.spec, seg);
+      const g = makeBinderGeo(new Vector3(A.x + ea.R * 0.97, A.y + ea.R * 0.2, A.z + ea.L * 0.12), new Vector3(B2.x - eb.R * 0.97, B2.y + eb.R * 0.2, B2.z + eb.L * 0.12));
+      binderGeos.push(g);
+      const bm = new Mesh(g, bMat);
+      bm.renderOrder = 3;
+      body.add(bm);
+    }
   }
+  const setCockpitSway = (x, y, z) => {
+    ckGrp.position.set(x, y, z);
+    ckGrp.rotation.z = -x * 0.14;
+    ckGrp.rotation.x = z * 0.07;
+    cabCk.value.set(x, y, z);
+  };
+  const setCockpitVisible = (v) => {
+    ckGrp.visible = v;
+  };
   const setEngineMotion = (yL, yR, pitchL, pitchR, rollBank) => {
     if (engines[0]) {
       engines[0].position.y = heroPivots[0].y + yL;
@@ -74451,7 +74486,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     cabLift.value.set(yL, yR);
     if (binderU?.uLift) binderU.uLift.value.set(binderSwap ? yR : yL, binderSwap ? yL : yR);
   };
-  let boostK = 0, flapT = 0;
+  let boostK = 0, flapT = 0, glowH = 0;
   const update = (t, throttle, boost, airbrake, dmgL, dmgR, heat) => {
     podSharedTime.value = t;
     const fl = 0.35 + throttle * 0.75 + boost * 0.8;
@@ -74481,13 +74516,16 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     const open = 0.1 * throttle + 0.9 * boostK * (1 + 0.04 * Math.sin(t * 43));
     for (let i = 0; i < petals.length; i++) petals[i].userData.open = open;
     for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (airbrake * 1.05 + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
-    const uL = hullL.userData.u, uR = hullR.userData.u;
+    glowH += (heat - glowH) * Math.min(1, dtF * (heat > glowH ? 1.5 : 0.55));
+    const uL = hullL.userData.u, uR = hullR.userData.u, uC = hullC.userData.u;
     uL.uScorch.value = Math.min(1, (1 - dmgL) * 1.1 + Math.max(0, heat - 0.75) * 0.8);
-    uL.uHeat.value = heat;
+    uL.uHeat.value = glowH;
     uL.uWear.value = 0.28 + (1 - dmgL) * 0.35;
     uR.uScorch.value = Math.min(1, (1 - dmgR) * 1.1 + Math.max(0, heat - 0.75) * 0.8);
-    uR.uHeat.value = heat;
+    uR.uHeat.value = glowH;
     uR.uWear.value = 0.28 + (1 - dmgR) * 0.35;
+    uC.uScorch.value = Math.min(0.6, (1 - Math.min(dmgL, dmgR)) * 0.6);
+    uC.uWear.value = 0.28 + (1 - Math.min(dmgL, dmgR)) * 0.3;
     if (binderU) {
       binderU.uTime.value = t;
       binderU.uColor.value.copy(hc);
@@ -74497,10 +74535,10 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
   const dispose = () => {
     own.forEach((m) => m.dispose());
     sideGeos.forEach((g) => g.dispose());
-    binderGeo?.dispose();
+    binderGeos.forEach((g) => g.dispose());
   };
   return { group, body, engines, exhaustLocal, eye, hood, update, setEngineMotion, setDistance: () => {
-  }, dispose };
+  }, setCockpitSway, setCockpitVisible, dispose };
 }
 
 // ../../src/game/texCore.ts

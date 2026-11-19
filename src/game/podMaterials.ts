@@ -77,7 +77,13 @@ export function hullMaterial(c1: string, c2: string, glow: string, livery: numbe
   mat.metalnessNode = mix(materialMetalness, float(0.95), hWear).mul(oneMinus(hScorch.mul(0.7))).mul(oneMinus(hGrime.mul(0.3)));
   mat.clearcoatNode = float(0.82).mul(oneMinus(hWear)).mul(oneMinus(hGrime.mul(0.7))).mul(oneMinus(hScorch));
   mat.normalNode = safeHullNormal(tex.normal, tuv, 0.85);
-  mat.emissiveNode = u.uGlowCol.mul(hDec.b.mul(1.3)).add(vec3(1.0, 0.32, 0.06).mul(hScorch).mul(u.uHeat).mul(1.25).mul(ssInv(0.35, 0.0, a)));
+  // Session 17 – heat glow as the overheating indicator: it starts dull red at the nozzle (a = 0) and creeps forward along the engine as
+  // the heat rises; the local temperature fades towards the front, so the colour runs yellow-white → orange → dark red and only reaches the
+  // binder mount faintly at the limit.
+  const hT = clamp(u.uHeat.mul(1.3).sub(a.mul(1.45)), 0.0, 1.3);
+  const hCol = mix(mix(vec3(0.5, 0.03, 0.0), vec3(1.0, 0.3, 0.04), smoothstep(0.1, 0.5, hT)), vec3(1.0, 0.88, 0.4), smoothstep(0.55, 1.05, hT));
+  const hGlow = hCol.mul(smoothstep(0.0, 0.35, hT).mul(0.85).add(pow(hT, 3.0).mul(1.5))).mul(hMask.a.mul(0.35).add(0.65));
+  mat.emissiveNode = u.uGlowCol.mul(hDec.b.mul(1.3)).add(hGlow);
   return mat;
 }
 
@@ -134,16 +140,21 @@ let oppBinderCache: THREE.MeshBasicNodeMaterial | null = null;
  *  ribbon, 24 Hz random strobe and bright pulses racing from engine to engine. Returns [white amount, opacity]. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function boltLook(f: any, y: any, t: any): [any, any] {
+  // Session 17: finer and several at once – a hair-thin core plus four thin arcs that wander independently across the ribbon and
+  // flicker on and off on their own; bright pulses still race from engine to engine.
   const c = y.mul(2).sub(1), ac = oneMinus(abs(c));
-  const core = pow(ac, 7.0), halo = pow(ac, 1.5).mul(0.5);
-  const w1 = sin(f.mul(21.0).add(t.mul(33.0))).mul(0.34).add(sin(f.mul(47.0).sub(t.mul(58.0))).mul(0.14));
-  const w2 = cos(f.mul(17.0).sub(t.mul(41.0))).mul(0.4).add(sin(f.mul(61.0).add(t.mul(77.0))).mul(0.1));
-  const arc1 = pow(oneMinus(clamp(abs(c.sub(w1)), 0.0, 1.0)), 18.0);
-  const arc2 = pow(oneMinus(clamp(abs(c.sub(w2)), 0.0, 1.0)), 26.0).mul(0.75);
-  const strobe = fract(sin(floorN(t.mul(24.0)).mul(91.7)).mul(43758.5)).mul(0.55).add(0.6);
-  const pulse = pow(sin(f.mul(9.0).sub(t.mul(24.0))).mul(0.5).add(0.5), 6.0).mul(0.9);
+  const core = pow(ac, 26.0).mul(0.85), halo = pow(ac, 2.6).mul(0.13);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let arcs: any = float(0.0);
+  const A: [number, number, number, number, number][] = [[21, 33, 47, 58, 0.5], [17, -41, 61, 77, 0.62], [29, 52, 39, -66, 0.72], [13, -27, 71, 93, 0.8]];
+  A.forEach(([f1, s1, f2, s2, amp], k) => {
+    const wv = sin(f.mul(f1).add(t.mul(s1)).add(k * 1.7)).mul(amp * 0.7).add(sin(f.mul(f2).sub(t.mul(s2))).mul(amp * 0.3));
+    const on = step(0.28, fract(sin(floorN(t.mul(17.0 + k * 3)).add(k * 7.1).mul(91.7)).mul(43758.5)));
+    arcs = arcs.add(pow(oneMinus(clamp(abs(c.sub(wv)), 0.0, 1.0)), 48.0).mul(on));
+  });
+  const pulse = pow(sin(f.mul(9.0).sub(t.mul(24.0))).mul(0.5).add(0.5), 6.0).mul(0.8);
   const ends = smoothstep(0.0, 0.05, f).mul(ssInv(1.0, 0.95, f));
-  return [clamp(core.add(arc1).add(arc2).mul(0.9), 0.0, 1.0), core.add(halo).add(arc1).add(arc2).mul(strobe.add(pulse)).mul(ends)];
+  return [clamp(core.add(arcs).mul(0.9), 0.0, 1.0), core.add(halo).add(arcs.mul(0.95)).mul(pulse.add(0.75)).mul(ends)];
 }
 
 export function sharedOpponentBinderMaterial() {
@@ -240,7 +251,9 @@ export function cableFlexMaterial() {
   const uLift = uniform(new THREE.Vector2(0, 0)); // x = left engine Y offset, y = right engine Y offset
   const L = attribute('aLiv', 'vec3'); // x = 0 (left) or 1 (right), y = 0 (cockpit anchor) .. 1 (engine pylon)
   const lift = mix(uLift.x, uLift.y, L.x).mul(L.y);
-  mat.positionNode = positionLocal.add(vec3(0.0, lift, 0.0));
+  const uCk = uniform(new THREE.Vector3()); // cockpit sway: the cockpit end of every cable follows it, the engine end stays
+  mat.positionNode = positionLocal.add(vec3(0.0, lift, 0.0)).add(uCk.mul(oneMinus(clamp(L.y, 0.0, 1.0))));
+  mat.userData.uCk = uCk;
   mat.normalNode = safeHullNormal(braid, uv().mul(vec2(26.0, 6.0)), 0.65);
   mat.userData.uLift = uLift;
   return mat;

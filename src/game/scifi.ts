@@ -7,10 +7,11 @@ import * as TSLmod from 'three/tsl';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { ThemeDef } from './data';
 import type { Sample, TrackData } from './trackBuilder';
+import { macroTexture } from './textures';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
-const { attribute, dot, floor, fract, pow, sin, step, time, uv, vec2, vec3 } = TSL;
+const { attribute, clamp, dot, float, floor, fract, length, mix, oneMinus, positionWorld, pow, sin, smoothstep, step, texture, time, uv, vec2, vec3 } = TSL;
 type Disp = { dispose: () => void }[];
 export const SCIFI_THEMES = new Set(['oovo', 'aquilaris', 'malastare', 'city']);
 
@@ -112,4 +113,25 @@ export function addSciFi(td: TrackData, theme: ThemeDef, group: THREE.Group, dis
   }
   disp.push(metal, glow, holo);
   addM(solids, metal); addM(glows, glow); addM(panels, holo, 3);
+}
+
+/** Session 17 – window panes of the underwater tunnels: a procedural ocean view in world space (depth gradient, moving caustics,
+ *  light shafts from the surface, drifting fish schools). Opaque – the real scene behind the glass is never shown. */
+export function oceanWindowMaterial(seaY: number) {
+  const m = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide });
+  const wp = positionWorld, mt = macroTexture();
+  const depth = clamp(float(seaY).sub(wp.y).div(20.0), 0.0, 1.0);             // 0 at the surface … 1 deep
+  let col = mix(vec3(0.08, 0.52, 0.64), vec3(0.0, 0.07, 0.18), pow(depth, 0.7));
+  const c1 = texture(mt, wp.xz.mul(0.021).add(vec2(time.mul(0.012), time.mul(0.008)))).r, c2 = texture(mt, wp.xz.mul(0.034).sub(vec2(time.mul(0.016), time.mul(-0.011)))).g;
+  const caust = smoothstep(0.4, 0.62, c1.mul(c2).mul(2.3));
+  col = col.add(vec3(0.26, 0.5, 0.5).mul(caust).mul(oneMinus(depth).mul(0.8).add(0.2)));
+  const shaft = pow(sin(wp.x.mul(0.19).add(wp.z.mul(0.13)).add(wp.y.mul(0.5)).add(time.mul(0.35))).mul(0.5).add(0.5), 6.0);
+  col = col.add(vec3(0.1, 0.25, 0.27).mul(shaft).mul(oneMinus(depth)));
+  const u = wp.x.add(wp.z).mul(0.5), row = floor(wp.y.mul(0.45));
+  const dir = fract(sin(row.mul(12.9898)).mul(43758.5)).sub(0.5).mul(2.4);
+  const fu = u.mul(0.22).add(time.mul(dir)), cell = floor(fu), f = fract(fu).sub(0.5), fv = fract(wp.y.mul(0.45)).sub(0.5);
+  const present = step(0.72, fract(sin(dot(vec2(cell, row), vec2(127.1, 311.7))).mul(43758.5)));
+  const fish = oneMinus(smoothstep(0.1, 0.16, length(vec2(f.mul(0.9), fv.mul(2.6)))));
+  m.colorNode = col.mul(oneMinus(fish.mul(present).mul(0.7)));
+  return m;
 }

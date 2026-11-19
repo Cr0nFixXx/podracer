@@ -41,6 +41,11 @@ for (const def of TRACKS) {
   const ohIdx = def.id === 'boonta' ? (td.startIdx + 150) % N : -1;
   if (ohIdx >= 0) { const q = S[ohIdx]; (td.overheads ??= []).push({ idx: ohIdx, y0: q.y + 3.6, y1: q.y + 7, half: 1.2 }); }
   const nBreakable = td.obstacles.filter(o => o.breakable).length; const touch = new Set<number>();
+  // tunnel report + deck self-test: pod 1 is lifted 24 m shortly before the first standard tunnel → must land on its deck, never inside
+  const runs: string[] = []; let tunA = -1;
+  for (let i = 1; i < N; i++) if (S[i].roof > 0 && !(S[i - 1].roof > 0)) { let e = i; while (e < N - 1 && S[e + 1].roof > 0) e++; let lo = 1e9; for (let k = i; k <= e; k++) lo = Math.min(lo, S[k].y);
+    runs.push(`${['?', 'std', 'sea', 'cave'][S[i].tun ?? 1]} ${(e - i) * 2} m${td.seaY !== undefined ? ` (road ${(lo - td.seaY).toFixed(1)} m vs sea)` : ''}`); if (tunA < 0 && S[i].tun === 1 && i > 80) tunA = i; }
+  let lifted = false, deckFrames = 0, teleports = 0; const prevY = pods.map(p => p.pos.y);
   let tunnels = 0, tunLen = 0; for (let i = 1; i < N; i++) { if (S[i].roof > 0) { tunLen += 2; if (!(S[i - 1].roof > 0)) tunnels++; } }
   const prog0 = pods.map(p => p.prog); const wasDead = pods.map(() => false);
   let deaths = 0, nan = 0, wall = 0, clear = 9, airMax = 0, rolls = 0, slides = 0, dives = 0, aiFrames = 0, breaks = 0, ohHits = 0, zgV = 0, zgN = 0, gV = 0, gN = 0, t = 0, worst = '', airDbg = '', air0 = 0, air0Dist = 0;
@@ -61,7 +66,9 @@ for (const def of TRACKS) {
       if (Math.abs(A.pos.y - B.pos.y) < 3 && Math.hypot(A.pos.x - B.pos.x, A.pos.z - B.pos.z) < R * 1.01) touch.add(a * 16 + b2);
     }
     for (const p of pods) { if (p.dead > 0) continue; const v = Math.hypot(p.vel.x, p.vel.z); if (p.zeroG) { zgV += v; zgN++; } else if (t > 6) { gV += v; gN++; } }
+    if (tunA >= 0 && !lifted) { const p = pods[1]; if (p.path === 0 && p.dead <= 0 && p.idx >= tunA - 30 && p.idx < tunA - 18) { p.pos.y += 24; p.vel.y = 0; lifted = true; } }
     for (let k = 0; k < 2; k++) { for (const p of pods) stepPod(p, td, h, t, GRIP, false); collidePods(pods, t); }
+    pods.forEach((p, i) => { if (p.upper) deckFrames++; if (p.dead <= 0 && prevY[i] - p.pos.y > 4.5 && i !== 1) teleports++; prevY[i] = p.pos.y; }); // > 4.5 m down within one frame = teleport
     for (const hz of td.hazards) {
       const ph = (((t + hz.phase) % hz.period) + hz.period) % hz.period; hz.state = ph < hz.period * hz.duty ? 1 : ph > hz.period - 1 ? 0.5 : 0;
       if (hz.state < 1) continue;
@@ -91,9 +98,11 @@ for (const def of TRACKS) {
   }
   const speeds = pods.map((p, i) => (p.prog - prog0[i]) * 2 / SECS); const avg = speeds.reduce((a, b) => a + b, 0) / speeds.length, slow = Math.min(...speeds);
   const divePct = dives / Math.max(1, aiFrames) * 100;
+  if (runs.length && process.env.DEBUG !== '0') console.log(`  tunnels: ${runs.join(' · ')}`);
+  if (lifted) console.log(`  deck self-test: ${deckFrames} frames on a tunnel deck (${deckFrames > 20 ? 'ok' : 'FAIL'}), downward teleports: ${teleports}`);
   if (zgN > 200) console.log(`  zero-G: avg ${(zgV / zgN).toFixed(0)} m/s in the tubes vs ${(gV / Math.max(1, gN)).toFixed(0)} m/s outside`);
   if (ohIdx >= 0) console.log(`  overhead self-test: ${ohHits} hits registered (${ohHits > 0 ? 'ok' : 'FAIL'})`);
-  const bad = (ohIdx >= 0 && ohHits === 0) || divePct > LIMIT.divePct || nan > 0 || deaths > LIMIT.deaths || wall > LIMIT.wall || clear < LIMIT.clear || slow < LIMIT.minSpeed;
+  const bad = (lifted && deckFrames <= 20) || teleports > 0 || (ohIdx >= 0 && ohHits === 0) || divePct > LIMIT.divePct || nan > 0 || deaths > LIMIT.deaths || wall > LIMIT.wall || clear < LIMIT.clear || slow < LIMIT.minSpeed;
   if (bad) failed++; if (process.env.PITCH_AIR !== undefined) console.log(`  pod0 airborne pitch ${process.env.PITCH_AIR}: longest flight ${air0.toFixed(2)} s ≈ ${air0Dist.toFixed(0)} m`);
   if (process.env.DEBUG) console.log('  worst:', worst, '\n  air:', airDbg, 'gap@idx', td.paths[0].samples.map((q, k) => q.gap ? k : -1).filter(k => k >= 0 && (k % 8 === 0)).join(','));
   console.log(`${def.id.padEnd(13)} ${String(deaths).padStart(5)} ${String(nan).padStart(5)} ${wall.toFixed(2).padStart(7)}m ${clear.toFixed(2).padStart(7)}m ${avg.toFixed(0).padStart(6)}m/s ${slow.toFixed(0).padStart(5)}m/s ${airMax.toFixed(1).padStart(6)}s ${String(rolls).padStart(6)} ${String(slides).padStart(7)} ${divePct.toFixed(1).padStart(5)}% ${(breaks + '/' + nBreakable).padStart(8)} ${String(touch.size).padStart(10)} ${(tunnels + '×/' + tunLen + 'm').padStart(9)}  ${bad ? 'FAIL' : 'ok'}`);

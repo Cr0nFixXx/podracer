@@ -25,6 +25,7 @@ export interface Sample {
   wallL: number; wallR: number; // barrier offsets from the centreline (rails / canyon rock) used for collision
   hL: number; hR: number; // cliff wall height per side (0 = no cliff → guard rail)
   roof: number; // tunnel ceiling height above the road (0 = open sky)
+  tun?: number; // tunnel kind: 1 = standard (drivable deck on top), 2 = underwater tube (Aquilaris), 3 = cave (Magma)
   vmax: number; // ai reference speed
   s: number;
 }
@@ -47,6 +48,7 @@ export interface Path {
 
 export interface TrackData {
   def: TrackDef;
+  seaY?: number; // fixed sea level of ocean worlds (set before the underwater tunnels dip the road)
   overheads?: Overhead[]; // filled by the world builder (trackDetail / start portal), read by stepPod
   paths: Path[];
   main: Path;
@@ -305,13 +307,81 @@ export function buildTrack(def: TrackDef): TrackData {
   const finishIdx = closed ? startIdx : N - 40;
   const okSpot = (s: Sample, i: number) => !s.gap && s.ramp === 0 && !s.openL && !s.openR && !samples[(i + 22) % N].gap && samples[(i + 18) % N].ramp === 0;
   const idxDist = (a: number, b: number) => { const d = Math.abs(a - b); return closed ? Math.min(d, N - d) : d; };
+
+  // ---------- Session 17: tunnels – placed BEFORE obstacles / hazards / set pieces, so those see the final heights and keep out ----------
+  //  kind 1 standard: roofed passage with a DRIVABLE DECK on top (a pod that jumps over the portal lands up there instead of being
+  //         pushed into the tube); 2–4 per track.
+  //  kind 2 underwater tube (Aquilaris): the road dips below sea level, windows show the ocean. Never within 600 m after a ramp.
+  //  kind 3 cave system (Magma-Inferno): a 600 m section sunk 11 m into the ground, roofed in three parts with two open skylights.
+  let seaY: number | undefined;
+  if (!(globalThis as { NO_TUNNELS?: boolean }).NO_TUNNELS) {
+    const rt = mulberry32(hashStr(def.id + '|tunnels'));
+    const W = (i: number) => samples[((i % N) + N) % N];
+    const clearRun = (i: number, len: number, pad: number) => {
+      if (!closed && (i - pad < 0 || i + len + pad >= N)) return false;
+      for (let k = -pad; k <= len + pad; k += 2) { const q = W(i + k); if (q.gap || q.ramp > 0 || q.zeroG || q.openL || q.openR || q.link >= 0 || q.roof > 0) return false; }
+      return true;
+    };
+    const awayFromGrid = (i: number, len: number) => idxDist(i + len / 2, startIdx) > 110 + len / 2 && (closed || idxDist(i + len / 2, finishIdx) > 90 + len / 2);
+    const rampBefore = (i: number, back: number) => { for (let k = 0; k <= back; k += 3) { const j = i - k; if (!closed && j < 0) break; const q = W(j); if (q.ramp > 0 || q.gap) return true; } return false; };
+    const taken: { i: number; len: number }[] = [];
+    const clash = (i: number, len: number, gap = 150) => taken.some(t => idxDist(t.i + t.len / 2, i + len / 2) < gap + (t.len + len) / 2);
+    const dip = (i: number, len: number, depth: number, ease: number) => { for (let k = 0; k <= len; k++) { const t = Math.min(k, len - k) / ease; W(i + k).y -= depth * (t >= 1 ? 1 : 0.5 - 0.5 * Math.cos(Math.PI * t)); } };
+    const roofRun = (i: number, len: number, h: number, kind: number) => { for (let k = 0; k <= len; k++) { const q = W(i + k); q.roof = h; q.tun = kind; } };
+
+    if (def.theme === 'aquilaris') {
+      seaY = samples.reduce((a, q) => a + q.y, 0) / N - 26;
+      const target = seaY - 13.5, FLAT = 60; const cands: { i: number; len: number; depth: number; ease: number }[] = [];
+      for (let f0 = 120; f0 < N - 200; f0 += 8) {
+        let top = -1e9; for (let k = 0; k <= FLAT; k += 2) top = Math.max(top, W(f0 + k).y);
+        const depth = top - target; if (depth < 6 || depth > 27) continue;
+        const ease = Math.ceil(7.85 * depth / DS), i0 = f0 - ease, len = FLAT + 2 * ease;   // 20 % max. gradient of the descent
+        if (!clearRun(i0, len, 14) || !awayFromGrid(i0, len) || rampBefore(i0, 300)) continue;
+        if (W(i0 + 4).y < seaY + 2.5 || W(i0 + len - 4).y < seaY + 2.5) continue;          // both portals stand above the waterline
+        cands.push({ i: i0, len, depth: depth + rt() * 0.5, ease });
+      }
+      cands.sort((a, b) => a.depth - b.depth);
+      for (const c of cands) {
+        if (taken.length >= 3) break; if (clash(c.i, c.len, 160)) continue;
+        taken.push(c); dip(c.i, c.len, c.depth, c.ease); roofRun(c.i + 3, c.len - 6, 9, 2);
+        for (let k = 0; k <= c.len; k++) { const q = W(c.i + k); q.hL = 0; q.hR = 0; q.canyon = false; q.wallL = q.wallR = q.hw - RAIL_INSET; }
+      }
+    }
+    if (def.id === 'magma') {
+      const LEN = 300, EASE = 60, DEPTH = 11; let best = -1, bs = -1e9;
+      for (const back of [260, 160]) {
+        for (let i = 60; i < N - LEN - 60 && best < 0 || i < N - LEN - 60 && back === 260; i += 10) {
+          if (!clearRun(i, LEN, 14) || !awayFromGrid(i, LEN) || rampBefore(i, back)) continue;
+          let walls = 0, curv = 0; for (let k = 0; k <= LEN; k += 6) { const q = W(i + k); if (q.hL > 0 || q.hR > 0) walls++; curv += Math.abs(q.curv); }
+          const sc = walls * 0.5 - curv * 40 + rt() * 4; if (sc > bs) { bs = sc; best = i; }
+        }
+        if (best >= 0) break;
+      }
+      if (best >= 0) {
+        dip(best, LEN, DEPTH, EASE);
+        for (const [a, b] of [[24, 112], [130, 204], [222, LEN - 24]]) roofRun(best + a, b - a, 13, 3);
+        taken.push({ i: best, len: LEN });
+      }
+    }
+    const want = def.theme === 'aquilaris' ? 0 : ({ oovo: 3, ice: 4, malastare: 4 } as Record<string, number>)[def.theme] ?? 2;
+    const cands: { i: number; len: number; score: number }[] = [];
+    for (let i = 40; i < N - 280; i += 12) {
+      const len = 60 + Math.floor(rt() * 60);
+      if (!clearRun(i, len, 14) || !awayFromGrid(i, len)) continue;
+      let walls = 0; for (let k = 0; k <= len; k += 2) { const q = W(i + k); if (q.hL > 0 && q.hR > 0) walls++; }
+      cands.push({ i, len, score: walls / (len / 2) + rt() * 0.6 });
+    }
+    cands.sort((a, b) => b.score - a.score);
+    let placed = 0;
+    for (const c of cands) { if (placed >= want) break; if (clash(c.i, c.len)) continue; taken.push(c); roofRun(c.i, c.len, 13, 1); placed++; }
+  }
   for (const [a, b, cnt] of def.obstacles) {
     const want = Math.max(2, Math.round(cnt * 0.45));
     let placed = 0;
     for (let tries = 0; tries < cnt * 5 && placed < want; tries++) {
       const idx = (Math.floor((a + (b - a) * rng()) * N) + N) % N;
       const s = samples[idx];
-      if (!okSpot(s, idx) || idxDist(idx, startIdx) < 85 || (!closed && idxDist(idx, finishIdx) < 60)) continue;
+      if (s.tun === 2 || !okSpot(s, idx) || idxDist(idx, startIdx) < 85 || (!closed && idxDist(idx, finishIdx) < 60)) continue;
       if (obstacles.some(o => o.path === 0 && idxDist(o.idx, idx) < 26)) continue; // min 52 m spacing!
       const r = 2.0 + rng() * 1.5;
       const lat = (rng() * 2 - 1) * Math.max(2, s.hw - r - 4.5);
@@ -332,7 +402,7 @@ export function buildTrack(def: TrackDef): TrackData {
   for (const [a, b, cnt] of def.hazards ?? []) {
     for (let c = 0; c < cnt; c++) {
       const idx = (Math.floor((a + (b - a) * rng()) * N) + N) % N; const s = samples[idx];
-      if (!okSpot(s, idx) || Math.abs(idx - startIdx) < 80 || hazards.some(h => Math.abs(h.idx - idx) < 25)) continue;
+      if (s.roof > 0 || !okSpot(s, idx) || Math.abs(idx - startIdx) < 80 || hazards.some(h => Math.abs(h.idx - idx) < 25)) continue;
       const lat = (rng() * 2 - 1) * s.hw * 0.55; const x = s.x + s.rx * lat, z = s.z + s.rz * lat, y = s.y - lat * s.bank;
       hazards.push({ idx, lat, r: 4.5, x, y, z, period: 4 + rng() * 3, phase: rng() * 10, duty: 0.3, state: 0 });
       obstacles.push({ path: 0, idx, lat, r: 4.5, kind: 3, x, y, z, hz: hazards.length - 1 });
@@ -344,7 +414,7 @@ export function buildTrack(def: TrackDef): TrackData {
   const spOk = (i: number, type: string) => {
     const s = samples[i]; if (!okSpot(s, i) || s.zeroG) return false;
     if (closed ? cdist(i, startIdx) < 110 : (i < startIdx + 110 || i > finishIdx - 70)) return false;
-    for (let k = -68; k <= 42; k += 3) { const q = samples[((i + k) % N + N) % N]; if (q.gap || q.ramp > 0 || q.openL || q.openR || q.zeroG) return false; }
+    for (let k = -68; k <= 42; k += 3) { const q = samples[((i + k) % N + N) % N]; if (q.gap || q.ramp > 0 || q.openL || q.openR || q.zeroG || q.roof > 0) return false; }
     if (hazards.some(h => cdist(h.idx, i) < 50) || setPieces.some(o => cdist(o.idx, i) < 120)) return false;
     if (obstacles.some(o => o.path === 0 && o.kind < 3 && cdist(o.idx, i) < 45)) return false; // never stack a set piece onto an obstacle field
     return type === 'arch' || type === 'icefall' || type === 'boulder' || Math.abs(s.curv) < 1 / 350;
@@ -384,7 +454,7 @@ export function buildTrack(def: TrackDef): TrackData {
   }
   // arches inside canyon zones
   const arches: number[] = [];
-  const canyonIdx = samples.map((s, i) => (s.canyon && !s.gap && s.ramp === 0 ? i : -1)).filter(i => i >= 0);
+  const canyonIdx = samples.map((s, i) => (s.canyon && !s.gap && s.ramp === 0 && !(s.roof > 0) ? i : -1)).filter(i => i >= 0);
   for (let a = 0; a < def.arches && canyonIdx.length; a++) {
     const idx = canyonIdx[Math.floor(rng() * canyonIdx.length)];
     if (arches.every(o => Math.abs(o - idx) > 40)) arches.push(idx);
@@ -395,32 +465,8 @@ export function buildTrack(def: TrackDef): TrackData {
     bounds.minZ = Math.min(bounds.minZ, s.z); bounds.maxZ = Math.max(bounds.maxZ, s.z);
     bounds.minY = Math.min(bounds.minY, s.y); bounds.maxY = Math.max(bounds.maxY, s.y);
   }
-  // Session 16: roofed tunnel passages on the main path (120–240 m each). Sci-fi / ice worlds get four, the others two. Preferred where
-  // cliffs stand on both sides (a roofed gorge); never at the grid, ramps, gaps, zero-G tubes, shortcut junctions, set pieces or geysers.
-  if (!(globalThis as { NO_TUNNELS?: boolean }).NO_TUNNELS) {
-    const rt = mulberry32(hashStr(def.id + '|tunnels'));
-    const want = ({ aquilaris: 4, oovo: 3, ice: 4, malastare: 4 } as Record<string, number>)[def.theme] ?? 2;
-    const W = (i: number) => samples[((i % N) + N) % N];
-    const near = (i: number, j: number, d: number) => { let k = Math.abs(i - j); if (closed) k = Math.min(k, N - k); return k < d; };
-    const cands: { i: number; len: number; score: number }[] = [];
-    for (let i = 40; i < N - 280; i += 12) {
-      const len = 60 + Math.floor(rt() * 60), mid = i + len / 2;
-      if (near(mid, startIdx, 110 + len / 2) || (!closed && near(mid, finishIdx, 90 + len / 2))) continue;
-      let ok = true, walls = 0;
-      for (let k = -14; k <= len + 14 && ok; k += 2) { const q = W(i + k); if (q.gap || q.ramp > 0 || q.zeroG || q.openL || q.openR || q.link >= 0 || q.roof > 0) ok = false; else if (q.hL > 0 && q.hR > 0) walls++; }
-      if (!ok || setPieces.some(sp => near(sp.idx, mid, 70 + len / 2)) || hazards.some(h => near(h.idx, mid, 10 + len / 2))) continue;
-      cands.push({ i, len, score: walls / (len / 2) + rt() * 0.6 });
-    }
-    cands.sort((a, b) => b.score - a.score);
-    const taken: { i: number; len: number }[] = [];
-    for (const c of cands) {
-      if (taken.length >= want) break;
-      if (taken.some(t => near(t.i + t.len / 2, c.i + c.len / 2, 150 + (t.len + c.len) / 2))) continue;
-      taken.push(c); for (let k = 0; k <= c.len; k++) samples[c.i + k].roof = 13;
-    }
-  }
   for (const o of obstacles) if (o.kind === 2 || (o.kind === 0 && o.r < 2.9)) o.breakable = true; // crates + small rocks
-  return { def, paths, main, N, startIdx, finishIdx, obstacles, obstaclesByPath, hazards, setPieces, arches, bounds, overheads: [] };
+  return { def, paths, main, N, startIdx, finishIdx, obstacles, obstaclesByPath, hazards, setPieces, arches, bounds, overheads: [], seaY };
 }
 
 function findShortcut(S: Sample[], N: number, fa: number, closed: boolean): [number, number] | null {

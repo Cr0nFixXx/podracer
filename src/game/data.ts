@@ -69,9 +69,9 @@ export const PODS: PodDef[] = [
     engine: 'quad', engineLen: 8.5, engineRad: 0.9, spread: 4.8, cable: 11, cockpit: 'long', colors: ['#27a36d', '#e8d27a', '#5affb4'],
   },
   {
-    id: 'bomquad', name: 'Quadra Lumber', pilotId: 'bom', desc: 'Vier Triebwerke an langen Seilen. Wild, aber schnell.',
+    id: 'bomquad', name: 'Quadra Lumber', pilotId: 'bom', desc: 'Vier schlanke Triebwerke im Quadrat, gekoppelt über ein X aus Energieblitzen. Wild, aber schnell.',
     stats: { topSpeed: 0.85, accel: 0.55, turn: 0.4, traction: 0.4, airbrake: 0.45, cooling: 0.8, repair: 0.7 },
-    engine: 'ring', engineLen: 6, engineRad: 1.35, spread: 5.6, cable: 12, cockpit: 'saucer', colors: ['#c9b23a', '#5d4a2c', '#fff07a'],
+    engine: 'ring', engineLen: 7.6, engineRad: 0.7, spread: 4.6, cable: 12, cockpit: 'saucer', colors: ['#c9b23a', '#5d4a2c', '#fff07a'],
   },
   {
     id: 'mavik', name: 'Hollo Needle', pilotId: 'mav', desc: 'Schlanke Nadel-Triebwerke für maximale Wendigkeit.',

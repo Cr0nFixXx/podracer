@@ -141,13 +141,14 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
             {/* boost heat: fills while boosting, hatched zone = danger, MAX = overheat; after overheating boost is locked until the READY mark */}
             <div className="absolute left-3 right-3 bottom-0">
               <div className="flex justify-between text-[9px] tracking-[0.25em] mb-0.5">
-                <span className={h.overheat ? 'text-red-400 animate-pulse' : h.boosting ? 'text-cyan-200' : 'text-white/70'}>{h.overheat ? 'ÜBERHITZT' : h.boosting ? 'BOOST' : 'BOOST-HITZE'}</span>
+                <span className={h.overheat ? 'text-red-400 animate-pulse' : h.boosting ? 'text-cyan-200' : 'text-white/70'}>{h.overheat ? 'ÜBERHITZT' : h.overdrive > 0 && h.heat >= 0.99 ? `ÜBERZOGEN · NOCH ${(3 - h.overdrive * 3).toFixed(1)} s` : h.boosting ? 'BOOST' : 'BOOST-HITZE'}</span>
                 <span className="text-white/70 tabular-nums">{Math.round(Math.min(1, h.heat) * 100)}%</span>
               </div>
               <div className="relative h-3 bg-black/55 border border-sky-300/50 rounded-sm overflow-hidden">
                 <div className="absolute inset-y-0 right-0" style={{ left: '80%', background: 'repeating-linear-gradient(135deg, rgba(248,113,113,0.6) 0 4px, rgba(0,0,0,0) 4px 8px)' }} />
                 <div className="absolute inset-y-0 left-0" style={{ width: `${Math.min(1, h.heat) * 100}%`, background: h.overheat ? '#ef4444' : h.heat > 0.8 ? 'linear-gradient(90deg,#38bdf8,#fbbf24 65%,#ef4444)' : h.heat > 0.5 ? 'linear-gradient(90deg,#38bdf8,#fbbf24)' : '#38bdf8' }} />
                 {h.overheat && <div className="absolute inset-y-0 w-0.5 bg-white" style={{ left: '55%' }} />}
+                {h.overdrive > 0 && !h.overheat && <div className="absolute inset-x-0 bottom-0 h-1 bg-black/70"><div className="h-full bg-white" style={{ width: `${(1 - h.overdrive) * 100}%` }} /></div>}
               </div>
               <div className="relative h-3 text-[8px] tracking-[0.2em]">
                 {h.overheat && <span className="absolute -translate-x-1/2 text-white" style={{ left: '55%' }}>BEREIT</span>}

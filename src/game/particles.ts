@@ -47,7 +47,7 @@ class Pool {
     const rawSz = mix(M.x, M.y, t).mul(1.45).mul(alive);
     const maxWorldSz = tslMax(vz.sub(1.1), float(0.0)).mul(additive ? 0.16 : 0.14);
     mat.sizeNode = tslMin(rawSz, maxWorldSz).mul(step(float(1.2), vz));
-    const nearFade = smoothstep(additive ? 2.0 : 4.5, additive ? 6.0 : 12.0, vz);
+    const nearFade = smoothstep(additive ? 2.0 : 3.0, additive ? 6.0 : 8.5, vz); // Session 17: the player's own dust / spray was invisible (faded out up to 12 m)
     const c = varying(vec4(mix(C0.xyz, C1.xyz, t), C0.w.mul(tslMin(t.mul(8.0), float(1.0))).mul(oneMinus(t)).mul(alive)));
     mat.colorNode = c.xyz;
     mat.opacityNode = c.w.mul(softDisc()).mul(nearFade);
@@ -137,23 +137,23 @@ export class Particles {
   debris(p: THREE.Vector3, vel: THREE.Vector3, col: THREE.Color) { this.dust(p, vel, col, 10); this.sparks(p, UP_V, vel, 10); }
   /** Session 15 – dust trail dragged behind a pod: low, widening puffs; denser, longer and larger with speed. */
   trail(p: THREE.Vector3, vel: THREE.Vector3, col: THREE.Color, speed: number, alpha: number) {
-    const want = Math.min(1.6, 0.25 + speed * 0.009) * this.amount * this.rateScale;
+    const want = Math.min(2.4, 0.4 + speed * 0.013) * this.amount * this.rateScale;
     const n = Math.floor(want) + (Math.random() < (want % 1) ? 1 : 0);
     for (let i = 0; i < n; i++) {
       _v.set((Math.random() - 0.5) * 5, 0.5 + Math.random() * 1.7, (Math.random() - 0.5) * 5).addScaledVector(vel, 0.2);
       _p.set(p.x + (Math.random() - 0.5) * 1.6, p.y, p.z + (Math.random() - 0.5) * 1.6);
-      this.alpha.spawn(_p, _v, 1.0 + Math.random() * 0.9, 0.9, 3.6 + speed * 0.03 + Math.random() * 2.2, col, col, alpha, 1.25, -0.5);
+      this.alpha.spawn(_p, _v, 1.0 + Math.random() * 0.9, 0.9, 4.2 + speed * 0.035 + Math.random() * 2.6, col, col, alpha, 1.25, -0.5);
     }
   }
 
   /** Rooster tail of fine spray thrown up from a wet road – taller and denser with speed. */
   spray(p: THREE.Vector3, vel: THREE.Vector3, speed: number, alphaScale = 1) {
-    const want = Math.min(3, 0.5 + speed * 0.013) * this.amount * this.rateScale;
+    const want = Math.min(4, 0.7 + speed * 0.018) * this.amount * this.rateScale;
     const n = Math.floor(want) + (Math.random() < (want % 1) ? 1 : 0);
     for (let i = 0; i < n; i++) {
       _v.set((Math.random() - 0.5) * 7, 1.6 + Math.random() * 3 + speed * 0.022, (Math.random() - 0.5) * 7).addScaledVector(vel, 0.32);
       _p.set(p.x + (Math.random() - 0.5) * 3.2, p.y, p.z + (Math.random() - 0.5) * 3.2);
-      this.alpha.spawn(_p, _v, 0.55 + Math.random() * 0.5, 0.9, 3.6 + speed * 0.028 + Math.random() * 2.5, C_SPRAY, C_SPRAY, 0.115 * alphaScale, 1.5, 5);
+      this.alpha.spawn(_p, _v, 0.55 + Math.random() * 0.5, 0.9, 3.6 + speed * 0.028 + Math.random() * 2.5, C_SPRAY, C_SPRAY, 0.15 * alphaScale, 1.5, 5);
     }
   }
   /** Tiny short-lived splash crown where a rain drop hits the road. */

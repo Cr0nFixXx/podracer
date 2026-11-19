@@ -35,6 +35,8 @@ export interface HudState {
   finished: boolean;
   /** Session 12: flight attitude (roll -1..1 = ∓90°, pitch -1 dive..+1 lift), slide state/charge, weather label */
   roll: number; pitch: number; sliding: boolean; slideCharge: number; airborne: boolean; env: string;
+  /** 0..1 share of the 3 s boost overdrive that is used up */
+  overdrive: number;
 }
 export interface RaceResult { place: number; name: string; pod: string; color: string; isPlayer: boolean; time: number | null; bestLap: number | null; }
 
@@ -445,7 +447,7 @@ export class Game {
     this.world.update(this.clock, this.camera.position, this.pods);
     this.sky.uniforms.time.value = this.clock;
     this.weather.update(dt, this.clock, this.camera, this.state === 'countdown', v => this.audio.thunder(v), near => { if (near > 0.5) this.player.shake = Math.min(1, this.player.shake + (near - 0.5) * 0.9); });
-    { const pl = this.player, ps = this.td.paths[pl.path].samples[pl.idx]; this.cover += ((ps && ps.roof > 0 ? 1 : 0) - this.cover) * Math.min(1, dt * 5); this.particles.setAmbientFade(1 - this.cover); }
+    { const pl = this.player, ps = this.td.paths[pl.path].samples[pl.idx]; this.cover += ((ps && ps.roof > 0 && !pl.upper ? 1 : 0) - this.cover) * Math.min(1, dt * 5); this.particles.setAmbientFade(1 - this.cover); }
     this.applyEnv(dt);
     if (this.env.wind > 0.6 && this.cover < 0.5 && this.state === 'race') this.player.shake = Math.max(this.player.shake, this.weather.gust * (this.env.wind - 0.5) * 0.22); // storm gusts buffet the pod
     if (this.post) this.post.lens.rain.value = this.wxQ > 0 ? this.env.rain * (1 - this.cover) : 0;
@@ -574,7 +576,8 @@ export class Game {
       v.body.rotation.set(p.pitch, 0, p.roll);
       const eyL = p.engYL ?? 0, eyR = p.engYR ?? 0;
       v.setEngineMotion(eyL, eyR, 0, 0, 0); // engines lift as a whole – no extra tilt
-      v.update(this.clock, p.input.throttle, p.boosting ? 1 : 0, p.airbraking ? 1 : 0, p.hpL / 100, p.hpR / 100, p.heat);
+      v.setCockpitSway?.(p.ckX ?? 0, p.ckY ?? 0, p.ckZ ?? 0);
+      v.update(this.clock, p.input.throttle, p.boosting ? 1 : 0, p.airbraking ? 1 : 0, p.hpL / 100, p.hpR / 100, p.heat + (p.overT ?? 0) / 3 * 0.25); // overdrive pushes the glow past the limit (yellow-white)
 
       // Skip exhaust/dust particle spawning while stationary on countdown grid; keep rival trails super clean for visibility!
       if (this.state === 'countdown') continue;
@@ -590,21 +593,27 @@ export class Game {
         const eLift = loc.x < 0 ? eyL : eyR;
         this.tmpV3.set(p.pos.x + loc.x * cy + lz * sy, p.pos.y + (loc.y + eLift) * Math.cos(p.roll) + loc.x * Math.sin(p.roll) - lz * p.pitch, p.pos.z - loc.x * sy + lz * cy);
         this.particles.exhaust(this.tmpV3, back, p.vel, this.tmpC, p.input.throttle, p.boosting ? 1 : 0, emitScale);
+        // close to the heat limit the engines spit sparks (more while overdriving)
+        if (p.heat > 0.86 && (p.isPlayer || dist < 160) && this.particles.chance((p.heat - 0.86) * 4 + (p.overT ?? 0) * 0.5)) this.particles.sparks(this.tmpV3, back, p.vel, 3);
         const hp = loc.x < 0 ? p.hpL : p.hpR;
         if (hp < 40 && (p.isPlayer || (i < 2 && dist > 22))) this.particles.smoke(this.tmpV3, p.vel, 1 - hp / 40, rivalVis);
         if ((hp < 20 || p.overheat) && (p.isPlayer || i < 2)) this.particles.fire(this.tmpV3, p.vel, rivalVis);
       }
       const sp = Math.hypot(p.vel.x, p.vel.z);
-      // Session 15: every pod drags a dust trail from under both engines (spray on a wet road). Denser and longer with speed;
-      // rivals closer than 24 m ahead of the camera keep only a hint so the view stays clear.
+      // Every pod drags two dust wakes from under its engines (spray on a wet road); denser and longer with speed.
+      // Session 17: the PLAYER's wakes start under the engines (≥ 15 m ahead of the chase camera) and drift outwards, so they pass left and
+      // right of the cockpit and are actually visible; rivals closer than 24 m ahead of the camera keep only a hint.
       if (p.grounded && sp > 16 && p.pos.y - p.groundY < HOVER + 2.2 && (p.isPlayer || dist < 260)) {
-        const wet = this.envBuild.rainRoad && this.wet > 0.3 && this.wxQ > 0 && !(this.td.paths[p.path].samples[p.idx]?.roof > 0); // dry under roofs
+        const smp = this.td.paths[p.path].samples[p.idx];
+        const wet = this.envBuild.rainRoad && this.wet > 0.3 && this.wxQ > 0 && !(smp && smp.roof > 0 && !p.upper); // dry inside tunnels
         const envP = podEnvelope(p.def), cyD = Math.cos(p.yaw), syD = Math.sin(p.yaw);
-        const near = !p.isPlayer && dist < 24 ? 0.3 : 1, aD = (p.isPlayer ? 0.1 : 0.13) * near * this.dustAmt;
+        const near = !p.isPlayer && dist < 24 ? 0.3 : 1, aD = (p.isPlayer ? 0.17 : 0.19) * near * this.dustAmt;
         for (const e of [envP.engL, envP.engR]) {
-          const lz = e.backZ - 1.2; this.tmpV.set(p.pos.x + e.x * cyD + lz * syD, p.groundY + 0.25, p.pos.z - e.x * syD + lz * cyD);
-          if (wet) this.particles.spray(this.tmpV, p.vel, sp, this.wet * (p.isPlayer ? 0.7 : 0.8) * near);
-          else this.particles.trail(this.tmpV, p.vel, this.dustCol, sp, aD);
+          const lz = p.isPlayer ? (e.frontZ + e.backZ) * 0.5 : e.backZ - 1.2, lx = e.outerX * 1.1, sg = e.x < 0 ? -1 : 1;
+          this.tmpV.set(p.pos.x + lx * cyD + lz * syD, p.groundY + 0.25, p.pos.z - lx * syD + lz * cyD);
+          this.tmpV2.set(p.vel.x + cyD * sg * 34, p.vel.y, p.vel.z - syD * sg * 34); // outward drift (×0.2–0.3 inside the emitters)
+          if (wet) this.particles.spray(this.tmpV, this.tmpV2, sp, this.wet * (p.isPlayer ? 1 : 0.85) * near);
+          else this.particles.trail(this.tmpV, this.tmpV2, this.dustCol, sp, aD);
         }
       }
       // Slide plume: the rear steps out and throws ground material (or spray) sideways + a few skid sparks
@@ -742,6 +751,7 @@ export class Game {
 
   updateCamera(dt: number) {
     const p = this.player; const cam = this.camera; const gfx = this.profile.gfx;
+    p.visual?.setCockpitVisible?.(this.camMode !== 2); // first-person: the near plane (0.8 m) cut the cockpit in half → hidden, engines and cables stay
     const sp = Math.hypot(p.vel.x, p.vel.z); const vmax = podParams(p).vmax;
     let fov = gfx.fov + Math.min(1.3, sp / vmax) * 16 + (p.boosting ? 8 : 0) + (p.zeroG ? 8 : 0); // zero-G: wider view = more sense of speed
     const velYaw = sp > 8 ? Math.atan2(p.vel.x, p.vel.z) : p.yaw;
@@ -767,7 +777,8 @@ export class Game {
     } else if (mode === 2 || mode === 3) {
       const v = p.visual!; v.group.position.copy(p.pos); v.group.rotation.set(0, p.yaw, 0); v.body.rotation.set(p.pitch, 0, p.roll); v.group.updateMatrixWorld(true);
       const src = mode === 2 ? v.eye : v.hood;
-      this.tmpV.copy(src); v.body.localToWorld(this.tmpV);
+      this.tmpV.copy(src); if (mode === 2) this.tmpV.add(this.tmpV3.set(p.ckX ?? 0, (p.ckY ?? 0) + 0.2, (p.ckZ ?? 0) + 0.5)); // the eye rides with the swaying cockpit
+      v.body.localToWorld(this.tmpV);
       cam.position.set(this.tmpV.x + sx * 0.5, this.tmpV.y + sy * 0.5, this.tmpV.z);
       v.body.getWorldQuaternion(this.tmpQ);
       cam.up.copy(UP).applyQuaternion(this.tmpQ);
@@ -857,7 +868,7 @@ export class Game {
       wrongWay: p.wrongWay > 1.2, zeroG: p.zeroG, countdown: this.state === 'countdown' ? this.countdown : -1,
       message: this.messageT > 0 ? this.message : '', camName: CAMERA_NAMES[this.camMode], fps: this.fps, backend: this.backend,
       standings: [], dead: p.dead > 0, finished: p.finished,
-      roll: p.rollCtl ?? 0, pitch: p.pitchCtl ?? 0, sliding: !!p.sliding, slideCharge: Math.min(1, (p.slideT ?? 0) / 1.6), airborne: !p.grounded && !p.zeroG, env: this.envLabel,
+      roll: p.rollCtl ?? 0, pitch: p.pitchCtl ?? 0, sliding: !!p.sliding, slideCharge: Math.min(1, (p.slideT ?? 0) / 1.6), airborne: !p.grounded && !p.zeroG, env: this.envLabel, overdrive: Math.min(1, (p.overT ?? 0) / 3),
     };
   }
 
