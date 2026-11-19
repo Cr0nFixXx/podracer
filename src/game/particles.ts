@@ -108,6 +108,7 @@ export class Particles {
   ambient: THREE.Sprite | null = null;
   private ambCam = uniform(new THREE.Vector3());
   private ambTime = uniform(0);
+  private ambFade = uniform(1); // 0 under roofs (tunnels, covered shortcuts)
   private ambVel = uniform(new THREE.Vector3()); private prevCam = new THREE.Vector3(); private camSet = false; private ambN = 1;
   group = new THREE.Group();
   constructor(amount: number) {
@@ -130,6 +131,18 @@ export class Particles {
 
   /** 0..1 share of the ambient weather particles that is drawn (rain getting heavier, snow easing off …). */
   setAmbientAmount(f: number) { if (this.ambient) this.ambient.count = Math.max(1, Math.round(this.ambN * Math.max(0, Math.min(1, f)))); }
+
+  setAmbientFade(f: number) { this.ambFade.value = f; }
+  /** Shattered obstacle: tumbling chunks + dust burst + sparks. */
+  debris(p: THREE.Vector3, vel: THREE.Vector3, col: THREE.Color, size = 2) {
+    const n = Math.round((10 + size * 4) * Math.min(1.2, this.amount + 0.3));
+    for (let i = 0; i < n; i++) {
+      _v.set((Math.random() - 0.5) * 26, 3 + Math.random() * 13, (Math.random() - 0.5) * 26).addScaledVector(vel, 0.5);
+      _p.set(p.x + (Math.random() - 0.5) * size, p.y + 0.4 + Math.random() * size, p.z + (Math.random() - 0.5) * size);
+      this.alpha.spawn(_p, _v, 0.7 + Math.random() * 0.6, 0.35 + Math.random() * 0.5, 0.2, col, col, 0.95, 0.35, 30);
+    }
+    this.dust(p, vel, col, 10); this.sparks(p, UP_V, vel, 10);
+  }
 
   /** Rooster tail of fine spray thrown up from a wet road – taller and denser with speed. */
   spray(p: THREE.Vector3, vel: THREE.Vector3, speed: number, alphaScale = 1) {
@@ -267,8 +280,8 @@ export class Particles {
       const q = uv().sub(0.5), along = dot(q, dirV), across = dot(q, vec2(dirV.y.negate(), dirV.x));
       const wUv = float(0.034).div(lenV.mul(1.1));
       const streak = oneMinus(smoothstep(wUv.mul(0.45), wUv, across.abs())).mul(oneMinus(smoothstep(0.3, 0.46, along.abs())));
-      mat.opacityNode = streak.mul(0.6).mul(smoothstep(2.5, 7.0, vz));
-    } else mat.opacityNode = softDisc().mul(type === 'dust' ? 0.2 : 0.72).mul(smoothstep(2.5, 7.0, vz));
+      mat.opacityNode = streak.mul(0.6).mul(smoothstep(2.5, 7.0, vz)).mul(this.ambFade);
+    } else mat.opacityNode = softDisc().mul(type === 'dust' ? 0.2 : 0.72).mul(smoothstep(2.5, 7.0, vz)).mul(this.ambFade);
     const sp = new THREE.Sprite(mat); sp.count = n; sp.frustumCulled = false;
     this.ambient = sp; this.ambN = n;
     this.group.add(sp);

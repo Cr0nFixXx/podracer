@@ -4,11 +4,13 @@ import { Game, fmt, type HudState, type RaceResult } from '../game/Game';
 import { THEMES, TRACKS } from '../game/data';
 import type { Profile } from '../game/settings';
 import { Btn } from './common';
+import { Fit } from './Fit';
+import { GfxPanels } from './GfxPanels';
 import { Background } from './screens';
 
-interface Props { profile: Profile; onExit: () => void; onBest: (trackId: string, t: number) => void; }
+interface Props { profile: Profile; update: (fn: (p: Profile) => Profile) => void; onExit: () => void; onBest: (trackId: string, t: number) => void; }
 
-export default function RaceView({ profile, onExit, onBest }: Props) {
+export default function RaceView({ profile, update, onExit, onBest }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game | null>(null);
@@ -18,6 +20,15 @@ export default function RaceView({ profile, onExit, onBest }: Props) {
   const [results, setResults] = useState<RaceResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [runId, setRunId] = useState(0);
+  const [showGfx, setShowGfx] = useState(false);
+  const startGfx = useRef(profile.gfx);
+  // HUD scales with the window (reference 1280 × 720) so nothing overlaps on small or very large screens
+  const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight });
+  useEffect(() => { const on = () => setVp({ w: window.innerWidth, h: window.innerHeight }); window.addEventListener('resize', on); return () => window.removeEventListener('resize', on); }, []);
+  const hs = Math.max(0.45, Math.min(1.6, Math.min(vp.w / 1280, vp.h / 720)));
+  // graphics changes from the pause menu: live ones are applied at once, the rest needs a restart of the race
+  useEffect(() => { gameRef.current?.applyLiveGfx(profile.gfx, profile.volume); }, [profile.gfx, profile.volume]);
+  const needRestart = (Object.keys({ ...startGfx.current, ...profile.gfx }) as (keyof typeof profile.gfx)[]).some(k => !Game.LIVE_GFX.includes(k) && startGfx.current[k] !== profile.gfx[k]);
   const track = TRACKS.find(t => t.id === profile.race.trackId)!;
 
   useEffect(() => {
@@ -32,7 +43,7 @@ export default function RaceView({ profile, onExit, onBest }: Props) {
         if (me && me.time && TRACKS.find(t => t.id === profile.race.trackId)) onBest(profile.race.trackId, me.time);
       },
     });
-    gameRef.current = g;
+    gameRef.current = g; startGfx.current = profile.gfx;
     g.start().catch(e => { console.error(e); setError(String(e?.message ?? e)); });
     return () => { g.dispose(); gameRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -40,7 +51,7 @@ export default function RaceView({ profile, onExit, onBest }: Props) {
 
   useEffect(() => { if (gameRef.current) gameRef.current.minimap = mapRef.current; });
 
-  const restart = () => { setResults(null); setHud(null); setPaused(false); setLoading({ p: 0, msg: 'Starte neu …' }); setRunId(x => x + 1); };
+  const restart = () => { setShowGfx(false); setResults(null); setHud(null); setPaused(false); setLoading({ p: 0, msg: 'Starte neu …' }); setRunId(x => x + 1); };
   const theme = THEMES[track.theme];
   const h = hud;
   const km = normalizeKeys(profile.keys); const kl = (a: Action) => keysLabel(km[a]);
@@ -50,7 +61,7 @@ export default function RaceView({ profile, onExit, onBest }: Props) {
       <div ref={ref} className="absolute inset-0" />
 
       {h && !loading && !results && (
-        <div className="absolute inset-0 pointer-events-none text-white" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+        <div className="absolute left-0 top-0 pointer-events-none text-white" style={{ fontFamily: 'Orbitron, sans-serif', width: vp.w / hs, height: vp.h / hs, transform: `scale(${hs})`, transformOrigin: 'top left' }}>
           {/* ===== top status bar (original style) ===== */}
           <div className="absolute top-0 inset-x-0 h-16">
             <div className="absolute inset-x-0 top-0 h-9" style={{ background: 'linear-gradient(180deg,#1d6ea8 0%,#0c3d66 60%,rgba(8,30,52,0.0) 100%)' }} />
@@ -126,6 +137,22 @@ export default function RaceView({ profile, onExit, onBest }: Props) {
             <div className="absolute left-[92px] top-[78px] w-[84px] text-center rounded-full border-2 border-sky-300/80 bg-sky-950/60 py-0.5">
               <span className="text-3xl font-black italic text-cyan-300 tabular-nums">{h.speed}</span>
             </div>
+            {/* boost heat: fills while boosting, hatched zone = danger, MAX = overheat; after overheating boost is locked until the READY mark */}
+            <div className="absolute left-3 right-3 -bottom-3">
+              <div className="flex justify-between text-[9px] tracking-[0.25em] mb-0.5">
+                <span className={h.overheat ? 'text-red-400 animate-pulse' : h.boosting ? 'text-cyan-200' : 'text-white/70'}>{h.overheat ? 'ÜBERHITZT' : h.boosting ? 'BOOST' : 'BOOST-HITZE'}</span>
+                <span className="text-white/70 tabular-nums">{Math.round(Math.min(1, h.heat) * 100)}%</span>
+              </div>
+              <div className="relative h-3 bg-black/55 border border-sky-300/50 rounded-sm overflow-hidden">
+                <div className="absolute inset-y-0 right-0" style={{ left: '80%', background: 'repeating-linear-gradient(135deg, rgba(248,113,113,0.6) 0 4px, rgba(0,0,0,0) 4px 8px)' }} />
+                <div className="absolute inset-y-0 left-0" style={{ width: `${Math.min(1, h.heat) * 100}%`, background: h.overheat ? '#ef4444' : h.heat > 0.8 ? 'linear-gradient(90deg,#38bdf8,#fbbf24 65%,#ef4444)' : h.heat > 0.5 ? 'linear-gradient(90deg,#38bdf8,#fbbf24)' : '#38bdf8' }} />
+                {h.overheat && <div className="absolute inset-y-0 w-0.5 bg-white" style={{ left: '55%' }} />}
+              </div>
+              <div className="relative h-3 text-[8px] tracking-[0.2em]">
+                {h.overheat && <span className="absolute -translate-x-1/2 text-white" style={{ left: '55%' }}>BEREIT</span>}
+                <span className="absolute right-0 text-red-300">MAX</span>
+              </div>
+            </div>
 
           </div>
 
@@ -157,20 +184,36 @@ export default function RaceView({ profile, onExit, onBest }: Props) {
       )}
 
       {paused && !results && (
-        <div className="absolute inset-0 z-30 bg-black/60 backdrop-blur-sm flex items-center justify-center">
-          <div className="flex flex-col gap-3 w-72 text-center">
-            <div className="font-display text-4xl text-amber-200 tracking-[0.4em] mb-6">PAUSE</div>
-            <Btn big onClick={() => gameRef.current?.setPaused(false)}>Weiter</Btn>
-            <Btn big onClick={() => { gameRef.current?.cycleCamera(); }}>Kamera wechseln</Btn>
-            <Btn big onClick={restart}>Neustart</Btn>
-            <Btn big onClick={onExit}>Rennen beenden</Btn>
-          </div>
+        <div className="absolute inset-0 z-30 bg-black/70 backdrop-blur-sm">
+          <Fit minW={showGfx ? 1180 : 760} maxScale={1.4}>
+            {!showGfx ? (
+              <div className="flex flex-col gap-3 w-72 text-center mx-auto py-16">
+                <div className="font-display text-4xl text-amber-200 tracking-[0.4em] mb-6">PAUSE</div>
+                <Btn big onClick={() => gameRef.current?.setPaused(false)}>Weiter</Btn>
+                <Btn big onClick={() => { gameRef.current?.cycleCamera(); }}>Kamera wechseln</Btn>
+                <Btn big onClick={() => setShowGfx(true)}>Grafik-Einstellungen</Btn>
+                <Btn big onClick={restart}>Neustart</Btn>
+                <Btn big onClick={onExit}>Rennen beenden</Btn>
+                {needRestart && <div className="text-[11px] text-amber-300 mt-2">Geänderte Grafik-Einstellungen wirken erst nach „Neustart".</div>}
+              </div>
+            ) : (
+              <div className="p-6 max-w-[1300px] mx-auto">
+                <div className="flex items-center justify-between mb-4 gap-4">
+                  <h2 className="font-display text-2xl text-amber-200 tracking-[0.3em]">GRAFIK</h2>
+                  <div className="text-[11px] text-stone-300 flex-1">Sofort wirksam: Sichtfeld, Render-Skalierung, LOD-Distanz, Gegner-Pod-Detail, Wetter-Effekte, FPS-Anzeige, Lautstärke. Alles andere nach Neustart des Rennens.</div>
+                  {needRestart && <Btn onClick={restart}>↻ Übernehmen &amp; neu starten</Btn>}
+                  <Btn onClick={() => setShowGfx(false)}>‹ Zurück</Btn>
+                </div>
+                <div className="grid grid-cols-1 @5xl:grid-cols-3 gap-5"><GfxPanels profile={profile} update={update} /></div>
+              </div>
+            )}
+          </Fit>
         </div>
       )}
 
       {results && (
-        <div className="absolute inset-0 z-30 bg-black/70 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="w-full max-w-3xl">
+        <div className="absolute inset-0 z-30 bg-black/70 backdrop-blur-md">
+          <Fit minW={860} maxScale={1.4}><div className="w-full max-w-3xl mx-auto p-6">
             <div className="font-display text-amber-400/80 tracking-[0.5em] text-xs text-center">{track.name.toUpperCase()}</div>
             <div className="font-display text-5xl text-center text-amber-200 tracking-[0.3em] mb-8">ERGEBNIS</div>
             <div className="bg-black/50 border border-amber-500/25 clip-corner">
@@ -188,7 +231,7 @@ export default function RaceView({ profile, onExit, onBest }: Props) {
               <Btn big onClick={restart}>Nochmal</Btn>
               <Btn big onClick={onExit}>Hauptmenü</Btn>
             </div>
-          </div>
+          </div></Fit>
         </div>
       )}
     </div>

@@ -6,7 +6,7 @@ import type { MatKey } from './podKit';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
 const {
-  abs, attribute, clamp, cos, cross, dFdx, dFdy, dot, float, fract, fwidth, inverseSqrt, length,
+  floor: floorN, abs, attribute, clamp, cos, cross, dFdx, dFdy, dot, float, fract, fwidth, inverseSqrt, length,
   materialColor, materialMetalness, materialRoughness, max, min, mix,
   normalView, normalViewGeometry, normalize, oneMinus, positionLocal, positionView, positionViewDirection, pow, select, sin, smoothstep, step, texture, uniform, uv, vec2, vec3, vertexColor,
 } = TSL;
@@ -130,18 +130,32 @@ export function sharedOpponentFlameMaterial() {
 
 /** SINGLE shared GPU-animated energy-binder pipeline for ALL AI opponent pods. */
 let oppBinderCache: THREE.MeshBasicNodeMaterial | null = null;
+/** Session 14 – energy binder look shared by player and rivals: white-hot core, soft halo, two forked arcs that wander across the
+ *  ribbon, 24 Hz random strobe and bright pulses racing from engine to engine. Returns [white amount, opacity]. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function boltLook(f: any, y: any, t: any): [any, any] {
+  const c = y.mul(2).sub(1), ac = oneMinus(abs(c));
+  const core = pow(ac, 7.0), halo = pow(ac, 1.5).mul(0.5);
+  const w1 = sin(f.mul(21.0).add(t.mul(33.0))).mul(0.34).add(sin(f.mul(47.0).sub(t.mul(58.0))).mul(0.14));
+  const w2 = cos(f.mul(17.0).sub(t.mul(41.0))).mul(0.4).add(sin(f.mul(61.0).add(t.mul(77.0))).mul(0.1));
+  const arc1 = pow(oneMinus(clamp(abs(c.sub(w1)), 0.0, 1.0)), 18.0);
+  const arc2 = pow(oneMinus(clamp(abs(c.sub(w2)), 0.0, 1.0)), 26.0).mul(0.75);
+  const strobe = fract(sin(floorN(t.mul(24.0)).mul(91.7)).mul(43758.5)).mul(0.55).add(0.6);
+  const pulse = pow(sin(f.mul(9.0).sub(t.mul(24.0))).mul(0.5).add(0.5), 6.0).mul(0.9);
+  const ends = smoothstep(0.0, 0.05, f).mul(ssInv(1.0, 0.95, f));
+  return [clamp(core.add(arc1).add(arc2).mul(0.9), 0.0, 1.0), core.add(halo).add(arc1).add(arc2).mul(strobe.add(pulse)).mul(ends)];
+}
+
 export function sharedOpponentBinderMaterial() {
   if (oppBinderCache) return oppBinderCache;
   const mat = new THREE.MeshBasicNodeMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
   const vUv = uv(); const f = vUv.x; const env = sin(f.mul(Math.PI));
-  const jigY = sin(podSharedTime.mul(36.0).add(f.mul(14.0))).mul(0.18);
-  const jigZ = cos(podSharedTime.mul(27.0).add(f.mul(11.0))).mul(0.1);
+  const jigY = sin(podSharedTime.mul(36.0).add(f.mul(14.0))).mul(0.26).add(sin(podSharedTime.mul(71.0).sub(f.mul(31.0))).mul(0.1));
+  const jigZ = cos(podSharedTime.mul(27.0).add(f.mul(11.0))).mul(0.16);
   mat.positionNode = positionLocal.add(vec3(0.0, env.mul(float(0.16).add(jigY)), env.mul(jigZ)));
-  const ac = oneMinus(abs(vUv.y.mul(2).sub(1)));
-  const core = pow(ac, 6.5), halo = pow(ac, 1.6).mul(0.42);
-  const ends = smoothstep(0.0, 0.06, f).mul(ssInv(1.0, 0.94, f));
-  mat.colorNode = mix(vertexColor(), vec3(1), core.mul(0.72));
-  mat.opacityNode = clamp(core.add(halo).mul(ends).mul(0.85), 0.0, 1.0);
+  const [wh, al] = boltLook(f, vUv.y, podSharedTime);
+  mat.colorNode = mix(vertexColor(), vec3(1), wh).mul(1.7);
+  mat.opacityNode = clamp(al.mul(0.95), 0.0, 1.0);
   mat.userData.shared = true;
   oppBinderCache = mat;
   return mat;
@@ -209,15 +223,12 @@ export function binderMaterial(color: THREE.Color) {
   const u = { uColor: uniform(color.clone()), uTime: uniform(0), uPower: uniform(1), uLift: uniform(new THREE.Vector2(0, 0)) };
   const vUv = uv(); const f = vUv.x; const env = sin(f.mul(Math.PI));
   const endLift = mix(u.uLift.x, u.uLift.y, f);
-  const jigY = sin(u.uTime.mul(38.0).add(f.mul(14.0))).mul(0.18).add(sin(u.uTime.mul(67.0).sub(f.mul(29.0))).mul(0.1));
-  const jigZ = cos(u.uTime.mul(29.0).add(f.mul(11.0))).mul(0.11);
+  const jigY = sin(u.uTime.mul(38.0).add(f.mul(14.0))).mul(0.27).add(sin(u.uTime.mul(67.0).sub(f.mul(29.0))).mul(0.13));
+  const jigZ = cos(u.uTime.mul(29.0).add(f.mul(11.0))).mul(0.17);
   mat.positionNode = positionLocal.add(vec3(0.0, endLift.add(env.mul(float(0.18).add(jigY))), env.mul(jigZ)));
-  const ac = oneMinus(abs(vUv.y.mul(2).sub(1)));
-  const core = pow(ac, 7.0), halo = pow(ac, 1.6).mul(0.45);
-  const fl = sin(f.mul(34.0).sub(u.uTime.mul(48.0))).mul(cos(f.mul(19.0).add(u.uTime.mul(27.0)))).mul(0.28).add(0.76);
-  const ends = smoothstep(0.0, 0.06, f).mul(ssInv(1.0, 0.94, f));
-  mat.colorNode = mix(u.uColor, vec3(1), core.mul(0.75));
-  mat.opacityNode = clamp(core.add(halo).mul(fl).mul(ends).mul(u.uPower), 0.0, 1.0);
+  const [wh, al] = boltLook(f, vUv.y, u.uTime);
+  mat.colorNode = mix(u.uColor, vec3(1), wh).mul(1.8);
+  mat.opacityNode = clamp(al.mul(u.uPower), 0.0, 1.0);
   mat.userData.u = u;
   return mat;
 }

@@ -29,7 +29,9 @@ export interface Sample {
   s: number;
 }
 
-export interface Obstacle { path: number; idx: number; lat: number; r: number; kind: number; x: number; y: number; z: number; hz?: number } // kind 3 = AI keep-out only (hazard / rotor disc), kind 4 = set-piece solid (no generic visual)
+export interface Obstacle { path: number; idx: number; lat: number; r: number; kind: number; x: number; y: number; z: number; hz?: number; /** Session 14: small rocks & crates can be smashed at speed */ breakable?: boolean; broken?: boolean }
+/** Overhead structure across the main path (sponsor gantry, start portal): solid between y0 and y1 within ±half metres along the track. */
+export interface Overhead { idx: number; y0: number; y1: number; half: number } // kind 3 = AI keep-out only (hazard / rotor disc), kind 4 = set-piece solid (no generic visual)
 /** Periodic eruption zone (methane geyser / lava vent). state: 0 idle, 0.5 warning, 1 erupting (set by Game). */
 export interface Hazard { idx: number; lat: number; r: number; x: number; y: number; z: number; period: number; phase: number; duty: number; state: number; }
 
@@ -45,6 +47,7 @@ export interface Path {
 
 export interface TrackData {
   def: TrackDef;
+  overheads?: Overhead[]; // filled by the world builder (trackDetail / start portal), read by stepPod
   paths: Path[];
   main: Path;
   N: number;
@@ -392,7 +395,8 @@ export function buildTrack(def: TrackDef): TrackData {
     bounds.minZ = Math.min(bounds.minZ, s.z); bounds.maxZ = Math.max(bounds.maxZ, s.z);
     bounds.minY = Math.min(bounds.minY, s.y); bounds.maxY = Math.max(bounds.maxY, s.y);
   }
-  return { def, paths, main, N, startIdx, finishIdx, obstacles, obstaclesByPath, hazards, setPieces, arches, bounds };
+  for (const o of obstacles) if (o.kind === 2 || (o.kind === 0 && o.r < 2.9)) o.breakable = true; // crates + small rocks
+  return { def, paths, main, N, startIdx, finishIdx, obstacles, obstaclesByPath, hazards, setPieces, arches, bounds, overheads: [] };
 }
 
 function findShortcut(S: Sample[], N: number, fa: number, closed: boolean): [number, number] | null {

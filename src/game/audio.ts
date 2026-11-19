@@ -35,7 +35,7 @@ export class AudioFX {
     try {
       const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new Ctx(); this.ctx = ctx;
-      this.master = ctx.createGain(); this.master.gain.value = volume * 0.5;
+      this.master = ctx.createGain(); this.vol = volume; this.master.gain.value = volume * 0.5;
       // Session 11: master bus compressor (glues the layers, prevents clipping when thunder + boost + hits overlap)
       const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.knee.value = 18; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.22;
       this.master.connect(comp); comp.connect(ctx.destination);
@@ -159,8 +159,10 @@ export class AudioFX {
     src.connect(f); f.connect(g); g.connect(this.master); src.start(t, Math.random()); src.stop(t + 0.4);
   }
 
-  resume() { this.ctx?.resume(); }
-  suspend() { this.ctx?.suspend(); }
+  private vol = 0.6;
+  /** Pause must be silent even if the context refuses to suspend: the master gain is zeroed as well. */
+  resume() { if (this.ctx) { this.master.gain.value = this.vol * 0.5; void this.ctx.resume(); } }
+  suspend() { if (this.ctx) { this.master.gain.cancelScheduledValues(this.ctx.currentTime); this.master.gain.value = 0; void this.ctx.suspend(); } }
 
   update(speed: number, throttle: number, boost: boolean, nearestOther: number, otherSpeed: number, world?: WorldAudioState, dt = 0.016) {
     if (!this.ctx) return;
@@ -296,6 +298,6 @@ export class AudioFX {
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
     o.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur + 0.05);
   }
-  setVolume(v: number) { if (this.ctx) this.master.gain.value = v * 0.5; }
+  setVolume(v: number) { this.vol = v; if (this.ctx && this.ctx.state === 'running') this.master.gain.value = v * 0.5; }
   dispose() { this.ctx?.close(); this.ctx = null; }
 }

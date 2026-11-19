@@ -15,6 +15,8 @@ export class WeatherFx {
   flash = 0;
   /** 0..1 current gust strength (wind audio, gust sheets) */
   gust = 0;
+  /** graphics setting "Wetter-Effekte": 0 = no gust sheets, 0.5 = reduced, 1 = full */
+  quality = 1;
   private bolt: THREE.Mesh | null = null; private boltI = uniform(0);
   private strikeAge = 9; private nextStrike: number; private hasBolt = false; private pulses: number[] = [];
   private thunderAt = -1; private thunderVol = 0;
@@ -108,7 +110,7 @@ export class WeatherFx {
       this.gust = env;
       const az = this.windAz + Math.sin(t * 0.05) * 0.5; this.wind.set(Math.sin(az), 0, Math.cos(az));
       camera.getWorldDirection(this.fwd); this.fwd.y = 0; this.fwd.normalize(); this.right.set(-this.fwd.z, 0, this.fwd.x);
-      this.carry += (0.22 + 0.78 * env) * fx.wind * fx.gustAmt * 300 * this.particles.amount * dt;
+      this.carry += (0.22 + 0.78 * env) * fx.wind * fx.gustAmt * 300 * this.particles.amount * this.quality * dt;
       const n = Math.min(12, Math.floor(this.carry)); this.carry -= Math.floor(this.carry);
       const snow = fx.gust === 'snow', alpha = snow ? 0.085 : fx.gust === 'dust' ? 0.11 : 0.05;
       for (let i = 0; i < n; i++) {

@@ -9,11 +9,11 @@ import { podEnvelope } from './podDesigns';
 import { WeatherFx } from './weather';
 import { CSMShadowNode } from 'three/examples/jsm/csm/CSMShadowNode.js';
 import { DIFFICULTIES, PILOTS, PODS, THEMES, TRACKS } from './data';
-import { effectiveStats, type Profile } from './settings';
+import { effectiveStats, type Profile, type GfxSettings } from './settings';
 import { buildTrack, type TrackData } from './trackBuilder';
 import { buildWorld, type World, worldTextureSpecs } from './world';
 import { makeSky, sunDirection } from './sky';
-import { buildPodModel } from './podModel';
+import { buildPodModel, setPodLodScale } from './podModel';
 import { Particles } from './particles';
 import { PostFX } from './post';
 import { AudioFX, type WorldAudioState } from './audio';
@@ -61,6 +61,8 @@ export class Game {
   beams: ReturnType<typeof makeBeams> | null = null; private tmpE = new THREE.Euler();
   private prevNd = 1e9; private closing = 0; private flybyT = 0;
   loadMs: Record<string, number> = {};
+  /** Session 14: 0..1 how far the player is under a roof (rain, splashes and lens drops fade out); weather-effects quality 0 / 0.5 / 1 */
+  cover = 0; wxQ = 1; envDirty = false;
   private shadowTexel = 0;
   private sunRight = new THREE.Vector3(); private sunUp = new THREE.Vector3();
   pods: PodState[] = []; player!: PodState;
@@ -157,7 +159,7 @@ export class Game {
     this.cb.onLoading(0.03, 'Berechne Streckenverlauf …');
     await new Promise(res => setTimeout(res, 0));
     this.td = buildTrack(trackDef);
-    { const avgY = this.td.main.samples.reduce((a, s) => a + s.y, 0) / this.td.N; this.fog = applyAtmosphere(this.scene, theme, theme.fogDensity / gfx.drawDistance, avgY - 12, this.sunDir, fx.volFog); }
+    { const avgY = this.td.main.samples.reduce((a, s) => a + s.y, 0) / this.td.N; this.fog = applyAtmosphere(this.scene, theme, theme.fogDensity / gfx.drawDistance, avgY - 12, this.sunDir, fx.volFog, gfx.volumetrics ?? 2); }
     this.world = await buildWorld(this.td, theme, gfx, (p, m) => this.cb.onLoading(0.05 + p * 0.85, m));
     if (this.disposed) return;
     this.scene.add(this.world.group);
@@ -165,7 +167,8 @@ export class Game {
     // particles
     this.particles = new Particles(gfx.particles);
     this.particles.initAmbient(theme.ambient, build.wind, Math.max(1, build.ambMax / 0.45));
-    this.weather = new WeatherFx(fx, this.particles, this.scene, theme.sunAz * Math.PI / 180 + 1.1, build.bolt);
+    this.wxQ = [0, 0.5, 1][gfx.weatherFx ?? 2] ?? 1; setPodLodScale(gfx.podDetail ?? 1);
+    this.weather = new WeatherFx(fx, this.particles, this.scene, theme.sunAz * Math.PI / 180 + 1.1, build.bolt); this.weather.quality = this.wxQ;
     this.scene.add(this.particles.group);
 
     // pods (player = full hero detail; opponents = merged whole-pod + automatic 2-tier distance LOD!)
@@ -181,11 +184,11 @@ export class Game {
       const cols = [new THREE.Color(2.4, 2.6, 3.1), new THREE.Color(2.4, 2.6, 3.1), new THREE.Color(0.25, 2.6, 0.5), new THREE.Color(2.8, 0.22, 0.16), new THREE.Color(2.6, 2.6, 2.6)];
       for (let i = 0; i < this.pods.length * 5; i++) im.setColorAt(i, cols[i % 5]);
       this.scene.add(im); this.navLights = im;
-      this.beams = makeBeams(this.pods.length * 2); this.scene.add(this.beams.mesh);
+      if ((gfx.volumetrics ?? 2) > 0) { this.beams = makeBeams(this.pods.length * 2); this.scene.add(this.beams.mesh); }
       const sl = new THREE.SpotLight('#dfeaff', 12000, 0, 0.5, 0.6, 2); this.scene.add(sl); this.scene.add(sl.target); this.headLamp = sl;
     }
 
-    this.post = new PostFX(r, this.scene, this.camera, gfx, { rain: build.maxRain, flare: build.flare });
+    this.post = new PostFX(r, this.scene, this.camera, gfx, { rain: (gfx.weatherFx ?? 2) > 0 ? build.maxRain : 0, flare: build.flare });
     this.applyEnv(0);
     this.post.lens.sunColor?.value.set(theme.sunColor);
     this.particles.setScale(h0 * r.getPixelRatio());
@@ -193,7 +196,7 @@ export class Game {
 
     // Full GPU warmup: compile HalfFloat scenePass + shadow + particle + both pod LODs + all PostFX passes & flush VRAM uploads!
     this.loadMs.pods = Math.round(performance.now() - tL0) - this.loadMs.init - this.loadMs.world;
-    console.info(`[load] init ${this.loadMs.init} ms · world ${this.loadMs.world} ms (textures ${this.world.timings.texMs} ms, ${textureStats.workers} workers${textureStats.jobMs.length ? ', jobs ' + textureStats.jobMs.join('/') + ' ms' : ''}) · pods ${this.loadMs.pods} ms`);
+    console.info(`[load] init ${this.loadMs.init} ms · world ${this.loadMs.world} ms (textures ${this.world.timings.texMs} ms, ${textureStats.cached} from cache, ${textureStats.workers} workers${textureStats.jobMs.length ? ', jobs ' + textureStats.jobMs.join('/') + ' ms' : ''}) · pods ${this.loadMs.pods} ms`);
     this.cb.onLoading(0.96, 'Wärme Grafik-Pipeline auf …');
     await new Promise(res => setTimeout(res, 0));
     this.updateCamera(0.016);
@@ -280,7 +283,7 @@ export class Game {
     this.keys.add(e.code);
     if (this.keymap.view.includes(e.code)) this.cycleCamera();
     if (e.code === 'Escape' || e.code === 'KeyP') this.setPaused(!this.paused);
-    this.audio?.resume();
+    if (!this.paused) this.audio?.resume(); // (was unconditional: pressing Esc suspended the audio and resumed it right away)
   };
   onKeyUp = (e: KeyboardEvent) => { this.keys.delete(e.code); };
 
@@ -439,7 +442,9 @@ export class Game {
     this.world.update(this.clock, this.camera.position, this.pods);
     this.sky.uniforms.time.value = this.clock;
     this.weather.update(dt, this.clock, this.camera, this.state === 'countdown', v => this.audio.thunder(v), near => { if (near > 0.5) this.player.shake = Math.min(1, this.player.shake + (near - 0.5) * 0.9); });
+    { const pl = this.player, ps = this.td.paths[pl.path].samples[pl.idx]; this.cover += ((ps && ps.roof > 0 ? 1 : 0) - this.cover) * Math.min(1, dt * 5); this.particles.setAmbientFade(1 - this.cover); }
     this.applyEnv(dt);
+    if (this.post) this.post.lens.rain.value = this.wxQ > 0 ? this.env.rain * (1 - this.cover) : 0;
     if (this.messageT > 0) this.messageT -= dt;
     this.flash = Math.max(0, this.flash - dt * 2);
 
@@ -477,7 +482,7 @@ export class Game {
     {
       const pl = this.player, ps = this.td.paths[pl.path].samples[pl.idx];
       const enc = ps ? (ps.roof > 0 ? 1 : (ps.hL > 0 ? 0.35 : 0) + (ps.hR > 0 ? 0.35 : 0)) : 0; // tunnel / canyon walls → slap-back echo
-      this.audio.setEnv(pl.sliding ? 1 : 0, enc, this.env.rain, Math.min(1, this.env.wind * (0.55 + 0.45 * this.weather.gust) + (this.env.gust !== 'none' ? 0.15 : 0)));
+      this.audio.setEnv(pl.sliding ? 1 : 0, enc, this.env.rain * (1 - 0.85 * this.cover), Math.min(1, this.env.wind * (0.55 + 0.45 * this.weather.gust) + (this.env.gust !== 'none' ? 0.15 : 0)));
       const rc = Math.abs(pl.rollCtl ?? 0); if (rc > 0.5 && this.prevRoll <= 0.5) this.audio.whoosh(); this.prevRoll = rc;
     }
     this.audio.update(Math.hypot(this.player.vel.x, this.player.vel.z), this.player.input.throttle, this.player.boosting, nd, os, wa, dt);
@@ -494,11 +499,11 @@ export class Game {
     this.particles.setFrameDt(dt);
     const camPos = this.camera.position;
     // rain drops bursting on the road ahead of the player (count follows the rain intensity)
-    if (this.env.rain > 0.08 && dt > 0) {
-      const pl = this.player, path = this.td.paths[pl.path], S = path.samples, n = Math.round(this.env.rain * 9 * Math.min(1.2, this.particles.amount) * this.particles.rateScale + Math.random());
+    if (this.env.rain > 0.08 && dt > 0 && this.wxQ > 0 && this.cover < 0.5) {
+      const pl = this.player, path = this.td.paths[pl.path], S = path.samples, n = Math.round(this.env.rain * 9 * this.wxQ * Math.min(1.2, this.particles.amount) * this.particles.rateScale + Math.random());
       for (let i = 0; i < n; i++) {
         let k = pl.idx - 3 + Math.floor(Math.random() * 46); k = path.closed ? ((k % S.length) + S.length) % S.length : Math.max(0, Math.min(S.length - 1, k));
-        const s = S[k]; if (s.gap) continue; const lat = (Math.random() * 2 - 1) * s.hw, x = s.x + s.rx * lat, z = s.z + s.rz * lat;
+        const s = S[k]; if (s.gap || s.roof > 0) continue; const lat = (Math.random() * 2 - 1) * s.hw, x = s.x + s.rx * lat, z = s.z + s.rz * lat;
         this.particles.splash(this.tmpV.set(x, roadSurfaceAt(path, k, x, z).y + 0.07, z));
       }
     }
@@ -529,6 +534,10 @@ export class Game {
             if (e.type === 'wall') this.world.flashField(e.x, e.y + 0.6, e.z, e.strength);
           }
           if (p.isPlayer || dist < 140) this.audio.hit(e.strength * (p.isPlayer ? 1 : 0.28));
+        } else if (e.type === 'break') {
+          if (e.ref) this.world.breakObstacle(e.ref);
+          if (dist < 420) this.particles.debris(this.tmpV, p.vel, this.tmpC.copy(this.dustBase).multiplyScalar(0.6), e.strength);
+          if (p.isPlayer || dist < 130) this.audio.hit(34 * (p.isPlayer ? 1 : 0.4));
         } else if (e.type === 'land') { if (near) this.particles.dust(this.tmpV, p.vel, this.dustCol, 8); if (p.isPlayer) this.audio.hit(e.strength * 0.5); }
         else if (e.type === 'explode') { if (dist < 480) this.particles.explosion(this.tmpV); if (p.isPlayer) { this.audio.boom(); this.flash = 0.8; this.showMsg('TRIEBWERK ZERSTÖRT!', 2.5); } else if (near) this.audio.hit(40); }
         else if (e.type === 'field') {
@@ -573,7 +582,7 @@ export class Game {
       const sp = Math.hypot(p.vel.x, p.vel.z);
       if (p.grounded && sp > 42 && p.pos.y - p.groundY < HOVER + 1.2) {
         // Keep rival dust very subtle (0.28×) and strictly omitted within 24 m ahead so leader never blinds player!
-        const wet = this.envBuild.rainRoad && this.wet > 0.3;
+        const wet = this.envBuild.rainRoad && this.wet > 0.3 && this.wxQ > 0 && !(this.td.paths[p.path].samples[p.idx]?.roof > 0); // dry under roofs
         this.tmpV.set(p.pos.x - Math.sin(p.yaw) * 2.5, p.groundY + 0.15, p.pos.z - Math.cos(p.yaw) * 2.5);
         if (wet) { if (p.isPlayer) this.particles.spray(this.tmpV, p.vel, sp, this.wet); else if (dist > 24 && dist < 160) this.particles.spray(this.tmpV, p.vel, sp, this.wet * 0.55); }
         else if (p.isPlayer) this.particles.dust(this.tmpV, p.vel, this.dustCol, 1, 0.75);
@@ -596,6 +605,17 @@ export class Game {
     }
   }
 
+  /** Graphics settings that can change while the race is running (pause menu). Everything else needs a restart of the race. */
+  static readonly LIVE_GFX: (keyof GfxSettings)[] = ['fov', 'showFps', 'renderScale', 'lodBias', 'podDetail', 'weatherFx', 'preset'];
+  applyLiveGfx(g: GfxSettings, volume?: number) {
+    const prev = this.profile.gfx; this.profile = { ...this.profile, gfx: g, volume: volume ?? this.profile.volume };
+    if (volume !== undefined) this.audio?.setVolume(volume);
+    if (!this.renderer || !this.world || !this.weather) return;
+    if (g.renderScale !== prev.renderScale) this.resize();
+    this.world.setLodBias(g.lodBias ?? 1); setPodLodScale(g.podDetail ?? 1);
+    this.wxQ = [0, 0.5, 1][g.weatherFx ?? 2] ?? 1; this.weather.quality = this.wxQ; this.envDirty = true;
+  }
+
   /** Sun / moon direction: sky, fog scattering, shadow basis, second sun of the desert worlds. */
   setSunDir(x: number, y: number, z: number) {
     const d = this.sunDir; if (Math.abs(d.x - x) + Math.abs(d.y - y) + Math.abs(d.z - z) < 1e-5) return;
@@ -612,7 +632,8 @@ export class Game {
    *  lightning, wind, grip, particle density, road wetness (with soak/dry lag) and the lightning flash. `snapWet` skips the lag. */
   applyEnv(dt: number, snapWet = false) {
     const tl = this.tl, e = this.env, b = this.envBuild;
-    if (tl.dynamic || !this.envInit) {
+    if (tl.dynamic || !this.envInit || this.envDirty) {
+      this.envDirty = false;
       const s = tl.eval(this.raceTime), U = this.sky.uniforms, S = THREE.SRGBColorSpace;
       U.top.value.setRGB(s.top[0], s.top[1], s.top[2], S); U.horizon.value.setRGB(s.hor[0], s.hor[1], s.hor[2], S); U.sunColor.value.setRGB(s.sun[0], s.sun[1], s.sun[2], S);
       U.clouds.value = s.clouds; U.stars.value = s.stars; U.cloudLit.value = s.lit;
@@ -625,7 +646,7 @@ export class Game {
       e.rain = s.rain; e.lightning = s.lightning; e.wind = s.wind; e.flare = s.flare; e.dark = s.dark; e.gustAmt = s.gustAmt; e.volFog = s.volFog; e.grip = s.grip;
       this.gripMul = this.baseGrip * s.grip;
       if (this.post) { this.post.lens.rain.value = s.rain; this.post.lens.sunColor?.value.setRGB(s.sun[0], s.sun[1], s.sun[2], S); }
-      this.particles?.setAmbientAmount(s.amb / b.ambMax);
+      this.particles?.setAmbientAmount(s.amb / b.ambMax * this.wxQ);
       this.wetTarget = b.rainRoad ? s.wet : 1;
       const k = Math.max(0, Math.min(1, (s.rain - 0.1) / 0.3));
       this.dustCol.copy(this.dustBase).lerp(this.tmpC.set('#c9d6e0'), k * 0.75).multiplyScalar(1 - 0.55 * s.dark);
@@ -791,7 +812,8 @@ export class Game {
       lap: Math.max(1, Math.min(total, p.lap + 1)), laps: total, sprint: !closed,
       progress: closed ? 0 : Math.max(0, Math.min(1, p.rel / (this.td.finishIdx - this.td.startIdx))),
       time: this.raceTime, lastLap: p.lapTimes.length ? p.lapTimes[p.lapTimes.length - 1] : null, bestLap: closed ? best : null,
-      hpL: Math.max(0, p.hpL), hpR: Math.max(0, p.hpR), heat: p.heat, boosting: p.boosting, overheat: p.overheat, repairing: p.repairing, airbrake: p.airbraking,
+      // HUD boxes mean screen-left / screen-right. Internal "L" is local x < 0 = the RIGHT engine in the chase view → swapped here.
+      hpL: Math.max(0, p.hpR), hpR: Math.max(0, p.hpL), heat: p.heat, boosting: p.boosting, overheat: p.overheat, repairing: p.repairing, airbrake: p.airbraking,
       wrongWay: p.wrongWay > 1.2, zeroG: p.zeroG, countdown: this.state === 'countdown' ? this.countdown : -1,
       message: this.messageT > 0 ? this.message : '', camName: CAMERA_NAMES[this.camMode], fps: this.fps, backend: this.backend,
       standings: [], dead: p.dead > 0, finished: p.finished,

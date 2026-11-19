@@ -238,7 +238,7 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
       if (s.gap || s.ramp > 0 || nearStart(i) || s.openL || s.openR) continue;
       const R = s.hw + 5;
       if (![-1, 1].every(sd => clear(s.x + s.rx * sd * R, s.z + s.rz * sd * R, 2.6, -0.5))) continue;
-      const m = new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y, s.z), new THREE.Quaternion().setFromAxisAngle(UP, yawOf(s)), new THREE.Vector3(1, 0.56, 1));
+      const m = new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y, s.z), new THREE.Quaternion().setFromAxisAngle(UP, yawOf(s)), new THREE.Vector3(1, 0.82, 1)); // taller arch: clears pods flying high / on knife-edge
       frames.push(new THREE.TorusGeometry(R, 1.15, 14, 72, Math.PI).applyMatrix4(m));
       rings.push(new THREE.TorusGeometry(R - 1.65, 0.26, 8, 96, Math.PI).applyMatrix4(m));
       for (let k = 1; k < 12; k++) {

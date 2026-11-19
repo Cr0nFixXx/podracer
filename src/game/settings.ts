@@ -14,6 +14,10 @@ export interface GfxSettings {
   bloomStrength: number; // 0..1.5
   godRays: boolean;
   ssr: boolean;
+  lodBias?: number;     // 0.5..2 distance scale for landscape LOD switches (live)
+  podDetail?: number;   // 0.5..3 distance scale for detailed rival pods (live)
+  weatherFx?: number;   // 0 off · 1 reduced · 2 full: rain/snow particles, gusts, spray, splashes, lens drops (live)
+  volumetrics?: number; // 0 off · 1 height fog + light cones · 2 + drifting fog banks
   lensFx?: boolean; // sun glare / lens flare + rain droplets on the lens (default on)
   csm?: boolean; // opt-in 2-cascade sun shadows (near 0–105 m + far 105–520 m) – costs one extra shadow pass
   motionBlur: boolean;
@@ -33,14 +37,15 @@ export interface GfxSettings {
   batching?: boolean; // static track geometry as BatchedMesh (per-object culling, fewer draws)
 }
 
-export const PRESETS: Record<'low' | 'medium' | 'high' | 'ultra', Omit<GfxSettings, 'preset' | 'fov' | 'showFps' | 'bloomStrength' | 'anisotropy' | 'shaderDetail' | 'bumpMapping' | 'tessellation'>> = {
-  low: { renderScale: 0.75, shadows: 0, texRes: 512, parallax: false, ao: false, bloom: false, godRays: false, ssr: false, motionBlur: false, cinematic: false, particles: 0.35, detail: 0.4, geometry: 1, aa: 'none', drawDistance: 0.6 },
-  medium: { renderScale: 1, shadows: 1, texRes: 1024, parallax: false, ao: false, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 0.6, detail: 0.7, geometry: 2, aa: 'fxaa', drawDistance: 0.8 },
-  high: { renderScale: 1, shadows: 2, texRes: 1024, parallax: true, ao: false, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 1, detail: 1, geometry: 2, aa: 'smaa', drawDistance: 1 },
-  ultra: { renderScale: 1, shadows: 3, texRes: 2048, parallax: true, ao: true, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 1.15, detail: 1.25, geometry: 3, aa: 'smaa', drawDistance: 1.25 },
+export const PRESETS: Record<'low' | 'medium' | 'high' | 'ultra', Omit<GfxSettings, 'preset' | 'fov' | 'showFps' | 'bloomStrength'>> = {
+  low: { renderScale: 0.75, shadows: 0, texRes: 512, parallax: false, ao: false, bloom: false, godRays: false, ssr: false, motionBlur: false, cinematic: false, particles: 0.35, detail: 0.4, geometry: 1, aa: 'none', drawDistance: 0.6, anisotropy: 4, shaderDetail: 0, bumpMapping: true, tessellation: 0, csm: false, lensFx: false, lodBias: 0.6, podDetail: 0.6, weatherFx: 1, volumetrics: 0 },
+  medium: { renderScale: 1, shadows: 1, texRes: 1024, parallax: false, ao: false, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 0.6, detail: 0.7, geometry: 2, aa: 'fxaa', drawDistance: 0.8, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 0, csm: false, lensFx: true, lodBias: 0.8, podDetail: 0.8, weatherFx: 1, volumetrics: 1 },
+  high: { renderScale: 1, shadows: 2, texRes: 1024, parallax: true, ao: false, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 1, detail: 1, geometry: 2, aa: 'smaa', drawDistance: 1, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 1, csm: false, lensFx: true, lodBias: 1, podDetail: 1, weatherFx: 2, volumetrics: 2 },
+  // Session 14: "Ultra" = every option at its maximum (only field of view and bloom strength stay as chosen)
+  ultra: { renderScale: 1.5, shadows: 3, texRes: 2048, parallax: true, ao: true, bloom: true, godRays: true, ssr: true, motionBlur: true, cinematic: true, particles: 1.5, detail: 1.6, geometry: 3, aa: 'smaa', drawDistance: 1.5, anisotropy: 16, shaderDetail: 2, bumpMapping: true, tessellation: 2, csm: true, lensFx: true, lodBias: 2, podDetail: 3, weatherFx: 2, volumetrics: 2 },
 };
 
-export const defaultGfx = (): GfxSettings => ({ preset: 'high', backend: 'auto', batching: true, fov: 75, showFps: true, bloomStrength: 0.5, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 1, ...PRESETS.high });
+export const defaultGfx = (): GfxSettings => ({ preset: 'high', backend: 'auto', batching: true, fov: 75, showFps: true, bloomStrength: 0.5, ...PRESETS.high });
 
 export interface PodCustom {
   colors: [string, string, string];

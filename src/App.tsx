@@ -21,6 +21,7 @@ export default function App() {
       {screen === 'race' && (
         <RaceView
           profile={profile}
+          update={update}
           onExit={() => setScreen('setup')}
           onBest={(id, t) => setProfile(p => (!p.best[id] || t < p.best[id] ? { ...p, best: { ...p.best, [id]: t } } : p))}
         />

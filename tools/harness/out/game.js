@@ -24224,8 +24224,8 @@ var init_three_core = __esm({
               start(controller) {
                 readData();
                 function readData() {
-                  reader.read().then(({ done, value }) => {
-                    if (done) {
+                  reader.read().then(({ done: done2, value }) => {
+                    if (done2) {
                       controller.close();
                     } else {
                       loaded += value.byteLength;
@@ -34191,6 +34191,99 @@ var init_texCore = __esm({
   }
 });
 
+// ../../src/game/texStore.ts
+function open() {
+  if (dbP) return dbP;
+  dbP = new Promise((res) => {
+    try {
+      if (typeof indexedDB === "undefined") {
+        res(null);
+        return;
+      }
+      const rq = indexedDB.open(DB, 1);
+      rq.onupgradeneeded = () => {
+        rq.result.createObjectStore(SETS);
+        rq.result.createObjectStore(META);
+      };
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => res(null);
+      rq.onblocked = () => res(null);
+    } catch {
+      res(null);
+    }
+  });
+  return dbP;
+}
+async function texGet(keys) {
+  const out = /* @__PURE__ */ new Map();
+  const db = await open();
+  if (!db || !keys.length) return out;
+  try {
+    const tx = db.transaction(SETS, "readonly"), st = tx.objectStore(SETS);
+    for (const k of keys) {
+      const rq = st.get(k);
+      rq.onsuccess = () => {
+        const v = rq.result;
+        if (v && v.map && v.nrm && v.rh) out.set(k, v);
+      };
+    }
+    await done(tx);
+  } catch {
+  }
+  return out;
+}
+async function texPut(entries) {
+  const db = await open();
+  if (!db) return;
+  try {
+    for (const [key, b] of entries) {
+      const tx2 = db.transaction([SETS, META], "readwrite");
+      tx2.objectStore(SETS).put(b.em ? { map: b.map, nrm: b.nrm, rh: b.rh, em: b.em } : { map: b.map, nrm: b.nrm, rh: b.rh }, key);
+      tx2.objectStore(META).put({ t: Date.now(), bytes: b.map.length + b.nrm.length + b.rh.length + (b.em?.length ?? 0) }, key);
+      await done(tx2);
+    }
+    const tx = db.transaction(META, "readonly");
+    const metas = [];
+    tx.objectStore(META).openCursor().onsuccess = (e) => {
+      const c = e.target.result;
+      if (c) {
+        metas.push({ key: String(c.key), ...c.value });
+        c.continue();
+      }
+    };
+    await done(tx);
+    let total = metas.reduce((a, m) => a + m.bytes, 0);
+    if (total > MAX_BYTES) {
+      metas.sort((a, b) => a.t - b.t);
+      const del = db.transaction([SETS, META], "readwrite");
+      for (const m of metas) {
+        if (total <= MAX_BYTES) break;
+        del.objectStore(SETS).delete(m.key);
+        del.objectStore(META).delete(m.key);
+        total -= m.bytes;
+      }
+      await done(del);
+    }
+  } catch {
+  }
+}
+var DB, SETS, META, MAX_BYTES, dbP, done;
+var init_texStore = __esm({
+  "../../src/game/texStore.ts"() {
+    "use strict";
+    DB = "podracer-textures";
+    SETS = "sets";
+    META = "meta";
+    MAX_BYTES = 420 * 1024 * 1024;
+    dbP = null;
+    done = (tx) => new Promise((res) => {
+      tx.oncomplete = () => res();
+      tx.onerror = () => res();
+      tx.onabort = () => res();
+    });
+  }
+});
+
 // ../../src/game/textures.ts
 var textures_exports = {};
 __export(textures_exports, {
@@ -34202,6 +34295,7 @@ __export(textures_exports, {
   hasTextureWorkers: () => hasTextureWorkers,
   macroTexture: () => macroTexture,
   microTexture: () => microTexture,
+  setTextureCacheEnabled: () => setTextureCacheEnabled,
   setTextureWorkerFactory: () => setTextureWorkerFactory,
   spriteTexture: () => spriteTexture,
   textureStats: () => textureStats
@@ -34233,6 +34327,21 @@ function generateTexture(kind, palette, size, seed, aniso = 8, emissiveColor) {
 function setTextureWorkerFactory(f) {
   workerFactory = f;
 }
+function setTextureCacheEnabled(on) {
+  storeOn = on;
+}
+function storeKey(k) {
+  if (!codeHash) {
+    const src = computeTexture.toString() + TileNoise.toString() + blur.toString() + aeolianWave.toString();
+    let h = 2166136261;
+    for (let i = 0; i < src.length; i++) {
+      h ^= src.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    codeHash = (h >>> 0).toString(36);
+  }
+  return codeHash + "|" + k;
+}
 function generateTextures(specs, aniso) {
   const id = specs.map((s) => texKey(s.kind, s.palette, s.size, s.seed, s.emissive)).join(";") + "@" + aniso;
   let p = inflight.get(id);
@@ -34254,14 +34363,27 @@ async function runTextures(specs, aniso) {
     }
   });
   todo.sort((a, b) => specs[b].size - specs[a].size);
-  const cores = typeof navigator !== "undefined" ? navigator.hardwareConcurrency || 4 : 1;
-  const n = workerFactory && typeof Worker !== "undefined" ? Math.min(todo.length, Math.min(6, Math.max(2, cores - 1))) : 0;
   textureStats.workers = 0;
   textureStats.jobMs = [];
+  textureStats.cached = 0;
+  if (storeOn && todo.length) {
+    const hit = await texGet(todo.map((i) => storeKey(keys[i])));
+    for (let q = todo.length - 1; q >= 0; q--) {
+      const i = todo[q], b = hit.get(storeKey(keys[i]));
+      if (b) {
+        cache2.set(keys[i], wrap(b, specs[i].size, aniso));
+        todo.splice(q, 1);
+        textureStats.cached++;
+      }
+    }
+  }
+  const fresh = [];
+  const cores = typeof navigator !== "undefined" ? navigator.hardwareConcurrency || 4 : 1;
+  const n = workerFactory && typeof Worker !== "undefined" ? Math.min(todo.length, Math.min(6, Math.max(2, cores - 1))) : 0;
   if (n >= 2) {
     try {
       await new Promise((resolve, reject) => {
-        let next = 0, done = 0;
+        let next = 0, done2 = 0;
         const ws = [];
         const fail = (e) => {
           ws.forEach((w) => w.terminate());
@@ -34272,18 +34394,19 @@ async function runTextures(specs, aniso) {
             w.terminate();
             return;
           }
-          const i = todo[next++], s = specs[i];
-          w.postMessage({ id: i, kind: s.kind, palette: s.palette, size: s.size, seed: s.seed, emissive: s.emissive });
+          const i = todo[next++], sp = specs[i];
+          w.postMessage({ id: i, kind: sp.kind, palette: sp.palette, size: sp.size, seed: sp.seed, emissive: sp.emissive });
         };
         for (let k = 0; k < n; k++) {
           const w = workerFactory();
           ws.push(w);
           w.onerror = (e) => fail(e);
           w.onmessage = (e) => {
-            const i = e.data.id;
-            textureStats.jobMs.push(e.data.ms);
-            cache2.set(keys[i], wrap(e.data, specs[i].size, aniso));
-            if (++done === todo.length) {
+            const d = e.data, i = d.id, b = d.em ? { map: d.map, nrm: d.nrm, rh: d.rh, em: d.em } : { map: d.map, nrm: d.nrm, rh: d.rh };
+            textureStats.jobMs.push(d.ms);
+            cache2.set(keys[i], wrap(b, specs[i].size, aniso));
+            fresh.push([storeKey(keys[i]), b]);
+            if (++done2 === todo.length) {
               ws.forEach((x) => x.terminate());
               resolve();
             } else feed(w);
@@ -34295,13 +34418,17 @@ async function runTextures(specs, aniso) {
     } catch {
     }
   }
-  const out = [];
-  for (let i = 0; i < specs.length; i++) {
-    const s = specs[i];
-    const had = cache2.has(keys[i]);
-    out.push(generateTexture(s.kind, s.palette, s.size, s.seed, aniso, s.emissive));
-    if (!had) await new Promise((r) => setTimeout(r, 0));
+  for (const i of todo) {
+    if (cache2.has(keys[i])) continue;
+    const sp = specs[i], b = computeTexture(sp.kind, sp.palette, sp.size, sp.seed, sp.emissive);
+    cache2.set(keys[i], wrap(b, sp.size, aniso));
+    fresh.push([storeKey(keys[i]), b]);
+    await new Promise((r) => setTimeout(r, 0));
   }
+  if (storeOn && fresh.length) setTimeout(() => {
+    void texPut(fresh);
+  }, 2500);
+  const out = specs.map((_sp, i) => cache2.get(keys[i]));
   textureStats.ms = Math.round(performance.now() - t0);
   return out;
 }
@@ -34478,16 +34605,19 @@ function detailNormalTexture(kind) {
 function microTexture() {
   return detailNormalTexture("grit");
 }
-var cache2, texKey, workerFactory, textureStats, inflight, hasTextureWorkers, macroTex, detailCache;
+var cache2, texKey, workerFactory, textureStats, storeOn, codeHash, inflight, hasTextureWorkers, macroTex, detailCache;
 var init_textures = __esm({
   "../../src/game/textures.ts"() {
     "use strict";
     init_three_module();
     init_texCore();
+    init_texStore();
     cache2 = /* @__PURE__ */ new Map();
     texKey = (kind, palette, size, seed, emissive2) => `${kind}|${palette.join(",")}|${size}|${seed}|${emissive2 ?? ""}`;
     workerFactory = null;
-    textureStats = { workers: 0, ms: 0, jobMs: [] };
+    textureStats = { workers: 0, ms: 0, jobMs: [], cached: 0 };
+    storeOn = false;
+    codeHash = "";
     inflight = /* @__PURE__ */ new Map();
     hasTextureWorkers = () => !!workerFactory && typeof Worker !== "undefined";
     macroTex = null;
@@ -34535,6 +34665,7 @@ var init_audio = __esm({
           const ctx = new Ctx();
           this.ctx = ctx;
           this.master = ctx.createGain();
+          this.vol = volume;
           this.master.gain.value = volume * 0.5;
           const comp = ctx.createDynamicsCompressor();
           comp.threshold.value = -16;
@@ -34861,11 +34992,20 @@ var init_audio = __esm({
         src.start(t, Math.random());
         src.stop(t + 0.4);
       }
+      vol = 0.6;
+      /** Pause must be silent even if the context refuses to suspend: the master gain is zeroed as well. */
       resume() {
-        this.ctx?.resume();
+        if (this.ctx) {
+          this.master.gain.value = this.vol * 0.5;
+          void this.ctx.resume();
+        }
       }
       suspend() {
-        this.ctx?.suspend();
+        if (this.ctx) {
+          this.master.gain.cancelScheduledValues(this.ctx.currentTime);
+          this.master.gain.value = 0;
+          void this.ctx.suspend();
+        }
       }
       update(speed, throttle, boost, nearestOther, otherSpeed, world, dt = 0.016) {
         if (!this.ctx) return;
@@ -35042,7 +35182,8 @@ var init_audio = __esm({
         o.stop(t + dur + 0.05);
       }
       setVolume(v) {
-        if (this.ctx) this.master.gain.value = v * 0.5;
+        this.vol = v;
+        if (this.ctx && this.ctx.state === "running") this.master.gain.value = v * 0.5;
       }
       dispose() {
         this.ctx?.close();
@@ -67825,14 +67966,14 @@ var CompileScheduler = class {
     } else {
       await new Promise((resolve) => {
         let resolved = false;
-        const done = () => {
+        const done2 = () => {
           if (resolved === false) {
             resolved = true;
             resolve();
           }
         };
-        requestAnimationFrame(() => setTimeout(done, 0));
-        setTimeout(done, 100);
+        requestAnimationFrame(() => setTimeout(done2, 0));
+        setTimeout(done2, 100);
       });
     }
     this.lastYieldTime = performance.now();
@@ -86593,7 +86734,8 @@ function envLabel(themeId, tod, wx) {
   const tn = tod !== "auto" ? TIME_OPTIONS.find((o) => o[0] === tod)?.[1].replace(/ \(.*\)/, "") ?? "" : "";
   const w = wx === "auto" ? c.auto[0] : wx;
   const wn = c.names?.[w] ?? WX_NAMES[w];
-  return [tn, wn.replace(/ mit .*/, "")].filter(Boolean).join(" \xB7 ");
+  const short = { front: "Aufziehend", clearing: "Aufklarend", changing: "Wechselhaft" };
+  return [tn, short[wx] ?? wn.replace(/ mit .*/, "")].filter(Boolean).join(" \xB7 ");
 }
 var rgb = (h) => {
   const n = parseInt(h.slice(1), 16);
@@ -87855,7 +87997,8 @@ function buildTrack(def) {
     bounds.minY = Math.min(bounds.minY, s.y);
     bounds.maxY = Math.max(bounds.maxY, s.y);
   }
-  return { def, paths, main, N: N2, startIdx, finishIdx, obstacles, obstaclesByPath, hazards, setPieces, arches, bounds };
+  for (const o of obstacles) if (o.kind === 2 || o.kind === 0 && o.r < 2.9) o.breakable = true;
+  return { def, paths, main, N: N2, startIdx, finishIdx, obstacles, obstaclesByPath, hazards, setPieces, arches, bounds, overheads: [] };
 }
 function findShortcut(S, N2, fa, closed) {
   let best = null, bestScore = 60;
@@ -88445,8 +88588,8 @@ function scaleUV(g2, su, sv) {
   for (let i = 0; i < uv9.count; i++) uv9.setXY(i, uv9.getX(i) * su, uv9.getY(i) * sv);
   return g2;
 }
-function cyl(rTop, rBot, h, seg, open = false, hSeg = 1) {
-  const g2 = new CylinderGeometry(rTop, rBot, h, seg, hSeg, open);
+function cyl(rTop, rBot, h, seg, open2 = false, hSeg = 1) {
+  const g2 = new CylinderGeometry(rTop, rBot, h, seg, hSeg, open2);
   return scaleUV(g2, Math.PI * (rTop + rBot) / TILE, h / TILE);
 }
 function sphere(r, ws, hs, phiS = 0, phiL = Math.PI * 2, thS = 0, thL = Math.PI) {
@@ -88838,8 +88981,8 @@ function sections(style, hw, len, perSpan) {
     const g2 = (j) => T2[Math.max(0, Math.min(T2.length - 1, j))];
     const f = (c) => catmull(g2(i - 1)[c], g2(i)[c], g2(i + 1)[c], g2(i + 2)[c], t);
     const e = t * t * (3 - 2 * t);
-    const open = g2(i)[5] + (g2(i + 1)[5] - g2(i)[5]) * e;
-    out.push({ z: f(0) * len, w: Math.max(0.02, f(1)) * hw, hT: Math.max(0.02, f(2)) * hw, hB: Math.max(0.02, f(3)) * hw, n: f(4), open: Math.max(0, Math.min(0.85, open)) });
+    const open2 = g2(i)[5] + (g2(i + 1)[5] - g2(i)[5]) * e;
+    out.push({ z: f(0) * len, w: Math.max(0.02, f(1)) * hw, hT: Math.max(0.02, f(2)) * hw, hB: Math.max(0.02, f(3)) * hw, n: f(4), open: Math.max(0, Math.min(0.85, open2)) });
   }
   const l = T2[T2.length - 1];
   out.push({ z: l[0] * len, w: l[1] * hw, hT: l[2] * hw, hB: l[3] * hw, n: l[4], open: 0 });
@@ -89057,6 +89200,8 @@ var WeatherFx = class {
   flash = 0;
   /** 0..1 current gust strength (wind audio, gust sheets) */
   gust = 0;
+  /** graphics setting "Wetter-Effekte": 0 = no gust sheets, 0.5 = reduced, 1 = full */
+  quality = 1;
   bolt = null;
   boltI = uniform4(0);
   strikeAge = 9;
@@ -89186,7 +89331,7 @@ var WeatherFx = class {
       this.fwd.y = 0;
       this.fwd.normalize();
       this.right.set(-this.fwd.z, 0, this.fwd.x);
-      this.carry += (0.22 + 0.78 * env) * fx.wind * fx.gustAmt * 300 * this.particles.amount * dt;
+      this.carry += (0.22 + 0.78 * env) * fx.wind * fx.gustAmt * 300 * this.particles.amount * this.quality * dt;
       const n = Math.min(12, Math.floor(this.carry));
       this.carry -= Math.floor(this.carry);
       const snow = fx.gust === "snow", alpha = snow ? 0.085 : fx.gust === "dust" ? 0.11 : 0.05;
@@ -90285,12 +90430,13 @@ var DIFFICULTIES = [
 
 // ../../src/game/settings.ts
 var PRESETS = {
-  low: { renderScale: 0.75, shadows: 0, texRes: 512, parallax: false, ao: false, bloom: false, godRays: false, ssr: false, motionBlur: false, cinematic: false, particles: 0.35, detail: 0.4, geometry: 1, aa: "none", drawDistance: 0.6 },
-  medium: { renderScale: 1, shadows: 1, texRes: 1024, parallax: false, ao: false, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 0.6, detail: 0.7, geometry: 2, aa: "fxaa", drawDistance: 0.8 },
-  high: { renderScale: 1, shadows: 2, texRes: 1024, parallax: true, ao: false, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 1, detail: 1, geometry: 2, aa: "smaa", drawDistance: 1 },
-  ultra: { renderScale: 1, shadows: 3, texRes: 2048, parallax: true, ao: true, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 1.15, detail: 1.25, geometry: 3, aa: "smaa", drawDistance: 1.25 }
+  low: { renderScale: 0.75, shadows: 0, texRes: 512, parallax: false, ao: false, bloom: false, godRays: false, ssr: false, motionBlur: false, cinematic: false, particles: 0.35, detail: 0.4, geometry: 1, aa: "none", drawDistance: 0.6, anisotropy: 4, shaderDetail: 0, bumpMapping: true, tessellation: 0, csm: false, lensFx: false, lodBias: 0.6, podDetail: 0.6, weatherFx: 1, volumetrics: 0 },
+  medium: { renderScale: 1, shadows: 1, texRes: 1024, parallax: false, ao: false, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 0.6, detail: 0.7, geometry: 2, aa: "fxaa", drawDistance: 0.8, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 0, csm: false, lensFx: true, lodBias: 0.8, podDetail: 0.8, weatherFx: 1, volumetrics: 1 },
+  high: { renderScale: 1, shadows: 2, texRes: 1024, parallax: true, ao: false, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 1, detail: 1, geometry: 2, aa: "smaa", drawDistance: 1, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 1, csm: false, lensFx: true, lodBias: 1, podDetail: 1, weatherFx: 2, volumetrics: 2 },
+  // Session 14: "Ultra" = every option at its maximum (only field of view and bloom strength stay as chosen)
+  ultra: { renderScale: 1.5, shadows: 3, texRes: 2048, parallax: true, ao: true, bloom: true, godRays: true, ssr: true, motionBlur: true, cinematic: true, particles: 1.5, detail: 1.6, geometry: 3, aa: "smaa", drawDistance: 1.5, anisotropy: 16, shaderDetail: 2, bumpMapping: true, tessellation: 2, csm: true, lensFx: true, lodBias: 2, podDetail: 3, weatherFx: 2, volumetrics: 2 }
 };
-var defaultGfx = () => ({ preset: "high", backend: "auto", batching: true, fov: 75, showFps: true, bloomStrength: 0.5, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 1, ...PRESETS.high });
+var defaultGfx = () => ({ preset: "high", backend: "auto", batching: true, fov: 75, showFps: true, bloomStrength: 0.5, ...PRESETS.high });
 function defaultProfile() {
   const custom = {};
   for (const p of PODS) custom[p.id] = { colors: [...p.colors], tuning: Object.fromEntries(STAT_KEYS.map((k) => [k, 0])) };
@@ -90623,7 +90769,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
       if (s.gap || s.ramp > 0 || nearStart(i) || s.openL || s.openR) continue;
       const R = s.hw + 5;
       if (![-1, 1].every((sd) => clear(s.x + s.rx * sd * R, s.z + s.rz * sd * R, 2.6, -0.5))) continue;
-      const m = new Matrix4().compose(new Vector3(s.x, s.y, s.z), new Quaternion().setFromAxisAngle(UP, yawOf(s)), new Vector3(1, 0.56, 1));
+      const m = new Matrix4().compose(new Vector3(s.x, s.y, s.z), new Quaternion().setFromAxisAngle(UP, yawOf(s)), new Vector3(1, 0.82, 1));
       frames.push(new TorusGeometry(R, 1.15, 14, 72, Math.PI).applyMatrix4(m));
       rings.push(new TorusGeometry(R - 1.65, 0.26, 8, 96, Math.PI).applyMatrix4(m));
       for (let k = 1; k < 12; k++) {
@@ -91833,7 +91979,8 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
       const s = S[i];
       const yaw = Math.atan2(s.tx, s.tz);
       const span = Math.max(s.wallL, s.wallR) + 1.8;
-      const H = 11;
+      const H = 21;
+      (td.overheads ??= []).push({ idx: i, y0: s.y + H - 1.8 - span * 1.5 / 16, y1: s.y + H + 2.1, half: 1 });
       const m = new Matrix4().compose(new Vector3(s.x, s.y, s.z), new Quaternion().setFromAxisAngle(UP3, yaw), new Vector3(1, 1, 1));
       for (const sd of [-1, 1]) {
         for (const dz of [-0.9, 0.9]) truss.push(new BoxGeometry(0.85, H + 4.2, 0.65).rotateX(dz * -0.07).translate(sd * span, H / 2 - 2, dz).applyMatrix4(m));
@@ -92624,38 +92771,38 @@ function makeTerrainField(td, theme) {
     const n1 = fbm2(x * 21e-4, z * 21e-4, 5), n2 = fbm2(x * 88e-4 + 7.1, z * 88e-4 - 3.3, 3);
     const n33 = vnoise(x * 0.028, z * 0.028) - 0.5;
     const rg = regAt(x, z);
-    let open = rg - 7 + (n1 - 0.5) * amp + (n2 - 0.5) * amp * 0.3 + n33 * 1.1;
+    let open2 = rg - 7 + (n1 - 0.5) * amp + (n2 - 0.5) * amp * 0.3 + n33 * 1.1;
     const eFade = sstep3(16, 75, e);
     let crest = 0, wadiGravel = 0;
     if (isDesert) {
       const duneMask = sstep3(0.46, 0.68, n1) * eFade;
       const dw = duneWave(x * 85e-4 + z * 32e-4 + n2 * 1.45);
-      open += (dw - 0.35) * 8.5 * duneMask;
+      open2 += (dw - 0.35) * 8.5 * duneMask;
       crest = sstep3(0.58, 0.92, dw) * duneMask;
       const wadi = (1 - sstep3(0, 0.036, Math.abs(fbm2(x * 26e-4 + 4.3, z * 26e-4 - 1.9, 4) - 0.5))) * eFade * (1 - duneMask);
-      open -= wadi * 3.8;
+      open2 -= wadi * 3.8;
       wadiGravel = wadi * 0.82;
     } else if (T2 === "mountains") {
       const ridge = ridged(x * 48e-4 + 1.2, z * 48e-4, 4);
-      open += (ridge - 0.45) * 9.5 * eFade;
+      open2 += (ridge - 0.45) * 9.5 * eFade;
       crest = sstep3(0.58, 0.85, ridge) * eFade;
       wadiGravel = sstep3(0.68, 0.82, ridge) * 0.55 * eFade;
     } else if (T2 === "jungle") {
       const chan = (1 - sstep3(0, 0.042, Math.abs(fbm2(x * 24e-4 - 2.7, z * 24e-4 + 5.1, 4) - 0.5))) * eFade;
       const mound = sstep3(0.55, 0.78, n1) * (n2 * 6.5) * eFade;
-      open += mound - chan * 5.2;
+      open2 += mound - chan * 5.2;
       crest = sstep3(0.56, 0.8, n1) * 0.7 * eFade;
       wadiGravel = chan * 0.65;
     } else if (T2 === "lava") {
       const rift = sstep3(0.44, 0.72, fbm2(x * 35e-4 + 3, z * 35e-4, 4));
       const pRidge = Math.pow(ridged(x * 65e-4, z * 65e-4, 3), 1.5) * (1 - rift) * eFade;
-      open += pRidge * 7.5 - rift * 23;
+      open2 += pRidge * 7.5 - rift * 23;
       crest = sstep3(0.45, 0.8, pRidge) * 0.85;
     }
     const bas = T2 === "lava" ? sstep3(0.36, 0.27, n1) * sstep3(34, 85, e) * 0.85 : sstep3(0.34, 0.28, n1) * sstep3(30, 75, e);
-    if (bas > 0) open += (rg - 7 - amp * 0.17 - open) * bas * 0.86;
-    open = Math.min(open, roadLow + Math.max(0, e - 8) * 0.125);
-    open = Math.max(open, roadLow - Math.max(0, e) * 0.72);
+    if (bas > 0) open2 += (rg - 7 - amp * 0.17 - open2) * bas * 0.86;
+    open2 = Math.min(open2, roadLow + Math.max(0, e - 8) * 0.125);
+    open2 = Math.max(open2, roadLow - Math.max(0, e) * 0.72);
     const fr = sstep3(R0, R1, e);
     if (fr > 0) {
       const nx = x * 11e-4, nz = z * 11e-4;
@@ -92668,17 +92815,17 @@ function makeTerrainField(td, theme) {
       } else {
         shape = Math.pow(ridged(nx + 0.3, nz + 0.9, 6), 1.22);
       }
-      open += fr * shape * A;
+      open2 += fr * shape * A;
       crest = Math.max(crest, fr * sstep3(0.45, 0.82, shape));
     }
-    let h = open;
+    let h = open2;
     const lat = (x - s.x) * s.rx + (z - s.z) * s.rz;
     const H = lat >= 0 ? s.hR : s.hL;
     let talus = 0;
     if (H > 0 && !s.gap) {
       const rim = s.y + H, foot = s.hw + 0.6 + H * 0.6;
       const rimTerrace = id === "mesa" || id === "desert" ? (terrace(n2, 3) - 0.5) * 12 : (n2 - 0.5) * 11;
-      const ch = d < foot ? roadLow + (rim - 3 - roadLow) * Math.pow(wallFrac(Math.max(0, d - s.hw) / Math.max(0.5, H / 25)), 1.48) : rim + rimTerrace - sstep3(foot, foot + 175 + H * 3.1, d) * Math.max(0, rim - open);
+      const ch = d < foot ? roadLow + (rim - 3 - roadLow) * Math.pow(wallFrac(Math.max(0, d - s.hw) / Math.max(0.5, H / 25)), 1.48) : rim + rimTerrace - sstep3(foot, foot + 175 + H * 3.1, d) * Math.max(0, rim - open2);
       if (ch > h + 0.5) {
         if (writeSplat) splat.b = 0;
         talus = 1 - sstep3(foot, foot + 45, d);
@@ -92689,7 +92836,7 @@ function makeTerrainField(td, theme) {
       const shoulder = (1 - sstep3(2.5, 15, e)) * 0.88;
       const patch = sstep3(0.62, 0.74, n2) * 0.72 * (1 - fr);
       splat.g = Math.max(shoulder, patch, wadiGravel, talus * 0.55);
-      splat.b = Math.min(splat.b > 0 || !(H > 0 && h > open + 0.5) ? bas * (1 - fr) : 0, 1);
+      splat.b = Math.min(splat.b > 0 || !(H > 0 && h > open2 + 0.5) ? bas * (1 - fr) : 0, 1);
       splat.c = Math.min(1, crest);
     }
     if (s.gap && d < s.hw + 40) h = Math.min(h, s.y - 55 + sstep3(s.hw, s.hw + 40, d) * 40);
@@ -93138,6 +93285,7 @@ function buildSetPieces(td, theme, group, disp, rockMat) {
       }
       root.updateMatrixWorld(true);
       const falling = [3, 4, 5].map((k) => pieces[k]);
+      const fades = [];
       fns.push((_t, rt, pods, dt, frozen, fx) => {
         if (sp.state === 0) {
           if (frozen || rt < 1) return;
@@ -93190,10 +93338,27 @@ function buildSetPieces(td, theme, group, disp, rockMat) {
               const mm = td.obstaclesByPath[0];
               if (!mm.has(bk)) mm.set(bk, []);
               mm.get(bk).push(o);
+              if (i !== 1) fades.push({ o, m, t: rt + 11 + i * 4, done: false });
               fx.push({ type: "dust", x: r.x, y: gy + 1, z: r.z, strength: 1 });
             }
           });
           if (all2) sp.state = 2;
+        }
+        for (const f of fades) {
+          if (f.done || rt < f.t) continue;
+          const sc = f.m.scale.x - dt * 0.16;
+          f.m.position.y -= dt * 0.9;
+          if (sc <= 0.06) {
+            f.done = true;
+            f.m.visible = false;
+            f.o.broken = true;
+            f.o.x = 1e9;
+            f.o.z = 1e9;
+            f.o.lat = 1e6;
+          } else {
+            f.m.scale.setScalar(sc);
+            if (Math.random() < dt * 6) fx.push({ type: "dust", x: f.m.position.x, y: f.m.position.y + 1, z: f.m.position.z, strength: 0.5 });
+          }
         }
       });
     }
@@ -93907,7 +94072,7 @@ var GEO = {
   fungus: (s) => ({ geo: fungus(s), h: 0.4 })
 };
 var W = ["#ffffff", "#ece6da", "#dcd4c6"];
-var SETS = {
+var SETS2 = {
   desert: [
     { geo: "shrubDry", perKm: 520, bias: 2, dMin: 4, dMax: 360, view: 185, farView: 520, scale: [0.7, 1.7], cols: W, slope: 0.5, shadow: true, wind: 0.03, cluster: 3, clusterR: 12 },
     { geo: "agave", perKm: 190, bias: 2.1, dMin: 4, dMax: 180, view: 200, scale: [0.8, 1.6], cols: W, slope: 0.55, cluster: 2, clusterR: 7, wind: 0.02 },
@@ -93952,7 +94117,7 @@ var SETS = {
     { geo: "stoneGrey", perKm: 280, bias: 2.1, dMin: 2, dMax: 400, view: 360, scale: [0.3, 1.25], cols: W, slope: 0.9, cluster: 4, clusterR: 6, sink: 0.2, align: 0.8 }
   ]
 };
-SETS.mesa = SETS.desert;
+SETS2.mesa = SETS2.desert;
 function coverMaterial(t, H, isImpostor = false) {
   const mat = new MeshStandardNodeMaterial({ vertexColors: true, side: t.blade || isImpostor ? DoubleSide : FrontSide });
   mat.roughness = t.rough ?? 0.86;
@@ -93979,7 +94144,7 @@ function coverMaterial(t, H, isImpostor = false) {
 }
 function buildGroundCover(td, theme, gfx, field, waterY, rng2, group, disp) {
   const t0 = performance.now();
-  const set = SETS[theme.id];
+  const set = SETS2[theme.id];
   const cells = [];
   if (!set) return { update: (cam) => {
     void cam;
@@ -95090,7 +95255,7 @@ async function buildWorld(td, theme, gfx, progress) {
           const pr = S2[idxs[k - 1]];
           sAcc += Math.hypot(s.x - pr.x, s.z - pr.z);
         }
-        const open = side > 0 ? s.openR : s.openL;
+        const open2 = side > 0 ? s.openR : s.openL;
         const ex = s.x + s.rx * side * s.hw, ez = s.z + s.rz * side * s.hw, ey = s.y + s.ramp - side * s.hw * s.bank + 0.16;
         const okS = !s.gap;
         const bx = ex + s.rx * side * 3.8, bz = ez + s.rz * side * 3.8;
@@ -95108,7 +95273,7 @@ async function buildWorld(td, theme, gfx, progress) {
         sv += SK;
         prevS = okS;
         const H = side > 0 ? s.hR : s.hL;
-        const okW = H > 0 && !open && !s.gap;
+        const okW = H > 0 && !open2 && !s.gap;
         const buttress = Math.pow(ridged2(sAcc * 0.022 + side * 3.7, 1.3, 3), 2) * 2.2;
         for (let j = 0; j < K; j++) {
           const f = j / (K - 1);
@@ -95248,7 +95413,7 @@ async function buildWorld(td, theme, gfx, progress) {
   const distToTrack = (x, z) => nearest(x, z);
   const decorCells = scatterDecor(theme, group, td, heightAt, distToTrack, gfx, disposables, rng2, wallTex, roadClear, waterY);
   addArches(td, group, wallMat, disposables, rng2, roadClear);
-  addObstacles(td, group, theme, wallMat, disposables);
+  const obstFx = addObstacles(td, group, theme, wallMat, disposables);
   progress(0.9, "Platziere Streckendetails \u2026");
   await yield_();
   const props = addProps(td, theme, group, gfx, heightAt, disposables, rng2, roadClear, roadDispOff);
@@ -95294,6 +95459,10 @@ async function buildWorld(td, theme, gfx, progress) {
   };
   progress(0.95, "Kompiliere Shader \u2026");
   await yield_();
+  let lodB2 = (gfx.lodBias ?? 1) ** 2;
+  const setLodBias = (v) => {
+    lodB2 = v * v;
+  };
   const update = (t, cam, pods) => {
     smoke.update(t);
     life.update(t, pods);
@@ -95304,7 +95473,7 @@ async function buildWorld(td, theme, gfx, progress) {
         const dx = dc.x - cam.x, dz = dc.z - cam.z, d2 = dx * dx + dz * dz;
         const vis = d2 < dc.view2;
         if (dc.lod) {
-          const near = d2 < dc.lod2;
+          const near = d2 < dc.lod2 * lodB2;
           dc.mesh.visible = vis && near;
           dc.lod.visible = vis && !near;
         } else dc.mesh.visible = vis;
@@ -95316,6 +95485,8 @@ async function buildWorld(td, theme, gfx, progress) {
     mech.update(t);
   };
   return {
+    breakObstacle: obstFx.breakObstacle,
+    setLodBias,
     group,
     heightAt,
     update,
@@ -95434,6 +95605,7 @@ function addStartArea(td, group, theme, disp, rng2, dOff = 0) {
   const mkGate = (idx, label2) => {
     const s = S[idx];
     const yaw = Math.atan2(s.tx, s.tz);
+    (td.overheads ??= []).push({ idx, y0: s.y + 15.8, y1: s.y + 21.3, half: 1.7 });
     const g2 = new Group();
     g2.position.set(s.x, s.y, s.z);
     g2.rotation.y = yaw;
@@ -95899,28 +96071,41 @@ function addObstacles(td, group, theme, rockMat, disp) {
   const boxes = [], beacons = [], masts = [];
   const q = new Quaternion(), e = new Euler(), I = new Quaternion();
   const C = (x, y, z, qq, sx, sy, sz) => new Matrix4().compose(new Vector3(x, y, z), qq, new Vector3(sx, sy, sz));
+  let cur2 = null;
+  const refs = /* @__PURE__ */ new Map();
+  const add2 = (list, m) => {
+    let l = refs.get(cur2);
+    if (!l) {
+      l = [];
+      refs.set(cur2, l);
+    }
+    l.push([list, list.length]);
+    list.push(m);
+  };
   for (const o of td.obstacles) {
     if (o.kind >= 3) continue;
-    rings.push(C(o.x, o.y + 0.28, o.z, I, o.r * 1.18, 1.3, o.r * 1.18));
+    cur2 = o;
+    add2(rings, C(o.x, o.y + 0.28, o.z, I, o.r * 1.18, 1.3, o.r * 1.18));
     if (o.kind === 0) {
       e.set(o.idx * 0.13 % 0.3 - 0.15, o.idx * 1.3, 0);
       q.setFromEuler(e);
       const hRock = o.r * 1.45;
-      rocks.push(C(o.x, o.y + hRock * 0.45, o.z, q.clone(), o.r * 1.05, hRock, o.r * 1.05));
-      masts.push(C(o.x, o.y + hRock + 1.1, o.z, I, 1, 2.4, 1));
-      beacons.push(C(o.x, o.y + hRock + 2.45, o.z, I, 1.15, 1.15, 1.15));
+      add2(rocks, C(o.x, o.y + hRock * 0.45, o.z, q.clone(), o.r * 1.05, hRock, o.r * 1.05));
+      add2(masts, C(o.x, o.y + hRock + 1.1, o.z, I, 1, 2.4, 1));
+      add2(beacons, C(o.x, o.y + hRock + 2.45, o.z, I, 1.15, 1.15, 1.15));
     } else if (o.kind === 1) {
-      cols.push(C(o.x, o.y, o.z, I, o.r, 1, o.r));
-      for (const h of [2, 4.6, 7.2]) rings.push(C(o.x, o.y + h, o.z, I, o.r * 0.96, 1.1, o.r * 0.96));
-      beacons.push(C(o.x, o.y + 9.8, o.z, I, 1.25, 1.25, 1.25));
+      add2(cols, C(o.x, o.y, o.z, I, o.r, 1, o.r));
+      for (const h of [2, 4.6, 7.2]) add2(rings, C(o.x, o.y + h, o.z, I, o.r * 0.96, 1.1, o.r * 0.96));
+      add2(beacons, C(o.x, o.y + 9.8, o.z, I, 1.25, 1.25, 1.25));
     } else {
       q.setFromAxisAngle(new Vector3(0, 1, 0), o.idx);
       const bh = o.r * 1.38;
-      boxes.push(C(o.x, o.y + bh * 0.5, o.z, q.clone(), o.r * 1.42, bh, o.r * 1.42));
-      masts.push(C(o.x, o.y + bh + 0.9, o.z, I, 1, 1.8, 1));
-      beacons.push(C(o.x, o.y + bh + 1.95, o.z, I, 1.15, 1.15, 1.15));
+      add2(boxes, C(o.x, o.y + bh * 0.5, o.z, q.clone(), o.r * 1.42, bh, o.r * 1.42));
+      add2(masts, C(o.x, o.y + bh + 0.9, o.z, I, 1, 1.8, 1));
+      add2(beacons, C(o.x, o.y + bh + 1.95, o.z, I, 1.15, 1.15, 1.15));
     }
   }
+  const meshOf = /* @__PURE__ */ new Map();
   const inst = (geo, mat, list) => {
     if (!list.length) {
       geo.dispose();
@@ -95933,6 +96118,7 @@ function addObstacles(td, group, theme, rockMat, disp) {
     im.computeBoundingSphere();
     group.add(im);
     disp.push(geo);
+    meshOf.set(list, im);
   };
   inst(rockGeo(2, 9, 1.05), rockMat, rocks);
   const colGeo = mergeGeometries([
@@ -95945,6 +96131,16 @@ function addObstacles(td, group, theme, rockMat, disp) {
   inst(new BoxGeometry(1, 1, 1), hazMat, boxes);
   inst(new CylinderGeometry(0.1, 0.14, 1, 6), mastMat, masts);
   inst(new OctahedronGeometry(0.48, 1), warn2, beacons);
+  const ZERO_M = new Matrix4().makeScale(0, 0, 0);
+  return { breakObstacle: (o) => {
+    for (const [list, i] of refs.get(o) ?? []) {
+      const im = meshOf.get(list);
+      if (im) {
+        im.setMatrixAt(i, ZERO_M);
+        im.instanceMatrix.needsUpdate = true;
+      }
+    }
+  } };
 }
 function buildZeroGTubes(path, group, mat, ribMat, disp, theme) {
   const S = path.samples;
@@ -96974,6 +97170,7 @@ function carbonTexture() {
 // ../../src/game/podMaterials.ts
 var TSL12 = three_tsl_exports;
 var {
+  floor: floorN,
   abs: abs8,
   attribute: attribute6,
   clamp: clamp11,
@@ -97126,20 +97323,30 @@ function sharedOpponentFlameMaterial() {
   return mat;
 }
 var oppBinderCache = null;
+function boltLook(f, y, t) {
+  const c = y.mul(2).sub(1), ac = oneMinus10(abs8(c));
+  const core = pow9(ac, 7), halo = pow9(ac, 1.5).mul(0.5);
+  const w12 = sin11(f.mul(21).add(t.mul(33))).mul(0.34).add(sin11(f.mul(47).sub(t.mul(58))).mul(0.14));
+  const w22 = cos5(f.mul(17).sub(t.mul(41))).mul(0.4).add(sin11(f.mul(61).add(t.mul(77))).mul(0.1));
+  const arc1 = pow9(oneMinus10(clamp11(abs8(c.sub(w12)), 0, 1)), 18);
+  const arc2 = pow9(oneMinus10(clamp11(abs8(c.sub(w22)), 0, 1)), 26).mul(0.75);
+  const strobe = fract5(sin11(floorN(t.mul(24)).mul(91.7)).mul(43758.5)).mul(0.55).add(0.6);
+  const pulse = pow9(sin11(f.mul(9).sub(t.mul(24))).mul(0.5).add(0.5), 6).mul(0.9);
+  const ends = smoothstep11(0, 0.05, f).mul(ssInv6(1, 0.95, f));
+  return [clamp11(core.add(arc1).add(arc2).mul(0.9), 0, 1), core.add(halo).add(arc1).add(arc2).mul(strobe.add(pulse)).mul(ends)];
+}
 function sharedOpponentBinderMaterial() {
   if (oppBinderCache) return oppBinderCache;
   const mat = new MeshBasicNodeMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide });
   const vUv = uv7();
   const f = vUv.x;
   const env = sin11(f.mul(Math.PI));
-  const jigY = sin11(podSharedTime.mul(36).add(f.mul(14))).mul(0.18);
-  const jigZ = cos5(podSharedTime.mul(27).add(f.mul(11))).mul(0.1);
+  const jigY = sin11(podSharedTime.mul(36).add(f.mul(14))).mul(0.26).add(sin11(podSharedTime.mul(71).sub(f.mul(31))).mul(0.1));
+  const jigZ = cos5(podSharedTime.mul(27).add(f.mul(11))).mul(0.16);
   mat.positionNode = positionLocal8.add(vec312(0, env.mul(float8(0.16).add(jigY)), env.mul(jigZ)));
-  const ac = oneMinus10(abs8(vUv.y.mul(2).sub(1)));
-  const core = pow9(ac, 6.5), halo = pow9(ac, 1.6).mul(0.42);
-  const ends = smoothstep11(0, 0.06, f).mul(ssInv6(1, 0.94, f));
-  mat.colorNode = mix8(vertexColor6(), vec312(1), core.mul(0.72));
-  mat.opacityNode = clamp11(core.add(halo).mul(ends).mul(0.85), 0, 1);
+  const [wh, al] = boltLook(f, vUv.y, podSharedTime);
+  mat.colorNode = mix8(vertexColor6(), vec312(1), wh).mul(1.7);
+  mat.opacityNode = clamp11(al.mul(0.95), 0, 1);
   mat.userData.shared = true;
   oppBinderCache = mat;
   return mat;
@@ -97212,15 +97419,12 @@ function binderMaterial(color9) {
   const f = vUv.x;
   const env = sin11(f.mul(Math.PI));
   const endLift = mix8(u.uLift.x, u.uLift.y, f);
-  const jigY = sin11(u.uTime.mul(38).add(f.mul(14))).mul(0.18).add(sin11(u.uTime.mul(67).sub(f.mul(29))).mul(0.1));
-  const jigZ = cos5(u.uTime.mul(29).add(f.mul(11))).mul(0.11);
+  const jigY = sin11(u.uTime.mul(38).add(f.mul(14))).mul(0.27).add(sin11(u.uTime.mul(67).sub(f.mul(29))).mul(0.13));
+  const jigZ = cos5(u.uTime.mul(29).add(f.mul(11))).mul(0.17);
   mat.positionNode = positionLocal8.add(vec312(0, endLift.add(env.mul(float8(0.18).add(jigY))), env.mul(jigZ)));
-  const ac = oneMinus10(abs8(vUv.y.mul(2).sub(1)));
-  const core = pow9(ac, 7), halo = pow9(ac, 1.6).mul(0.45);
-  const fl = sin11(f.mul(34).sub(u.uTime.mul(48))).mul(cos5(f.mul(19).add(u.uTime.mul(27)))).mul(0.28).add(0.76);
-  const ends = smoothstep11(0, 0.06, f).mul(ssInv6(1, 0.94, f));
-  mat.colorNode = mix8(u.uColor, vec312(1), core.mul(0.75));
-  mat.opacityNode = clamp11(core.add(halo).mul(fl).mul(ends).mul(u.uPower), 0, 1);
+  const [wh, al] = boltLook(f, vUv.y, u.uTime);
+  mat.colorNode = mix8(u.uColor, vec312(1), wh).mul(1.8);
+  mat.opacityNode = clamp11(al.mul(u.uPower), 0, 1);
   mat.userData.u = u;
   return mat;
 }
@@ -97242,6 +97446,10 @@ function cableFlexMaterial() {
 var SHADOW_KEYS = /* @__PURE__ */ new Set(["hull", "steel", "dark", "chrome", "carbon"]);
 var OPP_SHADOW_KEYS = /* @__PURE__ */ new Set(["hull", "steel", "dark"]);
 var BINDER_PTS = 18;
+var podLodScale = 1;
+function setPodLodScale(v) {
+  podLodScale = Math.max(0.3, Math.min(4, v));
+}
 function buildFlexCables(L, seg, anchors) {
   const cp = new Vector3(0, L.cockpit.y, L.cockpit.z);
   const up = new Vector3(0, 1, 0);
@@ -97267,24 +97475,35 @@ function buildFlexCables(L, seg, anchors) {
     const isR = em.x >= 0 ? 1 : 0;
     const a = eg.pylon.clone().add(new Vector3(em.x, em.y, em.z));
     const b = anchors[isR].clone().add(cp);
-    const dist = a.distanceTo(b);
-    const sag = 0.34 + dist * 0.032;
+    const rearZ = eg.exhaustZ + 0.12 * eg.L, topY = Math.max(eg.top, eg.R) + 0.14;
+    const v1 = new Vector3(em.x, em.y + topY + 0.1, em.z + rearZ - 0.3);
+    const v2 = new Vector3(em.x, em.y + topY, em.z + rearZ + (eg.pylon.z - rearZ) * 0.5);
+    const dist = v1.distanceTo(b);
+    const sag = 0.3 + dist * 0.03;
     for (const [r, off, s, rad] of [[0.055, 0, 1, 6], [0.024, 0.12, 1.18, 4]]) {
       const pts = [];
+      const ox = off * (isR ? -1 : 1);
       for (let i = 0; i <= 8; i++) {
         const t = i / 8;
-        const p = b.clone().lerp(a, t);
-        p.y -= sag * s * 4 * t * (1 - t);
-        p.x += off * (isR ? -1 : 1) * Math.sin(t * Math.PI);
+        const p = b.clone().lerp(v1, t);
+        p.y -= sag * s * 4 * t * (1 - t) * (1 - 0.35 * t);
+        p.x += ox * Math.sin(t * Math.PI * 0.5);
         pts.push(p);
       }
-      tagFlex(tube(pts, r, Math.max(12, Math.round(seg * 0.6)), rad), isR, a, b);
+      pts.push(v1.clone().lerp(v2, 0.5).add(new Vector3(ox, 0, 0)), v2.clone().add(new Vector3(ox, 0, 0)), a.clone().add(new Vector3(ox * 0.5, 0.03, 0)));
+      tagFlex(tube(pts, r, Math.max(16, Math.round(seg * 0.8)), rad), isR, v1, b);
     }
-    for (const [p, q] of [[a, b], [b, a]]) {
+    for (const [p, q] of [[a, v2], [b, v1]]) {
       const dir = q.clone().sub(p).normalize();
       const fg = cyl(0.085, 0.07, 0.24, 7);
       fg.applyMatrix4(new Matrix4().compose(p.clone().addScaledVector(dir, 0.12), new Quaternion().setFromUnitVectors(up, dir), new Vector3(1, 1, 1)));
-      tagFlex(fg, isR, a, b);
+      tagFlex(fg, isR, v1, b);
+    }
+    for (const sp of [v1, v2]) {
+      const cl = torus(0.085, 0.022, 5, 8);
+      cl.rotateY(Math.PI / 2);
+      cl.translate(sp.x, sp.y - 0.02, sp.z);
+      tagFlex(cl, isR, v1, b);
     }
   }
   const mg = mergeGeometries(list, false);
@@ -97336,7 +97555,7 @@ function bakeSolidColor(g2, col) {
 function makeBinderGeo(a, b, vertCol) {
   const pos = new Float32Array(BINDER_PTS * 4 * 3), uv9 = new Float32Array(BINDER_PTS * 4 * 2);
   const idx = [];
-  const w = 0.18;
+  const w = 0.3;
   const tmp3 = new Vector3();
   for (let i = 0; i < BINDER_PTS; i++) {
     const f = i / (BINDER_PTS - 1);
@@ -97574,10 +97793,10 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
         farGrp.visible = true;
         return;
       }
-      const useNear = d < 48;
+      const useNear = d < 48 * podLodScale;
       nearGrp.visible = useNear;
-      farGrp.visible = !useNear && d < 520;
-      const wantSh = d < 78;
+      farGrp.visible = !useNear && d < 520 * Math.max(1, podLodScale);
+      const wantSh = d < 78 * Math.min(2, podLodScale);
       if (useNear) for (let i = 0; i < shadowMeshes.length; i++) shadowMeshes[i].castShadow = wantSh;
       else fhM.castShadow = wantSh;
     };
@@ -97811,7 +98030,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     glow.color.copy(hc).multiplyScalar(1.1 + boost * 0.3);
     const fanAng = t * (16 + throttle * 42);
     for (let i = 0; i < fans.length; i++) fans[i].rotation.z = fanAng + i * 0.7;
-    const dmgF = Math.max(0, Math.max(dmgL, dmgR) - 0.45) / 0.55;
+    const dmgF = Math.max(0, 0.45 - Math.min(dmgL, dmgR)) / 0.45;
     for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (airbrake * 1.05 + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
     const uL = hullL.userData.u, uR = hullR.userData.u;
     uL.uScorch.value = Math.min(1, (1 - dmgL) * 1.1 + Math.max(0, heat - 0.75) * 0.8);
@@ -97988,6 +98207,8 @@ var Particles = class {
   ambient = null;
   ambCam = uniform9(new Vector3());
   ambTime = uniform9(0);
+  ambFade = uniform9(1);
+  // 0 under roofs (tunnels, covered shortcuts)
   ambVel = uniform9(new Vector3());
   prevCam = new Vector3();
   camSet = false;
@@ -98020,6 +98241,20 @@ var Particles = class {
   /** 0..1 share of the ambient weather particles that is drawn (rain getting heavier, snow easing off …). */
   setAmbientAmount(f) {
     if (this.ambient) this.ambient.count = Math.max(1, Math.round(this.ambN * Math.max(0, Math.min(1, f))));
+  }
+  setAmbientFade(f) {
+    this.ambFade.value = f;
+  }
+  /** Shattered obstacle: tumbling chunks + dust burst + sparks. */
+  debris(p, vel, col, size = 2) {
+    const n = Math.round((10 + size * 4) * Math.min(1.2, this.amount + 0.3));
+    for (let i = 0; i < n; i++) {
+      _v.set((Math.random() - 0.5) * 26, 3 + Math.random() * 13, (Math.random() - 0.5) * 26).addScaledVector(vel, 0.5);
+      _p.set(p.x + (Math.random() - 0.5) * size, p.y + 0.4 + Math.random() * size, p.z + (Math.random() - 0.5) * size);
+      this.alpha.spawn(_p, _v, 0.7 + Math.random() * 0.6, 0.35 + Math.random() * 0.5, 0.2, col, col, 0.95, 0.35, 30);
+    }
+    this.dust(p, vel, col, 10);
+    this.sparks(p, UP_V, vel, 10);
   }
   /** Rooster tail of fine spray thrown up from a wet road – taller and denser with speed. */
   spray(p, vel, speed, alphaScale = 1) {
@@ -98160,8 +98395,8 @@ var Particles = class {
       const q = uv8().sub(0.5), along = dot6(q, dirV), across = dot6(q, vec28(dirV.y.negate(), dirV.x));
       const wUv = float9(0.034).div(lenV.mul(1.1));
       const streak = oneMinus11(smoothstep12(wUv.mul(0.45), wUv, across.abs())).mul(oneMinus11(smoothstep12(0.3, 0.46, along.abs())));
-      mat.opacityNode = streak.mul(0.6).mul(smoothstep12(2.5, 7, vz));
-    } else mat.opacityNode = softDisc().mul(type === "dust" ? 0.2 : 0.72).mul(smoothstep12(2.5, 7, vz));
+      mat.opacityNode = streak.mul(0.6).mul(smoothstep12(2.5, 7, vz)).mul(this.ambFade);
+    } else mat.opacityNode = softDisc().mul(type === "dust" ? 0.2 : 0.72).mul(smoothstep12(2.5, 7, vz)).mul(this.ambFade);
     const sp = new Sprite(mat);
     sp.count = n;
     sp.frustumCulled = false;
@@ -100538,10 +100773,13 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
     if (pc2.obCd) pc2.obCd = Math.max(0, pc2.obCd - dt);
     if (pc2.wCd) pc2.wCd = Math.max(0, pc2.wCd - dt);
   }
-  const target = inp.steer;
+  const k0 = Math.abs(Math.sin((p.rollCtl ?? 0) * (Math.PI / 2))), g0 = (p.rollCtl ?? 0) >= 0 ? 1 : -1;
+  const steerMix = inp.steer * (1 - k0) + (inp.pitch ?? 0) * g0 * k0;
+  const pitchMix = (inp.pitch ?? 0) * (1 - k0) - inp.steer * g0 * k0;
+  const target = Math.max(-1, Math.min(1, steerMix));
   const rate = Math.sign(target) !== Math.sign(p.steer) && Math.abs(p.steer) > 0.05 ? 9 : target === 0 ? 7 : 4.5;
   p.steer += Math.max(-rate * dt, Math.min(rate * dt, target - p.steer));
-  const pIn = frozen ? 0 : Math.max(-1, Math.min(1, inp.pitch ?? 0)), rIn = frozen ? 0 : Math.max(-1, Math.min(1, inp.roll ?? 0));
+  const pIn = frozen ? 0 : Math.max(-1, Math.min(1, pitchMix)), rIn = frozen ? 0 : Math.max(-1, Math.min(1, inp.roll ?? 0));
   const pc = p.pitchCtl = (p.pitchCtl ?? 0) + (pIn - (p.pitchCtl ?? 0)) * Math.min(1, dt * 6.5);
   p.rollCtl = (p.rollCtl ?? 0) + Math.max(-dt * 4.4, Math.min(dt * 4.4, rIn - (p.rollCtl ?? 0)));
   const rollA = p.rollCtl * (Math.PI / 2), knife = Math.abs(Math.sin(rollA));
@@ -100552,8 +100790,10 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
   let vr = p.vel.x * rx + p.vel.z * rz;
   const hp = (p.hpL + p.hpR) / 200;
   p.airbraking = inp.airbrake && vf > 15;
-  const sliding = p.airbraking && Math.abs(p.steer) > 0.25 && p.grounded && !frozen;
-  if (sliding) p.slideT = Math.min(2.2, (p.slideT ?? 0) + dt);
+  const wantSlide = p.airbraking && Math.abs(p.steer) > 0.2 && p.grounded && !frozen;
+  const sk = p.slideK = Math.max(0, Math.min(1, (p.slideK ?? 0) + (wantSlide ? dt * 3.2 : -dt * 2.2)));
+  const sliding = sk > 0.25;
+  if (wantSlide) p.slideT = Math.min(2.2, (p.slideT ?? 0) + dt);
   else {
     if ((p.slideT ?? 0) > 0.45 && inp.throttle > 0.5 && !inp.airbrake && p.grounded) vf += Math.min(7, p.slideT * 4.2);
     if (!inp.airbrake || !p.grounded) p.slideT = 0;
@@ -100581,7 +100821,11 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
   const sp = Math.abs(vf);
   const lowF = Math.min(1, sp / 22);
   const highF = 1 - 0.32 * Math.min(1, sp / P.vmax);
-  let omega = p.steer * P.turn * lowF * highF * (sliding ? P.abTurn * 1.16 : p.airbraking ? P.abTurn : 1) * (p.grounded ? 1 : 0.55) * (1 - 0.4 * knife);
+  let omega = p.steer * P.turn * lowF * highF * (1 + (P.abTurn - 1) * 0.45 * sk) * (p.grounded ? 1 : 0.55) * (1 - 0.4 * knife);
+  if (sk > 0 && p.steer * vr < 0) {
+    const slip = Math.atan2(Math.abs(vr), Math.max(8, vf));
+    if (slip > 0.6) omega *= Math.max(0.15, 1 - (slip - 0.6) / 0.45);
+  }
   omega += (p.hpR - p.hpL) / 100 * 0.25 * lowF;
   if (p.zeroG) omega *= 1.4;
   if (frozen) omega = 0;
@@ -100600,11 +100844,11 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
       if (vf > 0) vf = Math.max(0, vf - 55 * inp.brake * dt);
       else vf = Math.max(-18, vf - 14 * inp.brake * dt);
     }
-    if (p.airbraking) vf = Math.max(10, vf - P.abDecel * (sliding ? 0.42 : 1) * dt);
+    if (p.airbraking) vf = Math.max(10, vf - P.abDecel * (1 - 0.7 * sk) * dt);
   } else vf *= Math.exp(-3 * dt);
   vf *= Math.exp(-(inp.throttle > 0 ? 0.04 : 0.28) * dt);
   const attGrip = (p.bankGrip ?? 1) * (pc < 0 ? 1 - 0.14 * pc : 1 - 0.2 * pc);
-  vr *= Math.exp(-P.grip * gripMul * attGrip * dt * (sliding ? 0.24 : p.airbraking ? 0.45 : 1) * (p.grounded ? 1 : 0.15));
+  vr *= Math.exp(-P.grip * gripMul * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.085 * sk) * (p.grounded ? 1 : 0.15));
   const fx2 = Math.sin(p.yaw), fz2 = Math.cos(p.yaw), rx2 = -fz2, rz2 = fx2;
   p.vel.x = fx2 * vf + rx2 * vr;
   p.vel.z = fz2 * vf + rz2 * vr;
@@ -100787,12 +101031,44 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
       }
     }
   }
+  if (td.overheads && td.overheads.length && p.path === 0) {
+    const Nm = td.N, ext = 1.5 + knife * halfSpan;
+    for (const oh of td.overheads) {
+      let di = p.idx - oh.idx;
+      if (td.main.closed) {
+        if (di > Nm / 2) di -= Nm;
+        else if (di < -Nm / 2) di += Nm;
+      }
+      if (Math.abs(di) > 5) continue;
+      const s0 = td.main.samples[oh.idx], along = (p.pos.x - s0.x) * s0.tx + (p.pos.z - s0.z) * s0.tz;
+      if (Math.abs(along) > oh.half + 2.4 || p.pos.y + ext <= oh.y0 || p.pos.y - ext >= oh.y1) continue;
+      const below = p.pos.y < (oh.y0 + oh.y1) * 0.5, hitY = below ? oh.y0 : oh.y1;
+      if (below) {
+        p.pos.y = oh.y0 - ext;
+        if (p.vel.y > -5) p.vel.y = -5;
+      } else {
+        p.pos.y = oh.y1 + ext;
+        if (p.vel.y < 4) p.vel.y = 4;
+      }
+      const wc = p;
+      if (p.invuln <= 0 && !(wc.wCd > 0)) {
+        wc.wCd = 0.5;
+        const spd = Math.hypot(p.vel.x, p.vel.z), dmg = Math.min(18, 5 + spd * 0.07) * P.sturdy;
+        p.hpL -= dmg * 0.5;
+        p.hpR -= dmg * 0.5;
+        p.vel.x *= 0.9;
+        p.vel.z *= 0.9;
+        p.shake = Math.min(1, p.shake + 0.5);
+        p.events.push({ type: "wall", strength: 18 + spd * 0.1, x: p.pos.x, y: hitY, z: p.pos.z, nx: 0, nz: 0 });
+      }
+    }
+  }
   const buckets = td.obstaclesByPath[p.path];
   const b0 = Math.floor(p.idx / 10);
   for (let bb = b0 - 1; bb <= b0 + 1; bb++) {
     const list = buckets.get(bb);
     if (!list) continue;
-    for (const o of list) if (o.kind !== 3) collideObstacle(p, o, P.sturdy);
+    for (const o of list) if (o.kind !== 3 && !o.broken) collideObstacle(p, o, P.sturdy);
   }
   if (td.setPieces.length) collideSetPieces(p, td, time11, P.sturdy);
   const N2 = td.N;
@@ -100864,7 +101140,7 @@ function stepPod(p, td, dt, time11, gripMul, frozen) {
       roadSlope = Math.atan2((sLF.y + sRF.y) * 0.5 - sCk.y, dz);
     }
   }
-  const rawRoll = p.steer * 0.07 + vr * 4e-3 + (sliding ? p.steer * 0.12 : 0) + (p.grounded ? Math.atan(S.bank) * 0.92 : 0);
+  const rawRoll = p.steer * 0.07 + vr * 4e-3 + p.steer * 0.12 * sk + (p.grounded ? Math.atan(S.bank) * 0.92 : 0);
   const targetRoll = Math.max(-0.5, Math.min(0.5, rawRoll));
   p.rollBase = (p.rollBase ?? 0) + (targetRoll - (p.rollBase ?? 0)) * Math.min(1, dt * 7);
   p.roll = p.rollBase * (1 - knife) + rollA;
@@ -100961,9 +101237,29 @@ function collideObstacle(p, o, sturdy) {
     const R = o.r + c.r;
     if (d >= R || d < 1e-3) continue;
     const nx = dx / d, nz = dz / d;
+    const vn3 = p.vel.x * nx + p.vel.z * nz;
+    if (o.breakable && vn3 < -5 && Math.hypot(p.vel.x, p.vel.z) > 38) {
+      if (p.invuln <= 0) {
+        const dmg = (4 + o.r * 2.6) * sturdy * (p.isPlayer ? 1 : 0.6);
+        if (c.side < 0) p.hpL -= dmg;
+        else if (c.side > 0) p.hpR -= dmg;
+        else {
+          p.hpL -= dmg * 0.5;
+          p.hpR -= dmg * 0.5;
+        }
+      }
+      p.vel.x *= 0.93;
+      p.vel.z *= 0.93;
+      p.shake = Math.min(1, p.shake + 0.35);
+      p.events.push({ type: "break", strength: o.r, x: o.x, y: o.y, z: o.z, nx, nz, ref: o });
+      o.broken = true;
+      o.x = 1e9;
+      o.z = 1e9;
+      o.lat = 1e6;
+      return;
+    }
     p.pos.x += nx * (R - d);
     p.pos.z += nz * (R - d);
-    const vn3 = p.vel.x * nx + p.vel.z * nz;
     if (vn3 < 0) {
       p.vel.x -= nx * vn3 * 1.5;
       p.vel.z -= nz * vn3 * 1.5;
@@ -101480,6 +101776,14 @@ function aiInputs(p, td, pods, time11, player) {
     pitchIn = 0;
     rollIn = 0;
   }
+  {
+    const k = Math.abs(Math.sin((p.rollCtl ?? 0) * (Math.PI / 2)));
+    if (k > 0.02) {
+      const g2 = (p.rollCtl ?? 0) >= 0 ? 1 : -1, det2 = (1 - k) * (1 - k) + k * k, S2 = steer, Pd = pitchIn;
+      steer = Math.max(-1, Math.min(1, (S2 * (1 - k) - Pd * g2 * k) / det2));
+      pitchIn = Math.max(-1, Math.min(1, (Pd * (1 - k) + S2 * g2 * k) / det2));
+    }
+  }
   p.input.pitch = pitchIn;
   p.input.roll = rollIn;
   p.input.steer = steer;
@@ -101539,7 +101843,7 @@ init_textures();
 var TSL15 = three_tsl_exports;
 var { cameraPosition: cameraPosition3, clamp: clamp14, dot: dot8, exp: exp6, fog: fog2, max: max10, min: min5, mix: mix11, normalize: normalize9, oneMinus: oneMinus13, positionView: positionView8, positionWorld: positionWorld5, pow: pow12, step: step7, texture: texture8, time: time10, uniform: uniform11, vec2: vec210 } = TSL15;
 var HEIGHT_FOG = { desert: 0.32, mesa: 0.32, ice: 0.55, jungle: 0.65, malastare: 0.75, lava: 0.55, crystal: 0.5, aquilaris: 0.45, city: 0.4, oovo: 0 };
-function applyAtmosphere(scene, theme, density, baseY, sunDir, volFog = 0.25) {
+function applyAtmosphere(scene, theme, density, baseY, sunDir, volFog = 0.25, quality = 2) {
   const fogCol = uniform11(new Color(theme.fogColor)), sunCol = uniform11(new Color(theme.sunColor)), vf = uniform11(volFog);
   const dens = uniform11(density), sd = uniform11(sunDir.clone().normalize());
   const hStr = HEIGHT_FOG[theme.id] ?? 0.4;
@@ -101547,7 +101851,7 @@ function applyAtmosphere(scene, theme, density, baseY, sunDir, volFog = 0.25) {
   const toFrag = positionWorld5.sub(cameraPosition3), rd = normalize9(toFrag);
   const fd = oneMinus13(exp6(dens.mul(dist).pow(2).negate()));
   let factor = fd, fh = null;
-  if (hStr > 0 && volFog > 0) {
+  if (hStr > 0 && volFog > 0 && quality > 0) {
     const a = vf.mul(2.2).add(1).mul(17e-4 * hStr), b = 0.032;
     const h0 = max10(cameraPosition3.y.sub(baseY), 0), h12 = max10(positionWorld5.y.sub(baseY), 0);
     const dh = h12.sub(h0), dhS = mix11(min5(dh, -2e-3), max10(dh, 2e-3), step7(0, dh));
@@ -101556,7 +101860,7 @@ function applyAtmosphere(scene, theme, density, baseY, sunDir, volFog = 0.25) {
     const drift = vec210(time10.mul(52e-4), time10.mul(31e-4));
     const pA = cameraPosition3.xz.add(toFrag.xz.mul(0.5)), pB = cameraPosition3.xz.add(toFrag.xz.mul(0.86));
     const n = texture8(m, pA.mul(11e-4).add(drift)).level(0).r.mul(0.62).add(texture8(m, pB.mul(27e-4).sub(drift.mul(1.7))).level(0).g.mul(0.38));
-    const bank = clamp14(n.sub(0.5).mul(vf.mul(0.55).add(0.35).mul(2.2)).add(1), 0.25, 2.2);
+    const bank = quality >= 2 ? clamp14(n.sub(0.5).mul(vf.mul(0.55).add(0.35).mul(2.2)).add(1), 0.25, 2.2) : 1;
     fh = oneMinus13(exp6(rhoAvg.mul(dist).mul(bank).negate()));
     factor = clamp14(fd.add(fh.mul(oneMinus13(fd))), 0, 1);
   }
@@ -101620,6 +101924,10 @@ var Game = class {
   closing = 0;
   flybyT = 0;
   loadMs = {};
+  /** Session 14: 0..1 how far the player is under a roof (rain, splashes and lens drops fade out); weather-effects quality 0 / 0.5 / 1 */
+  cover = 0;
+  wxQ = 1;
+  envDirty = false;
   shadowTexel = 0;
   sunRight = new Vector3();
   sunUp = new Vector3();
@@ -101773,14 +102081,17 @@ var Game = class {
     this.td = buildTrack(trackDef);
     {
       const avgY = this.td.main.samples.reduce((a, s) => a + s.y, 0) / this.td.N;
-      this.fog = applyAtmosphere(this.scene, theme, theme.fogDensity / gfx.drawDistance, avgY - 12, this.sunDir, fx.volFog);
+      this.fog = applyAtmosphere(this.scene, theme, theme.fogDensity / gfx.drawDistance, avgY - 12, this.sunDir, fx.volFog, gfx.volumetrics ?? 2);
     }
     this.world = await buildWorld(this.td, theme, gfx, (p, m) => this.cb.onLoading(0.05 + p * 0.85, m));
     if (this.disposed) return;
     this.scene.add(this.world.group);
     this.particles = new Particles(gfx.particles);
     this.particles.initAmbient(theme.ambient, build.wind, Math.max(1, build.ambMax / 0.45));
+    this.wxQ = [0, 0.5, 1][gfx.weatherFx ?? 2] ?? 1;
+    setPodLodScale(gfx.podDetail ?? 1);
     this.weather = new WeatherFx(fx, this.particles, this.scene, theme.sunAz * Math.PI / 180 + 1.1, build.bolt);
+    this.weather.quality = this.wxQ;
     this.scene.add(this.particles.group);
     this.loadMs.world = Math.round(performance.now() - tL0) - this.loadMs.init;
     this.cb.onLoading(0.92, "Montiere Podracer \u2026");
@@ -101795,20 +102106,22 @@ var Game = class {
       for (let i = 0; i < this.pods.length * 5; i++) im.setColorAt(i, cols[i % 5]);
       this.scene.add(im);
       this.navLights = im;
-      this.beams = makeBeams(this.pods.length * 2);
-      this.scene.add(this.beams.mesh);
+      if ((gfx.volumetrics ?? 2) > 0) {
+        this.beams = makeBeams(this.pods.length * 2);
+        this.scene.add(this.beams.mesh);
+      }
       const sl = new SpotLight("#dfeaff", 12e3, 0, 0.5, 0.6, 2);
       this.scene.add(sl);
       this.scene.add(sl.target);
       this.headLamp = sl;
     }
-    this.post = new PostFX(r, this.scene, this.camera, gfx, { rain: build.maxRain, flare: build.flare });
+    this.post = new PostFX(r, this.scene, this.camera, gfx, { rain: (gfx.weatherFx ?? 2) > 0 ? build.maxRain : 0, flare: build.flare });
     this.applyEnv(0);
     this.post.lens.sunColor?.value.set(theme.sunColor);
     this.particles.setScale(h0 * r.getPixelRatio());
     this.audio = new AudioFX(this.profile.volume);
     this.loadMs.pods = Math.round(performance.now() - tL0) - this.loadMs.init - this.loadMs.world;
-    console.info(`[load] init ${this.loadMs.init} ms \xB7 world ${this.loadMs.world} ms (textures ${this.world.timings.texMs} ms, ${textureStats.workers} workers${textureStats.jobMs.length ? ", jobs " + textureStats.jobMs.join("/") + " ms" : ""}) \xB7 pods ${this.loadMs.pods} ms`);
+    console.info(`[load] init ${this.loadMs.init} ms \xB7 world ${this.loadMs.world} ms (textures ${this.world.timings.texMs} ms, ${textureStats.cached} from cache, ${textureStats.workers} workers${textureStats.jobMs.length ? ", jobs " + textureStats.jobMs.join("/") + " ms" : ""}) \xB7 pods ${this.loadMs.pods} ms`);
     this.cb.onLoading(0.96, "W\xE4rme Grafik-Pipeline auf \u2026");
     await new Promise((res2) => setTimeout(res2, 0));
     this.updateCamera(0.016);
@@ -101945,7 +102258,7 @@ var Game = class {
     this.keys.add(e.code);
     if (this.keymap.view.includes(e.code)) this.cycleCamera();
     if (e.code === "Escape" || e.code === "KeyP") this.setPaused(!this.paused);
-    this.audio?.resume();
+    if (!this.paused) this.audio?.resume();
   };
   onKeyUp = (e) => {
     this.keys.delete(e.code);
@@ -102120,8 +102433,8 @@ var Game = class {
         if (p.dead <= 0) respawn(p, this.td);
       }
       if (!p.finished && this.state !== "countdown") {
-        const done = this.td.main.closed ? p.lap >= this.profile.race.laps : p.rel >= this.td.finishIdx - this.td.startIdx;
-        if (done) {
+        const done2 = this.td.main.closed ? p.lap >= this.profile.race.laps : p.rel >= this.td.finishIdx - this.td.startIdx;
+        if (done2) {
           p.finished = true;
           p.finishTime = this.raceTime;
           if (!this.td.main.closed) p.lapTimes.push(this.raceTime);
@@ -102166,7 +102479,13 @@ var Game = class {
     this.weather.update(dt, this.clock, this.camera, this.state === "countdown", (v) => this.audio.thunder(v), (near) => {
       if (near > 0.5) this.player.shake = Math.min(1, this.player.shake + (near - 0.5) * 0.9);
     });
+    {
+      const pl = this.player, ps = this.td.paths[pl.path].samples[pl.idx];
+      this.cover += ((ps && ps.roof > 0 ? 1 : 0) - this.cover) * Math.min(1, dt * 5);
+      this.particles.setAmbientFade(1 - this.cover);
+    }
     this.applyEnv(dt);
+    if (this.post) this.post.lens.rain.value = this.wxQ > 0 ? this.env.rain * (1 - this.cover) : 0;
     if (this.messageT > 0) this.messageT -= dt;
     this.flash = Math.max(0, this.flash - dt * 2);
     const pp = this.player.pos;
@@ -102227,7 +102546,7 @@ var Game = class {
     {
       const pl = this.player, ps = this.td.paths[pl.path].samples[pl.idx];
       const enc = ps ? ps.roof > 0 ? 1 : (ps.hL > 0 ? 0.35 : 0) + (ps.hR > 0 ? 0.35 : 0) : 0;
-      this.audio.setEnv(pl.sliding ? 1 : 0, enc, this.env.rain, Math.min(1, this.env.wind * (0.55 + 0.45 * this.weather.gust) + (this.env.gust !== "none" ? 0.15 : 0)));
+      this.audio.setEnv(pl.sliding ? 1 : 0, enc, this.env.rain * (1 - 0.85 * this.cover), Math.min(1, this.env.wind * (0.55 + 0.45 * this.weather.gust) + (this.env.gust !== "none" ? 0.15 : 0)));
       const rc = Math.abs(pl.rollCtl ?? 0);
       if (rc > 0.5 && this.prevRoll <= 0.5) this.audio.whoosh();
       this.prevRoll = rc;
@@ -102250,13 +102569,13 @@ var Game = class {
   updateVisuals(dt = 0.016) {
     this.particles.setFrameDt(dt);
     const camPos = this.camera.position;
-    if (this.env.rain > 0.08 && dt > 0) {
-      const pl = this.player, path = this.td.paths[pl.path], S = path.samples, n = Math.round(this.env.rain * 9 * Math.min(1.2, this.particles.amount) * this.particles.rateScale + Math.random());
+    if (this.env.rain > 0.08 && dt > 0 && this.wxQ > 0 && this.cover < 0.5) {
+      const pl = this.player, path = this.td.paths[pl.path], S = path.samples, n = Math.round(this.env.rain * 9 * this.wxQ * Math.min(1.2, this.particles.amount) * this.particles.rateScale + Math.random());
       for (let i = 0; i < n; i++) {
         let k = pl.idx - 3 + Math.floor(Math.random() * 46);
         k = path.closed ? (k % S.length + S.length) % S.length : Math.max(0, Math.min(S.length - 1, k));
         const s = S[k];
-        if (s.gap) continue;
+        if (s.gap || s.roof > 0) continue;
         const lat = (Math.random() * 2 - 1) * s.hw, x = s.x + s.rx * lat, z = s.z + s.rz * lat;
         this.particles.splash(this.tmpV.set(x, roadSurfaceAt(path, k, x, z).y + 0.07, z));
       }
@@ -102290,6 +102609,10 @@ var Game = class {
             if (e.type === "wall") this.world.flashField(e.x, e.y + 0.6, e.z, e.strength);
           }
           if (p.isPlayer || dist < 140) this.audio.hit(e.strength * (p.isPlayer ? 1 : 0.28));
+        } else if (e.type === "break") {
+          if (e.ref) this.world.breakObstacle(e.ref);
+          if (dist < 420) this.particles.debris(this.tmpV, p.vel, this.tmpC.copy(this.dustBase).multiplyScalar(0.6), e.strength);
+          if (p.isPlayer || dist < 130) this.audio.hit(34 * (p.isPlayer ? 1 : 0.4));
         } else if (e.type === "land") {
           if (near) this.particles.dust(this.tmpV, p.vel, this.dustCol, 8);
           if (p.isPlayer) this.audio.hit(e.strength * 0.5);
@@ -102339,7 +102662,7 @@ var Game = class {
       }
       const sp = Math.hypot(p.vel.x, p.vel.z);
       if (p.grounded && sp > 42 && p.pos.y - p.groundY < HOVER + 1.2) {
-        const wet = this.envBuild.rainRoad && this.wet > 0.3;
+        const wet = this.envBuild.rainRoad && this.wet > 0.3 && this.wxQ > 0 && !(this.td.paths[p.path].samples[p.idx]?.roof > 0);
         this.tmpV.set(p.pos.x - Math.sin(p.yaw) * 2.5, p.groundY + 0.15, p.pos.z - Math.cos(p.yaw) * 2.5);
         if (wet) {
           if (p.isPlayer) this.particles.spray(this.tmpV, p.vel, sp, this.wet);
@@ -102362,6 +102685,20 @@ var Game = class {
       }
     }
   }
+  /** Graphics settings that can change while the race is running (pause menu). Everything else needs a restart of the race. */
+  static LIVE_GFX = ["fov", "showFps", "renderScale", "lodBias", "podDetail", "weatherFx", "preset"];
+  applyLiveGfx(g2, volume) {
+    const prev = this.profile.gfx;
+    this.profile = { ...this.profile, gfx: g2, volume: volume ?? this.profile.volume };
+    if (volume !== void 0) this.audio?.setVolume(volume);
+    if (!this.renderer || !this.world || !this.weather) return;
+    if (g2.renderScale !== prev.renderScale) this.resize();
+    this.world.setLodBias(g2.lodBias ?? 1);
+    setPodLodScale(g2.podDetail ?? 1);
+    this.wxQ = [0, 0.5, 1][g2.weatherFx ?? 2] ?? 1;
+    this.weather.quality = this.wxQ;
+    this.envDirty = true;
+  }
   /** Sun / moon direction: sky, fog scattering, shadow basis, second sun of the desert worlds. */
   setSunDir(x, y, z) {
     const d = this.sunDir;
@@ -102381,7 +102718,8 @@ var Game = class {
    *  lightning, wind, grip, particle density, road wetness (with soak/dry lag) and the lightning flash. `snapWet` skips the lag. */
   applyEnv(dt, snapWet = false) {
     const tl = this.tl, e = this.env, b = this.envBuild;
-    if (tl.dynamic || !this.envInit) {
+    if (tl.dynamic || !this.envInit || this.envDirty) {
+      this.envDirty = false;
       const s = tl.eval(this.raceTime), U = this.sky.uniforms, S = SRGBColorSpace;
       U.top.value.setRGB(s.top[0], s.top[1], s.top[2], S);
       U.horizon.value.setRGB(s.hor[0], s.hor[1], s.hor[2], S);
@@ -102413,7 +102751,7 @@ var Game = class {
         this.post.lens.rain.value = s.rain;
         this.post.lens.sunColor?.value.setRGB(s.sun[0], s.sun[1], s.sun[2], S);
       }
-      this.particles?.setAmbientAmount(s.amb / b.ambMax);
+      this.particles?.setAmbientAmount(s.amb / b.ambMax * this.wxQ);
       this.wetTarget = b.rainRoad ? s.wet : 1;
       const k = Math.max(0, Math.min(1, (s.rain - 0.1) / 0.3));
       this.dustCol.copy(this.dustBase).lerp(this.tmpC.set("#c9d6e0"), k * 0.75).multiplyScalar(1 - 0.55 * s.dark);
@@ -102654,8 +102992,9 @@ var Game = class {
       time: this.raceTime,
       lastLap: p.lapTimes.length ? p.lapTimes[p.lapTimes.length - 1] : null,
       bestLap: closed ? best : null,
-      hpL: Math.max(0, p.hpL),
-      hpR: Math.max(0, p.hpR),
+      // HUD boxes mean screen-left / screen-right. Internal "L" is local x < 0 = the RIGHT engine in the chase view → swapped here.
+      hpL: Math.max(0, p.hpR),
+      hpR: Math.max(0, p.hpL),
       heat: p.heat,
       boosting: p.boosting,
       overheat: p.overheat,
@@ -102793,7 +103132,7 @@ window.track = async (i, view) => {
       const qs = new URLSearchParams(location.search);
       if (qs.get("tod")) prof2.race.timeOfDay = qs.get("tod");
       if (qs.get("wx")) prof2.race.weather = qs.get("wx");
-      if (qs.has("ultra")) Object.assign(prof2.gfx, PRESETS.ultra, { preset: "ultra", texRes: 1024 });
+      if (qs.has("ultra")) Object.assign(prof2.gfx, PRESETS.ultra, { preset: "ultra", texRes: 1024, renderScale: 0.6 });
     }
     prof2.gfx.renderScale = 0.6;
     prof2.gfx.shadows = 1;

@@ -29,7 +29,7 @@ export function KeyBindings({ profile, update }: { profile: Profile; update: Upd
             className={`px-3 py-1.5 text-xs border ${same(keys, KEY_PRESETS[id].keys) ? 'border-amber-400 text-amber-200 bg-amber-900/30' : 'border-stone-600 text-stone-300 hover:border-amber-500'}`}>{KEY_PRESETS[id].name}</button>
         ))}
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+      <div className="grid grid-cols-2 @3xl:grid-cols-4 gap-3 text-sm">
         {ACTIONS.map(([a, label]) => (
           <button key={a} onClick={() => setListen(listen === a ? null : a)} data-action={a}
             className={`flex items-center gap-3 bg-black/40 border p-2 text-left ${listen === a ? 'border-amber-400' : keys[a].length ? 'border-stone-800 hover:border-stone-500' : 'border-red-500/70'}`}>

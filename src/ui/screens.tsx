@@ -1,11 +1,13 @@
+import { Fit } from './Fit';
+import { GfxPanels } from './GfxPanels';
 import { KeyBindings } from './KeyBindings';
 import { sanitizeEnv, timeOptionsFor, weatherOptionsFor, type TimeOfDay, type WeatherKind } from '../game/environment';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, STAT_LABELS, THEMES, TRACKS, type StatKey } from '../game/data';
-import { PRESETS, effectiveStats, type GfxSettings, type Profile } from '../game/settings';
+import { effectiveStats, type Profile } from '../game/settings';
 import { buildTrack, type TrackData } from '../game/trackBuilder';
 import { CAMERA_NAMES, fmt } from '../game/Game';
-import { Btn, Panel, Slider, StatBar, Toggle } from './common';
+import { Btn, Panel, Slider, StatBar } from './common';
 import PodPreview from './PodPreview';
 import bg from '../assets/menu-bg.jpg';
 
@@ -32,12 +34,14 @@ export function Background({ dim = 0.55 }: { dim?: number }) {
 export function MainMenu({ profile, go }: { profile: Profile; go: (s: string) => void }) {
   const pod = PODS.find(p => p.id === profile.podId)!;
   return (
-    <div className="relative w-full h-full flex">
+    <div className="relative w-full h-full overflow-hidden">
       <Background />
-      <div className="relative z-10 flex flex-col justify-center pl-[8vw] w-full md:w-1/2">
+      <Fit>
+      <div className="relative z-10 flex h-[680px]">
+      <div className="flex flex-col justify-center pl-24 w-1/2">
         <div className="font-display text-amber-400/80 tracking-[0.6em] text-xs mb-3">OUTER RIM CHAMPIONSHIP</div>
-        <h1 className="font-display text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-orange-600 leading-none drop-shadow-[0_0_40px_rgba(251,146,60,0.35)]">PODRACER</h1>
-        <div className="font-display text-xl md:text-2xl text-amber-100/90 tracking-[0.4em] mt-2 mb-12">HYPERSPEED LEGENDS</div>
+        <h1 className="font-display text-6xl @3xl:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-orange-600 leading-none drop-shadow-[0_0_40px_rgba(251,146,60,0.35)]">PODRACER</h1>
+        <div className="font-display text-xl @3xl:text-2xl text-amber-100/90 tracking-[0.4em] mt-2 mb-12">HYPERSPEED LEGENDS</div>
         <div className="flex flex-col gap-3 w-72">
           <Btn big onClick={() => go('setup')}>Rennen starten</Btn>
           <Btn big onClick={() => go('garage')}>Hangar & Tuning</Btn>
@@ -45,9 +49,11 @@ export function MainMenu({ profile, go }: { profile: Profile; go: (s: string) =>
         </div>
         <div className="mt-12 text-stone-400 text-xs tracking-widest uppercase">Aktueller Pod: <span className="text-amber-300">{pod.name}</span></div>
       </div>
-      <div className="hidden md:block relative z-10 w-1/2 h-full">
+      <div className="relative w-1/2 h-full">
         <PodPreview podId={profile.podId} colors={profile.custom[profile.podId].colors} className="w-full h-full" />
       </div>
+      </div>
+      </Fit>
     </div>
   );
 }
@@ -83,24 +89,27 @@ function TrackMap({ id, className }: { id: string; className?: string }) {
 export function RaceSetup({ profile, update, go, start }: { profile: Profile; update: Upd; go: (s: string) => void; start: () => void }) {
   const r = profile.race;
   const [filter, setFilter] = useState<'all' | 'circuit' | 'sprint'>('all');
+  const [planet, setPlanet] = useState('all'); const planets = [...new Set(TRACKS.map(t => t.planet))];
   const track = TRACKS.find(t => t.id === r.trackId)!;
   const theme = THEMES[track.theme];
   const set = (k: keyof Profile['race'], v: number | string) => update(p => ({ ...p, race: { ...p.race, [k]: v } }));
   const td = useMemo(() => getTrack(track.id), [track.id]);
   const best = profile.best[track.id];
   return (
-    <div className="relative w-full h-full overflow-auto">
+    <div className="relative w-full h-full overflow-hidden">
       <Background dim={0.7} />
-      <div className="relative z-10 p-6 md:p-10 max-w-[1500px] mx-auto">
+      <Fit>
+      <div className="relative z-10 p-6 @3xl:p-10 max-w-[1500px] mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-display text-3xl text-amber-200 tracking-[0.3em]">RENNEN</h2>
           <Btn onClick={() => go('menu')}>‹ Zurück</Btn>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr_340px] gap-5">
+        <div className="grid grid-cols-1 @5xl:grid-cols-[360px_1fr_340px] gap-5">
           <Panel title="Strecken">
             <div className="flex gap-2 mb-4">{(['all', 'circuit', 'sprint'] as const).map(f => <Btn key={f} active={filter === f} onClick={() => setFilter(f)}>{f === 'all' ? 'Alle' : f === 'circuit' ? 'Rundkurs' : 'Sprint'}</Btn>)}</div>
+            <div className="flex flex-wrap gap-1.5 mb-4">{['all', ...planets].map(pl => <button key={pl} onClick={() => setPlanet(pl)} className={`px-2 py-1 text-[10px] uppercase tracking-widest border ${planet === pl ? 'border-amber-400 text-amber-200 bg-amber-900/30' : 'border-stone-700 text-stone-400 hover:border-stone-500'}`}>{pl === 'all' ? 'Alle Planeten' : pl}</button>)}</div>
             <div className="flex flex-col gap-2">
-              {TRACKS.filter(t => filter === 'all' || t.type === filter).map(t => (
+              {TRACKS.filter(t => (filter === 'all' || t.type === filter) && (planet === 'all' || t.planet === planet)).map(t => (
                 <button key={t.id} onClick={() => set('trackId', t.id)} className={`text-left p-3 border transition clip-corner ${t.id === r.trackId ? 'border-amber-300 bg-amber-400/15' : 'border-stone-700 bg-black/30 hover:border-amber-500/60'}`}>
                   <div className="flex justify-between items-center">
                     <span className="font-display text-amber-100 tracking-wider">{t.name}</span>
@@ -117,7 +126,7 @@ export function RaceSetup({ profile, update, go, start }: { profile: Profile; up
               <div className="absolute top-3 left-3 text-[10px] uppercase tracking-widest text-stone-300 bg-black/50 px-2 py-1">● Start {track.type === 'sprint' && <span className="text-green-400 ml-2">● Ziel</span>} <span className="text-amber-300 ml-2">┅ Abkürzung</span> <span className="text-red-400 ml-2">▬ Sprung</span></div>
             </div>
             <p className="text-stone-300 mt-4 leading-relaxed">{track.desc}</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 text-center">
+            <div className="grid grid-cols-2 @3xl:grid-cols-4 gap-3 mt-4 text-center">
               {[['Länge', (td.main.length / 1000).toFixed(2) + ' km'], ['Sprünge', String(track.ramps.length)], ['Abkürzungen', String(td.paths.length - 1)], ['Bestzeit', best ? fmt(best) : '—']].map(([a, b]) => (
                 <div key={a} className="bg-black/40 border border-stone-700 p-2"><div className="text-[10px] uppercase tracking-widest text-stone-400">{a}</div><div className="font-display text-amber-200 text-lg">{b}</div></div>
               ))}
@@ -155,6 +164,7 @@ export function RaceSetup({ profile, update, go, start }: { profile: Profile; up
           </Panel>
         </div>
       </div>
+      </Fit>
     </div>
   );
 }
@@ -171,14 +181,15 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
   const setColor = (i: number, v: string) => { const cols = [...custom.colors] as [string, string, string]; cols[i] = v; setCustom({ ...custom, colors: cols }); };
   const setTune = (k: StatKey, v: number) => setCustom({ ...custom, tuning: { ...custom.tuning, [k]: Math.max(0, Math.min(5, v)) } });
   return (
-    <div className="relative w-full h-full overflow-auto">
+    <div className="relative w-full h-full overflow-hidden">
       <Background dim={0.75} />
-      <div className="relative z-10 p-6 md:p-10 max-w-[1600px] mx-auto">
+      <Fit>
+      <div className="relative z-10 p-6 @3xl:p-10 max-w-[1600px] mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-display text-3xl text-amber-200 tracking-[0.3em]">HANGAR</h2>
           <div className="flex gap-2"><Btn active={profile.podId === sel} onClick={() => update(p => ({ ...p, podId: sel }))}>{profile.podId === sel ? '✓ Ausgewählt' : 'Diesen Pod fahren'}</Btn><Btn onClick={() => go('menu')}>‹ Zurück</Btn></div>
         </div>
-        <div className="grid grid-cols-1 xl:grid-cols-[240px_1fr_320px] gap-5">
+        <div className="grid grid-cols-1 @7xl:grid-cols-[240px_1fr_320px] gap-5">
           <Panel title="Podracer">
             <div className="flex flex-col gap-1.5">
               {PODS.map(p => (
@@ -191,7 +202,7 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
             </div>
           </Panel>
           <div className="flex flex-col gap-5">
-            <div className="relative h-[62vh] min-h-[460px] border border-amber-500/20 bg-black/40 clip-corner overflow-hidden">
+            <div className="relative h-[560px] border border-amber-500/20 bg-black/40 clip-corner overflow-hidden">
               <PodPreview podId={sel} colors={custom.colors} className="absolute inset-0" />
               <div className="absolute top-4 left-5 pointer-events-none">
                 <div className="font-display text-3xl text-amber-100">{pod.name}</div>
@@ -200,7 +211,7 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
               <div className="absolute bottom-3 right-4 text-[10px] uppercase tracking-widest text-stone-400">Ziehen zum Drehen</div>
             </div>
             <Panel title="Lackierung">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 @3xl:grid-cols-3 gap-4">
                 {['Primär', 'Sekundär', 'Triebwerksglühen'].map((l, i) => (
                   <div key={l}>
                     <div className="flex items-center justify-between mb-2"><span className="text-[11px] uppercase tracking-widest text-stone-300">{l}</span><input type="color" value={custom.colors[i]} onChange={e => setColor(i, e.target.value)} className="w-8 h-8 bg-transparent cursor-pointer" /></div>
@@ -248,71 +259,30 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
           </div>
         </div>
       </div>
+      </Fit>
     </div>
   );
 }
 
 export function SettingsScreen({ profile, update, go }: { profile: Profile; update: Upd; go: (s: string) => void }) {
-  const g = profile.gfx;
-  const set = <K extends keyof GfxSettings>(k: K, v: GfxSettings[K]) => update(p => ({ ...p, gfx: { ...p.gfx, [k]: v, preset: k === 'fov' || k === 'showFps' || k === 'backend' || k === 'batching' || k === 'bloomStrength' || k === 'anisotropy' || k === 'shaderDetail' || k === 'bumpMapping' || k === 'tessellation' ? p.gfx.preset : 'custom' } }));
-  const preset = (n: keyof typeof PRESETS) => update(p => ({ ...p, gfx: { ...p.gfx, ...PRESETS[n], preset: n } }));
-  const webgpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
   return (
-    <div className="relative w-full h-full overflow-auto">
+    <div className="relative w-full h-full overflow-hidden">
       <Background dim={0.8} />
-      <div className="relative z-10 p-6 md:p-10 max-w-[1300px] mx-auto">
+      <Fit>
+      <div className="relative z-10 p-6 @3xl:p-10 max-w-[1300px] mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-display text-3xl text-amber-200 tracking-[0.3em]">EINSTELLUNGEN</h2>
           <Btn onClick={() => go('menu')}>‹ Zurück</Btn>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <Panel title="Grafik-Voreinstellung" className="lg:col-span-3">
-            <div className="flex flex-wrap gap-2 items-center">
-              {(['low', 'medium', 'high', 'ultra'] as const).map(n => <Btn key={n} active={g.preset === n} onClick={() => preset(n)}>{{ low: 'Niedrig', medium: 'Mittel', high: 'Hoch', ultra: 'Ultra' }[n]}</Btn>)}
-              {g.preset === 'custom' && <span className="text-xs text-cyan-300 uppercase tracking-widest ml-2">Benutzerdefiniert</span>}
-              <span className="ml-auto text-[11px] text-stone-400 uppercase tracking-widest">Renderer: {g.backend === 'webgl' ? 'WebGL2 erzwungen' : webgpu ? 'WebGPU HDR-Pipeline' : 'WebGL2 Fallback'}</span>
-            </div>
-          </Panel>
-          <Panel title="Auflösung & Geometrie">
-            <Slider label="Render-Skalierung" value={g.renderScale} min={0.5} max={1.5} step={0.05} onChange={v => set('renderScale', v)} fmt={v => Math.round(v * 100) + '%'} />
-            <Slider label="Textur-Filter (Anisotrop)" value={g.anisotropy ?? 8} min={1} max={16} step={1} onChange={v => set('anisotropy', [1, 4, 8, 16].reduce((b, x) => Math.abs(x - v) < Math.abs(b - v) ? x : b))} fmt={v => v + 'x'} />
-            <Slider label="Texturauflösung" value={g.texRes} min={512} max={2048} step={512} onChange={v => set('texRes', v === 1536 ? 2048 : v)} fmt={v => v >= 2048 ? '2048 (UHD)' : String(v)} />
-            <Slider label="Geometrie-Detail" value={g.geometry} min={1} max={3} step={1} onChange={v => set('geometry', v)} fmt={v => ['Niedrig', 'Hoch', 'Ultra (High-Poly)'][v - 1]} />
-            <Slider label="Detaildichte" value={g.detail} min={0.2} max={1.6} step={0.1} onChange={v => set('detail', v)} fmt={v => Math.round(v * 100) + '%'} />
-            <Slider label="Sichtweite" value={g.drawDistance} min={0.5} max={1.5} step={0.1} onChange={v => set('drawDistance', v)} fmt={v => Math.round(v * 100) + '%'} />
-            <Slider label="Sichtfeld (FOV)" value={g.fov} min={60} max={100} step={1} onChange={v => set('fov', v)} fmt={v => v + '°'} />
-          </Panel>
-          <Panel title="Beleuchtung & Material">
-            <Slider label="Schattenqualität" value={g.shadows} min={0} max={3} step={1} onChange={v => set('shadows', v)} fmt={v => ['Aus', '1024', '2048', '4096'][v]} />
-            <Slider label="Shader-Details" value={g.shaderDetail ?? 1} min={0} max={2} step={1} onChange={v => set('shaderDetail', v)} fmt={v => ['Niedrig', 'Mittel', 'Hoch'][v]} />
-            <Toggle label="WebGL2 erzwingen (statt WebGPU)" value={g.backend === 'webgl'} onChange={v => set('backend', v ? 'webgl' : 'auto')} />
-            <Toggle label="Static Batching (BatchedMesh)" value={g.batching ?? true} onChange={v => set('batching', v)} />
-            <Toggle label="Bump-Mapping" value={g.bumpMapping ?? true} onChange={v => set('bumpMapping', v)} />
-            <Slider label="Tessellation" value={g.tessellation ?? 1} min={0} max={2} step={1} onChange={v => set('tessellation', v)} fmt={v => ['Aus', 'Mittel', 'Hoch'][v]} />
-            <Toggle label="Parallax-Occlusion-Mapping" value={g.parallax} onChange={v => set('parallax', v)} />
-            <Toggle label="Ambient Occlusion (GTAO)" value={g.ao} onChange={v => set('ao', v)} />
-            <Toggle label="Screen Space Reflections" value={g.ssr} onChange={v => set('ssr', v)} />
-            <Toggle label="Linseneffekte (Sonnenblendung, Regentropfen)" value={g.lensFx ?? true} onChange={v => set('lensFx', v)} />
-            <Toggle label="Kaskaden-Schatten (weit, +1 Schattenpass)" value={!!g.csm} onChange={v => set('csm', v)} />
-            <Toggle label="God Rays" value={g.godRays} onChange={v => set('godRays', v)} />
-            <Slider label="Partikel" value={g.particles} min={0.2} max={1.5} step={0.1} onChange={v => set('particles', v)} fmt={v => Math.round(v * 100) + '%'} />
-          </Panel>
-          <Panel title="Post-Processing & Audio">
-            <Toggle label="Bloom" value={g.bloom} onChange={v => set('bloom', v)} />
-            {g.bloom && <Slider label="Bloom-Stärke" value={g.bloomStrength ?? 0.5} min={0} max={1.5} step={0.05} onChange={v => update(p => ({ ...p, gfx: { ...p.gfx, bloomStrength: v } }))} fmt={v => Math.round(v * 100) + '%'} />}
-            <Toggle label="Geschwindigkeits-Unschärfe" value={g.motionBlur} onChange={v => set('motionBlur', v)} />
-            <Toggle label="Kino-Shader (CA, Grading, Vignette)" value={g.cinematic} onChange={v => set('cinematic', v)} />
-            <div className="text-[11px] uppercase tracking-widest text-stone-300 mt-2 mb-2">Kantenglättung</div>
-            <div className="flex gap-2 mb-3">{(['none', 'fxaa', 'smaa'] as const).map(a => <Btn key={a} active={g.aa === a} onClick={() => set('aa', a)}>{a === 'none' ? 'Aus' : a.toUpperCase()}</Btn>)}</div>
-            <Toggle label="FPS anzeigen" value={g.showFps} onChange={v => set('showFps', v)} />
-            <Slider label="Lautstärke" value={profile.volume} min={0} max={1} step={0.05} onChange={v => update(p => ({ ...p, volume: v }))} fmt={v => Math.round(v * 100) + '%'} />
-          </Panel>
-          <Panel title="Steuerung" className="lg:col-span-3">
+        <div className="grid grid-cols-1 @5xl:grid-cols-3 gap-5">
+          <GfxPanels profile={profile} update={update} />
+          <Panel title="Steuerung" className="@5xl:col-span-3">
             <KeyBindings profile={profile} update={update} />
             <p className="text-[11px] text-stone-500 mt-3">Gamepad: RT Schub · LT Bremse · Linker Stick lenken · Rechter Stick: ←/→ Rolle, ↑ Neigen, ↓ Anheben · A Boost · B/LB/RB Luftbremse/Slide · X Reparatur · Y Ansicht</p>
           </Panel>
         </div>
       </div>
+      </Fit>
     </div>
   );
 }

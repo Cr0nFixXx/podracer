@@ -188,6 +188,7 @@ export function buildSetPieces(td: TrackData, theme: ThemeDef, group: THREE.Grou
       }
       root.updateMatrixWorld(true);
       const falling = [3, 4, 5].map(k => pieces[k]);
+      const fades: { o: Obstacle; m: THREE.Mesh; t: number; done: boolean }[] = [];
       fns.push((_t, rt, pods, dt, frozen, fx) => {
         if (sp.state === 0) {
           if (frozen || rt < 1) return;
@@ -216,10 +217,18 @@ export function buildSetPieces(td: TrackData, theme: ThemeDef, group: THREE.Grou
               r.landed = true; r.y = gy + r.r * 0.6; m.position.y = r.y; m.scale.setScalar(0.48);
               const o: Obstacle = { path: 0, idx: qi, lat, r: r.r, kind: 0, x: r.x, y: gy, z: r.z };
               td.obstacles.push(o); const bk = Math.floor(qi / 10); const mm = td.obstaclesByPath[0]; if (!mm.has(bk)) mm.set(bk, []); mm.get(bk)!.push(o);
+              if (i !== 1) fades.push({ o, m, t: rt + 11 + i * 4, done: false });
               fx.push({ type: 'dust', x: r.x, y: gy + 1, z: r.z, strength: 1 });
             }
           });
           if (all) sp.state = 2;
+        }
+        // Session 14: two of the three fallen blocks crumble away 11–19 s after landing (the centre block stays as a permanent chicane)
+        for (const f of fades) {
+          if (f.done || rt < f.t) continue;
+          const sc = f.m.scale.x - dt * 0.16; f.m.position.y -= dt * 0.9;
+          if (sc <= 0.06) { f.done = true; f.m.visible = false; f.o.broken = true; f.o.x = 1e9; f.o.z = 1e9; f.o.lat = 1e6; }
+          else { f.m.scale.setScalar(sc); if (Math.random() < dt * 6) fx.push({ type: 'dust', x: f.m.position.x, y: f.m.position.y + 1, z: f.m.position.z, strength: 0.5 }); }
         }
       });
     }

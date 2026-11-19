@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { PILOTS, type PodDef } from './data';
-import { M4, PartBuilder, cyl, lathe, prof, rbox, tube } from './podKit';
+import { M4, PartBuilder, cyl, lathe, prof, rbox, tube, torus } from './podKit';
 import { engineGeo } from './podParts';
 import { cockpitGeo, podLayout, type PodLayout } from './podDesigns';
 import {
@@ -30,6 +30,9 @@ export interface PodVisual {
 const SHADOW_KEYS = new Set<string>(['hull', 'steel', 'dark', 'chrome', 'carbon']);
 const OPP_SHADOW_KEYS = new Set<string>(['hull', 'steel', 'dark']);
 const BINDER_PTS = 18;
+/** Graphics setting "Gegner-Pod-Detail": scales the distance at which rival pods switch from the detailed to the merged far model. */
+let podLodScale = 1;
+export function setPodLodScale(v: number) { podLodScale = Math.max(0.3, Math.min(4, v)); }
 
 /** Build flexible control cables tagged with `aLiv = (isRight, tEngine, 0)` so they follow moving engine pylons on GPU! */
 function buildFlexCables(L: PodLayout, seg: number, anchors: [THREE.Vector3, THREE.Vector3]) {
@@ -52,25 +55,33 @@ function buildFlexCables(L: PodLayout, seg: number, anchors: [THREE.Vector3, THR
   for (const em of L.engines) {
     const eg = engineGeo(em.spec, seg);
     const isR = em.x >= 0 ? 1 : 0;
-    const a = eg.pylon.clone().add(new THREE.Vector3(em.x, em.y, em.z)); // engine pylon (w=1)
+    const a = eg.pylon.clone().add(new THREE.Vector3(em.x, em.y, em.z)); // engine pylon on top of the nacelle (rigid with the engine)
     const b = anchors[isR].clone().add(cp);                               // cockpit anchor (w=0)
-    const dist = a.distanceTo(b); const sag = 0.34 + dist * 0.032;
+    // Session 14: the old cable ran in a straight sagging line from the cockpit to the pylon at 58 % of the engine length – straight
+    // THROUGH the rear half of the nacelle. It is now routed around it: free-hanging span to a saddle just above/behind the rear rim,
+    // then clipped along the top of the nacelle to the pylon (that part moves rigidly with the engine).
+    const rearZ = eg.exhaustZ + 0.12 * eg.L, topY = Math.max(eg.top, eg.R) + 0.14;
+    const v1 = new THREE.Vector3(em.x, em.y + topY + 0.1, em.z + rearZ - 0.3);
+    const v2 = new THREE.Vector3(em.x, em.y + topY, em.z + rearZ + (eg.pylon.z - rearZ) * 0.5);
+    const dist = v1.distanceTo(b); const sag = 0.3 + dist * 0.03;
     for (const [r, off, s, rad] of [[0.055, 0, 1, 6], [0.024, 0.12, 1.18, 4]] as [number, number, number, number][]) {
-      const pts: THREE.Vector3[] = [];
+      const pts: THREE.Vector3[] = []; const ox = off * (isR ? -1 : 1);
       for (let i = 0; i <= 8; i++) {
-        const t = i / 8; const p = b.clone().lerp(a, t);
-        p.y -= sag * s * 4 * t * (1 - t);
-        p.x += off * (isR ? -1 : 1) * Math.sin(t * Math.PI);
+        const t = i / 8; const p = b.clone().lerp(v1, t);
+        p.y -= sag * s * 4 * t * (1 - t) * (1 - 0.35 * t); // sag eases out towards the saddle so the cable clears the rear rim
+        p.x += ox * Math.sin(t * Math.PI * 0.5);
         pts.push(p);
       }
-      tagFlex(tube(pts, r, Math.max(12, Math.round(seg * 0.6)), rad), isR, a, b);
+      pts.push(v1.clone().lerp(v2, 0.5).add(new THREE.Vector3(ox, 0, 0)), v2.clone().add(new THREE.Vector3(ox, 0, 0)), a.clone().add(new THREE.Vector3(ox * 0.5, 0.03, 0)));
+      tagFlex(tube(pts, r, Math.max(16, Math.round(seg * 0.8)), rad), isR, v1, b);
     }
-    for (const [p, q] of [[a, b], [b, a]] as [THREE.Vector3, THREE.Vector3][]) {
+    for (const [p, q] of [[a, v2], [b, v1]] as [THREE.Vector3, THREE.Vector3][]) {
       const dir = q.clone().sub(p).normalize();
       const fg = cyl(0.085, 0.07, 0.24, 7);
       fg.applyMatrix4(new THREE.Matrix4().compose(p.clone().addScaledVector(dir, 0.12), new THREE.Quaternion().setFromUnitVectors(up, dir), new THREE.Vector3(1, 1, 1)));
-      tagFlex(fg, isR, a, b);
+      tagFlex(fg, isR, v1, b);
     }
+    for (const sp of [v1, v2]) { const cl = torus(0.085, 0.022, 5, 8); cl.rotateY(Math.PI / 2); cl.translate(sp.x, sp.y - 0.02, sp.z); tagFlex(cl, isR, v1, b); } // cable clips on the nacelle
   }
   const mg = mergeGeometries(list, false)!; list.forEach(x => x.dispose());
   mg.computeBoundingSphere(); mg.boundingSphere!.radius += 1.2;
@@ -117,7 +128,7 @@ function bakeSolidColor(g: THREE.BufferGeometry, col: THREE.Color) {
 
 function makeBinderGeo(a: THREE.Vector3, b: THREE.Vector3, vertCol?: THREE.Color) {
   const pos = new Float32Array(BINDER_PTS * 4 * 3), uv = new Float32Array(BINDER_PTS * 4 * 2);
-  const idx: number[] = []; const w = 0.18; const tmp = new THREE.Vector3();
+  const idx: number[] = []; const w = 0.3; const tmp = new THREE.Vector3(); // wider ribbon: room for the forked side arcs
   for (let i = 0; i < BINDER_PTS; i++) {
     const f = i / (BINDER_PTS - 1); tmp.copy(a).lerp(b, f);
     for (let k = 0; k < 4; k++) { uv[(i * 4 + k) * 2] = f; uv[(i * 4 + k) * 2 + 1] = k % 2 === 0 ? 1 : 0; }
@@ -296,10 +307,10 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
 
     const setDistance = (d: number, forceAll = false) => {
       if (forceAll) { nearGrp.visible = true; farGrp.visible = true; return; }
-      const useNear = d < 48;
+      const useNear = d < 48 * podLodScale;
       nearGrp.visible = useNear;
-      farGrp.visible = !useNear && d < 520;
-      const wantSh = d < 78;
+      farGrp.visible = !useNear && d < 520 * Math.max(1, podLodScale);
+      const wantSh = d < 78 * Math.min(2, podLodScale);
       if (useNear) for (let i = 0; i < shadowMeshes.length; i++) shadowMeshes[i].castShadow = wantSh;
       else fhM.castShadow = wantSh;
     };
@@ -450,7 +461,8 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     const fanAng = t * (16 + throttle * 42);
     for (let i = 0; i < fans.length; i++) fans[i].rotation.z = fanAng + i * 0.7;
     // Session 13: on a badly damaged pod the air-brake flaps rattle loose in the airstream
-    const dmgF = Math.max(0, Math.max(dmgL, dmgR) - 0.45) / 0.55;
+    // (dmgL / dmgR are HEALTH fractions: 1 = intact – the first version read them as damage and rattled on every healthy pod)
+    const dmgF = Math.max(0, 0.45 - Math.min(dmgL, dmgR)) / 0.45;
     for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (airbrake * 1.05 + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
     const uL = hullL.userData.u as HullU, uR = hullR.userData.u as HullU;
     uL.uScorch.value = Math.min(1, (1 - dmgL) * 1.1 + Math.max(0, heat - 0.75) * 0.8); uL.uHeat.value = heat; uL.uWear.value = 0.28 + (1 - dmgL) * 0.35;

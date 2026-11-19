@@ -20,8 +20,8 @@ export interface PodState {
   /** Dynamic left/right turbine vertical articulation & pitch (heaves on steering, bumps & curbs; clamped above ground!) */
   engYL?: number; engYR?: number; engVL?: number; engVR?: number; engPL?: number; engPR?: number;
   /** Session 10 manual attitude: smoothed pitch (-1 dive .. +1 lift) & roll (-1 .. +1 = ∓90°) controls, handbrake slide state, banked-road grip */
-  pitchCtl?: number; rollCtl?: number; rollBase?: number; sliding?: boolean; slideT?: number; bankGrip?: number;
-  events: { type: 'wall' | 'obstacle' | 'land' | 'explode' | 'pod' | 'fall' | 'field'; strength: number; x: number; y: number; z: number; nx: number; nz: number }[];
+  pitchCtl?: number; rollCtl?: number; rollBase?: number; sliding?: boolean; slideT?: number; slideK?: number; bankGrip?: number;
+  events: { type: 'wall' | 'obstacle' | 'land' | 'explode' | 'pod' | 'fall' | 'field' | 'break'; strength: number; x: number; y: number; z: number; nx: number; nz: number; ref?: Obstacle }[];
   visual: PodVisual | null;
   ai: AIState | null;
   place: number;
@@ -60,11 +60,16 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   if (p.invuln > 0) p.invuln -= dt;
   { const pc = p as unknown as { obCd?: number; wCd?: number }; if (pc.obCd) pc.obCd = Math.max(0, pc.obCd - dt); if (pc.wCd) pc.wCd = Math.max(0, pc.wCd - dt); }
   // steering smoothing
-  const target = inp.steer;
+  // Session 14 – knife-edge control: once rolled, the pod's axes are rotated. Lift/dive keys now turn it (pulling "up" turns towards
+  // the pod's top = the side it rolled to), the steering keys move it up/down. Blended with the roll amount, so it eases in.
+  const k0 = Math.abs(Math.sin((p.rollCtl ?? 0) * (Math.PI / 2))), g0 = (p.rollCtl ?? 0) >= 0 ? 1 : -1;
+  const steerMix = inp.steer * (1 - k0) + (inp.pitch ?? 0) * g0 * k0;
+  const pitchMix = (inp.pitch ?? 0) * (1 - k0) - inp.steer * g0 * k0;
+  const target = Math.max(-1, Math.min(1, steerMix));
   const rate = Math.sign(target) !== Math.sign(p.steer) && Math.abs(p.steer) > 0.05 ? 9 : target === 0 ? 7 : 4.5;
   p.steer += Math.max(-rate * dt, Math.min(rate * dt, target - p.steer));
   // Manual attitude controls (only act while their key is held; both ease back to neutral on release)
-  const pIn = frozen ? 0 : Math.max(-1, Math.min(1, inp.pitch ?? 0)), rIn = frozen ? 0 : Math.max(-1, Math.min(1, inp.roll ?? 0));
+  const pIn = frozen ? 0 : Math.max(-1, Math.min(1, pitchMix)), rIn = frozen ? 0 : Math.max(-1, Math.min(1, inp.roll ?? 0));
   const pc = p.pitchCtl = (p.pitchCtl ?? 0) + (pIn - (p.pitchCtl ?? 0)) * Math.min(1, dt * 6.5);
   p.rollCtl = (p.rollCtl ?? 0) + Math.max(-dt * 4.4, Math.min(dt * 4.4, rIn - (p.rollCtl ?? 0)));
   const rollA = p.rollCtl * (Math.PI / 2), knife = Math.abs(Math.sin(rollA));
@@ -75,9 +80,13 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   let vr = p.vel.x * rx + p.vel.z * rz;
   const hp = (p.hpL + p.hpR) / 200;
   p.airbraking = inp.airbrake && vf > 15;
-  // Handbrake slide: air brake + steering on the ground → rear steps out (low lateral grip, sharp yaw, little speed loss) + exit kick
-  const sliding = p.airbraking && Math.abs(p.steer) > 0.25 && p.grounded && !frozen;
-  if (sliding) p.slideT = Math.min(2.2, (p.slideT ?? 0) + dt);
+  // Handbrake slide (Session 14 retune): progressive instead of a hard snap. `slideK` ramps 0→1 in ~0.3 s while air brake + steering
+  // are held on the ground: lateral grip fades to 8.5 % (the pod keeps drifting on its momentum), the yaw boost is moderate
+  // (×1.2–1.47 instead of ×1.7–2.4), a slip-angle limiter prevents spins, and grip returns smoothly over ~0.45 s after release.
+  const wantSlide = p.airbraking && Math.abs(p.steer) > 0.2 && p.grounded && !frozen;
+  const sk = p.slideK = Math.max(0, Math.min(1, (p.slideK ?? 0) + (wantSlide ? dt * 3.2 : -dt * 2.2)));
+  const sliding = sk > 0.25;
+  if (wantSlide) p.slideT = Math.min(2.2, (p.slideT ?? 0) + dt);
   else { if ((p.slideT ?? 0) > 0.45 && inp.throttle > 0.5 && !inp.airbrake && p.grounded) vf += Math.min(7, p.slideT! * 4.2); if (!inp.airbrake || !p.grounded) p.slideT = 0; }
   p.sliding = sliding;
   p.repairing = inp.repair && !frozen;
@@ -95,7 +104,11 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   const sp = Math.abs(vf);
   const lowF = Math.min(1, sp / 22);
   const highF = 1 - 0.32 * Math.min(1, sp / P.vmax);
-  let omega = p.steer * P.turn * lowF * highF * (sliding ? P.abTurn * 1.16 : p.airbraking ? P.abTurn : 1) * (p.grounded ? 1 : 0.55) * (1 - 0.4 * knife);
+  let omega = p.steer * P.turn * lowF * highF * (1 + (P.abTurn - 1) * 0.45 * sk) * (p.grounded ? 1 : 0.55) * (1 - 0.4 * knife);
+  if (sk > 0 && p.steer * vr < 0) { // steering deeper into the slide: fade the yaw input beyond ~35° slip (no spin-outs)
+    const slip = Math.atan2(Math.abs(vr), Math.max(8, vf));
+    if (slip > 0.6) omega *= Math.max(0.15, 1 - (slip - 0.6) / 0.45);
+  }
   omega += (p.hpR - p.hpL) / 100 * 0.25 * lowF;
   if (p.zeroG) omega *= 1.4;
   if (frozen) omega = 0;
@@ -113,11 +126,11 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
       if (ratio > 1) vf -= (vf - vmaxE) * 1.2 * dt;
     }
     if (inp.brake > 0) { if (vf > 0) vf = Math.max(0, vf - 55 * inp.brake * dt); else vf = Math.max(-18, vf - 14 * inp.brake * dt); }
-    if (p.airbraking) vf = Math.max(10, vf - P.abDecel * (sliding ? 0.42 : 1) * dt);
+    if (p.airbraking) vf = Math.max(10, vf - P.abDecel * (1 - 0.7 * sk) * dt);
   } else vf *= Math.exp(-3 * dt);
   vf *= Math.exp(-(inp.throttle > 0 ? 0.04 : 0.28) * dt);
   const attGrip = (p.bankGrip ?? 1) * (pc < 0 ? 1 - 0.14 * pc : 1 - 0.2 * pc);
-  vr *= Math.exp(-P.grip * gripMul * attGrip * dt * (sliding ? 0.24 : p.airbraking ? 0.45 : 1) * (p.grounded ? 1 : 0.15));
+  vr *= Math.exp(-P.grip * gripMul * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.085 * sk) * (p.grounded ? 1 : 0.15));
   const fx2 = Math.sin(p.yaw), fz2 = Math.cos(p.yaw), rx2 = -fz2, rz2 = fx2;
   p.vel.x = fx2 * vf + rx2 * vr; p.vel.z = fz2 * vf + rz2 * vr;
 
@@ -255,11 +268,30 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
     }
   }
 
+  // overhead structures (sponsor gantries, start portal): solid – a pod flying into one is knocked back down (or up, if it came from above)
+  if (td.overheads && td.overheads.length && p.path === 0) {
+    const Nm = td.N, ext = 1.5 + knife * halfSpan;
+    for (const oh of td.overheads) {
+      let di = p.idx - oh.idx; if (td.main.closed) { if (di > Nm / 2) di -= Nm; else if (di < -Nm / 2) di += Nm; }
+      if (Math.abs(di) > 5) continue;
+      const s0 = td.main.samples[oh.idx], along = (p.pos.x - s0.x) * s0.tx + (p.pos.z - s0.z) * s0.tz;
+      if (Math.abs(along) > oh.half + 2.4 || p.pos.y + ext <= oh.y0 || p.pos.y - ext >= oh.y1) continue;
+      const below = p.pos.y < (oh.y0 + oh.y1) * 0.5, hitY = below ? oh.y0 : oh.y1;
+      if (below) { p.pos.y = oh.y0 - ext; if (p.vel.y > -5) p.vel.y = -5; } else { p.pos.y = oh.y1 + ext; if (p.vel.y < 4) p.vel.y = 4; }
+      const wc = p as unknown as { wCd?: number };
+      if (p.invuln <= 0 && !(wc.wCd! > 0)) {
+        wc.wCd = 0.5; const spd = Math.hypot(p.vel.x, p.vel.z), dmg = Math.min(18, 5 + spd * 0.07) * P.sturdy;
+        p.hpL -= dmg * 0.5; p.hpR -= dmg * 0.5; p.vel.x *= 0.9; p.vel.z *= 0.9; p.shake = Math.min(1, p.shake + 0.5);
+        p.events.push({ type: 'wall', strength: 18 + spd * 0.1, x: p.pos.x, y: hitY, z: p.pos.z, nx: 0, nz: 0 });
+      }
+    }
+  }
+
   // obstacles
   const buckets = td.obstaclesByPath[p.path]; const b0 = Math.floor(p.idx / 10);
   for (let bb = b0 - 1; bb <= b0 + 1; bb++) {
     const list = buckets.get(bb); if (!list) continue;
-    for (const o of list) if (o.kind !== 3) collideObstacle(p, o, P.sturdy);
+    for (const o of list) if (o.kind !== 3 && !o.broken) collideObstacle(p, o, P.sturdy);
   }
   if (td.setPieces.length) collideSetPieces(p, td, time, P.sturdy);
 
@@ -312,7 +344,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   // At yaw = 0: forward = (0, +1), right = (-1, 0), and local x = -2.5 maps to world (-2.5, 0) = RIGHT side of the pod!
   // And Three.js rotation.z = +roll maps (x, 0, 0) -> (x*cos, x*sin, 0): so roll > 0 dips x < 0 (RIGHT/inner) and lifts x > 0 (LEFT/outer)!
   // Steering no longer tilts the pod (engines heave instead): only a hint of lean, the road bank and the manual 90° roll remain
-  const rawRoll = p.steer * 0.07 + vr * 0.004 + (sliding ? p.steer * 0.12 : 0) + (p.grounded ? Math.atan(S.bank) * 0.92 : 0);
+  const rawRoll = p.steer * 0.07 + vr * 0.004 + p.steer * 0.12 * sk + (p.grounded ? Math.atan(S.bank) * 0.92 : 0);
   const targetRoll = Math.max(-0.5, Math.min(0.5, rawRoll));
   p.rollBase = (p.rollBase ?? 0) + (targetRoll - (p.rollBase ?? 0)) * Math.min(1, dt * 7);
   p.roll = p.rollBase * (1 - knife) + rollA;
@@ -398,8 +430,16 @@ function collideObstacle(p: PodState, o: Obstacle, sturdy: number) {
     const dx = wx - o.x, dz = wz - o.z; const d = Math.hypot(dx, dz); const R = o.r + c.r;
     if (d >= R || d < 1e-3) continue;
     const nx = dx / d, nz = dz / d;
-    p.pos.x += nx * (R - d); p.pos.z += nz * (R - d);
     const vn = p.vel.x * nx + p.vel.z * nz;
+    // Session 14: small rocks and cargo crates shatter when hit at speed – the pod ploughs through and pays with a little hull damage
+    if (o.breakable && vn < -5 && Math.hypot(p.vel.x, p.vel.z) > 38) {
+      if (p.invuln <= 0) { const dmg = (4 + o.r * 2.6) * sturdy * (p.isPlayer ? 1 : 0.6); if (c.side < 0) p.hpL -= dmg; else if (c.side > 0) p.hpR -= dmg; else { p.hpL -= dmg * 0.5; p.hpR -= dmg * 0.5; } }
+      p.vel.x *= 0.93; p.vel.z *= 0.93; p.shake = Math.min(1, p.shake + 0.35);
+      p.events.push({ type: 'break', strength: o.r, x: o.x, y: o.y, z: o.z, nx, nz, ref: o });
+      o.broken = true; o.x = 1e9; o.z = 1e9; o.lat = 1e6; // moved out of the world: every other system (AI lanes, collisions) ignores it from now on
+      return;
+    }
+    p.pos.x += nx * (R - d); p.pos.z += nz * (R - d);
     if (vn < 0) {
       p.vel.x -= nx * vn * 1.5; p.vel.z -= nz * vn * 1.5;
       if (vn < -4) { const sc = Math.max(0.6, 1 + vn * 0.004); p.vel.x *= sc; p.vel.z *= sc; }
@@ -815,6 +855,13 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
   }
   if (airbrake && Math.abs(steer) > 0.25 && speed > vTarget + 22) brake = Math.max(brake, 0.45);
   if (p.finished) { throttle = 0; brake = speed > 25 ? 1 : 0; boost = false; airbrake = speed > 30; pitchIn = 0; rollIn = 0; }
+  { // the AI thinks in "turn" and "pitch"; while rolled these go through the rotated controls (inverse of the knife-edge mix in stepPod)
+    const k = Math.abs(Math.sin((p.rollCtl ?? 0) * (Math.PI / 2)));
+    if (k > 0.02) {
+      const g = (p.rollCtl ?? 0) >= 0 ? 1 : -1, det = (1 - k) * (1 - k) + k * k, S = steer, Pd = pitchIn;
+      steer = Math.max(-1, Math.min(1, (S * (1 - k) - Pd * g * k) / det)); pitchIn = Math.max(-1, Math.min(1, (Pd * (1 - k) + S * g * k) / det));
+    }
+  }
   p.input.pitch = pitchIn; p.input.roll = rollIn;
   p.input.steer = steer; p.input.throttle = throttle; p.input.brake = brake; p.input.airbrake = airbrake;
   p.input.boost = boost && !ai.repairMode; p.input.repair = ai.repairMode && !rampAhead;

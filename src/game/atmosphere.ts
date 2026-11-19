@@ -20,7 +20,8 @@ const HEIGHT_FOG: Record<string, number> = { desert: 0.32, mesa: 0.32, ice: 0.55
  *  - forward (Mie) in-scattering towards the sun: wide warm lobe + tight glare lobe that grows with the fog amount.
  * `volFog` (0..1) scales layer density and bank contrast (weather "Nebel / Smog", dust storms, snow gusts).
  */
-export function applyAtmosphere(scene: THREE.Scene, theme: ThemeDef, density: number, baseY: number, sunDir: THREE.Vector3, volFog = 0.25) {
+export function applyAtmosphere(scene: THREE.Scene, theme: ThemeDef, density: number, baseY: number, sunDir: THREE.Vector3, volFog = 0.25, quality = 2) {
+  // quality (graphics setting "Volumetrie"): 0 = plain distance haze, 1 = + analytic height fog, 2 = + drifting fog banks (2 noise taps)
   // fog colour / sun colour / density / layer strength are uniforms so a weather front can blend them at runtime
   const fogCol = uniform(new THREE.Color(theme.fogColor)), sunCol = uniform(new THREE.Color(theme.sunColor)), vf = uniform(volFog);
   const dens = uniform(density), sd = uniform(sunDir.clone().normalize());
@@ -30,7 +31,7 @@ export function applyAtmosphere(scene: THREE.Scene, theme: ThemeDef, density: nu
   const fd = oneMinus(exp(dens.mul(dist).pow(2).negate()));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let factor: any = fd, fh: any = null;
-  if (hStr > 0 && volFog > 0) {
+  if (hStr > 0 && volFog > 0 && quality > 0) {
     const a = vf.mul(2.2).add(1.0).mul(0.0017 * hStr), b = 0.032;
     const h0 = max(cameraPosition.y.sub(baseY), 0.0), h1 = max(positionWorld.y.sub(baseY), 0.0);
     const dh = h1.sub(h0), dhS = mix(min(dh, -0.002), max(dh, 0.002), step(0.0, dh)); // never 0, keeps the sign
@@ -38,8 +39,8 @@ export function applyAtmosphere(scene: THREE.Scene, theme: ThemeDef, density: nu
     const m = macroTexture(); const drift = vec2(time.mul(0.0052), time.mul(0.0031));
     const pA = cameraPosition.xz.add(toFrag.xz.mul(0.5)), pB = cameraPosition.xz.add(toFrag.xz.mul(0.86));
     const n = texture(m, pA.mul(0.0011).add(drift)).level(0).r.mul(0.62).add(texture(m, pB.mul(0.0027).sub(drift.mul(1.7))).level(0).g.mul(0.38));
-    const bank = clamp(n.sub(0.5).mul(vf.mul(0.55).add(0.35).mul(2.2)).add(1.0), 0.25, 2.2);
-    fh = oneMinus(exp(rhoAvg.mul(dist).mul(bank).negate()));
+    const bank = quality >= 2 ? clamp(n.sub(0.5).mul(vf.mul(0.55).add(0.35).mul(2.2)).add(1.0), 0.25, 2.2) : 1.0;
+    fh = oneMinus(exp(rhoAvg.mul(dist).mul(bank as never).negate()));
     factor = clamp(fd.add(fh.mul(oneMinus(fd))), 0.0, 1.0);
   }
   const mu = max(dot(rd, sd), 0.0);

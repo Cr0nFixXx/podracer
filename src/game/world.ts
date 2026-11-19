@@ -4,7 +4,7 @@ import type { ThemeDef } from './data';
 import type { GfxSettings } from './settings';
 import { detailKindForTheme, generateTexture, generateTextures, type TexSpec } from './textures';
 import { surfaceMaterial } from './materials';
-import { mulberry32, type Path, type Sample, type TrackData } from './trackBuilder';
+import { mulberry32, type Path, type Sample, type TrackData, type Obstacle } from './trackBuilder';
 import { addProps, type Emitter } from './props';
 import { addMechProps } from './mechProps';
 import { addTrackDetail } from './trackDetail';
@@ -35,6 +35,7 @@ export const sstep = (a: number, b: number, x: number) => { const t = Math.max(0
 export interface WorldTimings { texMs: number; trackMs: number; terrainMs: number; coverMs: number; totalMs: number; coverCount: number; lifeCount: number }
 
 export interface World {
+  breakObstacle: (o: Obstacle) => void; setLodBias: (v: number) => void;
   group: THREE.Group;
   heightAt: (x: number, z: number) => number;
   update: (t: number, cam?: THREE.Vector3, pods?: PodPos[]) => void;
@@ -314,7 +315,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   const distToTrack = (x: number, z: number) => nearest(x, z);
   const decorCells = scatterDecor(theme, group, td, heightAt, distToTrack, gfx, disposables, rng, wallTex, roadClear, waterY);
   addArches(td, group, wallMat, disposables, rng, roadClear);
-  addObstacles(td, group, theme, wallMat, disposables);
+  const obstFx = addObstacles(td, group, theme, wallMat, disposables);
   progress(0.9, 'Platziere Streckendetails …'); await yield_();
   const props = addProps(td, theme, group, gfx, heightAt, disposables, rng, roadClear, roadDispOff);
   const mech = addMechProps(td, theme, group, disposables, heightAt, roadClear, waterY, gfx.detail);
@@ -349,6 +350,8 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   };
 
   progress(0.95, 'Kompiliere Shader …'); await yield_();
+  let lodB2 = (gfx.lodBias ?? 1) ** 2; // graphics setting "LOD-Distanz" (live)
+  const setLodBias = (v: number) => { lodB2 = v * v; };
   const update = (t: number, cam?: THREE.Vector3, pods?: PodPos[]) => {
     smoke.update(t); life.update(t, pods);
     if (cam) {
@@ -356,13 +359,14 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
       for (let i = 0; i < decorCells.length; i++) {
         const dc = decorCells[i]; const dx = dc.x - cam.x, dz = dc.z - cam.z, d2 = dx * dx + dz * dz;
         const vis = d2 < dc.view2;
-        if (dc.lod) { const near = d2 < dc.lod2!; dc.mesh.visible = vis && near; dc.lod.visible = vis && !near; } else dc.mesh.visible = vis;
+        if (dc.lod) { const near = d2 < dc.lod2! * lodB2; dc.mesh.visible = vis && near; dc.lod.visible = vis && !near; } else dc.mesh.visible = vis;
         if (dc.sh2 > 0) dc.mesh.castShadow = vis && d2 < dc.sh2;
       }
     }
     props.update(t); detail.update(t); mech.update(t);
   };
   return {
+    breakObstacle: obstFx.breakObstacle, setLodBias,
     group, heightAt, update, flashField: detail.flashField, nearAudio: life.nearAudio, cascades, timings,
     tvCams, glossy, emitters: props.emitters, setPieces,
     dispose: () => disposables.forEach(d => d.dispose()),
@@ -437,6 +441,7 @@ function addStartArea(td: TrackData, group: THREE.Group, theme: ThemeDef, disp: 
   const S = td.main.samples;
   const mkGate = (idx: number, label: 'start' | 'finish') => {
     const s = S[idx]; const yaw = Math.atan2(s.tx, s.tz);
+    (td.overheads ??= []).push({ idx, y0: s.y + 15.8, y1: s.y + 21.3, half: 1.7 }); // truss + start lights are solid
     const g = new THREE.Group(); g.position.set(s.x, s.y, s.z); g.rotation.y = yaw; group.add(g);
     const metal = new THREE.MeshStandardMaterial({ color: '#868c96', metalness: 0.86, roughness: 0.3 });
     const dark = new THREE.MeshStandardMaterial({ color: '#2b2f36', metalness: 0.76, roughness: 0.46 });
@@ -779,33 +784,38 @@ function addObstacles(td: TrackData, group: THREE.Group, theme: ThemeDef, rockMa
   const q = new THREE.Quaternion(), e = new THREE.Euler(), I = new THREE.Quaternion();
   const C = (x: number, y: number, z: number, qq: THREE.Quaternion, sx: number, sy: number, sz: number) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), qq, new THREE.Vector3(sx, sy, sz));
 
+  // every instance remembers its obstacle so a smashed one can be removed from all instanced meshes
+  let cur: Obstacle | null = null; const refs = new Map<Obstacle, [THREE.Matrix4[], number][]>();
+  const add = (list: THREE.Matrix4[], m: THREE.Matrix4) => { let l = refs.get(cur!); if (!l) { l = []; refs.set(cur!, l); } l.push([list, list.length]); list.push(m); };
   for (const o of td.obstacles) {
     if (o.kind >= 3) continue;
+    cur = o;
     // Glowing ground warning halo around EVERY track obstacle (unmistakable against sand, lava, ice & mud!)
-    rings.push(C(o.x, o.y + 0.28, o.z, I, o.r * 1.18, 1.3, o.r * 1.18));
+    add(rings, C(o.x, o.y + 0.28, o.z, I, o.r * 1.18, 1.3, o.r * 1.18));
     if (o.kind === 0) {
       e.set((o.idx * 0.13) % 0.3 - 0.15, o.idx * 1.3, 0); q.setFromEuler(e);
       const hRock = o.r * 1.45;
-      rocks.push(C(o.x, o.y + hRock * 0.45, o.z, q.clone(), o.r * 1.05, hRock, o.r * 1.05));
+      add(rocks, C(o.x, o.y + hRock * 0.45, o.z, q.clone(), o.r * 1.05, hRock, o.r * 1.05));
       // Tall race-marshal hazard beacon mounted atop every boulder
-      masts.push(C(o.x, o.y + hRock + 1.1, o.z, I, 1, 2.4, 1));
-      beacons.push(C(o.x, o.y + hRock + 2.45, o.z, I, 1.15, 1.15, 1.15));
+      add(masts, C(o.x, o.y + hRock + 1.1, o.z, I, 1, 2.4, 1));
+      add(beacons, C(o.x, o.y + hRock + 2.45, o.z, I, 1.15, 1.15, 1.15));
     } else if (o.kind === 1) {
-      cols.push(C(o.x, o.y, o.z, I, o.r, 1, o.r));
-      for (const h of [2.0, 4.6, 7.2]) rings.push(C(o.x, o.y + h, o.z, I, o.r * 0.96, 1.1, o.r * 0.96));
-      beacons.push(C(o.x, o.y + 9.8, o.z, I, 1.25, 1.25, 1.25));
+      add(cols, C(o.x, o.y, o.z, I, o.r, 1, o.r));
+      for (const h of [2.0, 4.6, 7.2]) add(rings, C(o.x, o.y + h, o.z, I, o.r * 0.96, 1.1, o.r * 0.96));
+      add(beacons, C(o.x, o.y + 9.8, o.z, I, 1.25, 1.25, 1.25));
     } else {
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), o.idx);
       const bh = o.r * 1.38;
-      boxes.push(C(o.x, o.y + bh * 0.5, o.z, q.clone(), o.r * 1.42, bh, o.r * 1.42));
-      masts.push(C(o.x, o.y + bh + 0.9, o.z, I, 1, 1.8, 1));
-      beacons.push(C(o.x, o.y + bh + 1.95, o.z, I, 1.15, 1.15, 1.15));
+      add(boxes, C(o.x, o.y + bh * 0.5, o.z, q.clone(), o.r * 1.42, bh, o.r * 1.42));
+      add(masts, C(o.x, o.y + bh + 0.9, o.z, I, 1, 1.8, 1));
+      add(beacons, C(o.x, o.y + bh + 1.95, o.z, I, 1.15, 1.15, 1.15));
     }
   }
+  const meshOf = new Map<THREE.Matrix4[], THREE.InstancedMesh>();
   const inst = (geo: THREE.BufferGeometry, mat: THREE.Material, list: THREE.Matrix4[]) => {
     if (!list.length) { geo.dispose(); return; }
     const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((m, i) => im.setMatrixAt(i, m));
-    im.castShadow = false; im.receiveShadow = true; im.computeBoundingSphere(); group.add(im); disp.push(geo);
+    im.castShadow = false; im.receiveShadow = true; im.computeBoundingSphere(); group.add(im); disp.push(geo); meshOf.set(list, im);
   };
   inst(rockGeo(2, 9, 1.05), rockMat, rocks);
   const colGeo = mergeGeometries([
@@ -818,6 +828,8 @@ function addObstacles(td: TrackData, group: THREE.Group, theme: ThemeDef, rockMa
   inst(new THREE.BoxGeometry(1, 1, 1), hazMat, boxes);
   inst(new THREE.CylinderGeometry(0.1, 0.14, 1, 6), mastMat, masts);
   inst(new THREE.OctahedronGeometry(0.48, 1), warn, beacons);
+  const ZERO_M = new THREE.Matrix4().makeScale(0, 0, 0);
+  return { breakObstacle: (o: Obstacle) => { for (const [list, i] of refs.get(o) ?? []) { const im = meshOf.get(list); if (im) { im.setMatrixAt(i, ZERO_M); im.instanceMatrix.needsUpdate = true; } } } };
 }
 
 function buildZeroGTubes(path: Path, group: THREE.Group, mat: THREE.Material, ribMat: THREE.Material, disp: { dispose: () => void }[], theme: ThemeDef) {

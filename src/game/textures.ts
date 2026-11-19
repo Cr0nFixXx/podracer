@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { TexKind } from './data';
-import { TileNoise, aeolianWave, clamp01, computeTexture, sstep, type TexBytes } from './texCore';
+import { TileNoise, aeolianWave, blur, clamp01, computeTexture, sstep, type TexBytes } from './texCore';
+import { texGet, texPut } from './texStore';
 
 export interface TexSet {
   map: THREE.Texture;       // RGB = sRGB albedo (with baked multi-scale cavity AO), A = packed height
@@ -40,7 +41,16 @@ export interface TexSpec { kind: TexKind; palette: string[]; size: number; seed:
 let workerFactory: (() => Worker) | null = null;
 /** The app registers an inlined worker (main.tsx); without a factory (test harness, node) everything runs synchronously. */
 export function setTextureWorkerFactory(f: (() => Worker) | null) { workerFactory = f; }
-export const textureStats = { workers: 0, ms: 0, jobMs: [] as number[] };
+export const textureStats = { workers: 0, ms: 0, jobMs: [] as number[], cached: 0 };
+let storeOn = false;
+/** Persistent cache (IndexedDB). Off by default (harness, node); the app switches it on in main.tsx (`?nocache` disables). */
+export function setTextureCacheEnabled(on: boolean) { storeOn = on; }
+/** The cache key carries a hash of the synthesis code itself – any change to texCore.ts invalidates old entries automatically. */
+let codeHash = '';
+function storeKey(k: string) {
+  if (!codeHash) { const src = computeTexture.toString() + TileNoise.toString() + blur.toString() + aeolianWave.toString(); let h = 2166136261; for (let i = 0; i < src.length; i++) { h ^= src.charCodeAt(i); h = Math.imul(h, 16777619); } codeHash = (h >>> 0).toString(36); }
+  return codeHash + '|' + k;
+}
 
 /** Generates several texture sets at once: one job per worker, largest first; the main thread stays free meanwhile. */
 const inflight = new Map<string, Promise<TexSet[]>>();
@@ -58,20 +68,28 @@ async function runTextures(specs: TexSpec[], aniso: number): Promise<TexSet[]> {
   const todo: number[] = []; const seen = new Set<string>();
   specs.forEach((_s, i) => { if (!cache.has(keys[i]) && !seen.has(keys[i])) { seen.add(keys[i]); todo.push(i); } });
   todo.sort((a, b) => specs[b].size - specs[a].size);
+  textureStats.workers = 0; textureStats.jobMs = []; textureStats.cached = 0;
+  // 1) persistent cache
+  if (storeOn && todo.length) {
+    const hit = await texGet(todo.map(i => storeKey(keys[i])));
+    for (let q = todo.length - 1; q >= 0; q--) { const i = todo[q], b = hit.get(storeKey(keys[i])); if (b) { cache.set(keys[i], wrap(b, specs[i].size, aniso)); todo.splice(q, 1); textureStats.cached++; } }
+  }
+  // 2) synthesise the rest: worker pool, or the calling thread as fallback
+  const fresh: [string, TexBytes][] = [];
   const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 4 : 1;
-  const n = workerFactory && typeof Worker !== 'undefined' ? Math.min(todo.length, Math.min(6, Math.max(2, cores - 1))) : 0; // the main thread mostly waits → use 2 workers even on dual-core
-  textureStats.workers = 0; textureStats.jobMs = [];
+  const n = workerFactory && typeof Worker !== 'undefined' ? Math.min(todo.length, Math.min(6, Math.max(2, cores - 1))) : 0; // the main thread mostly waits → 2 workers even on dual-core
   if (n >= 2) {
     try {
       await new Promise<void>((resolve, reject) => {
         let next = 0, done = 0; const ws: Worker[] = [];
         const fail = (e: unknown) => { ws.forEach(w => w.terminate()); reject(e); };
-        const feed = (w: Worker) => { if (next >= todo.length) { w.terminate(); return; } const i = todo[next++], s = specs[i]; w.postMessage({ id: i, kind: s.kind, palette: s.palette, size: s.size, seed: s.seed, emissive: s.emissive }); };
+        const feed = (w: Worker) => { if (next >= todo.length) { w.terminate(); return; } const i = todo[next++], sp = specs[i]; w.postMessage({ id: i, kind: sp.kind, palette: sp.palette, size: sp.size, seed: sp.seed, emissive: sp.emissive }); };
         for (let k = 0; k < n; k++) {
           const w = workerFactory!(); ws.push(w);
           w.onerror = e => fail(e);
           w.onmessage = (e: MessageEvent<TexBytes & { id: number; ms: number }>) => {
-            const i = e.data.id; textureStats.jobMs.push(e.data.ms); cache.set(keys[i], wrap(e.data, specs[i].size, aniso));
+            const d = e.data, i = d.id, b: TexBytes = d.em ? { map: d.map, nrm: d.nrm, rh: d.rh, em: d.em } : { map: d.map, nrm: d.nrm, rh: d.rh };
+            textureStats.jobMs.push(d.ms); cache.set(keys[i], wrap(b, specs[i].size, aniso)); fresh.push([storeKey(keys[i]), b]);
             if (++done === todo.length) { ws.forEach(x => x.terminate()); resolve(); } else feed(w);
           };
           feed(w);
@@ -80,12 +98,15 @@ async function runTextures(specs: TexSpec[], aniso: number): Promise<TexSet[]> {
       textureStats.workers = n;
     } catch { /* worker blocked (CSP, old browser) → synchronous fallback below */ }
   }
-  const out: TexSet[] = [];
-  for (let i = 0; i < specs.length; i++) {
-    const s = specs[i]; const had = cache.has(keys[i]);
-    out.push(generateTexture(s.kind, s.palette, s.size, s.seed, aniso, s.emissive));
-    if (!had) await new Promise(r => setTimeout(r, 0)); // keep the loading bar alive in the synchronous fallback
+  for (const i of todo) {
+    if (cache.has(keys[i])) continue;
+    const sp = specs[i], b = computeTexture(sp.kind, sp.palette, sp.size, sp.seed, sp.emissive);
+    cache.set(keys[i], wrap(b, sp.size, aniso)); fresh.push([storeKey(keys[i]), b]);
+    await new Promise(r => setTimeout(r, 0)); // keep the loading bar alive
   }
+  // 3) write new sets to the persistent cache a little later (never delays the race start)
+  if (storeOn && fresh.length) setTimeout(() => { void texPut(fresh); }, 2500);
+  const out = specs.map((_sp, i) => cache.get(keys[i])!);
   textureStats.ms = Math.round(performance.now() - t0);
   return out;
 }
