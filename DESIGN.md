@@ -35,6 +35,22 @@ Schwarz/Dunkelbraun, Glas-Panels, Amber-Akzent (`#ffb040`), Orbitron + Rajdhani,
 | Vulkanwelt | `lava` (Pahoehoe-Stricke + Schlackeporen) | Basaltsäulen, Lavakrusten, treibendes Magmameer, glühende Schlucht-Lavafälle |
 | Kristall / Aquilaris | `crystal` / `beach` | Kristall-Spaltstufen / Atoll-Inseln, Felsnadeln, Uferschaum, Küsten-Wasserfälle |
 
+## Umwelt-Verläufe, Regen, Gewitter, Licht (Session 13)
+Leitidee: **Jede Welt hat ihr eigenes Klima, und es lebt.** Wetter und Tageszeit ändern sich langsam (rund eine Minute je Übergang), werden einmal angesagt und bleiben fair.
+
+| Thema | Regel |
+|---|---|
+| Klima | Wüste: Sand statt Wasser. Eis: Schnee und Eisnebel. Vulkan: Smog und Asche mit trockenen Blitzen. Nur feuchte Welten kennen Regen und Gewitter. |
+| Sonnenbahn | Aufgang 40° vor, Untergang 70° nach dem Mittags-Azimut der Welt; der Mond steht gegenüber. Beim Wechsel wird das Licht kurz dunkel statt über den Himmel zu wandern. |
+| Regenstreifen | Länge und Richtung folgen der Relativgeschwindigkeit: im Stand fast senkrecht, in Fahrt vom Fluchtpunkt nach außen. Breite ~3 cm, Deckkraft ≤ 0,6. |
+| Linsentropfen | langsam: laufen herab; schnell: werden nach außen gedrückt, Spuren werden länger, Perlen werden weniger. Nie größer als 2,5 % der Bildhöhe. |
+| Gischt / Spritzer | Gischt weißgrau, hinter dem Pod, wächst mit Tempo; für Gegner unter 24 m aus (Sicht). Spritzer: winzige Kronen, 0,15 s. |
+| Blitz | weißer Kern, sechsmal so breites weiches Glühen, 3 Äste, 2–4 Folgeblitze in 0,3 s. Erhellt Wolken und Umgebungslicht, kein Vollbild-Weiß. |
+| Donner | Knall nur bei nahen Einschlägen, sonst Schlag + Grollen; Verzögerung = Entfernung / 343 m/s (max. 3 s). |
+| Lichtkegel | 30 m lang, kühles Weiß, Deckkraft ≤ 0,15, zur Kante weich auslaufend; blendet mit der Dunkelheit ein. |
+| Hitzeflimmern | nur direkt hinter den Düsen, Versatz < 0,15 % der Bildbreite, in Fahrt auf ein Drittel reduziert. |
+| Nässe | Straße wird in ~12 s nass, trocknet in ~50 s; Pfützen spiegeln, Staub wird zu Gischt. |
+
 ## HUD-Fluglage, Nachtlichter, Wetterverlauf (Session 12)
 - **Fluglage-Anzeige:** runder Künstlicher-Horizont-Stil in HUD-Cyan, unten links neben der Triebwerksanzeige. Pod-Symbol = zwei Triebwerkskreise + Cockpitpunkt; dreht mit der Rolle (gelb ab 45°), verschiebt sich mit Anheben/Neigen; grüner Pfeil oben = Anheben, roter unten = Neigen. Slide-Balken cyan → gelb, sobald der Exit-Schub bereitsteht. Ein Statuswort in Versalien darunter.
 - **Wetterzeile:** klein, rechtsbündig unter der Karte, nur Text („Nacht · Gewitter") – kein Symbol-Zoo.

@@ -1,15 +1,56 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-`npm run dev` → Renneinstellungen → **Wetter „Aufziehendes Gewitter"**, Tageszeit „Nacht", Strecke Boonta-Kessel → 90 s fahren und prüfen: Regen nimmt zu, Meldung „GEWITTER ZIEHT AUF", Blitze ab ca. 40 s, Scheinwerfer an (≈ 5 Min.).
+`npm run dev` → Renneinstellungen → Strecke **Dschungelfluss-Sprint**, Wetter **„Wechselhaft"**, Tageszeit **„Sonnenuntergang"** → 2 Minuten fahren. Prüfen: Donner hörbar und laut genug, Gegner hörbar, Regen wird stärker und lässt nach, Lichter gehen an (≈ 5 Min.).
 
-## Git-Stand
+## Git-Stand (wichtig)
 - Lokales Repo im Projekt-Root, Branch **`B`**, Remote `origin` = `https://github.com/Cr0nFixXx/podracer.git`. **Pushen:** `git push origin B`.
-- **Committen immer mit `npm run save -- "Nachricht"`** (`tools/save.sh`): staged alles außer `.archiv/git`, committet und schreibt das Sicherungs-Bundle `.archiv/git/podracer-B.bundle`.
-- **Warum das Bundle:** Diese Sandbox verwirft zwischen Sitzungen den Ordner `.git` **und alle Dateien, die in `.gitignore` stehen**. In Session 11 stand das Bundle in `.gitignore` und ging deshalb mit verloren; die drei Einzel-Commits aus Session 9–11 sind dadurch weg. Der Inhalt ist vollständig erhalten und liegt jetzt als ein Sammel-Commit vor. Das Bundle ist jetzt **nicht** mehr ignoriert (wird per Pathspec aus den Commits herausgehalten, erscheint in `git status` als unversioniert – so gewollt).
-- **`.git` fehlt, Bundle da?** `git clone -b B .archiv/git/podracer-B.bundle /tmp/rc && cp -r /tmp/rc/.git . && git remote set-url origin https://github.com/Cr0nFixXx/podracer.git && git status`.
-- **`.git` und Bundle fehlen?** `git clone --branch B https://github.com/Cr0nFixXx/podracer.git /tmp/rc && cp -r /tmp/rc/.git .` → Arbeitsstand erscheint als Änderung → `npm run save -- "Stand wiederhergestellt"`.
-- Commit-Autor ist der Platzhalter „Podracer Dev <dev@podracer.local>" (`git config user.name/user.email` vor dem Pushen anpassen).
+- **Der Ordner `.git` fehlt im Download und nach jedem Sandbox-Neustart.** Deshalb liegt das Repository zusätzlich dreifach in **`.archiv/repo-sicherung/`** (mit `LIESMICH.txt`):
+  1. `git-ordner/` – Kopie von `.git` (in den Projektordner kopieren, in `.git` umbenennen)
+  2. `podracer-B.bundle` – eine Datei (`git clone -b B podracer-B.bundle`)
+  3. `podracer-git.tar.gz.b64.txt` – `.git` als Base64-Text (übersteht Binärfilter)
+- **Committen immer mit `npm run save -- "Nachricht"`** (`tools/save.sh`): committet alles außer `.archiv/repo-sicherung` und schreibt die drei Kopien neu. Nie von Hand `git add -A`.
+- **Sitzungsbeginn ohne `.git`:** `npm run restore-git` (`tools/restore-git.sh`: Kopie → Bundle → Base64 → GitHub). Fällt es auf GitHub zurück, sind die lokalen Einzel-Commits weg; der Arbeitsstand bleibt und wird mit `npm run save` als ein Commit gesichert. So bereits dreimal passiert (zuletzt zu Beginn von Session 13: auch das alte Bundle in `.archiv/git/` war fort).
+- Offen: ob `.archiv/repo-sicherung/` einen Neustart übersteht, zeigt erst die nächste Sitzung. Commit-Autor ist der Platzhalter „Podracer Dev".
+
+## Stand: 2026-11-19 (Session 13) – Umwelt-Zeitleiste, Regen/Gewitter, Lichtkegel, Sound, Ladezeit, KI-Fix
+
+### Erledigt in Session 13
+1. **Umwelt-Zeitleiste (`environment.ts` neu geschrieben, `Game.applyEnv`):** Tageszeit und Wetter sind zwei unabhängige Keyframe-Spuren. `EnvTimeline.eval(raceTime)` mischt die vier Nachbarzustände (Tageszeit a/b × Wetter c/d) zu einem `EnvSnap`; `Game.applyEnv` setzt daraus Himmel, Nebel, Sonne/Mond (Richtung, Farbe, Stärke), Hemisphäre, Belichtung, Reflexionsstärke, Sterne, Wolkenlicht, Regen, Blitzrate, Wind, Haftung, Partikeldichte, Lichter.
+   - **Tag-Nacht-Übergänge:** „Sonnenuntergang (Abend → Nacht)", „Sonnenaufgang (Nacht → Tag)", „Tag-Nacht-Zeitraffer" (6-Minuten-Schleife). Sonne und Mond haben eine feste Bahn je Welt; beim Wechsel Sonne ↔ Mond wird das Licht kurz auf null gedimmt und kommt aus der neuen Richtung zurück.
+   - **Wetterwechsel im Rennen:** „Aufziehendes Unwetter", „Aufklarend", „Wechselhaft" (3,5-Minuten-Schleife). Ansagen: „UNWETTER/STURM ZIEHT AUF", „ES KLART AUF", „NACHT – LICHTER AN", „TAGESANBRUCH".
+   - **Realismus:** Tabelle `CLIMATE` legt pro Welt fest, welches Wetter es gibt und was „ruhig"/„heftig" bedeutet. Wüste: nur Klar/Sandsturm. Eis: Klar/Schneeböen/Eisnebel. Vulkan: Klar/Smog/Aschesturm mit Vulkanblitzen (kein Regen). Stadt, Dschungel, Aquilaris, Kristall, Malastare: Klar/Regen/Gewitter/Nebel. Das Menü zeigt nur passende Einträge; gespeicherte unpassende Wahl fällt auf „Standard" zurück (`sanitizeEnv`).
+   - **Fahrbahn-Nässe zur Laufzeit:** `materials.ts → WEATHER.wet` (globales Uniform). Die Straße wird in ~12 s nass und trocknet in ~50 s.
+2. **Regen:** Tropfen als bewegungsunscharfe Streifen entlang ihrer Bildschirm-Geschwindigkeit relativ zur Kamera (langsam: fast senkrecht; schnell: lange Streifen an den Rändern, kurze Punkte voraus). Linsentropfen in drei Schichten: Perlen, bei wenig Tempo herablaufende Tropfen, bei hohem Tempo radial nach außen getriebene Tropfen mit längeren Spuren (`post.ts`, Phase `cine.uniforms.flow`). **Gischtfahne** hinter jedem Pod (wächst mit Tempo, `particles.spray`), **Aufschlag-Spritzer** auf der Fahrbahn vor dem Spieler (`particles.splash`).
+3. **Gewitter (`weather.ts`, `audio.ts`):** Blitz mit weißem Kern + weichem Glühen, 3 Äste, 2–4 Folgeblitze (Flackern), häufiger; Einschlagglimmen + Bodenfunken bei nahen Einschlägen; Kamerawackeln bei sehr nahen. **Donner:** scharfer Knall (nah) → Schlag → rollendes Grollen mit 3–4 Wellen + Sub-Bass, eigener lauter Bus mit Echo.
+4. **Scheinwerfer (`lights.ts`, `Game.updateLights`):** weiche volumetrische Lichtkegel an beiden Triebwerksnasen aller Pods (1 instanzierter Draw-Call, additiv, zur Silhouette hin ausgeblendet). Spot-Licht des Spielers folgt Lenkung und Neigung, wird mit Boost heller, flackert bei beschädigtem Triebwerk. Alle Lichter blenden mit der Dunkelheit ein/aus.
+5. **Gegner-Sound:** ca. 3× lauter, Reichweite 170 m statt 80 m, zweite Harmonische + Düsenrauschen, Doppler-Verschiebung, Rudel-Grollen, Vorbeiflug-„Whoosh" (`audio.setRivals`, `audio.flyby`).
+6. **Hitzeflimmern:** Amplitude 60 % kleiner, Radius halbiert, bei Renntempo auf 35 % zurückgenommen (am stärksten am Start).
+7. **Ladezeit:** Textur-Synthese läuft in parallelen **Web Workern** (`texCore.ts` = reine Rechnung ohne three.js, `texWorker.ts`, Pool in `textures.ts → generateTextures`). Die Worker starten schon vor der Renderer-Initialisierung (`Game.start`). Registrierung des Inline-Workers in `main.tsx`; ohne Factory (Harness, Node) läuft alles synchron wie bisher. `?noworkers` schaltet zum Vergleich ab.
+8. **KI-Fix „Neigen":** Die KI hielt „Neigen" bei jeder kleinen Kuppe und in der zweiten Hälfte jedes Sprungs. Jetzt nur noch gute Piloten, nur bei ~30 % der großen Sprünge (> 9 m über der Straße, im Sinkflug, ≥ 0,9 s in der Luft), höchstens alle 6 s, nie mit vollem Ausschlag. CI prüft den Anteil (`dive%` ≤ 1,5 %).
+9. **Podracer:** 8 Lackierungs-Vorlagen im Hangar, weißglühender Nachbrenner-Strahl beim Boost, klappernde Luftbremsklappen bei schwerem Schaden, Lichtkegel.
+
+### Verifiziert
+- `npm run check`: 14/14 Strecken bestanden. **KI-„Neigen": vorher 4,1–7,3 % aller KI-Frames (5 Strecken gemessen), jetzt 0,0–1,0 %** (alle 14).
+- **Audio ohne Lautsprecher gemessen** (Analyser am Master-Bus, Headless-Chrome): Leerlauf-Spitze 0,13 · Gegner in 12 m 0,26 · Donner 0,63.
+- **Ladezeit, Textur-Synthese 6 × 1024 px isoliert:** Hauptthread 7,6 s → 2 Worker 4,3 s (Sandbox hat 2 Kerne). **In der App in dieser Sandbox nur ~9 % schneller** (gesamt 19,1 s → 17,4 s), weil das Software-Rendering beide Kerne mitbelegt.
+- `npm run check:gpu` (WebGPU), 0 Konsolenfehler: Dschungel + Boonta (Wechselhaft × Zeitraffer, t = 180 s), Vulkan + Ando Prime (Aufziehend × Sonnenuntergang, t = 70 s), Stadt mit Ultra + CSM + Gewitter + Nacht.
+- **App-Smoke-Test** (`papp.mjs`, gebaute App mit Textur-Workern, Stadt bei Sonnenuntergang + aufziehendem Unwetter): Menü → Rennen → 90°-Rolle → Tasten umbelegen, 0 Seitenfehler; Menü zeigt die neuen Einträge.
+- Standbilder gesichtet (WebGL2): Sonnenuntergang auf Boonta bei 0 / 55 / 100 s (Abendrot → Dämmerung mit ersten Sternen → Nacht mit Scheinwerferlicht auf der Piste), Sandsturm auf Boonta, Dschungel-Gewitter in Fahrt (Regenstreifen laufen richtig vom Fluchtpunkt weg, nasse Fahrbahn, Linsentropfen), Aschesturm auf der Vulkanwelt, klare Nacht auf Ando Prime (Scheinwerfer der Pods als Lichtpunkte).
+
+### Nicht verifiziert
+- **Ladezeit-Gewinn auf echter Hardware** (GPU + ≥ 4 Kerne) – nur hochgerechnet, nicht gemessen.
+- **Klangqualität** (nur Pegel gemessen, nicht gehört); Doppler und Vorbeiflug-Whoosh gar nicht.
+- **In Bewegung nicht gesehen:** Blitz-Mesh mit Folgeblitzen, radiale Linsentropfen bei hohem Tempo, Gischtfahne, Aufschlag-Spritzer, Lichtkegel (im Nachtbild nur das Spot-Licht erkennbar), Nachbrenner, klappernde Klappen.
+- Übergänge nur als Einzelbilder, nicht als durchgehender Verlauf; „Sonnenaufgang" und „Aufklarend" gar nicht gesichtet.
+- Bildrate auf echter GPU.
+
+### Befehle (neu)
+1. `npm run save -- "Nachricht"` · `npm run restore-git`
+2. Harness: `?webgl&tod=sunset&rt=55`, `?webgl&wx=changing&rt=100`, `tod=cycle`, `wx=front|clearing`; `pshot.mjs … "audio"` (Pegeltest), `"tex:1024"` (Textur-Benchmark, braucht `out/texWorker.js`: `npx esbuild ../../src/game/texWorker.ts --bundle --format=iife --outfile=out/texWorker.js`).
+3. App-Ladezeit: `LOAD_ONLY=1 node papp.mjs <dist/index.html> /tmp/t/ld '{"race":{"trackId":"jungle"}}'` (mit `QUERY='?noworkers'` zum Vergleich) → Zeile `[load] …`.
+
+---
 
 ## Stand: 2026-11-19 (Session 12) – Tastenbelegung, HUD-Fluglage, Nachtlichter, Wetterfront, Hitzeflimmern
 

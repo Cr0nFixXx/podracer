@@ -7,7 +7,7 @@
 - Finish with `npm run build` → `dist/index.html` (single file). Archived unrelated HTML stays in `.archiv/`.
 - Spec don'ts: **no film grain, no excessive bloom / overexposure.**
 - **Sandbox persistence:** if `.git` or `src/assets/menu-bg.jpg` vanished after a reset, restore via `git clone --branch B https://github.com/Cr0nFixXx/podracer.git /tmp/rc && cp -r /tmp/rc/.git . && mkdir -p src/assets && cp -n /tmp/rc/src/assets/menu-bg.jpg src/assets/` (working tree stays, shows as modified vs. `B`).
-- **Commit everything locally** (user request): after each finished task run `npm run save -- "message"` (stages all except `.archiv/git`, commits, writes `.archiv/git/podracer-B.bundle`). Never `git add -A` by hand (would commit the bundle), never push unless asked. **This sandbox drops `.git` and every git-ignored file between sessions** – so the bundle must never be added to `.gitignore`. Session start: if `.git` is missing, restore from the bundle; if both are missing, clone branch `B` from GitHub, copy `.git`, then `npm run save` (see `HANDOFF.md` → „Git-Stand").
+- **Commit with `npm run save -- "message"` after every finished task** (user request). It commits everything except `.archiv/repo-sicherung` and rewrites the three repository copies there (`git-ordner/`, `podracer-B.bundle`, `podracer-git.tar.gz.b64.txt` + `LIESMICH.txt`) – the user's download and every sandbox restart drop `.git`. Never `git add -A` by hand, never add the copies to `.gitignore`, never push unless asked. **Session start: `npm run restore-git`** if `.git` is missing, then `npm run save` if it fell back to GitHub.
 - **Before finishing: `npm run check` must be green** (typecheck + 14-track node physics sim). Add npm scripts only with `npm pkg set scripts.<name>=…`.
 
 ## Repo
@@ -39,11 +39,23 @@ React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto 
 - **Decor LOD:** `place(geo, …, { lod: { geo, dist } })` builds a far twin per sector (forces sector chunking); LOD geometry must come from the same seed (`jungleTreeGeometry(seed, gq, true)`, `spireGeometry(seed, halfRadial, sameStrata)`).
 - **CSM** is opt-in (`gfx.csm`): `CSMShadowNode` on `sun.shadow.shadowNode`; call `csm.updateFrustums()` only after `csm.camera` exists (first render).
 
+## Environment timeline, rain, storm, lights, loading (Session 13)
+- **`environment.ts` owns everything about time of day and weather.** `resolveEnvironment(theme, tod, wx)` → `{ theme, fx, build, timeline, label }`. `theme`/`fx` = state at t = 0, `build` = union of everything the timeline can reach (rain road shader, lens rain, bolt mesh, stars, lights, ambient particle type, brightest sky for the PMREM). Anything that must exist at compile time has to come from `build`, never from the start state.
+- **Realism table `CLIMATE`** (allowed weather, calm/severe, auto, local names). New world → add a row; the menu (`weatherOptionsFor`) and `sanitizeEnv` follow automatically. Never offer weather that does not fit the world.
+- **Adding a blended parameter:** field in `EnvSnap` (+ `NUM`/`COL` list, `snapOf`, `emptySnap`) → apply it in `Game.applyEnv`. Colours in `EnvSnap` are sRGB triples (`setRGB(r, g, b, THREE.SRGBColorSpace)`).
+- **Sun ↔ moon hand-over dips the light to zero** (`EnvTimeline.eval`); do not lerp the direction across the sky. `Game.setSunDir` updates sky, fog, shadow basis and the second sun.
+- **Road wetness is the global uniform `WEATHER.wet`** (`materials.ts`), driven with soak/dry lag in `applyEnv`; keep it at 1 on worlds whose `build.rainRoad` is false (mud roads rely on it).
+- **Rain streaks** (`particles.initAmbient`): direction/length come from the drop's screen-space velocity relative to the camera (`ambVel`). Wind is baked into the ambient velocities (use `build.wind`), density is runtime (`setAmbientAmount`). Lens drops: speed-dependent phase must be an accumulated uniform (`cine.uniforms.flow`), never `time × speed`.
+- **Lightning never uses the full-screen flash**; it raises `sky.uniforms.flash`, hemisphere and environment intensity (all in `applyEnv`). Thunder goes through `audio.thunderBus`.
+- **Lights:** `lights.ts → makeBeams` (one instanced additive cone mesh), `Game.updateLights`; everything scales with `lightLevel` (from `EnvSnap.dark`). Still only ONE real light besides sun/hemisphere.
+- **Textures:** `texCore.ts` must stay free of three.js/DOM imports (it is bundled into the worker). `generateTexture` = sync, `generateTextures(specs)` = worker pool with in-flight dedupe; `worldTextureSpecs` is the single list used by the pre-warm in `Game.start` and by `buildWorld`. Worker registration only in `main.tsx` (`?worker&inline`) – harness and node stay synchronous.
+- **AI dive rule** lives in `aiInputs` (`ai.dive`, `ai.diveT`, `ai.diveRoll`); CI fails above 1.5 % dive frames. Do not loosen it without re-measuring.
+
 ## Input, HUD, lights, weather front (Session 12)
 - **Keys:** `keymap.ts` is the single source (`ACTIONS`, `KEY_PRESETS`, `normalizeKeys`, `bindKey`). `Game.readInput` / `onKey` only use `this.keymap`; never hard-code `KeyboardEvent.code` again. UI = `ui/KeyBindings.tsx`. New action → add to `Action`, `ACTIONS`, both presets, `readInput`.
 - **HUD:** new fields go into `HudState` + `Game.hud()` + `RaceView.tsx`. HUD refreshes at ~12 Hz – no per-frame animation there.
 - **Lights:** `EnvFx.dark` (0..1, from resolved sky brightness) > 0.45 → `navLights` (one `InstancedMesh`, 5 instances per pod, colours > 1 for gentle bloom) + one player `SpotLight`. No more real lights (every lit material pays per light).
-- **Weather front:** `resolveEnvironment(..., 'front')` returns the END state plus `from`. Compile-time features (rain shader, wet road, bolt mesh, ambient type) come from the end state; `Game.applyFront()` blends everything else through uniforms / light props. To add a blended parameter: add it to `EnvSnap` + `snapEnv` + `applyFront`. Fog values are uniforms (`this.fog`).
+- **Weather front / timelines:** superseded by the Session 13 environment timeline (next section).
 - **Heat haze:** `post.heat` (2 screen positions, radius, strength), set in `Game.render`. UV offset only – keep it free of extra samples and control flow.
 - **Real-app test:** `tools/harness/papp.mjs` (Puppeteer). Match UI text via `textContent` (CSS uppercases `innerText`). Software rendering runs the game ~16× slow: wait for the `LOS!` message instead of fixed times.
 
@@ -71,6 +83,7 @@ React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto 
 
 ## Testing
 - **`npm run check`** (≈ 25 s, node only): `tools/ci/sim.ts` – fails on NaN, deaths > 3, wall penetration > 0.6 m, ground clearance < 0.2 m, pod slower than 18 m/s. `DEBUG=1`, `TRACK=<id>`, `SECS=<n>`, `PITCH_AIR=1|0|-1` (jump experiment).
+- **Session 13 test hooks:** harness `tod=sunset|sunrise|cycle`, `wx=front|clearing|changing`, `rt=<s>`; pshot items `audio` (level test via analyser) and `tex:1024` (worker benchmark, needs `out/texWorker.js`); `papp.mjs` env `LOAD_ONLY=1`, `QUERY='?noworkers'` → `[load]` line.
 - **App smoke test:** `node papp.mjs <dist/index.html> <out prefix> '<profile json>'` after `npm run build`. Harness extras: `?ultra`, `?rt=<race seconds>`, `wx=front`.
 - **Weather in tests:** harness query `?webgl&tod=night&wx=storm` (`flash`, `csm` optional), views `s` (towards the sun) and `m` (relay tower). `GRIP=0.88 npm run check` = storm grip.
 - **`npm run check:gpu`**: `tools/ci/gpu.mjs` – WebGPU console check (`PUPPETEER_DIR`, `TRACKS=0,5`, `QUERY='?csm'`). Harness view `r` = 2.8 s of real racing (live particles/banking).

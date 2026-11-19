@@ -1,16 +1,15 @@
 # TODO
 
-## 0. Direkt aus Session 12
-- [ ] **Hörtest + Probefahrt** auf echter Hardware: Sound-Balance, Bildrate (Nacht + Gewitter + Scheinwerfer), Hitzeflimmern-Stärke, Wetterfront-Übergang
-- [ ] **Gamepad-Belegung im Menü** (Tastatur ist umbelegbar, Gamepad noch fest) + Touch-Steuerung
-- [ ] **Scheinwerfer auf dunkler Fahrbahn** (Lava/Basalt) sichtbarer machen: z. B. projizierter Lichtkegel als Decal statt nur `SpotLight`
-- [ ] **Weitere Wetterverläufe:** aufklarend (Gewitter → klar), Staubsturm-Front, Tageszeit-Verlauf (Dämmerung → Nacht) – `Game.applyFront` ist dafür vorbereitet
-- [ ] **Regen-Aufschlagringe** auf der Fahrbahn verstärken; Blitz-Einschlag mit Bodenfunken in Streckennähe
+## 0. Direkt aus Session 13
+- [ ] **Hörtest + Probefahrt auf echter Hardware:** Donner-/Gegner-Lautstärke, Regen in Fahrt, Lichtkegel-Stärke, Bildrate, Ladezeit mit Workern (Zeile `[load]` in der Konsole)
+- [ ] **Startnummern** auf den Pods (Textur-Atlas, eine gemeinsame Material-Pipeline) + Pilotenköpfe
+- [ ] **Persistenter Textur-Cache** (IndexedDB) für Folgestarts; 2048-px-Texturen in Kacheln rechnen
+- [ ] **Gamepad-Belegung im Menü** + Touch-Steuerung
+- [ ] **Wetter auf Abkürzungen/Tunneln:** Regen und Spritzer unter Dächern ausblenden
 
 ## 1. Als Nächstes (Podracer & Ladezeit)
 - [ ] **Podracer-Aufwertung:** Livery-Vorlagen & Startnummern im Hangar; Hitzeflimmern auch für Gegner-Pods
 - [ ] **Schadensgeometrie & Pilot-Spezies:** sichtbare lose Klappen bei niedrigen HP, individuelle Pilotenköpfe im Cockpit
-- [ ] **Textur-Synthese im Web Worker:** `generateTexture` off-main-thread auslagern für verzögerungsfreien Ladebalken
 
 ## 2. Strecken & Spieltiefe
 - [ ] **Meisterschafts- / Cup-Modus:** 4-Rennen-Serien mit Gesamtpunkten und Siegerehrung
@@ -22,6 +21,18 @@
 - [ ] **`npm run check` in GitHub Actions** (Push auf `B`), `check:gpu` als optionaler Job
 - [ ] **Harness:** WebGPU-Screenshots im headless Chrome reparieren (weiß; nur Konsolencheck möglich)
 - [ ] **Fern-LOD auch für Kiefern/Tafelberge**, falls die Messung es rechtfertigt
+
+## Erledigt (Session 13 – Zeitleiste, Regen/Gewitter, Licht, Sound, Ladezeit, KI)
+- [x] **Tag-Nacht-Übergänge** (Sonnenuntergang, Sonnenaufgang, Zeitraffer) und **Wetterwechsel im Rennen** (Aufziehend, Aufklarend, Wechselhaft)
+- [x] **Wetter passend zur Welt** (kein Schnee in der Wüste, kein Regen am Vulkan; Menü zeigt nur Passendes)
+- [x] **Regen:** tempoabhängige Streifen und Linsentropfen, Gischtfahnen, Aufschlag-Spritzer, Straße wird nass und trocknet
+- [x] **Gewitter:** Blitz mit Kern/Glühen/Folgeblitzen, lauter Donner (Knall, Schlag, Grollen), Bodenfunken
+- [x] **Scheinwerfer:** volumetrische Lichtkegel, dynamisches Spot-Licht
+- [x] **Gegner lauter** (Reichweite 170 m, Doppler, Vorbeiflug), **Hitzeflimmern dezent**
+- [x] **Textur-Synthese in Web Workern**, Start schon vor der Renderer-Initialisierung
+- [x] **KI-„Neigen" behoben** (4,1–7,3 % → ≤ 1,0 % der Zeit), CI-Grenzwert
+- [x] **Podracer:** Lackierungs-Vorlagen, Nachbrenner, klappernde Klappen bei Schaden
+- [x] **Git-Kopien in `.archiv/repo-sicherung/`** (Ordner, Bundle, Base64-Text) + `npm run restore-git`
 
 ## Erledigt (Session 12 – Tastenbelegung, HUD, Nachtlichter, Wetterfront)
 - [x] **Tastenbelegung im Menü** mit 2 Presets (Standard / Klassisch) und freiem Umbelegen

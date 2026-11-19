@@ -43,32 +43,33 @@ Boost erhitzt die Triebwerke – rechtzeitig loslassen. **Hangar:** Pod mit der 
 
 ## Tageszeit & Wetter
 
-Im Menü **Renneinstellungen** gibt es zwei neue Auswahlfelder. Beide wirken auf jede der 14 Strecken (Ausnahme: Oovo IV liegt im Weltraum).
+Im Menü **Renneinstellungen** gibt es die Auswahlfelder „Tageszeit" und „Wetter". Sie wirken auf alle Strecken außer Oovo IV (Weltraum).
 
 | Tageszeit | Wirkung |
 |---|---|
 | Standard der Welt | das ursprüngliche Licht der Strecke |
-| Morgendämmerung | tiefe Sonne, rosa Horizont, Morgendunst |
-| Mittag | hohe Sonne, klares hartes Licht |
-| Abenddämmerung | Sonne knapp über dem Horizont, starke Blendung |
-| Nacht | Mondlicht, Sternenhimmel, leuchtende Triebwerke und Streckenlichter |
+| Morgendämmerung · Mittag · Abenddämmerung · Nacht | feste Tageszeit |
+| Sonnenuntergang (Abend → Nacht) | die Sonne sinkt in den ersten 95 Sekunden, Sterne erscheinen, Lichter gehen an |
+| Sonnenaufgang (Nacht → Tag) | Start bei Mondlicht, nach 2,5 Minuten heller Tag |
+| Tag-Nacht-Zeitraffer | ein voller Tag in 6 Minuten, in Schleife |
 
-| Wetter | Wirkung |
+**Wetter passt zur Welt** – das Menü zeigt nur, was es dort gibt:
+
+| Welt | Wetter |
 |---|---|
-| Standard der Welt | jede Welt hat ihr eigenes Wetter (z. B. Staub auf Tatooine, Schneeböen auf Ando Prime, Smog auf der Vulkanwelt) |
-| Klar | wenig Wolken, weite Sicht, volle Sonnenblendung |
-| Regen | nasse, spiegelnde Fahrbahn, Regentropfen auf der Linse, Gischt hinter den Pods; etwas weniger Haftung |
-| Gewitter | Starkregen, Wind, Blitze mit Donner; am wenigsten Haftung |
-| Schneeböen | treibender Schnee, Schneeschwaden quer über die Piste, Schnee auf der Fahrbahn |
-| Staubsturm | dichte Staubschwaden, diffuse Sonne |
-| Nebel / Smog | Bodennebel mit ziehenden Nebelbänken |
-| Aufziehendes Gewitter | Start im Nieselregen; in den ersten 75 Sekunden zieht ein Gewitter auf – mehr Regen, dunklerer Himmel, Blitze, weniger Haftung |
+| Tatooine, Rote Tafelberge | Klar, Sandsturm |
+| Ando Prime | Klar, Schneeböen, Eisnebel |
+| Vulkanwelt | Klar, Smog, Aschesturm mit Vulkanblitzen |
+| Ökumenopolis, Dschungelmond, Aquilaris, Kristallschluchten, Malastare | Klar, Regen, Gewitter, Nebel |
 
-**Lichter:** Bei Nacht (und auf den dunklen Welten Vulkan und Oovo IV) schalten alle Pods Scheinwerfer, Positionslichter und ein Blitzlicht ein; dein Pod leuchtet die Fahrbahn aus. Hinter deinen Triebwerken flimmert die heiße Luft.
+Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → heftig in 75 s), „Aufklarend" (umgekehrt) und „Wechselhaft" (beides im Wechsel). Was „heftig" ist, hängt von der Welt ab: Gewitter, Sandsturm, Schneesturm oder Aschesturm.
 
-**Sound:** Turbinen mit Whine und Sub-Bass, Düsenrauschen beim Boost, Zischen im Slide, Regen, Wind, Donner und Echo in Schluchten und Tunneln.
+- **Regen:** Tropfen ziehen mit steigendem Tempo immer längere Streifen, auf der Linse laufen sie erst herab und werden bei hohem Tempo nach außen getrieben. Pods ziehen Gischtfahnen, Tropfen spritzen auf der Fahrbahn. Die Straße wird nass und trocknet nach dem Regen langsam ab. Etwas weniger Haftung.
+- **Gewitter:** verzweigte Blitze mit Folgeblitzen, lauter Donner mit Verzögerung je nach Entfernung, Wind.
+- **Lichter:** Bei Dunkelheit schalten alle Pods Scheinwerfer mit Lichtkegeln, Positionslichter und Blitzlicht ein. Dein Scheinwerfer folgt der Lenkung.
+- **Sound:** Turbinen mit Whine und Sub-Bass, deutlich hörbare Gegner (mit Vorbeiflug-Geräusch), Düsenrauschen beim Boost, Zischen im Slide, Regen, Wind, Donner, Echo in Schluchten und Tunneln.
 
-**Linseneffekte** (Sonnenblendung, Regentropfen) lassen sich in den Grafik-Einstellungen abschalten.
+**Linseneffekte** (Sonnenblendung, Regentropfen, Hitzeflimmern) lassen sich in den Grafik-Einstellungen abschalten.
 
 ## Strecken-Gefahren & Set-Pieces
 
@@ -90,6 +91,7 @@ Im Menü **Renneinstellungen** gibt es zwei neue Auswahlfelder. Beide wirken auf
 ## Landschaft & Atmosphäre
 
 - **Steigungen & Schrägkurven (neu):** jede der 14 Strecken hat lange Anstiege und Gefälle (bis 11–17 %) mit Kuppen zum Abheben sowie überhöhte Kurven (bis ca. 21°), die spürbar mehr Haftung geben.
+- **Hangar (neu):** 8 Lackierungs-Vorlagen (z. B. „Boonta Gold", „Tarnkappe", „Neon-Nacht") neben der freien Farbwahl.
 - **Breitere Pisten & Renntechnik (neu):** alle Strecken sind 18 % breiter. Am Rand stehen Repulsor-Relaistürme mit gegenläufig drehenden Ringen, Patrouillen-Drohnen begleiten das Feld.
 - **Offene Welten & Schluchten:** Barchan-Dünen und Kies-Wadis (Tatooine), Gletschergrate (Ando Prime), Karsthügel und Flussläufe (Dschungel/Malastare), glühende Lavarinnen (Vulkanwelt), Atolle und Felsnadeln (Aquilaris), dreistufige Horizont-Silhouetten, Talnebel und **ziehende Wolkenschatten**.
 - **Mehrschichtiger Boden & Detail-Normalmaps:** Sand/Gras/Schnee wechselt mit **Kiesbanketten**, **Salzpfannen**, **gefrorenen Seen**, **Sümpfen**, **Lavakrusten mit glühenden Rissen** und geschichtetem Fels (Schnee-, Moos- und Sandauflage auf flachen Felsabsätzen); jede Welt hat eigene Nah-/Mitteldistanz-Normalmaps (Windrippel, Sastrugi, Humus/Wurzeln, Pahoehoe-Lava, Kristallfacetten, Strandsand) sowie Uferschaum am Wasser.
@@ -113,14 +115,17 @@ Im Menü **Renneinstellungen** gibt es zwei neue Auswahlfelder. Beide wirken auf
 | Screen Space Reflections | optionale Echtzeit-Spiegelungen auf nahen Metall-/Glanzflächen (in Ultra standardmäßig aus für maximale FPS) |
 | Detail-Dichte / Geometrie | Menge & Feinheit von Bewuchs, Sektor-Deko, Podracer-LODs und Gelände |
 
-## Auf GitHub pushen
+## Git: lokale Commits und Kopie im Archiv
 
-Der Projektordner ist ein Git-Repository (Branch `B`, Remote `origin` = `github.com/Cr0nFixXx/podracer`). Alle Änderungen sind lokal committet.
+Alle Änderungen sind lokal committet (Branch `B`, Remote `origin` = `github.com/Cr0nFixXx/podracer`).
 
-1. `git log --oneline` – Commits ansehen.
-2. `git push origin B` – hochladen (GitHub-Anmeldung nötig).
-3. Neue Änderungen sichern: `npm run save -- "Beschreibung"` (committet und schreibt zusätzlich die Sicherung `.archiv/git/podracer-B.bundle`).
-4. Falls der Ordner `.git` fehlt: Anleitung in `HANDOFF.md` → „Git-Stand".
+**Der versteckte Ordner `.git` fehlt im Download.** Deshalb liegt das komplette Repository zusätzlich in **`.archiv/repo-sicherung/`**:
+
+1. `git-ordner/` – in den Projektordner kopieren und in `.git` umbenennen. Danach funktionieren `git log` und `git push origin B`.
+2. `podracer-B.bundle` – Alternative als einzelne Datei: `git clone -b B podracer-B.bundle podracer`.
+3. `podracer-git.tar.gz.b64.txt` – dieselben Daten als Textdatei. Anleitung in `LIESMICH.txt` im selben Ordner.
+
+Neue Änderungen sichern: `npm run save -- "Beschreibung"` (committet und erneuert alle drei Kopien).
 
 ## Für Entwickler: Prüfbefehle
 

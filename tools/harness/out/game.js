@@ -97811,7 +97811,8 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     glow.color.copy(hc).multiplyScalar(1.1 + boost * 0.3);
     const fanAng = t * (16 + throttle * 42);
     for (let i = 0; i < fans.length; i++) fans[i].rotation.z = fanAng + i * 0.7;
-    for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * airbrake * 1.05;
+    const dmgF = Math.max(0, Math.max(dmgL, dmgR) - 0.45) / 0.55;
+    for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (airbrake * 1.05 + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
     const uL = hullL.userData.u, uR = hullR.userData.u;
     uL.uScorch.value = Math.min(1, (1 - dmgL) * 1.1 + Math.max(0, heat - 0.75) * 0.8);
     uL.uHeat.value = heat;

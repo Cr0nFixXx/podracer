@@ -54,7 +54,8 @@ export function envLabel(themeId: string, tod: TimeOfDay, wx: WeatherKind) {
   const tn = tod !== 'auto' ? TIME_OPTIONS.find(o => o[0] === tod)?.[1].replace(/ \(.*\)/, '') ?? '' : '';
   const w: Wx | WeatherKind = wx === 'auto' ? c.auto[0] : wx;
   const wn = (c.names as Record<string, string> | undefined)?.[w] ?? WX_NAMES[w as WeatherKind];
-  return [tn, wn.replace(/ mit .*/, '')].filter(Boolean).join(' · ');
+  const short: Partial<Record<WeatherKind, string>> = { front: 'Aufziehend', clearing: 'Aufklarend', changing: 'Wechselhaft' }; // HUD line stays short
+  return [tn, short[wx] ?? wn.replace(/ mit .*/, '')].filter(Boolean).join(' · ');
 }
 
 export interface EnvFx {
