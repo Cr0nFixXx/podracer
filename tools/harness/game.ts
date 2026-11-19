@@ -65,9 +65,9 @@ let g: Game | null = null; let cur = -1;
   if (location.search.includes('flash')) { G.sky.uniforms.flash.value = 0.9; G.hemi.intensity = 1.75; }
   if (location.search.includes('live')) { // live graphics switching: toggle everything that is switchable at runtime, render, toggle back
     const g0 = G.profile.gfx; G.render(0.016); await new Promise(r => setTimeout(r, 300));
-    G.applyLiveGfx({ ...g0, bloom: !g0.bloom, ssr: !g0.ssr, ao: !g0.ao, godRays: !g0.godRays, aa: g0.aa === 'fxaa' ? 'smaa' : 'fxaa', shadows: g0.shadows ? 0 : 2, particles: 0.5, drawDistance: 0.8, motionBlur: !g0.motionBlur });
+    G.applyLiveGfx({ ...g0, bloom: !g0.bloom, ao: !g0.ao, godRays: !g0.godRays, aa: g0.aa === 'fxaa' ? 'smaa' : 'fxaa', shadows: g0.shadows ? 0 : 2, particles: 0.5, drawDistance: 0.8, motionBlur: !g0.motionBlur });
     await new Promise(r => setTimeout(r, 1500)); G.render(0.016); await new Promise(r => setTimeout(r, 600));
-    G.applyLiveGfx({ ...g0, ssr: true, shadows: 2 }); await new Promise(r => setTimeout(r, 1500));
+    G.applyLiveGfx({ ...g0, shadows: 2, lensFx: false, cinematic: !g0.cinematic }); await new Promise(r => setTimeout(r, 1500));
     (window as unknown as Record<string, unknown>).coverInfo = 'live-switch ok';
   }
   if (location.search.includes('wetnow')) { G.wet = 1; G.wetTarget = 1; }

@@ -39,8 +39,19 @@ React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto 
 - **Decor LOD:** `place(geo, …, { lod: { geo, dist } })` builds a far twin per sector (forces sector chunking); LOD geometry must come from the same seed (`jungleTreeGeometry(seed, gq, true)`, `spireGeometry(seed, halfRadial, sameStrata)`).
 - **CSM** is opt-in (`gfx.csm`): `CSMShadowNode` on `sun.shadow.shadowNode`; call `csm.updateFrustums()` only after `csm.camera` exists (first render).
 
+## Session 15 rules
+- **Texture coordinates along the track must be integrated per segment** (`vAcc += ds / tile(width)`), never `distance / tile(width)` – the latter smears the texture wherever the width changes (worse the further along the track).
+- **Set-piece materials are opaque.** Broken-out arch/ice blocks are capped torus segments; flying chunks are real meshes (`debris.ts → DebrisPool`), not sprites.
+- **Placing objects on terrain:** use the minimum of several height samples under the footprint (`groundMin` in `world.ts`, `place()` in `scatterDecor`), not the centre height.
+- **SSR:** MRT channel `metalrough.r` is *reflectivity* (`max(metalness, smooth-dielectric term)`); SSRNode discards pixels where it is 0. New glossy non-metal surfaces need roughness < 0.3 to reflect.
+- **Live graphics:** `Game.LIVE_GFX` lists what `applyLiveGfx` can change at runtime; `POST_KEYS` trigger a rebuild of `PostFX` (dispose old, warm up new). Anything baked into geometry/compiled materials stays restart-only – keep the two UI texts (pause menu, README) in sync with the list.
+- **Slide strength** is `sk` (player) / `sk × 0.45` (AI). Retune grip (`0.035`), return rate (`1.4`), slip limiter (`0.88` rad) together and rerun `npm run check`.
+- **Overheads** may carry `arch: { R, sy }` (checkpoint gates): ceiling = `sy·√((R−1.7)² − lat²)` above the road.
+- **Pod extras:** `numberPlate()` (shared atlas + material, added to the hero body / rival near-LOD group), boost flaps via `boostK` in the hero `update()`. `buildPodModel(…, isOpponent, num)`.
+- **Dust:** `particles.trail` (dry) / `particles.spray` (wet) from both engine tails in `Game.updateVisuals`; `dustAmt` scales it per world. Keep the 24 m near-camera reduction for rivals.
+
 ## UI layout, controls, obstacles, cache (Session 14)
-- **No scrollbars, ever.** Every menu/overlay lives inside `<Fit>` (`ui/Fit.tsx`): virtual width → measure → scale to fit both axes. Inside `Fit` use **container-query variants** (`@3xl:` ≈ md, `@5xl:` ≈ lg), never viewport variants (`md:`/`lg:`) and never `vh`/`vw` units or `overflow-auto`. Keep views flat (tabs, compact lists) – a tall view gets scaled down. Run `tools/harness/pui.mjs` after UI changes (fails on any scrollable element).
+- **No scrollbars, one UI scale.** Every menu/overlay lives inside `<Fit>` (`ui/Fit.tsx`): the window maps to a virtual canvas ≥ 1180 × 720 with the single scale `min(w/1180, h/720)` – identical on every screen. Design each screen to fit 720 px of virtual height: root `flex-1 flex flex-col min-h-0 p-6`, header `shrink-0`, panels in a fixed 3-column grid with `flex-1 min-h-0`; no `vh`/`vw`, no `overflow-auto`, no viewport breakpoints (`md:`/`lg:`), no percentage heights (use flex). If a screen is too tall, `Fit` shrinks only that screen (`data-fit-shrunk="1"`) and `tools/harness/pui.mjs` fails – make the screen more compact instead of accepting it.
 - **HUD** is a scaled layer (reference 1280 × 720, `hs` in `RaceView`). Position with absolute px inside it.
 - **Graphics panels** are one component (`ui/GfxPanels.tsx`) used by the settings screen and the pause menu. New option → field in `GfxSettings`, value in **all four** `PRESETS` (ultra = maximum), slider/toggle in `GfxPanels`, and – if it can change at runtime – in `Game.LIVE_GFX` + `Game.applyLiveGfx`.
 - **HUD left/right:** internal `hpL` / `engL` = local x < 0 = screen-RIGHT in the chase view. Only `Game.hud()` swaps; do not "fix" it anywhere else.
@@ -97,6 +108,7 @@ React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto 
 
 ## Testing
 - **`npm run check`** (≈ 25 s, node only): `tools/ci/sim.ts` – fails on NaN, deaths > 3, wall penetration > 0.6 m, ground clearance < 0.2 m, pod slower than 18 m/s. `DEBUG=1`, `TRACK=<id>`, `SECS=<n>`, `PITCH_AIR=1|0|-1` (jump experiment).
+- **Session 15 tests:** `pui.mjs` prints scale + content height per screen and fails on non-uniform scale / emergency shrink; harness query `live` (runtime graphics switching), `ssr`, `wetnow`; views `x`/`y`/`z` = shortcut exit.
 - **Session 14 tests:** `pui.mjs` (layout, 5 window sizes), `papp.mjs` (HUD sides, pause audio, pause graphics menu; `TWICE=1 LOAD_ONLY=1` = cache timing), CI overhead self-test + `smashed` column. Test handle in the browser: `window.__podracer`.
 - **Session 13 test hooks:** harness `tod=sunset|sunrise|cycle`, `wx=front|clearing|changing`, `rt=<s>`; pshot items `audio` (level test via analyser) and `tex:1024` (worker benchmark, needs `out/texWorker.js`); `papp.mjs` env `LOAD_ONLY=1`, `QUERY='?noworkers'` → `[load]` line.
 - **App smoke test:** `node papp.mjs <dist/index.html> <out prefix> '<profile json>'` after `npm run build`. Harness extras: `?ultra`, `?rt=<race seconds>`, `wx=front`.

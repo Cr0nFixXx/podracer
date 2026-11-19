@@ -614,10 +614,12 @@ export class Game {
 
   /** Graphics settings that take effect while the race is running (pause menu). The rest needs a restart of the race:
    *  texture resolution, geometry/detail density, tessellation, parallax, shader detail, bump mapping, batching, backend,
-   *  anisotropy, cascaded shadows, volumetrics – they are baked into geometry or compiled materials. */
+   *  anisotropy, cascaded shadows, volumetrics, screen-space reflections – they are baked into geometry, compiled materials or the
+   *  render-target layout. */
   static readonly LIVE_GFX: (keyof GfxSettings)[] = ['fov', 'showFps', 'renderScale', 'lodBias', 'podDetail', 'weatherFx', 'preset',
-    'bloom', 'bloomStrength', 'ao', 'ssr', 'godRays', 'motionBlur', 'cinematic', 'aa', 'lensFx', 'shadows', 'particles', 'drawDistance'];
-  private static readonly POST_KEYS: (keyof GfxSettings)[] = ['bloom', 'bloomStrength', 'ao', 'ssr', 'godRays', 'motionBlur', 'cinematic', 'aa', 'lensFx', 'weatherFx'];
+    'bloom', 'bloomStrength', 'ao', 'godRays', 'motionBlur', 'cinematic', 'aa', 'lensFx', 'shadows', 'particles', 'drawDistance'];
+  // (SSR is NOT live: it adds two render targets to the scene pass; pipelines compiled for the old attachment layout become invalid on WebGPU)
+  private static readonly POST_KEYS: (keyof GfxSettings)[] = ['bloom', 'bloomStrength', 'ao', 'godRays', 'motionBlur', 'cinematic', 'aa', 'lensFx', 'weatherFx'];
   applyLiveGfx(g: GfxSettings, volume?: number) {
     const prev = this.profile.gfx; this.profile = { ...this.profile, gfx: g, volume: volume ?? this.profile.volume };
     if (volume !== undefined) this.audio?.setVolume(volume);
@@ -633,8 +635,8 @@ export class Game {
     }
     if (Game.POST_KEYS.some(k => g[k] !== prev[k])) { // rebuild the post-processing chain with the new options
       const old = this.post;
-      this.post = new PostFX(this.renderer, this.scene, this.camera, g, { rain: (g.weatherFx ?? 2) > 0 ? this.envBuild.maxRain : 0, flare: this.envBuild.flare });
-      old.dispose(); void this.post.warmup(this.renderer);
+      this.post = new PostFX(this.renderer, this.scene, this.camera, { ...g, ssr: prev.ssr && g.ssr }, { rain: (g.weatherFx ?? 2) > 0 ? this.envBuild.maxRain : 0, flare: this.envBuild.flare });
+      old.dispose(); // no async warm-up here: it would interleave with running frames and compile pipelines for the wrong target layout
     }
   }
 

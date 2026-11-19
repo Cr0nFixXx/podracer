@@ -100670,14 +100670,14 @@ var PostFX = class {
       const normal2 = sample2((uvN) => unpackRGBToNormal2(nNode.sample(uvN)));
       const s = ssr(sceneColor, depthNode, normal2, { metalnessNode: mrNode.r, roughnessNode: mrNode.g, camera });
       s.resolutionScale = 0.35;
-      s.quality.value = 0.1;
-      s.maxDistance.value = 42;
-      s.thickness.value = 2;
+      s.quality.value = 0.22;
+      s.maxDistance.value = 130;
+      s.thickness.value = 3.5;
       s.maxLuminance.value = 2.4;
       s.intensity.value = 0.85;
       s.screenEdgeFade.value = 0.28;
       s.screenEdgeFadeBlack = true;
-      s.blurQuality = 1;
+      s.blurQuality = 2;
       this.disposables.push(s);
       const ssrTex = s.getTextureNode ? s.getTextureNode() : s;
       const prev = col;
@@ -102891,7 +102891,8 @@ var Game = class _Game {
   }
   /** Graphics settings that take effect while the race is running (pause menu). The rest needs a restart of the race:
    *  texture resolution, geometry/detail density, tessellation, parallax, shader detail, bump mapping, batching, backend,
-   *  anisotropy, cascaded shadows, volumetrics – they are baked into geometry or compiled materials. */
+   *  anisotropy, cascaded shadows, volumetrics, screen-space reflections – they are baked into geometry, compiled materials or the
+   *  render-target layout. */
   static LIVE_GFX = [
     "fov",
     "showFps",
@@ -102903,7 +102904,6 @@ var Game = class _Game {
     "bloom",
     "bloomStrength",
     "ao",
-    "ssr",
     "godRays",
     "motionBlur",
     "cinematic",
@@ -102913,7 +102913,8 @@ var Game = class _Game {
     "particles",
     "drawDistance"
   ];
-  static POST_KEYS = ["bloom", "bloomStrength", "ao", "ssr", "godRays", "motionBlur", "cinematic", "aa", "lensFx", "weatherFx"];
+  // (SSR is NOT live: it adds two render targets to the scene pass; pipelines compiled for the old attachment layout become invalid on WebGPU)
+  static POST_KEYS = ["bloom", "bloomStrength", "ao", "godRays", "motionBlur", "cinematic", "aa", "lensFx", "weatherFx"];
   applyLiveGfx(g2, volume) {
     const prev = this.profile.gfx;
     this.profile = { ...this.profile, gfx: g2, volume: volume ?? this.profile.volume };
@@ -102939,9 +102940,8 @@ var Game = class _Game {
     }
     if (_Game.POST_KEYS.some((k) => g2[k] !== prev[k])) {
       const old = this.post;
-      this.post = new PostFX(this.renderer, this.scene, this.camera, g2, { rain: (g2.weatherFx ?? 2) > 0 ? this.envBuild.maxRain : 0, flare: this.envBuild.flare });
+      this.post = new PostFX(this.renderer, this.scene, this.camera, { ...g2, ssr: prev.ssr && g2.ssr }, { rain: (g2.weatherFx ?? 2) > 0 ? this.envBuild.maxRain : 0, flare: this.envBuild.flare });
       old.dispose();
-      void this.post.warmup(this.renderer);
     }
   }
   /** Sun / moon direction: sky, fog scattering, shadow basis, second sun of the desert worlds. */
@@ -103524,11 +103524,11 @@ window.track = async (i, view) => {
     const g0 = G2.profile.gfx;
     G2.render(0.016);
     await new Promise((r) => setTimeout(r, 300));
-    G2.applyLiveGfx({ ...g0, bloom: !g0.bloom, ssr: !g0.ssr, ao: !g0.ao, godRays: !g0.godRays, aa: g0.aa === "fxaa" ? "smaa" : "fxaa", shadows: g0.shadows ? 0 : 2, particles: 0.5, drawDistance: 0.8, motionBlur: !g0.motionBlur });
+    G2.applyLiveGfx({ ...g0, bloom: !g0.bloom, ao: !g0.ao, godRays: !g0.godRays, aa: g0.aa === "fxaa" ? "smaa" : "fxaa", shadows: g0.shadows ? 0 : 2, particles: 0.5, drawDistance: 0.8, motionBlur: !g0.motionBlur });
     await new Promise((r) => setTimeout(r, 1500));
     G2.render(0.016);
     await new Promise((r) => setTimeout(r, 600));
-    G2.applyLiveGfx({ ...g0, ssr: true, shadows: 2 });
+    G2.applyLiveGfx({ ...g0, shadows: 2, lensFx: false, cinematic: !g0.cinematic });
     await new Promise((r) => setTimeout(r, 1500));
     window.coverInfo = "live-switch ok";
   }

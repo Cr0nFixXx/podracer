@@ -35,6 +35,16 @@ Schwarz/Dunkelbraun, Glas-Panels, Amber-Akzent (`#ffb040`), Orbitron + Rajdhani,
 | Vulkanwelt | `lava` (Pahoehoe-Stricke + Schlackeporen) | Basaltsäulen, Lavakrusten, treibendes Magmameer, glühende Schlucht-Lavafälle |
 | Kristall / Aquilaris | `crystal` / `beach` | Kristall-Spaltstufen / Atoll-Inseln, Felsnadeln, Uferschaum, Küsten-Wasserfälle |
 
+## Einheitliche Oberfläche, Drift, Staub, Spiegelungen (Session 15)
+- **Eine Schriftgröße überall:** virtuelle Leinwand 1180 × 720 (bei breiteren Fenstern breiter), ein Skalierungsfaktor für Menü, Streckenwahl, Hangar, Einstellungen, Pause und Ergebnis. Jede Ansicht füllt die Leinwand: Kopfzeile (Titel links, Aktionen rechts), darunter drei Spalten mit Panels; die mittlere Spalte ist die Bühne (Karte, Pod-Vorschau) und nimmt den Restplatz.
+- **Kompakte Bausteine:** Panel-Innenabstand 16 px, Regler 2-zeilig (Beschriftung + Wert, darunter Schieber), Schalter einzeilig, Listenzeilen einzeilig mit Farbstreifen.
+- **Drift:** der Pod darf weit quer stehen (bis ~50°), bleibt aber abfangbar; Staub-/Gischtfahne und seitliche Staubwolke machen den Drift sichtbar.
+- **Staubfahne:** flach und bodennah, in Bodenfarbe, wird nach hinten breiter und blasser (Deckkraft ≤ 0,13); nie höher als die Triebwerke. Bei Nässe weißgraue Gischt stattdessen.
+- **Startnummer:** helle quadratische Tafel mit dunkler Zahl auf kurzem Mast hinter dem Cockpit, von hinten und vorn lesbar, leicht selbstleuchtend.
+- **Boost:** Triebwerksklappen klappen ~30° auf, Nachbrenner-Kern, Hitzebalken steigt.
+- **Spiegelungen:** Pfützen und nasse Fahrbahn spiegeln Lichter, Pods und Umgebung (Screen Space), Himmel über die Umgebungsbeleuchtung; trockene raue Flächen spiegeln nicht.
+- **Trümmer:** immer deckend und kantig; verschwinden durch Schrumpfen, nie durch Transparenz.
+
 ## Bedienoberfläche & Rückmeldungen (Session 14)
 Leitidee: **Alles auf einen Blick, in jedem Fenster.** Kein Scrollen, keine abgeschnittenen Elemente; lieber Reiter und kompakte Zeilen als lange Seiten.
 

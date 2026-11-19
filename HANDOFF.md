@@ -1,7 +1,7 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-`npm run dev` → Boonta-Kessel → in einer Kurve **Leertaste + A/D halten** (Slide), dann auf der Geraden **→ halten und mit ↑/↓ lenken** (Rolle). Fühlt sich der Slide jetzt weich genug an? (≈ 5 Min.) Werte zum Nachstellen: `physics.ts`, Block „Handbrake slide (Session 14 retune)".
+`npm run dev` → Boonta-Kessel → **Leertaste + A/D** in einer Kurve halten: driftet der Pod jetzt weit genug? Danach `→` halten und mit `↓`/`↑` lenken (Rolle). Stellwerte: `physics.ts`, Kommentar „Session 15: more drift" (Haftung 3,5 %, Rückkehr 0,7 s) und `(1 + 0.45 * knife)` (≈ 5 Min.).
 
 ## Git-Stand (wichtig)
 - Lokales Repo im Projekt-Root, Branch **`B`**, Remote `origin` = `https://github.com/Cr0nFixXx/podracer.git`. **Pushen:** `git push origin B`.
@@ -10,6 +10,43 @@
 - **Committen immer mit `npm run save -- "Nachricht"`** (`tools/save.sh`): committet alles außer `.archiv/repo-sicherung`, schreibt die Textkopie neu und testet sie durch Probe-Wiederherstellung. Nie von Hand `git add -A`.
 - **Sitzungsbeginn ohne `.git`:** `npm run restore-git` (Textkopie → sonst GitHub; im zweiten Fall sind ungepushte Einzel-Commits weg, dann `npm run save`).
 - Commit-Autor ist der Platzhalter „Podracer Dev".
+
+## Stand: 2026-11-19 (Session 15) – Bugfixes (UV-Schmieren, UI-Skalierung, Trümmer, SSR), Drift, Staubfahnen, Live-Grafik
+
+### Erledigt in Session 15
+**Bugs**
+1. **Schmierige/langgezogene Bodentextur (alle Strecken, am stärksten spät auf Sprints):** Die Fahrbahn-Texturkoordinate war `zurückgelegte Strecke / Kachellänge(Breite)`. Wo sich die Streckenbreite ändert, wird damit die GESAMTE bisherige Strecke durch eine andere Zahl geteilt → Textur wird immer stärker gestreckt/gestaucht, je weiter man ist. Jetzt segmentweise integriert (`world.ts`, Road-Deck).
+2. **Halb durchsichtige Trümmer:** (a) Eisbrücken-Material hatte 88 % Deckkraft → jetzt deckend. (b) Bogen-/Eisblöcke sind Torus-Segmente ohne Stirnflächen; nach dem Herausbrechen sah man durch die offenen Enden → Deckel ergänzt. (c) Die Trümmer-„Brocken" zerplatzender Hindernisse waren weiche Sprites → jetzt echte, deckende Brocken (`debris.ts`, instanziert, prallen ab, schrumpfen am Ende).
+3. **UI uneinheitlich (Hangar winzig, Steuerung riesig):** `Fit` skalierte jede Ansicht nach ihrer eigenen Höhe. Jetzt **ein** Faktor für alle Ansichten: `min(Breite/1180, Höhe/720)`; jede Ansicht ist auf die virtuelle Höhe 720 px ausgelegt (Flex-Spalten). Notfall-Schrumpfen nur, wenn eine Ansicht zu hoch ist – der Layout-Test schlägt dann fehl.
+4. **Schwebende Objekte an Hängen:** Dekor, Streckenrand-Props und Relaistürme saßen auf der Geländehöhe ihres Mittelpunkts. Jetzt auf dem tiefsten Punkt ihrer Standfläche (5 Höhenproben).
+5. **Keine Spiegelungen in Pfützen:** Die SSR verwarf alle Nichtmetalle. Der Puffer führt jetzt „Reflektivität" statt Metallanteil (glatte, nasse Flächen zählen mit); SSR-Reichweite 42 m, stärker; nasse Fahrbahn glatter. SSR ist jetzt auch in der Voreinstellung „Hoch" an.
+
+**Soll**
+6. **Staubfahnen:** jeder Pod zieht unter beiden Triebwerken eine Staubfahne (dichter/länger mit Tempo, ab 16 m/s), bei Nässe Gischt. Gegner näher als 24 m vor der Kamera nur angedeutet (Sicht). Auf Metallstrecken (Stadt, Oovo) 30 %.
+7. **Triebwerksklappen** öffnen beim Boost (weich, leichtes Flattern) und schließen wieder (nur Spieler-Pod und Hangar; Gegner-Modelle sind statisch gemerged).
+8. **Mehr Drift:** Seitenhaftung im Slide 3,5 % (vorher 8,5 %), Haftung kehrt in ~0,7 s zurück, Eindreh-Begrenzer erst ab ~50° Schräglauf, weniger Bremswirkung. Gegner sliden mit 45 % Stärke.
+9. **Rolle:** Anheben/Neigen lenken mit +45 % Wirkung (vorher −40 %), Eingabe ×1,25, Lenkung spricht schneller an.
+
+**TODO-Punkte**
+10. **Checkpoint-Bögen haben Kollision** (`Overhead.arch`): Decke folgt der Halbellipse – am Rand niedrig, in der Mitte hoch.
+11. **Grafik live schalten** (`Game.applyLiveGfx`): zusätzlich Bloom (+Stärke), AO, God Rays, Unschärfe, Kino-Shader, Kantenglättung, Linseneffekte (Post-Kette wird neu gebaut), Schatten an/aus + Auflösung (nicht bei Kaskaden-Schatten), Partikel, Sichtweite. Neustart weiter nötig: Texturen, Geometrie/Detaildichte, Tessellation, Parallax/Bump/Shader-Details, Batching, Renderer, Anisotropie, Kaskaden-Schatten, Volumetrie und **SSR** (SSR ändert die Render-Ziele der Szene; live umgeschaltet gab es auf WebGPU Pipeline-Fehler – getestet und deshalb herausgenommen).
+12. **Podracer-Aufwertung:** Startnummern-Tafel hinter dem Cockpit (1 gemeinsames Material/Atlas), Boost-Klappen, Staubfahnen.
+
+### Verifiziert
+- `npm run check`: 14/14 Strecken bestanden (0 NaN, 0 m Wand-Durchdringung, KI-Neigen ≤ 1,3 %).
+- **Layout-Test** (`pui.mjs`): gleiche Skalierung auf allen Ansichten (1280×720 → 1,00 · 1920×1080 → 1,50 · 1024×600 → 0,83 · 800×1000 → 0,68 · 2560×1440 → 2,00), kein Notfall-Schrumpfen, keine Scrollbalken. Screenshots gesichtet.
+- **Standbilder:** Dschungel nach der Abkürzung vorher (Streifen bis zum Horizont) / nachher (normale Schlammtextur); Startnummern an Spieler- und Gegner-Pods.
+- **Live-Umschalten** (Harness `?live`: Bloom, AO, God Rays, AA, Unschärfe, Kino-Shader, Linseneffekte, Schatten aus/an, Partikel, Sichtweite): WebGPU Boonta + Stadt bei Regen → 0 Konsolenfehler; WebGL2 Boonta → ebenfalls fehlerfrei. Zwei Fehler dabei gefunden und behoben: (1) SSR live umzuschalten erzeugt auf beiden Backends ungültige Pipelines → SSR ist jetzt Neustart-Option; (2) asynchrones Warm-up nach dem Neuaufbau kollidierte mit laufenden Frames → entfernt.
+- **SSR:** WebGPU Dschungel bei Gewitter mit SSR 0 Fehler. Standbild Stadt bei Regen: Triebwerksglühen spiegelt sich unter dem Pod auf der nassen Fahrbahn (im Software-Rendering körnig; Weichzeichnung danach erhöht, nicht erneut gesichtet). Gebäude-Spiegelungen kaum sichtbar.
+- **App-Smoke-Test** (gebaute App): Rennen, HUD-Seiten, stumme Pause, Grafik im Pausemenü ohne Scrollen, Tasten umbelegen – bestanden.
+
+### Nicht verifiziert
+- **Fahrgefühl** von Drift und Rollen-Lenkung (nur Simulation).
+- In Bewegung nicht gesehen: Staubfahnen, Boost-Klappen, solide Trümmer, gedeckelte Bogenblöcke, Bogen-Kollision (nur gerade Traverse per Selbsttest geprüft).
+- Hang-Sitz der Objekte nicht einzeln gesichtet; Tribünen am Start und Landmarken nutzen den alten Weg.
+- Schatten-Umschalten zur Laufzeit optisch (nur auf Fehlerfreiheit geprüft).
+
+---
 
 ## Stand: 2026-11-19 (Session 14) – Bugfixes, responsive UI, Rollen-Steuerung, zerstörbare Hindernisse, Textur-Cache
 

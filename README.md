@@ -33,15 +33,17 @@ npm run build    # erzeugt dist/index.html (alles inline, offline lauffähig)
 **Anzeige im Rennen:** unten links zeigt ein Pod-Symbol die Fluglage (dreht sich bei der Rolle, Pfeil für Anheben/Neigen). Der Balken darunter füllt sich im Slide – ist er gelb, gibt es beim Loslassen den Extra-Schub. Unter der Karte stehen Tageszeit und Wetter.
 
 ### Flugmanöver
-1. **Slide:** `Leertaste` halten und lenken – die Haftung lässt weich nach, das Heck kommt herum und der Pod driftet auf seinem Schwung weiter. Gegenlenken fängt ihn ab; nach dem Loslassen greift er über etwa eine halbe Sekunde wieder. Nach einem langen Slide loslassen und Schub geben: kurzer Extra-Schub (Balken unter der Fluglage-Anzeige wird gelb).
+1. **Slide / Drift:** `Leertaste` halten und lenken – die Haftung lässt weich nach, das Heck kommt herum und der Pod driftet weit auf seinem Schwung (bis etwa 50° quer). Gegenlenken fängt ihn ab; nach dem Loslassen greift er über etwa eine halbe Sekunde wieder. Nach einem langen Slide loslassen und Schub geben: kurzer Extra-Schub (Balken unter der Fluglage-Anzeige wird gelb).
 2. **Weiter springen:** auf der Rampe und in der Luft `↓` halten – der Pod hebt die Nase und gleitet (etwa doppelte Sprungweite, kostet etwas Tempo).
 3. **Schneller landen:** in der Luft `↑` halten – der Pod taucht ab. Am Boden drückt `↑` den Pod tiefer und gibt mehr Haftung.
-4. **Hochkant durch Lücken:** `←` oder `→` halten – der Pod rollt 90° und ist nur noch ein Viertel so breit. **Im gerollten Zustand ist die Steuerung mitgedreht:** `↓` (Anheben) zieht den Pod zur Rollseite hin, `↑` (Neigen) von ihr weg; `A`/`D` bewegen ihn auf und ab.
+4. **Hochkant durch Lücken:** `←` oder `→` halten – der Pod rollt 90° und ist nur noch ein Viertel so breit. **Im gerollten Zustand ist die Steuerung mitgedreht:** `↓` (Anheben) zieht den Pod zur Rollseite hin, `↑` (Neigen) von ihr weg; `A`/`D` bewegen ihn auf und ab. Die Lenkung über `↑`/`↓` ist dabei kräftiger als die normale Lenkung.
 5. Cockpit und Triebwerke neigen sich nur gemeinsam und nur, solange `↑`/`↓` gedrückt ist. Beim Lenken hebt sich das äußere Triebwerk als Ganzes, ohne zu kippen.
 
 **Boost-Anzeige:** Der Balken unter dem Tacho zeigt die Triebwerkshitze. Im schraffierten Bereich (ab 80 %) wird es kritisch, bei „MAX" überhitzen die Triebwerke und nehmen Schaden; der Boost ist dann gesperrt, bis die Hitze unter die Marke „BEREIT" gefallen ist.
 
-**Hindernisse:** Frachtkisten und kleine Felsen lassen sich mit Tempo zertrümmern – das kostet etwas Triebwerkszustand und Tempo. Säulen und große Felsen bleiben hart. Sponsoren-Traversen und das Startportal sind massiv: nicht hineinfliegen.
+**Hindernisse:** Frachtkisten und kleine Felsen lassen sich mit Tempo zertrümmern – das kostet etwas Triebwerkszustand und Tempo. Säulen und große Felsen bleiben hart. Sponsoren-Traversen, das Startportal und die Checkpoint-Bögen sind massiv: nicht hineinfliegen (die Bögen sind am Rand niedriger als in der Mitte).
+
+**Pods:** Jeder Pod trägt seine Startnummer hinter dem Cockpit und zieht eine Staubfahne hinter sich her (bei Nässe Gischt). Beim Boost öffnen sich die Triebwerksklappen.
 
 ## Tageszeit & Wetter
 
@@ -93,7 +95,7 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 ## Landschaft & Atmosphäre
 
 - **Steigungen & Schrägkurven (neu):** jede der 14 Strecken hat lange Anstiege und Gefälle (bis 11–17 %) mit Kuppen zum Abheben sowie überhöhte Kurven (bis ca. 21°), die spürbar mehr Haftung geben.
-- **Bedienoberfläche:** passt sich jeder Fenstergröße an und kommt ohne Scrollbalken aus. In der Streckenwahl filtert ein Auswahlfeld nach Planet.
+- **Bedienoberfläche:** alle Menüs haben dieselbe Schriftgröße und wachsen mit dem Fenster (Bezugsgröße 1180 × 720); keine Scrollbalken. In der Streckenwahl filtert ein Auswahlfeld nach Planet.
 - **Schnellere Folgestarts:** berechnete Texturen werden im Browser gespeichert (IndexedDB); ab dem zweiten Start einer Welt entfällt die Berechnung. `?nocache` an der Adresse schaltet das ab.
 - **Hangar (neu):** 8 Lackierungs-Vorlagen (z. B. „Boonta Gold", „Tarnkappe", „Neon-Nacht") neben der freien Farbwahl.
 - **Breitere Pisten & Renntechnik (neu):** alle Strecken sind 18 % breiter. Am Rand stehen Repulsor-Relaistürme mit gegenläufig drehenden Ringen, Patrouillen-Drohnen begleiten das Feld.
@@ -108,7 +110,8 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 
 ## Grafik-Einstellungen (Auswahl)
 
-- **Erreichbar** über „Einstellungen → Grafik & Ton" und im Rennen über **Pause (`Esc`) → Grafik-Einstellungen**. Sofort wirksam sind Sichtfeld, Render-Skalierung, LOD-Distanz, Gegner-Pod-Detail, Wetter-Effekte, FPS-Anzeige und Lautstärke; alles andere über „Übernehmen & neu starten".
+- **Erreichbar** über „Einstellungen → Grafik & Ton" und im Rennen über **Pause (`Esc`) → Grafik-Einstellungen**. **Sofort wirksam:** alle Effekte (Bloom, Ambient Occlusion, God Rays, Unschärfe, Kino-Shader, Linseneffekte), Kantenglättung, Schatten, Partikel, Wetter-Effekte, Sichtweite, LOD, Gegner-Pod-Detail, Render-Skalierung, Sichtfeld, Lautstärke. **Neustart des Rennens nötig:** Texturauflösung, Geometrie/Detaildichte, Tessellation, Material-Optionen, Spiegelungen (SSR), Kaskaden-Schatten, Volumetrie, Renderer.
+- **Spiegelungen:** „Screen Space Reflections" spiegeln jetzt auch in Pfützen, auf nasser Fahrbahn und Eis (in „Hoch" und „Ultra" eingeschaltet).
 - **Voreinstellung „Ultra":** stellt jede Option auf ihr Maximum (nur Sichtfeld und Bloom-Stärke bleiben). Sehr leistungshungrig.
 - **Neu:** LOD-Distanz (ab wann ferne Bäume/Felsen vereinfacht werden), Gegner-Pod-Detail (bis zu welcher Entfernung Gegner voll detailliert sind), Wetter-Effekte (Aus/Reduziert/Voll), Volumetrie (Nebelbänke und Lichtkegel).
 

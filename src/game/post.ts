@@ -88,14 +88,14 @@ export class PostFX {
       const normal = sample((uvN: N) => unpackRGBToNormal(nNode.sample(uvN)));
       const s = ssr(sceneColor, depthNode, normal, { metalnessNode: mrNode.r, roughnessNode: mrNode.g, camera });
       s.resolutionScale = 0.35;
-      s.quality.value = 0.1;
-      s.maxDistance.value = 42;
-      s.thickness.value = 2.0;
+      s.quality.value = 0.22;
+      s.maxDistance.value = 130; // far enough to catch buildings, walls and other pods in puddles
+      s.thickness.value = 3.5;
       s.maxLuminance.value = 2.4;
       s.intensity.value = 0.85;
       s.screenEdgeFade.value = 0.28;
       s.screenEdgeFadeBlack = true;
-      s.blurQuality = 1;
+      s.blurQuality = 2; // smoother (less speckle) reflections
       this.disposables.push(s);
       const ssrTex = (s as N).getTextureNode ? (s as N).getTextureNode() : s;
       const prev = col;

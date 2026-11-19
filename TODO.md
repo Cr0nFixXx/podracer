@@ -1,11 +1,11 @@
 # TODO
 
-## 0. Direkt aus Session 14
-- [ ] **Probefahrt:** Slide-Gefühl, Rollen-Steuerung, Banner-Kollision, Hindernisse zertrümmern, Ultra-Preset auf echter Hardware
-- [ ] **Kollision für Checkpoint-Bögen** (bogenförmig, seitenabhängige Höhe) und für Set-Piece-Türme
-- [ ] **Gamepad-Belegung im Menü** + Touch-Steuerung (Tastatur ist umbelegbar)
-- [ ] **Startnummern** auf den Pods + Pilotenköpfe
-- [ ] **Grafik-Optionen live schalten**, die heute einen Neustart brauchen (Schatten, AA, Bloom) – PostFX zur Laufzeit neu aufbauen
+## 0. Direkt aus Session 15
+- [ ] **Probefahrt:** Drift-Stärke, Rollen-Lenkung, Staubfahnen-Dichte, Spiegelungen bei Regen, Live-Umschalten der Grafik
+- [ ] **Boost-Klappen auch bei Gegnern** (GPU-Vertexanimation im geteilten Gegner-Material) + Pilotenköpfe
+- [ ] **Restliche Grafik-Optionen live** (Volumetrie, Kaskaden-Schatten, Anisotropie) – brauchen Material-Neuaufbau
+- [ ] **Tribünen/Landmarken am Hang** auf tiefsten Standpunkt setzen (Dekor/Props/Türme sind erledigt)
+- [ ] **Gamepad-Belegung im Menü** + Touch-Steuerung
 
 ## 1. Als Nächstes (Podracer & Ladezeit)
 - [ ] **Podracer-Aufwertung:** Livery-Vorlagen & Startnummern im Hangar; Hitzeflimmern auch für Gegner-Pods
@@ -21,6 +21,14 @@
 - [ ] **`npm run check` in GitHub Actions** (Push auf `B`), `check:gpu` als optionaler Job
 - [ ] **Harness:** WebGPU-Screenshots im headless Chrome reparieren (weiß; nur Konsolencheck möglich)
 - [ ] **Fern-LOD auch für Kiefern/Tafelberge**, falls die Messung es rechtfertigt
+
+## Erledigt (Session 15 – Bugfixes, Drift, Staub, Live-Grafik)
+- [x] **Schmier-Textur behoben** (Fahrbahn-UV segmentweise), **Trümmer deckend** (Eis, Bogen-Deckel, solide Brocken)
+- [x] **Einheitliche UI-Skalierung** auf allen Ansichten, **Objekte sitzen am Hang auf**
+- [x] **Spiegelungen (SSR) in Pfützen/auf nasser Fahrbahn**, SSR in „Hoch" aktiv
+- [x] **Staubfahnen / Gischt** hinter allen Pods, **Boost-Klappen**, **Startnummern**
+- [x] **Mehr Drift**, **stärkere Rollen-Lenkung**
+- [x] **Kollision für Checkpoint-Bögen**, **Grafik-Optionen live** (Effekte, Schatten, AA, Partikel, Sichtweite)
 
 ## Erledigt (Session 14 – Bugfixes, UI, Steuerung, Hindernisse, Cache)
 - [x] **Bugs:** Slide weicher/progressiv, HUD-Schaden L/R, Klappen-Klappern, Leitungen durchs Triebwerk, Ton in der Pause, Banner zu niedrig + Kollision
