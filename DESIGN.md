@@ -35,6 +35,19 @@ Schwarz/Dunkelbraun, Glas-Panels, Amber-Akzent (`#ffb040`), Orbitron + Rajdhani,
 | Vulkanwelt | `lava` (Pahoehoe-Stricke + Schlackeporen) | Basaltsäulen, Lavakrusten, treibendes Magmameer, glühende Schlucht-Lavafälle |
 | Kristall / Aquilaris | `crystal` / `beach` | Kristall-Spaltstufen / Atoll-Inseln, Felsnadeln, Uferschaum, Küsten-Wasserfälle |
 
+## Tunnel-Typen, Hitze, Pendel (Session 17)
+| Thema | Gestaltung |
+|---|---|
+| Standard-Tunnel | „unterirdisch": Röhre unter einem Erdwall (Böschung bis zum Gelände), geschlossene Portalwand, oben ein befahrbares Deck mit Fahrbahn-Belag und zwei schmalen Leuchtkanten |
+| Unterwassertunnel (Aquilaris) | Stahl-Caisson, der an der Wasserlinie ins Meer abtaucht; innen Fensterbänder auf beiden Flanken zwischen Stahlrippen, Blick ins Blau mit Kaustik, Lichtstrahlen und Fischen; 9 m hoch |
+| Höhle (Magma) | raue, unregelmäßige Felsröhre mit Stalaktiten und Glutadern, sparsame Lampen, zwei offene Lichtschächte; 11 m unter Gelände |
+| Hitzeglühen | beginnt an der Düse, wandert mit der Hitze nach vorn; dunkelrot → orange → gelbweiß; träge (Metall); ab 86 % Funken |
+| Überziehen | HUD: weißer ablaufender Balken im Hitzebalken + Text; Triebwerke gelbweiß, viele Funken |
+| Energieblitz | fein: haardünner Kern, vier dünne Bögen, die getrennt wandern und flackern; Quadra Lumber: zwei Blitze als X |
+| Cockpit-Pendel | sichtbar, aber nie hektisch: max. ±1,9 m seitlich, unterdämpft (schwingt 1–2-mal nach) |
+| Staubfahne | zwei Fahnen unter den Triebwerken, driften nach außen, heller als der Boden, bis ~40 % Deckkraft; bei Nässe weißgraue Gischt |
+| Ego-Ansicht | kein Cockpit-Rahmen, freier Blick auf Triebwerke, Leitungen und Blitz |
+
 ## Sci-Fi-Sprache, Tunnel, Schwerelosigkeit (Session 16)
 Leitidee: **Technik leuchtet schmal und bewegt sich.** Futuristisch wirkt nicht die Menge an Teilen, sondern Licht in Linien, das mit der Fahrtrichtung läuft.
 

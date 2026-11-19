@@ -28,6 +28,8 @@ npm run build    # erzeugt dist/index.html (alles inline, offline lauffähig)
 | Ansicht wechseln | `C` | Y |
 | Pause | `Esc` / `P` | Start |
 
+In der Ansicht „Cockpit" (`C`) blickt man ohne Cockpit-Rahmen frei über die Triebwerke.
+
 **Gamepad ändern:** Einstellungen → Steuerung → Abschnitt „Gamepad": Aktion anklicken, dann Taste drücken oder Stick bewegen. „Standard" stellt die Belegung aus der Tabelle wieder her.
 
 **Tasten ändern:** Einstellungen → Steuerung. Aktion anklicken und die gewünschte Taste drücken (Esc bricht ab). Zwei Vorlagen stehen bereit: „Standard" (Tabelle oben) und „Klassisch" (Pfeiltasten lenken und geben Schub, `I`/`K` Neigen/Anheben, `J`/`L` Rolle). Pause bleibt auf `Esc`/`P`.
@@ -41,15 +43,17 @@ npm run build    # erzeugt dist/index.html (alles inline, offline lauffähig)
 4. **Hochkant durch Lücken:** `←` oder `→` halten – der Pod rollt 90° und ist nur noch ein Viertel so breit. **Im gerollten Zustand ist die Steuerung mitgedreht:** `↓` (Anheben) zieht den Pod zur Rollseite hin, `↑` (Neigen) von ihr weg; `A`/`D` bewegen ihn auf und ab. Die Lenkung über `↑`/`↓` ist dabei kräftiger als die normale Lenkung.
 5. Cockpit und Triebwerke neigen sich nur gemeinsam und nur, solange `↑`/`↓` gedrückt ist. Beim Lenken hebt sich das äußere Triebwerk als Ganzes, ohne zu kippen.
 
-**Boost-Anzeige:** Der Balken unter dem Tacho zeigt die Triebwerkshitze. Im schraffierten Bereich (ab 80 %) wird es kritisch, bei „MAX" überhitzen die Triebwerke und nehmen Schaden; der Boost ist dann gesperrt, bis die Hitze unter die Marke „BEREIT" gefallen ist.
+**Boost-Anzeige:** Der Balken unter dem Tacho zeigt die Triebwerkshitze; im schraffierten Bereich (ab 80 %) wird es kritisch. **Überziehen:** bei „MAX" lässt sich der Boost noch bis zu 3 Sekunden halten – das kostet langsam Triebwerkszustand (Anzeige „ÜBERZOGEN · NOCH x s"). Danach schalten die Triebwerke ab, bis die Hitze unter die Marke „BEREIT" gefallen ist. Die Hitze sieht man auch am Pod: die Glut wandert von der Düse nach vorn, kurz vor dem Limit glühen die Triebwerke hellgelb und sprühen Funken.
 
 **Hindernisse:** Frachtkisten und kleine Felsen lassen sich mit Tempo zertrümmern – das kostet etwas Triebwerkszustand und Tempo. Säulen und große Felsen bleiben hart. Sponsoren-Traversen, das Startportal und die Checkpoint-Bögen sind massiv: nicht hineinfliegen (die Bögen sind am Rand niedriger als in der Mitte).
 
-**Pods:** Jeder Pod zieht eine Staubfahne hinter sich her (bei Nässe Gischt). Beim Boost öffnen sich die Düsenklappen am Triebwerksausgang – auch bei den Gegnern.
+**Pods:** Jeder Pod zieht zwei Staubfahnen unter den Triebwerken hervor (bei Nässe Gischt) – auch der eigene. Das Cockpit hängt an den Leitungen und pendelt in Kurven, beim Beschleunigen und Bremsen mit. Der **Quadra Lumber** fliegt mit vier schlanken Triebwerken im Quadrat und einem X aus Energieblitzen. Beim Boost öffnen sich die Düsenklappen am Triebwerksausgang – auch bei den Gegnern.
 
 **Schwerelosigkeit (Oovo IV):** In den Röhren gibt es keine Schwerkraft und keinen Luftwiderstand: der Pod wird schneller, schwebt frei und driftet seitlich nach. `↓` und `↑` schieben ihn dort wie Steuerdüsen nach oben und unten. Kurz vor dem Röhrenende sinkt er von selbst auf Schwebehöhe.
 
-**Tunnel:** Jede Strecke hat überdachte Passagen (2, auf Aquilaris, Oovo IV, Ando Prime und Malastare 3–4). Die Decke ist massiv; am Rand ist sie niedriger als in der Mitte.
+**Tunnel:** Jede Strecke hat Tunnel. Die Decke ist massiv – und **oben befahrbar**: wer vor dem Portal abhebt und darüber fliegt, landet auf dem Tunneldach, fährt dort weiter und springt am Ende wieder auf die Strecke hinunter.
+- **Aquilaris:** zwei Unterwassertunnel; die Fahrbahn taucht unter den Meeresspiegel, durch die Fenster sieht man den Ozean.
+- **Magma-Inferno:** ein Höhlensystem – 600 m teils unterirdisch, mit zwei offenen Lichtschächten.
 
 ## Tageszeit & Wetter
 
@@ -119,7 +123,7 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 ## Grafik-Einstellungen (Auswahl)
 
 - **Erreichbar** über „Einstellungen → Grafik & Ton" und im Rennen über **Pause (`Esc`) → Grafik-Einstellungen**. **Sofort wirksam:** alle Effekte (Bloom, Ambient Occlusion, God Rays, Unschärfe, Kino-Shader, Linseneffekte), Kantenglättung, Schatten, Textur-Filter, Volumetrie, Partikel, Wetter-Effekte, Sichtweite, LOD, Gegner-Pod-Detail, Render-Skalierung, Sichtfeld, Lautstärke. **Neustart des Rennens nötig:** Texturauflösung, Geometrie/Detaildichte, Tessellation, Material-Optionen, Spiegelungen (SSR), Kaskaden-Schatten, Renderer.
-- **Spiegelungen:** „Screen Space Reflections" spiegeln jetzt auch in Pfützen, auf nasser Fahrbahn und Eis (in „Hoch" und „Ultra" eingeschaltet).
+- **Spiegelungen:** „Screen Space Reflections" spiegeln jetzt auch in Pfützen, auf nasser Fahrbahn und Eis (in „Hoch" und „Ultra" eingeschaltet). Die **Spiegelungs-Auflösung** ist einstellbar (35–100 %, Standard 75 %).
 - **Voreinstellung „Ultra":** stellt jede Option auf ihr Maximum (nur Sichtfeld und Bloom-Stärke bleiben). Sehr leistungshungrig.
 - **Neu:** LOD-Distanz (ab wann ferne Bäume/Felsen vereinfacht werden), Gegner-Pod-Detail (bis zu welcher Entfernung Gegner voll detailliert sind), Wetter-Effekte (Aus/Reduziert/Voll), Volumetrie (Nebelbänke und Lichtkegel).
 

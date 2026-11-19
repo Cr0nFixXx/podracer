@@ -70,8 +70,10 @@ class Pool {
     if (this.dirty > 0) {
       const n = this.dirty, st = this.dirtyStart, wrap = st + n > this.max;
       for (const at of this.attrs) {
-        at.clearUpdateRanges();
-        if (n >= this.max) at.addUpdateRange(0, this.max * 4);
+        // Ranges are ADDED (the renderer clears them after uploading). The old code cleared them here first – if two updates ran
+        // without a render in between, the earlier spawns were never uploaded. Too many pending ranges → one full upload.
+        if (at.updateRanges.length > 24 || n >= this.max) at.clearUpdateRanges();
+        if (n >= this.max) { /* empty range list = full upload */ }
         else if (wrap) { at.addUpdateRange(st * 4, (this.max - st) * 4); at.addUpdateRange(0, (st + n - this.max) * 4); }
         else at.addUpdateRange(st * 4, n * 4);
         at.needsUpdate = true;
@@ -81,6 +83,8 @@ class Pool {
     }
     this.sprite.count = this.live;
   }
+  /** Re-uploads all spawn records (tests that run many updates without rendering). */
+  fullUpload() { for (const at of this.attrs) { at.clearUpdateRanges(); at.needsUpdate = true; } }
   clear() {
     (this.aVel.array as Float32Array).fill(0); this.aVel.clearUpdateRanges(); this.aVel.needsUpdate = true;
     this.head = 0; this.live = 0; this.dirty = 0; this.sprite.count = 0;
@@ -137,12 +141,14 @@ export class Particles {
   debris(p: THREE.Vector3, vel: THREE.Vector3, col: THREE.Color) { this.dust(p, vel, col, 10); this.sparks(p, UP_V, vel, 10); }
   /** Session 15 – dust trail dragged behind a pod: low, widening puffs; denser, longer and larger with speed. */
   trail(p: THREE.Vector3, vel: THREE.Vector3, col: THREE.Color, speed: number, alpha: number) {
-    const want = Math.min(2.4, 0.4 + speed * 0.013) * this.amount * this.rateScale;
+    // The puffs are dragged along in the pod's slipstream (80 % of its velocity, strong drag): they stay between engines and cockpit for
+    // the first ~0.3 s – where they are visible – and only then fall behind. (With 20 % they were left behind before they had faded in.)
+    const want = Math.min(3, 0.6 + speed * 0.02) * this.amount * this.rateScale;
     const n = Math.floor(want) + (Math.random() < (want % 1) ? 1 : 0);
     for (let i = 0; i < n; i++) {
-      _v.set((Math.random() - 0.5) * 5, 0.5 + Math.random() * 1.7, (Math.random() - 0.5) * 5).addScaledVector(vel, 0.2);
+      _v.set((Math.random() - 0.5) * 6, 1.2 + Math.random() * 2.6, (Math.random() - 0.5) * 6).addScaledVector(vel, 0.8);
       _p.set(p.x + (Math.random() - 0.5) * 1.6, p.y, p.z + (Math.random() - 0.5) * 1.6);
-      this.alpha.spawn(_p, _v, 1.0 + Math.random() * 0.9, 0.9, 4.2 + speed * 0.035 + Math.random() * 2.6, col, col, alpha, 1.25, -0.5);
+      this.alpha.spawn(_p, _v, 0.8 + Math.random() * 0.7, 1.5, 4.6 + speed * 0.035 + Math.random() * 2.6, col, col, alpha, 3.2, -0.5);
     }
   }
 
@@ -151,9 +157,9 @@ export class Particles {
     const want = Math.min(4, 0.7 + speed * 0.018) * this.amount * this.rateScale;
     const n = Math.floor(want) + (Math.random() < (want % 1) ? 1 : 0);
     for (let i = 0; i < n; i++) {
-      _v.set((Math.random() - 0.5) * 7, 1.6 + Math.random() * 3 + speed * 0.022, (Math.random() - 0.5) * 7).addScaledVector(vel, 0.32);
+      _v.set((Math.random() - 0.5) * 7, 2.2 + Math.random() * 3.4 + speed * 0.03, (Math.random() - 0.5) * 7).addScaledVector(vel, 0.78); // carried along in the slipstream
       _p.set(p.x + (Math.random() - 0.5) * 3.2, p.y, p.z + (Math.random() - 0.5) * 3.2);
-      this.alpha.spawn(_p, _v, 0.55 + Math.random() * 0.5, 0.9, 3.6 + speed * 0.028 + Math.random() * 2.5, C_SPRAY, C_SPRAY, 0.15 * alphaScale, 1.5, 5);
+      this.alpha.spawn(_p, _v, 0.55 + Math.random() * 0.5, 0.9, 3.6 + speed * 0.028 + Math.random() * 2.5, C_SPRAY, C_SPRAY, 0.3 * alphaScale, 3.0, 7);
     }
   }
   /** Tiny short-lived splash crown where a rain drop hits the road. */

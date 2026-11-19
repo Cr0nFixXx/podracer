@@ -1,11 +1,11 @@
 # TODO
 
-## 0. Direkt aus Session 16
-- [ ] **Probefahrt:** Heck-Drift, Schwerelosigkeit (Tempo, Schweben), Start im Feld, Tunnel von außen, Wetterstärke
-- [ ] **Kaskaden-Schatten live schalten** (braucht Neuaufbau des Schatten-Knotens + aller beleuchteten Materialien) – einzige verbliebene Neustart-Option neben SSR/Texturen/Geometrie
-- [ ] **Tunnel-Außenhülle ans Gelände anbinden** (Erdwall/Felsmantel bei frei stehenden Tunneln), Tunnel-Varianten je Welt (Glasröhre Aquilaris, Eisgrotte Ando Prime)
-- [ ] **Start weiter entzerren** (Ø 2,6 streifende Paare) – z. B. versetzte Startaufstellung
-- [ ] **Pilotenköpfe**, Touch-Steuerung
+## 0. Direkt aus Session 17
+- [ ] **Probefahrt:** Sprung aufs Tunneldach (Boonta), Unterwassertunnel von außen/innen, Höhle, Boost überziehen, Cockpit-Pendel, Staubstärke
+- [ ] **Rampe am Deckende** (statt 14 m Sturz) und Geländer/Barrieren-Optik auf dem Deck
+- [ ] **Unterwassertunnel verfeinern:** echte Glasröhre mit Blick auf Meeresboden, Luftblasen, Portal-Insel
+- [ ] **Hitzeglühen + Cockpit-Pendel für Gegner** (Vertex-Animation im geteilten Gegner-Material)
+- [ ] **Kaskaden-Schatten live**, Pilotenköpfe, Touch-Steuerung
 
 ## 1. Als Nächstes (Podracer & Ladezeit)
 - [ ] **Podracer-Aufwertung:** Livery-Vorlagen & Startnummern im Hangar; Hitzeflimmern auch für Gegner-Pods
@@ -20,6 +20,15 @@
 - [ ] **`npm run check` in GitHub Actions** (Push auf `B`), `check:gpu` als optionaler Job
 - [ ] **Harness:** WebGPU-Screenshots im headless Chrome reparieren (weiß; nur Konsolencheck möglich)
 - [ ] **Fern-LOD auch für Kiefern/Tafelberge**, falls die Messung es rechtfertigt
+
+## Erledigt (Session 17 – Tunneldecks, Unterwasser, Höhle, Quadra, Überziehen, Pendel)
+- [x] **Kein Teleport mehr:** befahrbares Tunneldeck + Erdwall; Tunnel vor Hindernissen platziert
+- [x] **Aquilaris:** 2 Unterwassertunnel mit Ozean-Fenstern, keine Schanzen davor
+- [x] **Magma-Inferno:** Höhlensystem (3 Teile, 2 Lichtschächte), keine Schanzen davor
+- [x] **Quadra Lumber** 2×2 schlanke Triebwerke + X-Energieblitz; **Blitze feiner und mehrfach**
+- [x] **Boost überziehen** (3 s gegen Schaden), **Hitzeglühen als Anzeige** mit Funken
+- [x] **Cockpit-Pendel**, **Ego-Ansicht ohne halbes Cockpit**, **mehr Triebwerkshub**
+- [x] **Staub/Gischt am eigenen Pod sichtbar** und stärker, **Spiegelungs-Auflösung einstellbar**, **Zero-G zentrierter**
 
 ## Erledigt (Session 16 – Klappen, Bögen, Start, Tunnel, Sci-Fi, Zero-G, Wetter, Gamepad)
 - [x] **Düsenklappen** öffnen beim Boost (Spieler + Gegner); Bremsklappen nur bei Luftbremse; **Startnummern entfernt**

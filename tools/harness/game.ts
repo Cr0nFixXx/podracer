@@ -80,6 +80,17 @@ let g: Game | null = null; let cur = -1;
     (window as unknown as Record<string, unknown>).coverInfo = 'live-switch ok';
   }
   if (location.search.includes('wetnow')) { G.wet = 1; G.wetTarget = 1; }
+  if (location.search.includes('ptest')) { // particle pool self-test: 300 big red (alpha pool) + 300 green (additive pool) particles 25 m ahead of the camera
+    const f = G.camera.getWorldDirection(new THREE.Vector3()), c = G.camera.position, P = G.particles, v0 = new THREE.Vector3();
+    for (let i = 0; i < 300; i++) {
+      const p = new THREE.Vector3(c.x + f.x * 25 + (Math.random() - 0.5) * 16, c.y + f.y * 25 + (Math.random() - 0.5) * 6, c.z + f.z * 25 + (Math.random() - 0.5) * 16);
+      if (location.search.includes('ptest2')) P.alpha.spawn(p, new THREE.Vector3(f.x * 60, 2, f.z * 60), 1.1, 1.5, 9, new THREE.Color(0xff0000), new THREE.Color(0xff0000), 0.42, 3.2, -0.5); // dust-like parameters, red
+      else (i % 2 ? P.alpha : P.add).spawn(p, v0, 5, 2.5, 2.5, new THREE.Color(i % 2 ? 0xff0000 : 0x00ff00), new THREE.Color(i % 2 ? 0xff0000 : 0x00ff00), 1, 0.1, 0);
+    }
+    P.update(location.search.includes('ptest2') ? 0.2 : 1.25, c, G.clock);
+    (window as unknown as Record<string, unknown>).coverInfo = `ptest alphaLive=${(P.alpha as unknown as { live: number }).live} addLive=${(P.add as unknown as { live: number }).live} count=${P.alpha.sprite.count}`;
+  }
+  (G.particles.alpha as unknown as { fullUpload: () => void }).fullUpload(); (G.particles.add as unknown as { fullUpload: () => void }).fullUpload(); // the harness runs many updates without rendering
   for (let k = 0; k < 3; k++) { G.render(0.016); await new Promise(r => setTimeout(r, 900)); }
   return `${(window as unknown as Record<string, unknown>).loadInfo ?? ''} ${(window as unknown as Record<string, unknown>).coverInfo ?? ''} ${G.backend} ${TRACKS[i].id}/${view} calls=${G.renderer.info.render.calls} tris=${G.renderer.info.render.triangles}`;
 };

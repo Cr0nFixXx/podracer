@@ -23,7 +23,7 @@ import { applyAtmosphere } from './atmosphere';
 import type { LifeAudio } from './wildlife';
 
 const ZERO = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
-const C_ICE = new THREE.Color('#d8f2ff');
+const C_ICE = new THREE.Color('#d8f2ff'), WHITE_C = new THREE.Color(1, 1, 1);
 export const CAMERA_NAMES = ['Verfolger', 'Verfolger (fern)', 'Cockpit', 'Motorhaube', 'TV-Kamera', 'Kino-Orbit'];
 
 export interface Standing { name: string; color: string; isPlayer: boolean; gap: string; finished: boolean; }
@@ -607,13 +607,14 @@ export class Game {
         const smp = this.td.paths[p.path].samples[p.idx];
         const wet = this.envBuild.rainRoad && this.wet > 0.3 && this.wxQ > 0 && !(smp && smp.roof > 0 && !p.upper); // dry inside tunnels
         const envP = podEnvelope(p.def), cyD = Math.cos(p.yaw), syD = Math.sin(p.yaw);
-        const near = !p.isPlayer && dist < 24 ? 0.3 : 1, aD = (p.isPlayer ? 0.17 : 0.19) * near * this.dustAmt;
+        const near = !p.isPlayer && dist < 24 ? 0.3 : 1, aD = (p.isPlayer ? 0.42 : 0.36) * near * this.dustAmt;
+        this.tmpC.copy(this.dustCol).lerp(WHITE_C, 0.3); // a little lighter than the ground, otherwise the wake is invisible on its own surface
         for (const e of [envP.engL, envP.engR]) {
           const lz = p.isPlayer ? (e.frontZ + e.backZ) * 0.5 : e.backZ - 1.2, lx = e.outerX * 1.1, sg = e.x < 0 ? -1 : 1;
           this.tmpV.set(p.pos.x + lx * cyD + lz * syD, p.groundY + 0.25, p.pos.z - lx * syD + lz * cyD);
-          this.tmpV2.set(p.vel.x + cyD * sg * 34, p.vel.y, p.vel.z - syD * sg * 34); // outward drift (×0.2–0.3 inside the emitters)
+          this.tmpV2.set(p.vel.x + cyD * sg * 11, 0, p.vel.z - syD * sg * 11); // slight outward drift: the wakes pass left and right of the cockpit
           if (wet) this.particles.spray(this.tmpV, this.tmpV2, sp, this.wet * (p.isPlayer ? 1 : 0.85) * near);
-          else this.particles.trail(this.tmpV, this.tmpV2, this.dustCol, sp, aD);
+          else this.particles.trail(this.tmpV, this.tmpV2, this.tmpC, sp, aD);
         }
       }
       // Slide plume: the rear steps out and throws ground material (or spray) sideways + a few skid sparks

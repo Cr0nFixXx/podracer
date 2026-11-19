@@ -100038,9 +100038,9 @@ var Pool = class {
     if (this.dirty > 0) {
       const n = this.dirty, st = this.dirtyStart, wrap2 = st + n > this.max;
       for (const at of this.attrs) {
-        at.clearUpdateRanges();
-        if (n >= this.max) at.addUpdateRange(0, this.max * 4);
-        else if (wrap2) {
+        if (at.updateRanges.length > 24 || n >= this.max) at.clearUpdateRanges();
+        if (n >= this.max) {
+        } else if (wrap2) {
           at.addUpdateRange(st * 4, (this.max - st) * 4);
           at.addUpdateRange(0, (st + n - this.max) * 4);
         } else at.addUpdateRange(st * 4, n * 4);
@@ -100050,6 +100050,13 @@ var Pool = class {
       this.dirty = 0;
     }
     this.sprite.count = this.live;
+  }
+  /** Re-uploads all spawn records (tests that run many updates without rendering). */
+  fullUpload() {
+    for (const at of this.attrs) {
+      at.clearUpdateRanges();
+      at.needsUpdate = true;
+    }
   }
   clear() {
     this.aVel.array.fill(0);
@@ -100145,12 +100152,12 @@ var Particles = class {
   }
   /** Session 15 – dust trail dragged behind a pod: low, widening puffs; denser, longer and larger with speed. */
   trail(p, vel, col, speed, alpha) {
-    const want = Math.min(2.4, 0.4 + speed * 0.013) * this.amount * this.rateScale;
+    const want = Math.min(3, 0.6 + speed * 0.02) * this.amount * this.rateScale;
     const n = Math.floor(want) + (Math.random() < want % 1 ? 1 : 0);
     for (let i = 0; i < n; i++) {
-      _v.set((Math.random() - 0.5) * 5, 0.5 + Math.random() * 1.7, (Math.random() - 0.5) * 5).addScaledVector(vel, 0.2);
+      _v.set((Math.random() - 0.5) * 6, 1.2 + Math.random() * 2.6, (Math.random() - 0.5) * 6).addScaledVector(vel, 0.8);
       _p.set(p.x + (Math.random() - 0.5) * 1.6, p.y, p.z + (Math.random() - 0.5) * 1.6);
-      this.alpha.spawn(_p, _v, 1 + Math.random() * 0.9, 0.9, 4.2 + speed * 0.035 + Math.random() * 2.6, col, col, alpha, 1.25, -0.5);
+      this.alpha.spawn(_p, _v, 0.8 + Math.random() * 0.7, 1.5, 4.6 + speed * 0.035 + Math.random() * 2.6, col, col, alpha, 3.2, -0.5);
     }
   }
   /** Rooster tail of fine spray thrown up from a wet road – taller and denser with speed. */
@@ -100158,9 +100165,9 @@ var Particles = class {
     const want = Math.min(4, 0.7 + speed * 0.018) * this.amount * this.rateScale;
     const n = Math.floor(want) + (Math.random() < want % 1 ? 1 : 0);
     for (let i = 0; i < n; i++) {
-      _v.set((Math.random() - 0.5) * 7, 1.6 + Math.random() * 3 + speed * 0.022, (Math.random() - 0.5) * 7).addScaledVector(vel, 0.32);
+      _v.set((Math.random() - 0.5) * 7, 2.2 + Math.random() * 3.4 + speed * 0.03, (Math.random() - 0.5) * 7).addScaledVector(vel, 0.78);
       _p.set(p.x + (Math.random() - 0.5) * 3.2, p.y, p.z + (Math.random() - 0.5) * 3.2);
-      this.alpha.spawn(_p, _v, 0.55 + Math.random() * 0.5, 0.9, 3.6 + speed * 0.028 + Math.random() * 2.5, C_SPRAY, C_SPRAY, 0.15 * alphaScale, 1.5, 5);
+      this.alpha.spawn(_p, _v, 0.55 + Math.random() * 0.5, 0.9, 3.6 + speed * 0.028 + Math.random() * 2.5, C_SPRAY, C_SPRAY, 0.3 * alphaScale, 3, 7);
     }
   }
   /** Tiny short-lived splash crown where a rain drop hits the road. */
@@ -102675,6 +102682,7 @@ function applyAtmosphere(scene, theme, density, baseY, sunDir, volFog = 0.25, qu
 var ZERO = new Vector3();
 var UP4 = new Vector3(0, 1, 0);
 var C_ICE = new Color("#d8f2ff");
+var WHITE_C = new Color(1, 1, 1);
 var CAMERA_NAMES = ["Verfolger", "Verfolger (fern)", "Cockpit", "Motorhaube", "TV-Kamera", "Kino-Orbit"];
 var Game = class _Game {
   container;
@@ -103492,13 +103500,14 @@ var Game = class _Game {
         const smp = this.td.paths[p.path].samples[p.idx];
         const wet = this.envBuild.rainRoad && this.wet > 0.3 && this.wxQ > 0 && !(smp && smp.roof > 0 && !p.upper);
         const envP = podEnvelope(p.def), cyD = Math.cos(p.yaw), syD = Math.sin(p.yaw);
-        const near2 = !p.isPlayer && dist < 24 ? 0.3 : 1, aD = (p.isPlayer ? 0.17 : 0.19) * near2 * this.dustAmt;
+        const near2 = !p.isPlayer && dist < 24 ? 0.3 : 1, aD = (p.isPlayer ? 0.42 : 0.36) * near2 * this.dustAmt;
+        this.tmpC.copy(this.dustCol).lerp(WHITE_C, 0.3);
         for (const e of [envP.engL, envP.engR]) {
           const lz = p.isPlayer ? (e.frontZ + e.backZ) * 0.5 : e.backZ - 1.2, lx = e.outerX * 1.1, sg = e.x < 0 ? -1 : 1;
           this.tmpV.set(p.pos.x + lx * cyD + lz * syD, p.groundY + 0.25, p.pos.z - lx * syD + lz * cyD);
-          this.tmpV2.set(p.vel.x + cyD * sg * 34, p.vel.y, p.vel.z - syD * sg * 34);
+          this.tmpV2.set(p.vel.x + cyD * sg * 11, 0, p.vel.z - syD * sg * 11);
           if (wet) this.particles.spray(this.tmpV, this.tmpV2, sp, this.wet * (p.isPlayer ? 1 : 0.85) * near2);
-          else this.particles.trail(this.tmpV, this.tmpV2, this.dustCol, sp, aD);
+          else this.particles.trail(this.tmpV, this.tmpV2, this.tmpC, sp, aD);
         }
       }
       if (p.sliding && (p.isPlayer || dist > 24 && dist < 120)) {
@@ -104201,6 +104210,18 @@ window.track = async (i, view) => {
     G2.wet = 1;
     G2.wetTarget = 1;
   }
+  if (location.search.includes("ptest")) {
+    const f = G2.camera.getWorldDirection(new Vector3()), c = G2.camera.position, P = G2.particles, v0 = new Vector3();
+    for (let i2 = 0; i2 < 300; i2++) {
+      const p = new Vector3(c.x + f.x * 25 + (Math.random() - 0.5) * 16, c.y + f.y * 25 + (Math.random() - 0.5) * 6, c.z + f.z * 25 + (Math.random() - 0.5) * 16);
+      if (location.search.includes("ptest2")) P.alpha.spawn(p, new Vector3(f.x * 60, 2, f.z * 60), 1.1, 1.5, 9, new Color(16711680), new Color(16711680), 0.42, 3.2, -0.5);
+      else (i2 % 2 ? P.alpha : P.add).spawn(p, v0, 5, 2.5, 2.5, new Color(i2 % 2 ? 16711680 : 65280), new Color(i2 % 2 ? 16711680 : 65280), 1, 0.1, 0);
+    }
+    P.update(location.search.includes("ptest2") ? 0.2 : 1.25, c, G2.clock);
+    window.coverInfo = `ptest alphaLive=${P.alpha.live} addLive=${P.add.live} count=${P.alpha.sprite.count}`;
+  }
+  G2.particles.alpha.fullUpload();
+  G2.particles.add.fullUpload();
   for (let k = 0; k < 3; k++) {
     G2.render(0.016);
     await new Promise((r) => setTimeout(r, 900));

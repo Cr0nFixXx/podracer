@@ -39,6 +39,19 @@ React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto 
 - **Decor LOD:** `place(geo, …, { lod: { geo, dist } })` builds a far twin per sector (forces sector chunking); LOD geometry must come from the same seed (`jungleTreeGeometry(seed, gq, true)`, `spireGeometry(seed, halfRadial, sameStrata)`).
 - **CSM** is opt-in (`gfx.csm`): `CSMShadowNode` on `sun.shadow.shadowNode`; call `csm.updateFrustums()` only after `csm.camera` exists (first render).
 
+## Session 17 rules
+- **Tunnels have three kinds** (`Sample.tun`: 1 standard, 2 underwater, 3 cave) and are placed in `buildTrack` BEFORE obstacles / hazards / set pieces (those skip `roof > 0`). Underwater tubes and the cave dip the road (`dip()`); never put a ramp within 520–600 m before them (`rampBefore`).
+- **Never clamp a pod down to a ceiling it approached from outside.** Entering a roofed run decides once: `PodState.upper` (drive on the deck, ground = road + `roof + TUNNEL_DECK`) or inside (ceiling applies). Everything that asks "is this pod under a roof?" must use `roof > 0 && !p.upper`. CI: deck self-test + `downward teleports` must stay 0.
+- **`buildTunnel`** (world.ts) builds per roof run: inner shell, berm or caisson, drivable deck (road material, UV integrated per segment), portal faces, ribs, lamps; underwater: window faces share the shell's vertex buffer and use `oceanWindowMaterial` (scifi.ts) where the tube top is below `td.seaY`.
+- **Sea level of ocean worlds is `td.seaY`** (fixed before the dips). The water plane takes a hole mask (`tunnelWaterMask`) where an underwater tube breaks the surface.
+- **Pod layouts may define several binders** (`PodLayout.binders`); hero and rival builders loop over them, A is always the left-hand engine. Binder look = `boltLook` (thin core + 4 independent arcs).
+- **Hull heat glow** = `uHeat` in `hullMaterial` (temperature falls off along `aLiv.y` from the nozzle); the hero model feeds a lagged value (`glowH`). The cockpit uses its own hull instance (`hullC`, no heat).
+- **Cockpit pendulum:** physics state `ckX/ckY/ckZ` (stepPod), visual via `setCockpitSway` (cockpit group + cable uniform `uCk`); first-person view hides the cockpit group (`setCockpitVisible`) – do not lower the camera near plane instead.
+- **Boost overdrive:** `PodState.overT` (0..3 s) in the heat block of `stepPod`; HUD field `overdrive`.
+- **Own-pod dust must stay visible:** spawn under the engines, inherit ~80 % of the pod velocity with strong drag (slipstream), slight outward drift; alpha-pool near fade is 3–8.5 m. Check with harness view `r`.
+- **Particle pools add update ranges** (the renderer clears them after upload). Any test that runs several `Game.update()` calls without rendering must call `pool.fullUpload()` before the screenshot (the harness does) – otherwise particles are missing in the picture although the game is fine.
+- **`reflRes`** (0.35–1) scales the SSR buffer; restart-only like SSR.
+
 ## Session 16 rules
 - **Boost opens the nozzle petals, never the side flaps.** Petals = `EngineGeo.petals` (attribute `aPet`: outward dir xy + swing z), ONE shared `petalMaterial()`; opening per mesh via `mesh.userData.open` (TSL `userData`). Hero: `petals[]` in `update()`; rivals: `oppPetals` in the opponent `update(t, throttle, boost)`. Side flaps = air brake (+ damage rattle) only.
 - **No number plates / signs on pods** (user dislikes them).
@@ -120,6 +133,7 @@ React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto 
 
 ## Testing
 - **`npm run check`** (≈ 25 s, node only): `tools/ci/sim.ts` – fails on NaN, deaths > 3, wall penetration > 0.6 m, ground clearance < 0.2 m, pod slower than 18 m/s. `DEBUG=1`, `TRACK=<id>`, `SECS=<n>`, `PITCH_AIR=1|0|-1` (jump experiment).
+- **Session 17 tests:** CI prints a tunnel report per track + deck self-test; harness views `v` (inside first tunnel), `k` (above the first standard tunnel); pods harness item `3` = Quadra Lumber.
 - **Session 16 tests:** harness views `u` (first main tunnel), `w` (zero-G tube); pods harness `?boost`; `NOGRID=1 npm run check` = old start behaviour for A/B; `papp.mjs` fakes a gamepad and rebinds Boost.
 - **Session 15 tests:** `pui.mjs` prints scale + content height per screen and fails on non-uniform scale / emergency shrink; harness query `live` (runtime graphics switching), `ssr`, `wetnow`; views `x`/`y`/`z` = shortcut exit.
 - **Session 14 tests:** `pui.mjs` (layout, 5 window sizes), `papp.mjs` (HUD sides, pause audio, pause graphics menu; `TWICE=1 LOAD_ONLY=1` = cache timing), CI overhead self-test + `smashed` column. Test handle in the browser: `window.__podracer`.
