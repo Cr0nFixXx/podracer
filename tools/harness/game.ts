@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { Game } from '../../src/game/Game';
 import { TRACKS } from '../../src/game/data';
 import { PRESETS, defaultProfile } from '../../src/game/settings';
+import { loadPhotoTextures } from '../../src/game/photoAssets';
+if (!location.search.includes('nophoto')) void loadPhotoTextures();
 const div = document.createElement('div'); div.style.cssText = 'width:1280px;height:720px;position:fixed;left:0;top:0'; document.body.style.margin = '0'; document.body.appendChild(div);
 let g: Game | null = null; let cur = -1;
 (window as unknown as Record<string, unknown>).track = async (i: number, view: string) => {
@@ -60,6 +62,10 @@ let g: Game | null = null; let cur = -1;
     let e0 = a0; while (e0 < N - 1 && S[e0 + 1].roof > 0) e0++;
     if (view === 'v') { const a = S[Math.floor((a0 + e0) / 2) - 12], b = S[Math.floor((a0 + e0) / 2) + 14]; G.camera.position.set(a.x, a.y + 4, a.z); G.camera.lookAt(b.x + b.rx * b.hw * 0.9, b.y + 4.5, b.z + b.rz * b.hw * 0.9); }
     else { const a = S[Math.max(0, a0 - 34)], b = S[a0 + 30]; G.camera.position.set(a.x + a.rx * 6, a.y + a.roof + 22, a.z + a.rz * 6); G.camera.lookAt(b.x, b.y + b.roof, b.z); }
+  } else if (view === 'f') { // close-up of the first alpha-mapped decor instance (HQ tree)
+    let found: THREE.InstancedMesh | null = null;
+    G.scene.traverse(o => { const im = o as THREE.InstancedMesh; if (!found && im.isInstancedMesh && im.visible && (im.material as THREE.MeshStandardMaterial).alphaMap && im.count > 0) found = im; });
+    if (found) { const m = new THREE.Matrix4(); (found as THREE.InstancedMesh).getMatrixAt(0, m); const p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3(); m.decompose(p, q, sc); (found as THREE.InstancedMesh).visible = true; G.camera.position.set(p.x + 21 * sc.x, p.y + 9 * sc.y, p.z + 17 * sc.x); G.camera.lookAt(p.x, p.y + 11.5 * sc.y, p.z); }
   } else if (view === 's') { // look from above the road towards the sun (lens flare / god-ray / glare check)
     const S = G.td.main.samples, a = S[Math.floor(S.length * 0.2)];
     G.camera.position.set(a.x, a.y + 6, a.z); G.camera.lookAt(a.x + G.sunDir.x * 100, a.y + 6 + G.sunDir.y * 60, a.z + G.sunDir.z * 100);

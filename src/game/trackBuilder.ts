@@ -74,8 +74,52 @@ export function mulberry32(a: number) {
 
 function hashStr(s: string) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
 
-function controlPoints(def: TrackDef) {
-  return def.pts.map(([x, z, y, w]) => ({ x: x * 100, z: z * 100, y, w: w * WIDTH_SCALE }));
+/** Session 18: every layout is expanded procedurally – scaled ×1.3, extra S-curves inserted into long segments (with a clearance
+ *  check against the rest of the layout) and two wide open flats (road ×1.9, no canyon walls) on the longest segments.
+ *  `map[i]` = index of the original control point i in the enriched list (shortcut hints refer to original indices). */
+export const TRACK_SCALE = 1.3;
+function controlPoints(def: TrackDef): { pts: { x: number; z: number; y: number; w: number }[]; map: number[] } {
+  const raw = !!(globalThis as { NO_EXPAND?: boolean }).NO_EXPAND, sc = raw ? 1 : TRACK_SCALE;
+  const base = def.pts.map(([x, z, y, w]) => ({ x: x * 100 * sc, z: z * 100 * sc, y, w: w * WIDTH_SCALE }));
+  const n = base.length;
+  if (raw) return { pts: base, map: base.map((_p, i) => i) };
+  const closed = def.type === 'circuit', segN = closed ? n : n - 1, rnd = mulberry32(hashStr(def.id + '|expand'));
+  const P = (i: number) => base[((i % n) + n) % n];
+  const segLen = (i: number) => Math.hypot(P(i + 1).x - P(i).x, P(i + 1).z - P(i).z);
+  // (1) open flats: the two longest segments away from the grid, the finish and the shortcut hints
+  const order: number[] = []; for (let i = 2; i < segN - 2; i++) if (!def.shortcuts.some(c => Math.abs(c - i) <= 1 || Math.abs(c - i - 1) <= 1)) order.push(i);
+  order.sort((a, b) => segLen(b) - segLen(a));
+  const flats: number[] = []; for (const i of order) { if (flats.length >= 2) break; if (flats.every(f => Math.abs(f - i) > 3)) flats.push(i); }
+  for (const f of flats) for (const i of [f, f + 1]) { const q = P(i); q.w = Math.max(q.w, Math.min(q.w * 1.9, 46 * WIDTH_SCALE)); } // → up to ~108 m of road width
+  // (2) meanders
+  const dSeg = (px: number, pz: number, a: { x: number; z: number }, b: { x: number; z: number }) => {
+    const vx = b.x - a.x, vz = b.z - a.z, t = Math.max(0, Math.min(1, ((px - a.x) * vx + (pz - a.z) * vz) / (vx * vx + vz * vz || 1)));
+    return Math.hypot(px - a.x - vx * t, pz - a.z - vz * t);
+  };
+  const ins: { x: number; z: number }[] = [];
+  const clear = (px: number, pz: number, i: number) => {
+    for (let s2 = 0; s2 < segN; s2++) { const d = Math.abs(s2 - i), dd = closed ? Math.min(d, segN - d) : d; if (dd <= 1) continue; if (dSeg(px, pz, P(s2), P(s2 + 1)) < 185) return false; }
+    return ins.every(q => Math.hypot(q.x - px, q.z - pz) > 170);
+  };
+  const out: typeof base = [], map: number[] = []; let sign = rnd() < 0.5 ? 1 : -1;
+  for (let i = 0; i < n; i++) {
+    map.push(out.length); out.push(base[i]);
+    if (i >= segN) continue;
+    const a = base[i], b = P(i + 1), len = segLen(i);
+    if (i === 0 || i === segN - 1 || len < 330) continue;              // grid straight / closing or finish straight stay as designed
+    const k = len > 640 ? 2 : 1, dx = (b.x - a.x) / len, dz = (b.z - a.z) / len;
+    for (let j = 1; j <= k; j++) {
+      const t = j / (k + 1), mx = a.x + (b.x - a.x) * t, mz = a.z + (b.z - a.z) * t, amp0 = Math.min(len * (k === 2 ? 0.17 : 0.25), 95);
+      let done = false;
+      for (const [sg, am] of [[sign, amp0], [-sign, amp0], [sign, amp0 * 0.55], [-sign, amp0 * 0.55]]) {
+        const px = mx - dz * sg * am, pz = mz + dx * sg * am;
+        if (!clear(px, pz, i)) continue;
+        out.push({ x: px, z: pz, y: a.y + (b.y - a.y) * t, w: a.w + (b.w - a.w) * t }); ins.push({ x: px, z: pz }); sign = -sg; done = true; break;
+      }
+      if (!done) sign = -sign;
+    }
+  }
+  return { pts: out, map };
 }
 
 function findStraight(S: Sample[], N: number, at: number, closed: boolean, taken: number[], need: number) {
@@ -136,7 +180,7 @@ function makeSample(p: THREE.Vector3, hw: number, s: number): Sample {
 
 export function buildTrack(def: TrackDef): TrackData {
   const rng = mulberry32(hashStr(def.id));
-  const pts = controlPoints(def);
+  const { pts, map: cpMap } = controlPoints(def);
   const closed = def.type === 'circuit';
   const curve = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(p.x, p.y, p.z)), closed, 'centripetal');
   let length = curve.getLength();
@@ -187,7 +231,8 @@ export function buildTrack(def: TrackDef): TrackData {
   // zero-gravity zones: the first two canyon ranges on the prison moon
   if (def.theme === 'oovo') for (const [a, b] of def.canyons.slice(0, 2)) for (let i = Math.floor(a * N); i < Math.floor(b * N); i++) samples[(i + N) % N].zeroG = true;
   // canyon flags
-  for (const [a, b] of def.canyons) for (let i = Math.floor(a * N); i < Math.floor(b * N); i++) samples[(i + N) % N].canyon = true;
+  const hwMed = samples.map(q => q.hw).sort((a, b) => a - b)[N >> 1], wideLim = Math.min(hwMed * 1.45, 45); // wider = open flat: no canyon walls, no tunnels
+  for (const [a, b] of def.canyons) for (let i = Math.floor(a * N); i < Math.floor(b * N); i++) { const q = samples[(i + N) % N]; if (q.hw < wideLim) q.canyon = true; }
   // cliff mode per canyon range: 0 both walls, 1 left wall only, 2 right wall only (half-canyon with a view), 3 none (zero-G tube)
   const rngC = mulberry32(hashStr(def.id + '|cliff'));
   const canyonModes = def.canyons.map(([a, b], ci) => ({ a: Math.floor(a * N), b: Math.floor(b * N), mode: def.theme === 'oovo' && ci < 2 ? 3 : (() => { const r = rngC(); return r < 0.4 ? 0 : r < 0.7 ? 1 : 2; })() }));
@@ -226,14 +271,14 @@ export function buildTrack(def: TrackDef): TrackData {
       if (near) damp(i, 6, 110);
     }
     const TAU = Math.PI * 2, k1 = 2 + Math.floor(rh() * 2), k2 = 5 + Math.floor(rh() * 3), p1 = rh() * TAU, p2 = rh() * TAU;
-    for (let i = 0; i < N; i++) { const u = i / N * TAU; samples[i].y = samples[i].y * 1.2 + (15 * Math.sin(u * k1 + p1) + 6.5 * Math.sin(u * k2 + p2)) * flat[i]; }
+    for (let i = 0; i < N; i++) { const u = i / N * TAU; samples[i].y = samples[i].y * 1.2 + (19 * Math.sin(u * (k1 + 1) + p1) + 8 * Math.sin(u * (k2 + 2) + p2)) * flat[i]; } // (longer tracks since Session 18: more and slightly higher waves)
   }
   finalizeSamples(samples, closed, true);
   const main: Path = { id: 0, samples, closed, length, mainFrom: 0, mainTo: N - 1, side: 0 };
   const paths: Path[] = [main];
 
   // shortcuts
-  const cpFrac = (ci: number) => { const p = pts[ci]; let bi = 0, bd = 1e12; samples.forEach((s, i) => { const d = (s.x - p.x) ** 2 + (s.z - p.z) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi / N; };
+  const cpFrac = (ci: number) => { const p = pts[cpMap[ci] ?? ci]; let bi = 0, bd = 1e12; samples.forEach((s, i) => { const d = (s.x - p.x) ** 2 + (s.z - p.z) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi / N; };
   for (const ci of def.shortcuts) {
     const found = findShortcut(samples, N, cpFrac(ci), closed);
     if (!found) continue;
@@ -313,13 +358,13 @@ export function buildTrack(def: TrackDef): TrackData {
   //         pushed into the tube); 2–4 per track.
   //  kind 2 underwater tube (Aquilaris): the road dips below sea level, windows show the ocean. Never within 600 m after a ramp.
   //  kind 3 cave system (Magma-Inferno): a 600 m section sunk 11 m into the ground, roofed in three parts with two open skylights.
-  let seaY: number | undefined;
+  let seaY: number | undefined; const cavePillars: [number, number][] = []; // [sample index, lateral position as a share of the half width]
   if (!(globalThis as { NO_TUNNELS?: boolean }).NO_TUNNELS) {
     const rt = mulberry32(hashStr(def.id + '|tunnels'));
     const W = (i: number) => samples[((i % N) + N) % N];
     const clearRun = (i: number, len: number, pad: number) => {
       if (!closed && (i - pad < 0 || i + len + pad >= N)) return false;
-      for (let k = -pad; k <= len + pad; k += 2) { const q = W(i + k); if (q.gap || q.ramp > 0 || q.zeroG || q.openL || q.openR || q.link >= 0 || q.roof > 0) return false; }
+      for (let k = -pad; k <= len + pad; k += 2) { const q = W(i + k); if (q.gap || q.ramp > 0 || q.zeroG || q.openL || q.openR || q.link >= 0 || q.roof > 0 || q.hw > wideLim) return false; }
       return true;
     };
     const awayFromGrid = (i: number, len: number) => idxDist(i + len / 2, startIdx) > 110 + len / 2 && (closed || idxDist(i + len / 2, finishIdx) > 90 + len / 2);
@@ -331,42 +376,55 @@ export function buildTrack(def: TrackDef): TrackData {
 
     if (def.theme === 'aquilaris') {
       seaY = samples.reduce((a, q) => a + q.y, 0) / N - 26;
-      const target = seaY - 13.5, FLAT = 60; const cands: { i: number; len: number; depth: number; ease: number }[] = [];
-      for (let f0 = 120; f0 < N - 200; f0 += 8) {
+      const target = seaY - 13.5;
+      const cands: { i: number; len: number; depth: number; ease: number }[] = [];
+      for (const FLAT of [170, 115]) for (let f0 = 120; f0 < N - FLAT - 260; f0 += 8) { // Session 18: 340 m (or 230 m) of level tube, was 120 m
         let top = -1e9; for (let k = 0; k <= FLAT; k += 2) top = Math.max(top, W(f0 + k).y);
-        const depth = top - target; if (depth < 6 || depth > 27) continue;
+        const depth = top - target; if (depth < 6 || depth > 33) continue;
         const ease = Math.ceil(7.85 * depth / DS), i0 = f0 - ease, len = FLAT + 2 * ease;   // 20 % max. gradient of the descent
         if (!clearRun(i0, len, 14) || !awayFromGrid(i0, len) || rampBefore(i0, 300)) continue;
         if (W(i0 + 4).y < seaY + 2.5 || W(i0 + len - 4).y < seaY + 2.5) continue;          // both portals stand above the waterline
-        cands.push({ i: i0, len, depth: depth + rt() * 0.5, ease });
+        cands.push({ i: i0, len, depth: depth + rt() * 0.5 + (FLAT < 150 ? 6 : 0), ease });  // prefer the long variant
       }
       cands.sort((a, b) => a.depth - b.depth);
       for (const c of cands) {
         if (taken.length >= 3) break; if (clash(c.i, c.len, 160)) continue;
-        taken.push(c); dip(c.i, c.len, c.depth, c.ease); roofRun(c.i + 3, c.len - 6, 9, 2);
+        taken.push(c); dip(c.i, c.len, c.depth - (c.len - 2 * c.ease < 150 ? 6 : 0), c.ease); roofRun(c.i + 3, c.len - 6, 9, 2);
         for (let k = 0; k <= c.len; k++) { const q = W(c.i + k); q.hL = 0; q.hR = 0; q.canyon = false; q.wallL = q.wallR = q.hw - RAIL_INSET; }
       }
     }
-    if (def.id === 'magma') {
-      const LEN = 300, EASE = 60, DEPTH = 11; let best = -1, bs = -1e9;
-      for (const back of [260, 160]) {
-        for (let i = 60; i < N - LEN - 60 && best < 0 || i < N - LEN - 60 && back === 260; i += 10) {
-          if (!clearRun(i, LEN, 14) || !awayFromGrid(i, LEN) || rampBefore(i, back)) continue;
-          let walls = 0, curv = 0; for (let k = 0; k <= LEN; k += 6) { const q = W(i + k); if (q.hL > 0 || q.hR > 0) walls++; curv += Math.abs(q.curv); }
-          const sc = walls * 0.5 - curv * 40 + rt() * 4; if (sc > bs) { bs = sc; best = i; }
+    // Cave systems (Session 18: longer and more complex, also on the ice and crystal worlds): the road is sunk into the ground and roofed
+    // in several CHAMBERS separated by open skylights; inside every chamber the ceiling swells up (12.5 → 18–24 m); rock pillars stand
+    // in the chambers (added to the obstacle list below). Magma: 5 chambers over ~1.1 km.
+    const CAVES: Record<string, [number, number, number]> = { lava: [540, 12, 5], ice: [300, 9, 3], crystal: [320, 10, 3] }; // samples, depth (m), chambers
+    const cv = CAVES[def.theme];
+    if (cv) {
+      for (const shrink of [1, 0.78, 0.6]) {
+        const LEN = Math.round(cv[0] * shrink), CH = Math.max(2, Math.round(cv[2] * shrink)), DEPTH = cv[1], EASE = 60; let best = -1, bs = -1e9;
+        for (const back of [260, 160]) {
+          for (let i = 60; i < N - LEN - 60; i += 10) {
+            if (!clearRun(i, LEN, 14) || !awayFromGrid(i, LEN) || rampBefore(i, back)) continue;
+            let walls = 0, curv = 0; for (let k = 0; k <= LEN; k += 6) { const q = W(i + k); if (q.hL > 0 || q.hR > 0) walls++; curv += Math.abs(q.curv); }
+            const sc = walls * 0.5 - curv * 40 + rt() * 4; if (sc > bs) { bs = sc; best = i; }
+          }
+          if (best >= 0) break;
         }
-        if (best >= 0) break;
-      }
-      if (best >= 0) {
+        if (best < 0) continue;
         dip(best, LEN, DEPTH, EASE);
-        for (const [a, b] of [[24, 112], [130, 204], [222, LEN - 24]]) roofRun(best + a, b - a, 13, 3);
+        const gap = 18, part = (LEN - 48 - gap * (CH - 1)) / CH;
+        for (let c = 0; c < CH; c++) {
+          const a = 24 + Math.round(c * (part + gap)), b = a + Math.round(part), hi = 5.5 + rt() * 6;
+          for (let k = a; k <= b; k++) { const q = W(best + k), t = (k - a) / (b - a), sn = Math.sin(Math.PI * t); q.roof = 12.5 + hi * sn * sn; q.tun = 3; }
+          cavePillars.push([best + Math.round((a + b) / 2 + (rt() - 0.5) * part * 0.3), (c % 2 ? 1 : -1) * (0.25 + rt() * 0.2)]);
+        }
         taken.push({ i: best, len: LEN });
+        break;
       }
     }
-    const want = def.theme === 'aquilaris' ? 0 : ({ oovo: 3, ice: 4, malastare: 4 } as Record<string, number>)[def.theme] ?? 2;
+    const want = def.theme === 'aquilaris' ? 0 : ({ oovo: 3, ice: 3, malastare: 4 } as Record<string, number>)[def.theme] ?? 2;
     const cands: { i: number; len: number; score: number }[] = [];
-    for (let i = 40; i < N - 280; i += 12) {
-      const len = 60 + Math.floor(rt() * 60);
+    for (let i = 40; i < N - 440; i += 12) {
+      const len = 130 + Math.floor(rt() * 150); // Session 18: 260–560 m (was 120–240 m)
       if (!clearRun(i, len, 14) || !awayFromGrid(i, len)) continue;
       let walls = 0; for (let k = 0; k <= len; k += 2) { const q = W(i + k); if (q.hL > 0 && q.hR > 0) walls++; }
       cands.push({ i, len, score: walls / (len / 2) + rt() * 0.6 });
@@ -376,7 +434,7 @@ export function buildTrack(def: TrackDef): TrackData {
     for (const c of cands) { if (placed >= want) break; if (clash(c.i, c.len)) continue; taken.push(c); roofRun(c.i, c.len, 13, 1); placed++; }
   }
   for (const [a, b, cnt] of def.obstacles) {
-    const want = Math.max(2, Math.round(cnt * 0.45));
+    const want = Math.max(2, Math.round(cnt * 0.62)); // (tracks are ~1.55× longer since Session 18)
     let placed = 0;
     for (let tries = 0; tries < cnt * 5 && placed < want; tries++) {
       const idx = (Math.floor((a + (b - a) * rng()) * N) + N) % N;
@@ -392,6 +450,10 @@ export function buildTrack(def: TrackDef): TrackData {
       placed++;
     }
   }
+  for (const [ci, lf] of cavePillars) { // rock pillars inside the cave chambers
+    const idx = ((ci % N) + N) % N, s = samples[idx], lat = lf * s.hw;
+    obstacles.push({ path: 0, idx, lat, r: 2.3, kind: 1, x: s.x + s.rx * lat, y: s.y - lat * s.bank + 0.1, z: s.z + s.rz * lat });
+  }
   for (let p = 1; p < paths.length; p++) {
     const ss = paths[p].samples;
     const idx = Math.floor(ss.length * 0.52); const s = ss[idx]; const lat = 3.4;
@@ -400,7 +462,7 @@ export function buildTrack(def: TrackDef): TrackData {
   // hazards (geysers / vents) – also registered as kind-3 pseudo obstacles so the AI steers around them
   const hazards: Hazard[] = [];
   for (const [a, b, cnt] of def.hazards ?? []) {
-    for (let c = 0; c < cnt; c++) {
+    for (let c = 0; c < Math.round(cnt * 1.4); c++) {
       const idx = (Math.floor((a + (b - a) * rng()) * N) + N) % N; const s = samples[idx];
       if (s.roof > 0 || !okSpot(s, idx) || Math.abs(idx - startIdx) < 80 || hazards.some(h => Math.abs(h.idx - idx) < 25)) continue;
       const lat = (rng() * 2 - 1) * s.hw * 0.55; const x = s.x + s.rx * lat, z = s.z + s.rz * lat, y = s.y - lat * s.bank;
@@ -455,7 +517,7 @@ export function buildTrack(def: TrackDef): TrackData {
   // arches inside canyon zones
   const arches: number[] = [];
   const canyonIdx = samples.map((s, i) => (s.canyon && !s.gap && s.ramp === 0 && !(s.roof > 0) ? i : -1)).filter(i => i >= 0);
-  for (let a = 0; a < def.arches && canyonIdx.length; a++) {
+  for (let a = 0; a < Math.round(def.arches * 1.5) && canyonIdx.length; a++) {
     const idx = canyonIdx[Math.floor(rng() * canyonIdx.length)];
     if (arches.every(o => Math.abs(o - idx) > 40)) arches.push(idx);
   }
@@ -472,9 +534,9 @@ export function buildTrack(def: TrackDef): TrackData {
 function findShortcut(S: Sample[], N: number, fa: number, closed: boolean): [number, number] | null {
   let best: [number, number] | null = null, bestScore = 60;
   const c = Math.floor(fa * N);
-  for (let ia = c - 120; ia <= c + 120; ia += 6) {
+  for (let ia = c - 170; ia <= c + 170; ia += 6) {
     if (!closed && (ia < 80)) continue;
-    for (let len = 110; len <= 360; len += 10) {
+    for (let len = 110; len <= 470; len += 10) {
       const ib = ia + len; if (!closed && ib > N - 80) continue; if (closed && len > N / 3) continue;
       const A = S[(ia + N) % N], B = S[(ib + N) % N];
       const chord = Math.hypot(B.x - A.x, B.z - A.z);

@@ -318,7 +318,8 @@ export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group,
       put(M.red, new THREE.ConeGeometry(2.6, 3.2, 16), TRS(p.x, base + 41, p.z));
     },
   };
-  const id = theme.id; const rep = (n: number, f: () => void) => { for (let i = 0; i < n; i++) f(); };
+  const id = theme.id; const lk = Math.min(2, Math.max(1, td.N / 3300)); // more landmarks on the longer tracks
+  const rep = (n: number, f: () => void) => { for (let i = 0; i < Math.round(n * lk); i++) f(); };
   if (id === 'desert' || id === 'mesa') { if (['boonta', 'mosespa'].includes(td.def.id)) B.city(); rep(2, () => B.arch(M.rock)); rep(id === 'mesa' ? 7 : 5, () => B.butte(M.rock)); if (id === 'desert') { B.wreck(); B.homestead(); } B.krayt(); }
   else if (id === 'ice') { rep(2, () => B.arch(M.ice)); rep(2, B.station); rep(3, () => B.butte(M.rock)); B.wreck(); }
   else if (id === 'malastare') { rep(2, B.refinery); B.volcano(); rep(3, () => B.butte(M.rock)); B.obelisks(); }

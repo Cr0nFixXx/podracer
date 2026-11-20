@@ -174,59 +174,91 @@ export function crystalClusterGeometry(seed: number, count: number, h: number, r
   return merge(parts);
 }
 
-/** Emergent rainforest tree: buttress roots, bent trunk, forked boughs, layered umbrella canopy of noise-broken lobes + tufts, hanging lianas (vertex colours). */
-/** `lod = true` → same seeded silhouette at ~1/4 of the triangles (far sectors, see world.ts `place({ lod })`). */
+const LEAF_TILE = (q: number): V3 & { 3?: number } => { const x0 = 512 + (q % 2) * 256 + 3, y0 = 40 + Math.floor(q / 2) * 236 + 3; return [x0 / 1024, 1 - (y0 + 230) / 512, (x0 + 250) / 1024] as V3; };
+/** uv helpers for the tree atlas (foliage.ts): bark = left half (mirror-tiled along the height), plain = white strip */
+function barkUV(g: THREE.BufferGeometry, tile = 4.2) {
+  const p = g.attributes.position, uv = g.attributes.uv as THREE.BufferAttribute;
+  for (let i = 0; i < uv.count; i++) { const t = p.getY(i) / tile, f = t - Math.floor(t), v = Math.floor(t) % 2 ? 1 - f : f; uv.setXY(i, 0.004 + uv.getX(i) * 0.49, 0.01 + v * 0.98); }
+  return g;
+}
+function plainUV(g: THREE.BufferGeometry) { const uv = g.attributes.uv as THREE.BufferAttribute; for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.75, 0.962); return g; }
+
+/** Emergent rainforest tree (Session 18, HQ): buttress roots, bent trunk and forked boughs with a real bark texture, a dark canopy core
+ *  and a shell of alpha-tested LEAF-SPRIG CARDS around every canopy lobe (16 per lobe at high quality), hanging lianas.
+ *  `lod = true` → far model: same silhouette from plain lobes only (no cards), ~1/3 of the triangles. Material: foliage.ts → treeMaterial. */
 export function jungleTreeGeometry(seed: number, quality: number, lod = false): THREE.BufferGeometry {
   const r = rng(seed * 211 + 9); const parts: THREE.BufferGeometry[] = [];
   const bend = (t: number): V3 => [Math.sin(t * 2.4 + 0.4) * 0.55 * t, t * 12.4, Math.cos(t * 1.9) * 0.35 * t - 0.35 * t];
-  const bark = (x: number, y: number, z: number): V3 => {
-    const m = 0.72 + fbm(Math.atan2(z, x) * 3 + y * 0.3, y * 1.6, 3) * 0.5, moss = sstep(3.6, 0.2, y) * (0.35 + 0.65 * vn(x * 2.1 + 5, z * 2.1));
-    return [lerp(0.25 * m, 0.14, moss * 0.8), lerp(0.19 * m, 0.24, moss * 0.8), lerp(0.14 * m, 0.08, moss * 0.8)];
+  const bark = (x: number, y: number, z: number): V3 => { // tint on top of the bark photo: slight variation + moss towards the roots
+    const m = 0.82 + fbm(Math.atan2(z, x) * 3 + y * 0.3, y * 1.6, 3) * 0.4, moss = sstep(3.6, 0.2, y) * (0.35 + 0.65 * vn(x * 2.1 + 5, z * 2.1));
+    return [lerp(1.0 * m, 0.5, moss * 0.8), lerp(0.94 * m, 0.82, moss * 0.8), lerp(0.84 * m, 0.36, moss * 0.8)];
   };
   const nb = 5 + Math.floor(r() * 2), bph = r() * TAU;
-  parts.push(paint(smooth(ringSurface(lod ? 6 : quality >= 2 ? 12 : 9, 9, (a, j) => {
+  parts.push(paint(barkUV(smooth(ringSurface(lod ? 6 : quality >= 2 ? 12 : 9, 9, (a, j) => {
     const t = [0, 0.03, 0.08, 0.16, 0.3, 0.48, 0.66, 0.84, 1][j], c = bend(t);
     const root = Math.pow(Math.max(0, Math.cos(a * nb + bph)), 2.2);
     const rad = (0.62 - t * 0.24) * (1 + (1.9 * Math.exp(-t * 16) + 0.55 * Math.exp(-t * 5)) * (0.3 + 0.7 * root)) + (fbm(a * 2 + 7, t * 9, 2) - 0.5) * 0.14;
     return [c[0] + Math.cos(a) * rad, c[1] - (j === 0 ? 0.6 : 0), c[2] + Math.sin(a) * rad];
-  })), bark));
+  }))), bark));
   const top = bend(1); const lobes: { c: V3; r: number }[] = [];
   const nBough = 4;
   for (let k = 0; k < nBough; k++) {
     const a = k / nBough * TAU + r() * 0.7, len = 3.4 + r() * 2.2, rise = 1.6 + r() * 2.2, base = bend(0.74 + r() * 0.2);
     const end: V3 = [top[0] + Math.cos(a) * len, base[1] + rise + 1.2, top[2] + Math.sin(a) * len];
     const mid: V3 = [lerp(base[0], end[0], 0.5), lerp(base[1], end[1], 0.5) + 0.7, lerp(base[2], end[2], 0.5)];
-    parts.push(paint(smooth(tube([base, [lerp(base[0], mid[0], 0.5), lerp(base[1], mid[1], 0.5) + 0.25, lerp(base[2], mid[2], 0.5)], mid, end], [0.34, 0.27, 0.2, 0.09], lod ? 3 : 5)), bark));
+    parts.push(paint(barkUV(smooth(tube([base, [lerp(base[0], mid[0], 0.5), lerp(base[1], mid[1], 0.5) + 0.25, lerp(base[2], mid[2], 0.5)], mid, end], [0.34, 0.27, 0.2, 0.09], lod ? 3 : 5)), 2.4), bark));
     lobes.push({ c: [end[0], end[1] + 0.7, end[2]], r: 2.9 + r() * 1.3 });
-    if (quality >= 2 || (quality === 1 && k % 2 === 0)) lobes.push({ c: [lerp(mid[0], end[0], 0.2) + (r() - 0.5) * 2, mid[1] + 1.5 + r(), lerp(mid[2], end[2], 0.2) + (r() - 0.5) * 2], r: 2.1 + r() * 0.9 });
+    if (quality >= 2 || (quality === 1 && k % 2 === 0)) {
+      const c2: V3 = [lerp(mid[0], end[0], 0.2) + (r() - 0.5) * 2, mid[1] + 1.5 + r(), lerp(mid[2], end[2], 0.2) + (r() - 0.5) * 2];
+      lobes.push({ c: c2, r: 2.1 + r() * 0.9 });
+      if (!lod) parts.push(paint(barkUV(smooth(tube([mid, [lerp(mid[0], c2[0], 0.6), lerp(mid[1], c2[1], 0.5), lerp(mid[2], c2[2], 0.6)], c2], [0.15, 0.1, 0.05], 4)), 2.4), bark)); // twig into the side lobe
+    }
   }
   lobes.push({ c: [top[0], top[1] + 3.2, top[2]], r: 3.6 }, { c: [top[0] + 1.2, top[1] + 1.4, top[2] - 1.0], r: 3.0 });
   const hue = r();
-  const leaf = (cx: number, cy: number, cz: number, rad: number, detail: number, sy: number, tint: number) => {
+  const lobe = (cx: number, cy: number, cz: number, rad: number, detail: number, sy: number, tint: number, core: boolean) => {
     const g = new THREE.IcosahedronGeometry(1, detail); const p = g.attributes.position as THREE.BufferAttribute, nrm = g.attributes.normal as THREE.BufferAttribute; const col = new Float32Array(p.count * 3);
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-      const n = 0.62 + n3(x * 1.7 + cx, y * 1.7 + cy, z * 1.7 + cz) * 0.84, under = y < 0 ? 0.5 : 1; // flat, shaded underside
+      const n = 0.62 + n3(x * 1.7 + cx, y * 1.7 + cy, z * 1.7 + cz) * 0.84, under = y < 0 ? 0.5 : 1;
       const px = x * n * rad * 1.22, py = y * n * rad * sy * under, pz = z * n * rad * 1.22;
       p.setXYZ(i, cx + px, cy + py, cz + pz);
       const l = Math.hypot(px, py * 1.9 + rad * 0.35, pz) || 1; nrm.setXYZ(i, px / l, (py * 1.9 + rad * 0.35) / l, pz / l); // soft, sky-biased foliage normal
-      const up = sstep(-0.5, 0.9, y), cl = 0.8 + n3(x * 3.1 + cz, y * 3.1, z * 3.1 + cx) * 0.4, sunny = up * up;
-      col[i * 3] = (0.045 + sunny * (0.15 + hue * 0.1) + tint * 0.05) * cl; col[i * 3 + 1] = (0.14 + sunny * 0.33 + tint * 0.04) * cl; col[i * 3 + 2] = (0.05 + sunny * 0.06) * cl * (1 - tint * 0.3);
+      const up = sstep(-0.5, 0.9, y), cl = 0.8 + n3(x * 3.1 + cz, y * 3.1, z * 3.1 + cx) * 0.4, sunny = up * up, k = core ? 0.5 : 1; // core = shaded interior behind the leaf cards
+      col[i * 3] = (0.045 + sunny * (0.15 + hue * 0.1) + tint * 0.05) * cl * k; col[i * 3 + 1] = (0.14 + sunny * 0.33 + tint * 0.04) * cl * k; col[i * 3 + 2] = (0.05 + sunny * 0.06) * cl * (1 - tint * 0.3) * k;
     }
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return plainUV(g);
   };
-  for (const l of lobes) parts.push(leaf(l.c[0], l.c[1], l.c[2], lod ? l.r * 1.12 : l.r, lod ? 0 : 1, 0.66 + r() * 0.2, r()));
-  const nTuft = lod ? 0 : quality >= 2 ? 8 : quality >= 1 ? 5 : 0;
-  for (let k = 0; k < nTuft; k++) {
-    const l = lobes[Math.floor(r() * lobes.length)], a = r() * TAU, d = l.r * (0.95 + r() * 0.35);
-    parts.push(leaf(l.c[0] + Math.cos(a) * d, l.c[1] - 0.2 + (r() - 0.6) * 1.4, l.c[2] + Math.sin(a) * d, 0.9 + r() * 0.8, 0, 0.62, r()));
+  // leaf-sprig cards: quads on a shell around every lobe, facing roughly outwards, soft sky-biased normals
+  const cP: number[] = [], cN: number[] = [], cU: number[] = [], cC: number[] = [];
+  const card = (cx: number, cy: number, cz: number, size: number, dx: number, dy: number, dz: number, light: number, tint: number) => {
+    let ux = -dz, uy = 0, uz = dx; const ul = Math.hypot(ux, uz); if (ul < 1e-3) { ux = 1; uz = 0; } else { ux /= ul; uz /= ul; }
+    let vx = dy * uz - dz * uy, vy = dz * ux - dx * uz, vz = dx * uy - dy * ux;
+    const ro = r() * TAU, cs = Math.cos(ro), sn = Math.sin(ro), ax = ux * cs + vx * sn, ay = uy * cs + vy * sn, az = uz * cs + vz * sn; vx = vx * cs - ux * sn; vy = vy * cs - uy * sn; vz = vz * cs - uz * sn;
+    const [u0, v0, u1] = LEAF_TILE(Math.floor(r() * 4)), v1 = v0 + 230 / 512;
+    const nl = Math.hypot(dx * 0.6, dy * 0.6 + 0.8, dz * 0.6) || 1, nx = dx * 0.6 / nl, ny = (dy * 0.6 + 0.8) / nl, nz = dz * 0.6 / nl;
+    const cr = (0.86 + tint * 0.3 + hue * 0.12) * light, cg = 1.0 * light, cb = (0.78 - tint * 0.2) * light;
+    for (const [a, b, uu, vv] of [[-1, -1, u0, v0], [1, -1, u1, v0], [1, 1, u1, v1], [-1, -1, u0, v0], [1, 1, u1, v1], [-1, 1, u0, v1]]) {
+      cP.push(cx + (ax * a + vx * b) * size, cy + (ay * a + vy * b) * size, cz + (az * a + vz * b) * size); cN.push(nx, ny, nz); cU.push(uu, vv); cC.push(cr, cg, cb);
+    }
+  };
+  const nCards = lod ? 0 : quality >= 2 ? 16 : quality === 1 ? 11 : 7;
+  for (const l of lobes) {
+    const sy = 0.66 + r() * 0.2, tint = r();
+    parts.push(lod ? lobe(l.c[0], l.c[1], l.c[2], l.r * 1.12, 0, sy, tint, false) : lobe(l.c[0], l.c[1], l.c[2], l.r * 0.8, 0, sy, tint, true));
+    for (let k = 0; k < nCards; k++) {
+      const th = r() * TAU, dy = -0.35 + r() * 1.35, hr = Math.sqrt(Math.max(0.05, 1 - Math.min(1, dy * dy))), dx = Math.cos(th) * hr, dz = Math.sin(th) * hr, dl = Math.hypot(dx, dy, dz);
+      const rr = l.r * (0.72 + r() * 0.4);
+      card(l.c[0] + dx / dl * rr * 1.22, l.c[1] + dy / dl * rr * sy, l.c[2] + dz / dl * rr * 1.22, l.r * (0.52 + r() * 0.3), dx / dl, dy / dl, dz / dl, 0.72 + 0.5 * Math.max(0, dy), r());
+    }
   }
-  const nVine = lod ? 0 : quality >= 2 ? 5 : quality >= 1 ? 3 : 0;
+  if (cP.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(cP, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(cN, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(cU, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(cC, 3)); parts.push(g); }
+  const nVine = lod ? 0 : quality >= 2 ? 6 : quality >= 1 ? 3 : 0;
   for (let k = 0; k < nVine; k++) {
     const l = lobes[Math.floor(r() * lobes.length)], a = r() * TAU, d = l.r * (0.5 + r() * 0.5), len = 2.5 + r() * 4.5, x = l.c[0] + Math.cos(a) * d, z = l.c[2] + Math.sin(a) * d, y = l.c[1] - 0.3;
-    parts.push(paint(smooth(tube([[x, y, z], [x + (r() - 0.5) * 0.5, y - len * 0.5, z + (r() - 0.5) * 0.5], [x + (r() - 0.5) * 0.8, y - len, z + (r() - 0.5) * 0.8]], [0.07, 0.06, 0.035], 3, true)), (_x, yy) => { const m = 0.7 + h2(yy * 2.3, k) * 0.5; return [0.08 * m, 0.2 * m, 0.07 * m]; }));
+    parts.push(paint(plainUV(smooth(tube([[x, y, z], [x + (r() - 0.5) * 0.5, y - len * 0.5, z + (r() - 0.5) * 0.5], [x + (r() - 0.5) * 0.8, y - len, z + (r() - 0.5) * 0.8]], [0.07, 0.06, 0.035], 3, true))), (_x, yy) => { const m = 0.7 + h2(yy * 2.3, k) * 0.5; return [0.08 * m, 0.2 * m, 0.07 * m]; }));
   }
-  return merge(parts);
+  return merge(parts.map(g => g.index ? smooth(g) : g));
 }
 
 /** Ribbed saguaro with rounded crown and curved, upturned arms. Height ≈ 4.6. */

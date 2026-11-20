@@ -8,6 +8,7 @@ import { mulberry32, type Path, type Sample, type TrackData, type Obstacle } fro
 import { addProps, type Emitter } from './props';
 import { addMechProps } from './mechProps';
 import { addSciFi, oceanWindowMaterial } from './scifi';
+import { treeMaterial } from './foliage';
 import { TUNNEL_DECK } from './physics';
 import { addTrackDetail } from './trackDetail';
 import { StaticBatcher } from './trackMesh';
@@ -482,6 +483,10 @@ function buildTunnel(path: Path, group: THREE.Group, mat: THREE.Material, roadMa
         if ((i - ra) % 12 === 0) lamps.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + s.ramp + s.roof - 0.6 - (cave ? 1.6 : 0), s.z), new THREE.Quaternion().setFromAxisAngle(upV, Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, 1, 1)));
         if (!cave) ribs.push(arch(s, s.hw + 1.3, sea ? 0.3 : 0.36, H - 0.2)); // structural rib / window mullion
       }
+      if (cave && i > ra + 2 && i < rb - 2 && h2(i, 21) > 0.35) { // stalagmites along both edges of the cave floor
+        const sd = h2(i, 23) > 0.5 ? 1 : -1, len = 1.2 + h2(i, 27) * 2.6, rr = 0.45 + h2(i, 29) * 0.6, lat = sd * (s.hw + 0.95);
+        tites.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + len / 2 - 0.2, s.z + s.rz * lat), new THREE.Quaternion(), new THREE.Vector3(rr, len, rr)));
+      }
       if (cave && i > ra + 2 && i < rb - 2) { // stalactites hanging from the ceiling
         const ang = (0.28 + h2(i, 5) * 0.44) * Math.PI, len = 0.9 + h2(i, 9) * 1.7, rr = 0.35 + h2(i, 3) * 0.5, nz = noise(Math.round(ang / Math.PI * segA));
         const lat = Math.cos(ang) * (Wd + nz), up = Math.sin(ang) * (H + nz) + 1.15;
@@ -649,7 +654,7 @@ function scatterDecor(
   near: (x: number, z: number) => { d: number; s: Sample }, gfx: GfxSettings, disp: { dispose: () => void }[], rng: () => number,
   wallTex: ReturnType<typeof generateTexture>, roadClear: (x: number, z: number, r: number, margin?: number) => boolean, waterY: number,
 ) {
-  const det = gfx.detail; const gq = gfx.geometry;
+  const det = gfx.detail; const gq = gfx.geometry; const dens = Math.min(2.6, Math.max(1, td.N / 3000) * 1.2);
   const rockMat = surfaceMaterial(wallTex, {
     strata: STRATA[theme.id], repeat: [2, 2], normalScale: 1.55,
     emissive: theme.id === 'lava' ? '#ff5a10' : '#c87aff',
@@ -659,7 +664,7 @@ function scatterDecor(
   const decorCells: { mesh: THREE.InstancedMesh; x: number; z: number; view2: number; sh2: number; lod?: THREE.InstancedMesh; lod2?: number }[] = [];
   // Sector-chunked + distance/shadow-culled InstancedMesh placement: skips distant sectors & shadows beyond the shadow box!
   const place = (geo: THREE.BufferGeometry, mat: THREE.Material, count: number, dMin: number, dMax: number, sMin: number, sMax: number, opts: { foot?: number; yOff?: number; tilt?: number; air?: number; shadow?: boolean; scaleY?: [number, number]; colors?: string[]; keepDry?: boolean; view?: number; lod?: { geo: THREE.BufferGeometry; dist: number } } = {}) => {
-    count = Math.floor(count * det); if (count <= 0) { geo.dispose(); return; }
+    count = Math.floor(count * det * dens); // Session 18: density follows the (longer) track + 20 % more decoration if (count <= 0) { geo.dispose(); return; }
     const SEC = dMax > 900 ? 900 : 340;
     const sectors = new Map<string, { m: THREE.Matrix4[]; c: THREE.Color[]; cx: number; cz: number }>();
     const q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
@@ -738,7 +743,7 @@ function scatterDecor(
       }
       case 'trees': {
         // Emergent rainforest trees (buttress roots, forked boughs, layered canopy lobes, lianas) – 2 seeded variants, sector-culled
-        const tm = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.84 }); disp.push(tm);
+        const tm = treeMaterial(disp); // atlas: real bark photo + leaf sprigs with alpha (foliage.ts)
         for (let v = 0; v < 2; v++) place(jungleTreeGeometry(5 + v * 8, gq), tm, 470, 10, 620, 1, 2.45, { foot: 6.5, keepDry: true, scaleY: [0.85, 1.2], colors: ['#dce8cf', '#ffffff', '#e8f0c8', '#c8dec0'], lod: { geo: jungleTreeGeometry(5 + v * 8, gq, true), dist: 240 } });
         break;
       }

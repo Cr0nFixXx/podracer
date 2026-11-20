@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { TexKind } from './data';
 import { TileNoise, aeolianWave, blur, clamp01, computeTexture, sstep, type TexBytes } from './texCore';
 import { texGet, texPut } from './texStore';
+import { applyPhotoDetail, hasPhotoFor, photosReady } from './photoTex';
 
 export interface TexSet {
   map: THREE.Texture;       // RGB = sRGB albedo (with baked multi-scale cavity AO), A = packed height
@@ -21,8 +22,10 @@ function toTex(data: Uint8Array, size: number, srgb: boolean, aniso: number) {
 
 const cache = new Map<string, TexSet>();
 const texKey = (kind: TexKind, palette: string[], size: number, seed: number, emissive?: string) => `${kind}|${palette.join(',')}|${size}|${seed}|${emissive ?? ''}`;
-function wrap(b: TexBytes, size: number, aniso: number): TexSet {
-  const set: TexSet = { map: toTex(b.map, size, true, aniso), normalMap: toTex(b.nrm, size, false, aniso), rhMap: toTex(b.rh, size, false, aniso) };
+function wrap(b: TexBytes, size: number, aniso: number, kind?: TexKind): TexSet {
+  let map = b.map, nrm = b.nrm;
+  if (kind && hasPhotoFor(kind)) { map = b.map.slice(); nrm = b.nrm.slice(); applyPhotoDetail(kind, size, map, nrm); } // copies: the originals go to the persistent cache
+  const set: TexSet = { map: toTex(map, size, true, aniso), normalMap: toTex(nrm, size, false, aniso), rhMap: toTex(b.rh, size, false, aniso) };
   if (b.em) set.emissiveMap = toTex(b.em, size, true, aniso);
   return set;
 }
@@ -31,7 +34,7 @@ function wrap(b: TexBytes, size: number, aniso: number): TexSet {
 export function generateTexture(kind: TexKind, palette: string[], size: number, seed: number, aniso = 8, emissiveColor?: string): TexSet {
   const key = texKey(kind, palette, size, seed, emissiveColor);
   const c = cache.get(key); if (c) return c;
-  const set = wrap(computeTexture(kind, palette, size, seed, emissiveColor), size, aniso);
+  const set = wrap(computeTexture(kind, palette, size, seed, emissiveColor), size, aniso, kind);
   cache.set(key, set);
   return set;
 }
@@ -63,6 +66,7 @@ export function generateTextures(specs: TexSpec[], aniso: number): Promise<TexSe
   return p;
 }
 async function runTextures(specs: TexSpec[], aniso: number): Promise<TexSet[]> {
+  await photosReady(); // photo detail is applied when a set is wrapped into GPU textures
   const t0 = performance.now();
   const keys = specs.map(s => texKey(s.kind, s.palette, s.size, s.seed, s.emissive));
   const todo: number[] = []; const seen = new Set<string>();
@@ -72,7 +76,7 @@ async function runTextures(specs: TexSpec[], aniso: number): Promise<TexSet[]> {
   // 1) persistent cache
   if (storeOn && todo.length) {
     const hit = await texGet(todo.map(i => storeKey(keys[i])));
-    for (let q = todo.length - 1; q >= 0; q--) { const i = todo[q], b = hit.get(storeKey(keys[i])); if (b) { cache.set(keys[i], wrap(b, specs[i].size, aniso)); todo.splice(q, 1); textureStats.cached++; } }
+    for (let q = todo.length - 1; q >= 0; q--) { const i = todo[q], b = hit.get(storeKey(keys[i])); if (b) { cache.set(keys[i], wrap(b, specs[i].size, aniso, specs[i].kind)); todo.splice(q, 1); textureStats.cached++; } }
   }
   // 2) synthesise the rest: worker pool, or the calling thread as fallback
   const fresh: [string, TexBytes][] = [];
@@ -89,7 +93,7 @@ async function runTextures(specs: TexSpec[], aniso: number): Promise<TexSet[]> {
           w.onerror = e => fail(e);
           w.onmessage = (e: MessageEvent<TexBytes & { id: number; ms: number }>) => {
             const d = e.data, i = d.id, b: TexBytes = d.em ? { map: d.map, nrm: d.nrm, rh: d.rh, em: d.em } : { map: d.map, nrm: d.nrm, rh: d.rh };
-            textureStats.jobMs.push(d.ms); cache.set(keys[i], wrap(b, specs[i].size, aniso)); fresh.push([storeKey(keys[i]), b]);
+            textureStats.jobMs.push(d.ms); cache.set(keys[i], wrap(b, specs[i].size, aniso, specs[i].kind)); fresh.push([storeKey(keys[i]), b]);
             if (++done === todo.length) { ws.forEach(x => x.terminate()); resolve(); } else feed(w);
           };
           feed(w);
@@ -101,7 +105,7 @@ async function runTextures(specs: TexSpec[], aniso: number): Promise<TexSet[]> {
   for (const i of todo) {
     if (cache.has(keys[i])) continue;
     const sp = specs[i], b = computeTexture(sp.kind, sp.palette, sp.size, sp.seed, sp.emissive);
-    cache.set(keys[i], wrap(b, sp.size, aniso)); fresh.push([storeKey(keys[i]), b]);
+    cache.set(keys[i], wrap(b, sp.size, aniso, sp.kind)); fresh.push([storeKey(keys[i]), b]);
     await new Promise(r => setTimeout(r, 0)); // keep the loading bar alive
   }
   // 3) write new sets to the persistent cache a little later (never delays the race start)
