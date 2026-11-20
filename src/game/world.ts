@@ -139,10 +139,10 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     for (let i = 1; i < n; i++) {
       const a = S[last], b = S[i], pv = S[i - 1];
       const turn = Math.abs(Math.atan2(a.tx * b.tz - a.tz * b.tx, a.tx * b.tx + a.tz * b.tz));
-      const flag = pv.gap !== b.gap || pv.canyon !== b.canyon || pv.openL !== b.openL || pv.openR !== b.openR || b.ramp > 0 || pv.ramp > 0;
+      const flag = pv.gap !== b.gap || pv.canyon !== b.canyon || pv.openL !== b.openL || pv.openR !== b.openR || pv.bridge !== b.bridge || b.ramp > 0 || pv.ramp > 0;
       const dy = Math.abs((b.y + b.ramp) - (a.y + a.ramp)) + Math.abs(b.bank - a.bank) * b.hw;
       if (flag && i - 1 > last) { idxs.push(i - 1); last = i - 1; }
-      if (flag || i - last >= maxStep || turn > 0.022 || dy > 0.55) { idxs.push(i); last = i; }
+      if (flag || i - last >= maxStep || turn > 0.02 || dy > 0.36) { idxs.push(i); last = i; }
     }
     if (path.closed) idxs.push(0); else if (idxs[idxs.length - 1] !== n - 1) idxs.push(n - 1);
 
@@ -189,10 +189,10 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
         const s = S[idxs[k]]; if (k > 0) { const pr = S[idxs[k - 1]]; sAcc += Math.hypot(s.x - pr.x, s.z - pr.z); }
         const open = side > 0 ? s.openR : s.openL;
         const ex = s.x + s.rx * side * s.hw, ez = s.z + s.rz * side * s.hw, ey = s.y + s.ramp - side * s.hw * s.bank + 0.16;
-        // 3-point sculpted embankment skirt
-        const okS = !s.gap;
+        // 3-point sculpted embankment skirt (omitted on open shortcut/cave forks so zero skirt slices across a merge, and on bridges which carry a box girder)
+        const okS = !s.gap && !open && !s.bridge;
         const bx = ex + s.rx * side * 3.8, bz = ez + s.rz * side * 3.8;
-        const depth = okS ? Math.max(6.2, ey - heightAt(bx, bz) + 3.2) : 16;
+        const depth = okS ? Math.max(6.2, ey - heightAt(bx, bz) + 4.2) : 16;
         const mx = ex + s.rx * side * 0.75, mz = ez + s.rz * side * 0.75;
         sp.push(ex, ey, ez, mx, ey - 0.85, mz, bx, ey - depth, bz);
         su.push(sAcc / 18, 0, sAcc / 18, 0.06, sAcc / 18, depth / 18);
@@ -261,30 +261,46 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
       const abM = new THREE.Mesh(abG, abutmentMetal); abM.position.set(s.x, s.y + s.ramp, s.z); abM.rotation.y = yaw; abM.castShadow = true; group.add(abM); disposables.push(abG);
     }
 
-    // ---- shortcut tunnels with structural support ribs & Oovo Zero-G containment tubes ----
-    buildTunnel(path, group, wallMat, roadMat, abutmentMetal, disposables, theme, waterY);
+    // ---- high-clearance tunnels, underwater tubes, underpasses & widened/branching caverns ----
+    buildTunnel(path, group, wallMat, roadMat, abutmentMetal, disposables, theme, waterY, heightAt);
     if (td.def.theme === 'oovo') buildZeroGTubes(path, group, wallMat, abutmentMetal, disposables, theme);
   }
+  // ---- sculpted rock bifurcation wedges with glowing direction chevrons at every branching cave split & reunion ----
+  buildCaveForkPylons(td, group, wallMat, abutmentMetal, theme, disposables);
+  // ---- elevated overpass viaduct bridges where the track crosses over itself ----
+  buildBridges(td, group, abutmentMetal, wallMat, theme, disposables, heightAt, roadClear, waterY);
 
-  // ---- ramp warning chevrons (instanced) ----
+  // ---- flush ramp-conforming warning chevrons (sit directly on curved ramp slope + bank, never float!) ----
   {
     const chevMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.25), side: THREE.DoubleSide });
-    const S = td.main.samples; const mats: THREE.Matrix4[] = [];
+    const S = td.main.samples; const pos: number[] = [], ind: number[] = [];
+    const rSurf = (q: Sample, l: number) => { const e = Math.min(1, Math.abs(l) / q.hw); return q.y + q.ramp - l * q.bank + (1 - e * e) * 0.2 + 0.055 + roadDispOff; };
     for (let i = 1; i < S.length; i++) {
       if (!(S[i].ramp > 0 && S[i - 1].ramp === 0)) continue;
       for (let c = 0; c < 4; c++) {
-        const s = S[(i + c * 4) % S.length]; const yaw = Math.atan2(s.tx, s.tz);
+        const idx0 = (i + c * 4) % S.length, s0 = S[idx0], s1 = S[(idx0 + 1) % S.length], s2 = S[(idx0 + 2) % S.length];
         for (const side of [-1, 1]) {
-          const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, yaw + side * 0.6, -yaw + Math.PI / 2 + side * 0.5, 'YXZ'));
-          mats.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x + s.rx * side * (s.hw * 0.4), s.y + s.ramp - side * s.hw * 0.4 * s.bank + 0.35, s.z + s.rz * side * s.hw * 0.4), q, new THREE.Vector3(1, 1, 1)));
+          // Pointed V-chevron arm conforming vertex-by-vertex to the rising ramp deck
+          const lIn = side * s0.hw * 0.14, lOut = side * s0.hw * 0.56;
+          const v = pos.length / 3;
+          pos.push(
+            s0.x + s0.rx * lOut, rSurf(s0, lOut), s0.z + s0.rz * lOut,
+            s1.x + s1.rx * lOut, rSurf(s1, lOut), s1.z + s1.rz * lOut,
+            s1.x + s1.rx * lIn, rSurf(s1, lIn), s1.z + s1.rz * lIn,
+            s2.x + s2.rx * lIn, rSurf(s2, lIn), s2.z + s2.rz * lIn,
+          );
+          ind.push(v, v + 1, v + 2, v + 1, v + 3, v + 2);
         }
       }
     }
-    if (mats.length) { const geo = new THREE.PlaneGeometry(4, 0.6); const im = new THREE.InstancedMesh(geo, chevMat, mats.length); mats.forEach((m, k) => im.setMatrixAt(k, m)); im.computeBoundingSphere(); group.add(im); disposables.push(geo, chevMat); }
+    if (ind.length) {
+      const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); cg.setIndex(ind);
+      const cm = new THREE.Mesh(cg, chevMat); group.add(cm); disposables.push(cg, chevMat);
+    } else disposables.push(chevMat);
   }
 
-  // ---- upgraded start / finish arena (merged by material for crisp start-grid FPS) ----
-  addStartArea(td, group, theme, disposables, rng, roadDispOff);
+  // ---- upgraded start / finish arena (grounded foundations + road-conforming finish line) ----
+  addStartArea(td, group, theme, disposables, rng, roadDispOff, heightAt);
   const trackMs = Math.round(performance.now() - tTrack0);
 
   progress(0.55, 'Generiere Terrain (LOD) …'); await yield_();
@@ -309,26 +325,24 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     const pg = new THREE.PlaneGeometry(W, D);
     const wp = new THREE.Mesh(pg, wm); wp.rotation.x = -Math.PI / 2; wp.position.set(cxm, waterY, czm); wp.receiveShadow = true; group.add(wp); glossy.push(wp);
     disposables.push(wm, pg);
-    if (T === 'ocean') addViaductPiers(td, group, abutmentMetal, disposables, 44, s => ({ bot: waterY - 8, top: s.y - 1.2, w: s.hw * 1.65, r: 1.9 }));
+    if (T === 'ocean') addViaductPiers(td, group, abutmentMetal, disposables, 44, s => s.bridge || s.tun === 2 ? null : ({ bot: waterY - 8, top: s.y - 1.2, w: s.hw * 1.65, r: 1.9 }), roadClear);
   } else if (T === 'prison') {
     addAsteroidBelt(td, group, wallMat, disposables, rng);
-    addViaductPiers(td, group, abutmentMetal, disposables, 56, s => s.zeroG ? null : ({ bot: s.y - 380, top: s.y - 1.5, w: s.hw * 1.7, r: 2.5 }));
-  } else if (T === 'city') {
-    addViaductPiers(td, group, abutmentMetal, disposables, 38, s => ({ bot: -165, top: s.y - 1.5, w: s.hw * 1.75, r: 3.2 }));
+    addViaductPiers(td, group, abutmentMetal, disposables, 56, s => s.zeroG || s.bridge ? null : ({ bot: s.y - 380, top: s.y - 1.5, w: s.hw * 1.7, r: 2.5 }), roadClear);
   }
 
   progress(0.82, 'Platziere Landschaftsdetails …'); await yield_();
   const distToTrack = (x: number, z: number) => nearest(x, z);
   const decorCells = scatterDecor(theme, group, td, heightAt, distToTrack, gfx, disposables, rng, wallTex, roadClear, waterY);
-  addArches(td, group, wallMat, disposables, rng, roadClear);
+  addArches(td, group, wallMat, disposables, rng, roadClear, heightAt, waterY, T === 'prison');
   const obstFx = addObstacles(td, group, theme, wallMat, disposables);
   progress(0.9, 'Platziere Streckendetails …'); await yield_();
   // Session 15: objects are seated on the LOWEST ground point under their footprint (sampling only the centre left them floating on slopes)
   const groundMin = (x: number, z: number, r: number) => Math.min(heightAt(x, z), heightAt(x + r, z), heightAt(x - r, z), heightAt(x, z + r), heightAt(x, z - r));
   const props = addProps(td, theme, group, gfx, (x, z) => groundMin(x, z, 1.4), disposables, rng, roadClear, roadDispOff);
-  addSciFi(td, theme, group as never, disposables);
+  addSciFi(td, theme, group as never, disposables, (x, z) => groundMin(x, z, 1.6), roadDispOff);
   const mech = addMechProps(td, theme, group, disposables, (x, z) => groundMin(x, z, 2.8), roadClear, waterY, gfx.detail);
-  const setPieces = buildSetPieces(td, theme, group, disposables, wallMat);
+  const setPieces = buildSetPieces(td, theme, group, disposables, wallMat, (x, z) => groundMin(x, z, 2.5));
   const landRock = surfaceMaterial(wallTex, {
     strata: STRATA[theme.id], ledge: wallLedge, cloud: theme.clouds * 0.4,
     macro: 0.35, detail: 0.3, normalScale: 1.35, bump,
@@ -349,7 +363,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   const S = td.main.samples;
   for (let i = 0; i < S.length; i += 110) { const s = S[i]; const side = (i / 110) % 2 ? 1 : -1; tvCams.push(new THREE.Vector3(s.x + s.rx * side * (s.hw + 6), s.y + 7 + (s.canyon ? 6 : 0), s.z + s.rz * side * (s.hw + 6))); }
 
-  const detail = addTrackDetail(td, theme, group, disposables, rng, wallMat, { across, disp: roadDispOff, detail: gfx.detail, tvCams, batcher, groundTex });
+  const detail = addTrackDetail(td, theme, group, disposables, rng, wallMat, { across, disp: roadDispOff, detail: gfx.detail, tvCams, batcher, groundTex, heightAt: (x, z) => groundMin(x, z, 1.8) });
   batcher.build(group, disposables);
 
   const timings: WorldTimings = {
@@ -386,17 +400,33 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
 function addViaductPiers(
   td: TrackData, group: THREE.Group, mat: THREE.Material, disp: { dispose: () => void }[],
   step: number, spec: (s: Sample) => { bot: number; top: number; w: number; r: number } | null,
+  roadClear?: (x: number, z: number, r: number, margin?: number) => boolean,
 ) {
-  const S = td.main.samples; const cols: THREE.Matrix4[] = [], caps: THREE.Matrix4[] = [];
+  const S = td.main.samples, N = S.length; const cols: THREE.Matrix4[] = [], caps: THREE.Matrix4[] = [];
   const up = new THREE.Vector3(0, 1, 0);
+  // Check that a pier does not drop through a lower crossing road deck
+  const clearBelow = (i: number, x: number, z: number, yTop: number, rad: number) => {
+    for (const c of td.crossings) {
+      const d = Math.abs(i - c.upperIdx), di = td.main.closed ? Math.min(d, N - d) : d;
+      if (di > 90) continue;
+      for (let k = c.lowerFrom - 12; k <= c.lowerTo + 12; k += 2) {
+        if (!td.main.closed && (k < 0 || k >= N)) continue;
+        const q = S[((k % N) + N) % N];
+        if (q.y < yTop && Math.hypot(q.x - x, q.z - z) < q.hw + rad + 5.5) return false;
+      }
+    }
+    return true;
+  };
+  void roadClear;
   for (let i = 0; i < S.length; i += step) {
     const s = S[i]; if (s.gap) continue;
     const sp = spec(s); if (!sp || sp.top - sp.bot < 6) continue;
+    const legs = [-0.36, 0.36].map(sd => [s.x + s.rx * sd * sp.w, s.z + s.rz * sd * sp.w] as const);
+    if (!legs.every(([lx, lz]) => clearBelow(i, lx, lz, s.y, sp.r))) continue;
     const yaw = Math.atan2(s.tx, s.tz); const q = new THREE.Quaternion().setFromAxisAngle(up, yaw);
     const h = sp.top - sp.bot;
     caps.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x, sp.top - 0.9, s.z), q, new THREE.Vector3(sp.w, 2.2, sp.r * 2.2)));
-    for (const sd of [-0.34, 0.34]) {
-      const lx = s.x + s.rx * sd * sp.w, lz = s.z + s.rz * sd * sp.w;
+    for (const [lx, lz] of legs) {
       cols.push(new THREE.Matrix4().compose(new THREE.Vector3(lx, sp.bot + h / 2, lz), q, new THREE.Vector3(sp.r, h, sp.r)));
     }
   }
@@ -427,80 +457,328 @@ function tunnelWaterMask(td: TrackData, seaY: number, disp: { dispose: () => voi
   return { tex, x0, z0, sx, sz };
 }
 
-function buildTunnel(path: Path, group: THREE.Group, mat: THREE.Material, roadMat: THREE.Material, ribMat: THREE.Material, disp: { dispose: () => void }[], theme: ThemeDef, seaY: number) {
-  // Session 17: one tunnel per run of roofed samples, three kinds (Sample.tun):
-  //  1 standard – inner shell + earth berm + DRIVABLE DECK on top (physics: PodState.upper) with glowing edge lines,
-  //  2 underwater tube – steel caisson, ocean-view windows where the tube is below sea level,
-  //  3 cave – rough rock shell with stalactites, same berm + deck.
-  // Cross-sections are sheared with the road bank; both mouths get a portal frame and a closed portal face.
-  const S = path.samples; const n = S.length;
+/** Builds futuristic beveled box-girder overpass viaducts, abutments & terrain-grounded twin piers for every `s.bridge` crossing! */
+function buildBridges(
+  td: TrackData, group: THREE.Group, steelMat: THREE.Material, wallMat: THREE.Material, theme: ThemeDef,
+  disp: { dispose: () => void }[], heightAt: (x: number, z: number) => number,
+  _roadClear: (x: number, z: number, r: number, margin?: number) => boolean, waterY: number,
+) {
+  const S = td.main.samples, n = S.length;
   const runs: [number, number][] = []; let a0 = -1;
-  for (let i = 0; i < n; i++) { const on = S[i].roof > 0; if (on && a0 < 0) a0 = i; if ((!on || i === n - 1) && a0 >= 0) { const b0 = on ? i : i - 1; if (b0 - a0 >= 6) runs.push([a0, b0]); a0 = -1; } }
+  for (let i = 0; i < n; i++) {
+    const on = !!S[i].bridge && !S[i].gap;
+    if (on && a0 < 0) a0 = i;
+    if ((!on || i === n - 1) && a0 >= 0) { const b0 = on ? i : i - 1; if (b0 - a0 >= 6) runs.push([a0, b0]); a0 = -1; }
+  }
+  if (!runs.length) return;
+  const gPos: number[] = [], gUv: number[] = [], gInd: number[] = [];
+  const lPos: number[] = [], lUv: number[] = [], lInd: number[] = [];
+  const ribs: THREE.BufferGeometry[] = [], abuts: THREE.BufferGeometry[] = [];
+  const pierCols: THREE.Matrix4[] = [], pierCaps: THREE.Matrix4[] = [];
+  const upV = new THREE.Vector3(0, 1, 0), isPrison = theme.terrain === 'prison';
+  // Cross-section profile of the armored viaduct box-girder: left road curb → beveled fascia → deep box soffit → beveled fascia → right curb
+  const PROF = 6;
+  const clearLower = (x: number, z: number, yTop: number, rad: number) => {
+    for (const path of td.paths) for (let k = 0; k < path.samples.length; k += 2) {
+      const q = path.samples[k];
+      if (q.bridge || q.y > yTop - 6) continue;
+      if (Math.hypot(q.x - x, q.z - z) < q.hw + rad + 6.5) return false;
+    }
+    return true;
+  };
+  for (const [ra, rb] of runs) {
+    let pRow = -1, pGlow = -1, sAcc = 0;
+    for (let i = ra; i <= rb; i = i === rb ? rb + 1 : Math.min(rb, i + 2)) {
+      const s = S[i]; if (i > ra) sAcc += 4;
+      const hw = s.hw, eL = s.y + s.ramp + hw * s.bank + 0.16, eR = s.y + s.ramp - hw * s.bank + 0.16;
+      const sofL = eL - 2.65, sofR = eR - 2.65;
+      const row = gPos.length / 3;
+      const pts: [number, number][] = [
+        [-hw, eL], [-(hw + 0.9), eL - 0.85], [-(hw * 0.76), sofL],
+        [hw * 0.76, sofR], [hw + 0.9, eR - 0.85], [hw, eR],
+      ];
+      pts.forEach(([lat, py], k) => { gPos.push(s.x + s.rx * lat, py, s.z + s.rz * lat); gUv.push(k / (PROF - 1), sAcc / 14); });
+      if (pRow >= 0) for (let k = 0; k < PROF - 1; k++) {
+        const a = pRow + k, b = row + k;
+        gInd.push(a, b, a + 1, a + 1, b, b + 1);
+      }
+      pRow = row;
+      // Glowing futuristic navigation strips along both outer bridge fascias (highly readable from the underpass below!)
+      const gr = lPos.length / 3;
+      for (const [lat, py] of [[-(hw + 0.94), eL - 0.72], [-(hw + 0.94), eL - 1.02], [hw + 0.94, eR - 0.72], [hw + 0.94, eR - 1.02]]) {
+        lPos.push(s.x + s.rx * lat, py, s.z + s.rz * lat); lUv.push(0, 0);
+      }
+      if (pGlow >= 0) for (const k of [0, 2]) lInd.push(pGlow + k, gr + k, pGlow + k + 1, pGlow + k + 1, gr + k, gr + k + 1);
+      pGlow = gr;
+      // Transverse structural cross-girders every 14 m + twin ground-seated viaduct piers every 28 m (safely flanking the lower road!)
+      const yaw = Math.atan2(s.tx, s.tz), q = new THREE.Quaternion().setFromAxisAngle(upV, yaw);
+      if ((i - ra) % 7 === 0) {
+        const bg = new THREE.BoxGeometry(hw * 1.62, 0.75, 1.1);
+        const bp = bg.attributes.position as THREE.BufferAttribute;
+        for (let vi = 0; vi < bp.count; vi++) bp.setY(vi, bp.getY(vi) + bp.getX(vi) * s.bank);
+        bg.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + s.ramp - 2.75, s.z), q, new THREE.Vector3(1, 1, 1)));
+        ribs.push(bg.toNonIndexed()); bg.dispose();
+      }
+      if (i > ra + 6 && i < rb - 6 && (i - ra) % 14 === 0) {
+        const wSpan = hw * 1.52, rP = 2.15;
+        const lPt: [number, number] = [s.x - s.rx * wSpan * 0.42, s.z - s.rz * wSpan * 0.42];
+        const rPt: [number, number] = [s.x + s.rx * wSpan * 0.42, s.z + s.rz * wSpan * 0.42];
+        if (clearLower(lPt[0], lPt[1], s.y, rP) && clearLower(rPt[0], rPt[1], s.y, rP)) {
+          const top = Math.min(sofL, sofR) + 0.35;
+          const gL = isPrison ? s.y - 340 : Math.min(heightAt(lPt[0], lPt[1]), waterY > -1e8 ? waterY - 6 : 1e9) - 5;
+          const gR = isPrison ? s.y - 340 : Math.min(heightAt(rPt[0], rPt[1]), waterY > -1e8 ? waterY - 6 : 1e9) - 5;
+          if (top - Math.max(gL, gR) > 4.5) {
+            pierCaps.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x, top - 0.8, s.z), q, new THREE.Vector3(wSpan, 2.1, rP * 2.1)));
+            for (const [[lx, lz], bot] of [[lPt, gL], [rPt, gR]] as const) {
+              const hP = top - bot;
+              pierCols.push(new THREE.Matrix4().compose(new THREE.Vector3(lx, bot + hP * 0.5, lz), q, new THREE.Vector3(rP, hP, rP)));
+            }
+          }
+        }
+      }
+    }
+    // Solid masonry/rock bridge end-abutments anchoring both bridge approaches firmly into terrain (never floating!)
+    if (!isPrison) for (const e of [ra, rb]) {
+      const s = S[e], yaw = Math.atan2(s.tx, s.tz), q = new THREE.Quaternion().setFromAxisAngle(upV, yaw);
+      const gy = Math.min(heightAt(s.x - s.rx * s.hw, s.z - s.rz * s.hw), heightAt(s.x + s.rx * s.hw, s.z + s.rz * s.hw), heightAt(s.x, s.z)) - 6;
+      const top = s.y + s.ramp - Math.abs(s.bank) * s.hw - 0.1, hA = Math.max(6, top - gy);
+      if (clearLower(s.x, s.z, s.y, s.hw * 0.5)) {
+        const ag = new THREE.BoxGeometry(s.hw * 2.04, hA, 6.4);
+        ag.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(s.x, gy + hA * 0.5, s.z), q, new THREE.Vector3(1, 1, 1)));
+        abuts.push(ag.toNonIndexed()); ag.dispose();
+      }
+    }
+  }
+  if (gInd.length) {
+    const sm = (steelMat as THREE.MeshStandardMaterial).clone(); sm.side = THREE.DoubleSide; disp.push(sm);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(gPos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(gUv, 2)); g.setIndex(gInd); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, sm); m.castShadow = true; m.receiveShadow = true; group.add(m); disp.push(g);
+  }
+  if (lInd.length) {
+    const lm = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.45), side: THREE.DoubleSide });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(lPos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(lUv, 2)); g.setIndex(lInd);
+    group.add(new THREE.Mesh(g, lm)); disp.push(g, lm);
+  }
+  if (ribs.length) { const rg = mergeGeometries(ribs)!; ribs.forEach(x => x.dispose()); const rm = new THREE.Mesh(rg, steelMat); rm.castShadow = true; rm.receiveShadow = true; group.add(rm); disp.push(rg); }
+  if (abuts.length) { const ag = mergeGeometries(abuts)!; abuts.forEach(x => x.dispose()); const am = new THREE.Mesh(ag, wallMat); am.castShadow = true; am.receiveShadow = true; group.add(am); disp.push(ag); }
+  if (pierCols.length) {
+    const cg = new THREE.CylinderGeometry(0.82, 1.18, 1, 12); const im = new THREE.InstancedMesh(cg, steelMat, pierCols.length);
+    pierCols.forEach((m, i) => im.setMatrixAt(i, m)); im.castShadow = true; im.receiveShadow = true; group.add(im); disp.push(cg);
+  }
+  if (pierCaps.length) {
+    const kg = mergeGeometries([new THREE.BoxGeometry(1, 0.65, 1).translate(0, 0.18, 0), new THREE.BoxGeometry(0.82, 0.45, 0.85).translate(0, -0.28, 0)].map(x => x.toNonIndexed()))!;
+    const im = new THREE.InstancedMesh(kg, steelMat, pierCaps.length);
+    pierCaps.forEach((m, i) => im.setMatrixAt(i, m)); im.receiveShadow = true; group.add(im); disp.push(kg);
+  }
+}
+
+/** Sculpted floor-to-ceiling cavern septum column + glowing split-arrow beacons marking every branching cave Y-junction. */
+function buildCaveForkPylons(td: TrackData, group: THREE.Group, rockMat: THREE.Material, metalMat: THREE.Material, theme: ThemeDef, disp: { dispose: () => void }[]) {
+  const caveBranches = td.paths.filter(p => p.isCave);
+  if (!caveBranches.length) return;
+  const S = td.main.samples, N = S.length, upV = new THREE.Vector3(0, 1, 0);
+  const rocks: THREE.BufferGeometry[] = [], frames: THREE.BufferGeometry[] = [], glows: THREE.BufferGeometry[] = [];
+  for (const br of caveBranches) {
+    const bs = br.samples, nB = bs.length;
+    // Place the split septum right where the branch edge first clears the main road edge (safely outside both collision envelopes!)
+    for (const isStart of [true, false]) {
+      const bi = isStart ? Math.min(nB - 1, 20) : Math.max(0, nB - 21);
+      const bq = bs[bi];
+      const mi = td.main.closed ? (((isStart ? br.mainFrom + 28 : br.mainTo - 28) % N) + N) % N : Math.max(0, Math.min(N - 1, isStart ? br.mainFrom + 28 : br.mainTo - 28));
+      const mq = S[mi];
+      const eMainX = mq.x + mq.rx * br.side * (mq.hw + 2.2), eMainZ = mq.z + mq.rz * br.side * (mq.hw + 2.2);
+      const eBrX = bq.x - bq.rx * br.side * (bq.hw + 2.2), eBrZ = bq.z - bq.rz * br.side * (bq.hw + 2.2);
+      const px = (eMainX + eBrX) * 0.5, pz = (eMainZ + eBrZ) * 0.5;
+      // Ensure safe clearance from both roadways
+      if (Math.hypot(px - mq.x, pz - mq.z) < mq.hw + 1.8 || Math.hypot(px - bq.x, pz - bq.z) < bq.hw + 1.8) continue;
+      const py = Math.min(mq.y - br.side * mq.hw * mq.bank, bq.y), h = Math.max(20, (mq.roof || 22) + 2);
+      const yaw = Math.atan2(mq.tx, mq.tz) + (isStart ? 0 : Math.PI);
+      const q = new THREE.Quaternion().setFromAxisAngle(upV, yaw);
+      const col = new THREE.CylinderGeometry(2.4, 3.3, h + 4, 9, 5);
+      const cp = col.attributes.position as THREE.BufferAttribute;
+      for (let k = 0; k < cp.count; k++) { const x = cp.getX(k), y = cp.getY(k), z = cp.getZ(k); const f = 0.85 + 0.35 * vnoise(x * 0.4 + y * 0.2, z * 0.4); cp.setXYZ(k, x * f, y, z * f * 1.45); }
+      col.computeVertexNormals();
+      col.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(px, py + h * 0.5 - 1.5, pz), q, new THREE.Vector3(1, 1, 1)));
+      rocks.push(col.toNonIndexed()); col.dispose();
+      if (isStart) {
+        // Futuristic illuminated split-chevron guide sign pointing into BOTH left & right cave tubes!
+        const m = new THREE.Matrix4().compose(new THREE.Vector3(px, py + 4.4, pz), q, new THREE.Vector3(1, 1, 1));
+        frames.push(new THREE.BoxGeometry(3.8, 2.2, 0.5).translate(0, 0, -3.4).applyMatrix4(m));
+        for (const sd of [-1, 1]) {
+          glows.push(new THREE.BoxGeometry(1.15, 0.28, 0.16).rotateZ(sd * 0.55).translate(sd * 0.95, 0.32, -3.7).applyMatrix4(m));
+          glows.push(new THREE.BoxGeometry(1.15, 0.28, 0.16).rotateZ(-sd * 0.55).translate(sd * 0.95, -0.32, -3.7).applyMatrix4(m));
+        }
+      }
+    }
+  }
+  const addM = (list: THREE.BufferGeometry[], m: THREE.Material, cast: boolean) => {
+    if (!list.length) return;
+    const g = mergeGeometries(list.map(x => x.index ? x.toNonIndexed() : x))!; list.forEach(x => x.dispose());
+    const o = new THREE.Mesh(g, m); o.castShadow = cast; o.receiveShadow = true; group.add(o); disp.push(g);
+  };
+  addM(rocks, rockMat, true); addM(frames, metalMat, false);
+  if (glows.length) { const gm = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.65) }); disp.push(gm); addM(glows, gm, false); }
+}
+
+function buildTunnel(
+  path: Path, group: THREE.Group, mat: THREE.Material, roadMat: THREE.Material, ribMat: THREE.Material,
+  disp: { dispose: () => void }[], theme: ThemeDef, seaY: number, heightAt: (x: number, z: number) => number,
+) {
+  // Four tunnel kinds (Sample.tun), all with tall generous headroom (19.5–38 m) & wide shoulders (Wd = hw + 3.4 + caveW):
+  //  1 standard  – vaulted shell + terrain-seated earth berm + DRIVABLE DECK on top (PodState.upper) with glowing edge lines,
+  //  2 sea tube  – tall 19.5 m Aquilaris caisson with panoramic underwater ocean windows (caustics, light shafts, fish schools),
+  //  3 cave      – widened multi-chamber & branching caverns (up to 38 m dome) + sculpted CAVE-FLOOR MESH, stalactites, stalagmites & glowing veins,
+  //  4 underpass – cut-and-cover underpass tunnel beneath an elevated crossing viaduct bridge (portal frames, ribs, lamps, grounded side berms).
+  const S = path.samples; const n = S.length, floatWorld = theme.terrain === 'prison' || theme.terrain === 'ocean';
+  const runs: [number, number][] = []; let a0 = -1;
+  for (let i = 0; i < n; i++) { const on = S[i].roof > 0; if (on && a0 < 0) a0 = i; if ((!on || i === n - 1) && a0 >= 0) { const b0 = on ? i : i - 1; if (b0 - a0 >= 5) runs.push([a0, b0]); a0 = -1; } }
   if (!runs.length) return;
   type Buf = { pos: number[]; uv: number[]; ind: number[] };
   const mk = (): Buf => ({ pos: [], uv: [], ind: [] });
-  const shell = mk(), deck = mk(), berm = mk(), steel = mk(), glowB = mk(); const winInd: number[] = [];
-  const segA = 18, DECK = TUNNEL_DECK; const lamps: THREE.Matrix4[] = [], ribs: THREE.BufferGeometry[] = [], tites: THREE.Matrix4[] = [];
-  const upV = new THREE.Vector3(0, 1, 0);
+  const shell = mk(), deck = mk(), berm = mk(), steel = mk(), glowB = mk(), caveFloor = mk(), veinB = mk(); const winInd: number[] = [];
+  const segA = 20, DECK = TUNNEL_DECK; const lamps: THREE.Matrix4[] = [], ribs: THREE.BufferGeometry[] = [], tites: THREE.Matrix4[] = [];
+  const upV = new THREE.Vector3(0, 1, 0), flipQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
   const put = (b: Buf, s: Sample, lat: number, up: number, u: number, v: number) => { b.pos.push(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + up, s.z + s.rz * lat); b.uv.push(u, v); };
   const strip = (b: Buf, r0: number, r1: number, cols: number) => { for (let a = 0; a < cols; a++) b.ind.push(r0 + a, r0 + a + 1, r1 + a, r0 + a + 1, r1 + a + 1, r1 + a); };
-  const arch = (s: Sample, R: number, tube: number, H: number) => { // half torus in the track's cross-section, sheared with the bank (local x = -lat)
-    const rg = new THREE.TorusGeometry(R, tube, 8, 28, Math.PI); rg.scale(1, H / R, 1);
+  const arch = (s: Sample, R: number, tube: number, H: number) => {
+    const rg = new THREE.TorusGeometry(R, tube, 8, 32, Math.PI); rg.scale(1, H / R, 1);
     const p = rg.attributes.position as THREE.BufferAttribute; for (let k = 0; k < p.count; k++) p.setY(k, p.getY(k) + p.getX(k) * s.bank);
-    rg.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + s.ramp + 1, s.z), new THREE.Quaternion().setFromAxisAngle(upV, Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, 1, 1)));
+    rg.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + s.ramp + 1.5, s.z), new THREE.Quaternion().setFromAxisAngle(upV, Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, 1, 1)));
     const out = rg.toNonIndexed(); rg.dispose(); return out;
   };
+  const bermFootUp = (s: Sample, lat: number) => {
+    if (floatWorld) return -6;
+    const wx = s.x + s.rx * lat, wz = s.z + s.rz * lat, roadAtLat = s.y + s.ramp - lat * s.bank;
+    return Math.max(-28, Math.min(-5, heightAt(wx, wz) - roadAtLat - 4.5));
+  };
+
   for (const [ra, rb] of runs) {
-    const kind = S[ra].tun ?? 1, sea = kind === 2, cave = kind === 3, amp = cave ? 3.0 : sea ? 0 : 1.5;
-    let pRing = -1, pDeck = -1, pBerm = -1, pSteel = -1, pGlow = -1, pUnder = false, vAcc = 0, last = ra;
+    const kind = S[ra].tun ?? 1, sea = kind === 2, cave = kind === 3, underP = kind === 4;
+    const hasDeck = !sea && !underP && !path.isCave;
+    const amp = cave ? 3.2 : (sea || underP) ? 0 : 1.3;
+    let pRing = -1, pDeck = -1, pBerm = -1, pSteel = -1, pGlow = -1, pUnder = false, pOpenL = false, pOpenR = false;
+    let pFloorL = -1, pFloorR = -1, pVein = -1, vAcc = 0, last = ra;
     for (let i = ra; i <= rb; i = i === rb ? rb + 1 : Math.min(rb, i + 2)) {
-      const s = S[i], H = s.roof - 1, Wd = s.hw + 1.5, D = s.roof + DECK;
-      const under = sea && s.y + D < seaY - 0.5;
+      const s = S[i], cw = cave ? (s.caveW ?? 0) : 0;
+      const H = s.roof - 1.5, Wd = s.hw + 3.4 + cw, D = s.roof + DECK;
+      // Underwater windows open wherever the window crown lies safely beneath the ocean surface!
+      const under = sea && s.y + s.roof * 0.88 < seaY - 0.4;
       vAcc += (i - last) * 2 / Math.max(24, s.hw * 1.4); last = i;
-      const noise = (a: number) => amp ? (vnoise(i * 0.2, a * 0.7) - 0.5) * amp : 0;
-      // inner shell (windows on both flanks of the underwater tube)
+      // Positive-biased noise near the crown so rock roughness adds grandeur upward and never lowers headroom!
+      const noise = (a: number) => {
+        if (!amp) return 0;
+        const raw = (vnoise(i * 0.2, a * 0.7) - 0.5) * amp;
+        const top = Math.sin(Math.PI * a / segA);
+        return top > 0.5 ? Math.max(-0.35, raw + 0.35 * amp * top) : raw;
+      };
+      // Inner vaulted shell (leave open wall aperture where a branching cave tube forks off or reunites!)
       const ring = shell.pos.length / 3;
-      for (let a = 0; a <= segA; a++) { const ang = Math.PI * a / segA, nz = noise(a); put(shell, s, Math.cos(ang) * (Wd + nz), Math.sin(ang) * (H + nz) + 1, s.s / 15, a / segA * 2.2); }
-      if (pRing >= 0) for (let a = 0; a < segA; a++) { const p0 = pRing + a, p1 = ring + a; ((pUnder && under && ((a >= 2 && a <= 6) || (a >= 11 && a <= 15))) ? winInd : shell.ind).push(p0, p0 + 1, p1, p1, p0 + 1, p1 + 1); }
-      pRing = ring; pUnder = under;
-      if (sea) { // steel caisson: wall – top slab – wall
-        const dw = Wd + 12, r = steel.pos.length / 3;
-        put(steel, s, -dw, -8, 0, s.s / 12); put(steel, s, -dw, D, 0.3, s.s / 12); put(steel, s, dw, D, 0.7, s.s / 12); put(steel, s, dw, -8, 1, s.s / 12);
+      for (let a = 0; a <= segA; a++) {
+        const ang = Math.PI * a / segA, nz = noise(a);
+        const yBase = a === 0 || a === segA ? -2.2 : 1.5; // tuck shell base 2.2 m below road edge so walls never gap on hills!
+        put(shell, s, Math.cos(ang) * (Wd + nz), Math.sin(ang) * (H + nz) + yBase, s.s / 15, a / segA * 2.4);
+      }
+      if (pRing >= 0) {
+        const cutR = cave && (s.openR || pOpenR), cutL = cave && (s.openL || pOpenL);
+        for (let a = 0; a < segA; a++) {
+          if ((cutR && a <= 4) || (cutL && a >= segA - 5)) continue; // open archway into branching cave tunnel!
+          const p0 = pRing + a, p1 = ring + a;
+          const isWin = pUnder && under && ((a >= 1 && a <= 7) || (a >= 12 && a <= 18));
+          (isWin ? winInd : shell.ind).push(p0, p0 + 1, p1, p1, p0 + 1, p1 + 1);
+        }
+      }
+      pRing = ring; pUnder = under; pOpenL = s.openL; pOpenR = s.openR;
+
+      // Sculpted lateral CAVE-FLOOR MESH + glowing mineral/lava fissures inside widened cave chambers!
+      if (cave) {
+        const addSideFloor = (sd: number, open: boolean, prev: number) => {
+          if (open || cw < 0.2) return -1;
+          const r0 = caveFloor.pos.length / 3, COLS = 4;
+          const lIn = sd * (s.hw - 0.15), lOut = sd * (Wd + 1.8);
+          for (let c = 0; c < COLS; c++) {
+            const f = c / (COLS - 1), lat = lIn + (lOut - lIn) * f;
+            const shelf = f === 0 ? 0.1 : f === COLS - 1 ? 1.4 : 0.35 * f + (vnoise(i * 0.22 + sd * 5, c * 1.3) - 0.42) * 1.35 * Math.sin(f * Math.PI);
+            put(caveFloor, s, lat, shelf, f * 1.4, s.s / 14);
+          }
+          if (prev >= 0) for (let c = 0; c < COLS - 1; c++) {
+            const a = prev + c, b = r0 + c;
+            if (sd > 0) caveFloor.ind.push(a, a + 1, b, a + 1, b + 1, b); else caveFloor.ind.push(a, b, a + 1, a + 1, b, b + 1);
+          }
+          // Stalagmite clusters rooted into the widened cave-floor terrace (well outside the collision barrier!)
+          if (cw > 2.2 && i > ra + 4 && i < rb - 4 && h2(i, sd > 0 ? 31 : 37) > 0.32) {
+            const fSt = 0.32 + h2(i, sd > 0 ? 41 : 43) * 0.52, lat = lIn + (lOut - lIn) * fSt;
+            const len = 1.8 + h2(i, 27) * (2.6 + cw * 0.28), rr = 0.55 + h2(i, 29) * 0.85;
+            tites.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + len * 0.45 - 0.3, s.z + s.rz * lat), new THREE.Quaternion(), new THREE.Vector3(rr, len, rr)));
+          }
+          return r0;
+        };
+        pFloorL = addSideFloor(-1, s.openL, pFloorL);
+        pFloorR = addSideFloor(1, s.openR, pFloorR);
+        // Glowing magma / ice / bioluminescent crystal veins running along widened cave chamber shoulders
+        if (cw > 1.8 && !s.openL && !s.openR) {
+          const rv = veinB.pos.length / 3;
+          for (const sd of [-1, 1]) {
+            const vl = sd * (s.hw + cw * 0.55 + 1.4 + Math.sin(i * 0.17 + sd) * 0.8);
+            put(veinB, s, vl - 0.22, 0.52, 0, 0); put(veinB, s, vl + 0.22, 0.52, 1, 0);
+          }
+          if (pVein >= 0) for (const a of [0, 2]) veinB.ind.push(pVein + a, pVein + a + 1, rv + a, pVein + a + 1, rv + a + 1, rv + a);
+          pVein = rv;
+        } else pVein = -1;
+      }
+
+      if (sea) { // heavy marine steel caisson around underwater tunnel
+        const dw = Wd + 11, r = steel.pos.length / 3;
+        put(steel, s, -dw, -9, 0, s.s / 12); put(steel, s, -dw, D, 0.3, s.s / 12); put(steel, s, dw, D, 0.7, s.s / 12); put(steel, s, dw, -9, 1, s.s / 12);
         if (pSteel >= 0) strip(steel, pSteel, r, 3); pSteel = r;
-      } else {      // drivable deck (road material) + earth berm down to the terrain + glowing edge lines
-        const dw = s.hw + 1, fw = s.hw + 19, r = deck.pos.length / 3;
+      } else if (hasDeck) { // drivable top deck + deep terrain-grounded earth berm + glowing deck guidelines
+        const dw = Math.max(s.hw + 1.5, Wd - 1.5), fw = dw + 20, r = deck.pos.length / 3;
         put(deck, s, -dw, D, 0, vAcc); put(deck, s, dw, D, 1, vAcc);
         if (pDeck >= 0) strip(deck, pDeck, r, 1); pDeck = r;
         const rb2 = berm.pos.length / 3;
-        put(berm, s, -fw, -4, s.s / 18, 0); put(berm, s, -dw, D - 0.05, s.s / 18, 1.4); put(berm, s, dw, D - 0.05, s.s / 18, 1.4); put(berm, s, fw, -4, s.s / 18, 0);
-        if (pBerm >= 0) { for (const a of [0, 2]) berm.ind.push(pBerm + a, pBerm + a + 1, rb2 + a, pBerm + a + 1, rb2 + a + 1, rb2 + a); } pBerm = rb2;
+        const yFL = bermFootUp(s, -fw), yFR = bermFootUp(s, fw);
+        put(berm, s, -fw, yFL, s.s / 18, 0); put(berm, s, -dw, D, s.s / 18, 1.4); put(berm, s, dw, D, s.s / 18, 1.4); put(berm, s, fw, yFR, s.s / 18, 0);
+        if (pBerm >= 0) {
+          if (!s.openL) berm.ind.push(pBerm, pBerm + 1, rb2, pBerm + 1, rb2 + 1, rb2);
+          if (!s.openR) berm.ind.push(pBerm + 2, pBerm + 3, rb2 + 2, pBerm + 3, rb2 + 3, rb2 + 2);
+        }
+        pBerm = rb2;
         const rg2 = glowB.pos.length / 3;
-        for (const sd of [-1, 1]) { put(glowB, s, sd * (s.hw - 0.9), D + 0.14, 0, 0); put(glowB, s, sd * (s.hw - 0.5), D + 0.14, 1, 0); }
+        for (const sd of [-1, 1]) { put(glowB, s, sd * (s.hw - 0.9), D + 0.08, 0, 0); put(glowB, s, sd * (s.hw - 0.5), D + 0.08, 1, 0); }
         if (pGlow >= 0) for (const a of [0, 2]) glowB.ind.push(pGlow + a, pGlow + a + 1, rg2 + a, pGlow + a + 1, rg2 + a + 1, rg2 + a); pGlow = rg2;
+      } else if (underP) { // sleek protective rock/concrete hood over bridge-underpass tunnel (stays well below bridge soffit!)
+        const dw = Wd + 1.2, fw = dw + 18, r = berm.pos.length / 3;
+        const yFL = bermFootUp(s, -fw), yFR = bermFootUp(s, fw);
+        put(berm, s, -fw, yFL, s.s / 18, 0); put(berm, s, -dw, D, s.s / 18, 1.2); put(berm, s, dw, D, s.s / 18, 2.4); put(berm, s, fw, yFR, s.s / 18, 3.6);
+        if (pBerm >= 0) strip(berm, pBerm, r, 3); pBerm = r;
       }
+
       const every = sea ? 6 : 12;
       if ((i - ra) % every === 0) {
-        if ((i - ra) % 12 === 0) lamps.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + s.ramp + s.roof - 0.6 - (cave ? 1.6 : 0), s.z), new THREE.Quaternion().setFromAxisAngle(upV, Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, 1, 1)));
-        if (!cave) ribs.push(arch(s, s.hw + 1.3, sea ? 0.3 : 0.36, H - 0.2)); // structural rib / window mullion
+        if ((i - ra) % 12 === 0) lamps.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + s.ramp + s.roof - (cave ? 0.9 : 0.45), s.z), new THREE.Quaternion().setFromAxisAngle(upV, Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, 1, 1)));
+        if (!cave) ribs.push(arch(s, Wd - 0.15, sea ? 0.32 : 0.38, H - 0.15));
       }
-      if (cave && i > ra + 2 && i < rb - 2 && h2(i, 21) > 0.35) { // stalagmites along both edges of the cave floor
-        const sd = h2(i, 23) > 0.5 ? 1 : -1, len = 1.2 + h2(i, 27) * 2.6, rr = 0.45 + h2(i, 29) * 0.6, lat = sd * (s.hw + 0.95);
-        tites.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + len / 2 - 0.2, s.z + s.rz * lat), new THREE.Quaternion(), new THREE.Vector3(rr, len, rr)));
+      if (cave && !s.openL && !s.openR && cw <= 0.25 && i > ra + 2 && i < rb - 2 && h2(i, 21) > 0.38) {
+        const sd = h2(i, 23) > 0.5 ? 1 : -1, len = 1.3 + h2(i, 27) * 2.5, rr = 0.45 + h2(i, 29) * 0.6, lat = sd * (s.hw + 1.4);
+        tites.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + len / 2 - 0.25, s.z + s.rz * lat), new THREE.Quaternion(), new THREE.Vector3(rr, len, rr)));
       }
-      if (cave && i > ra + 2 && i < rb - 2) { // stalactites hanging from the ceiling
-        const ang = (0.28 + h2(i, 5) * 0.44) * Math.PI, len = 0.9 + h2(i, 9) * 1.7, rr = 0.35 + h2(i, 3) * 0.5, nz = noise(Math.round(ang / Math.PI * segA));
-        const lat = Math.cos(ang) * (Wd + nz), up = Math.sin(ang) * (H + nz) + 1.15;
-        tites.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + up - len / 2, s.z + s.rz * lat), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI), new THREE.Vector3(rr, len, rr)));
+      if (cave && s.roof > 21.5 && i > ra + 2 && i < rb - 2) { // ceiling stalactites strictly in high vaults (tips always >= 17.5 m!)
+        const ang = (0.26 + h2(i, 5) * 0.48) * Math.PI, len = 1.1 + h2(i, 9) * 2.2, rr = 0.38 + h2(i, 3) * 0.58, nz = noise(Math.round(ang / Math.PI * segA));
+        const lat = Math.cos(ang) * (Wd + nz), up = Math.sin(ang) * (H + nz) + 1.6;
+        if (up - len > 17.5) tites.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + up - len / 2, s.z + s.rz * lat), flipQ, new THREE.Vector3(rr, len, rr)));
       }
     }
-    for (const e of [ra, rb]) { // portal frame + closed portal face between the arch and the outline of the berm / caisson
-      const s = S[e], H = s.roof - 1, Wd = s.hw + 1.5, D = s.roof + DECK, dw = sea ? Wd + 12 : s.hw + 1, fw = sea ? dw : s.hw + 19, fy = sea ? -8 : -4;
-      ribs.push(arch(s, s.hw + 2.3, 1.25, s.roof + 0.6));
+    // Portal arch frames + grounded headwalls (skipped on underground cave-branch junctions which open directly into the main cave!)
+    if (!path.isCave) for (const e of [ra, rb]) {
+      const s = S[e], cw = cave ? (s.caveW ?? 0) : 0, H = s.roof - 1.5, Wd = s.hw + 3.4 + cw, D = s.roof + DECK;
+      const dw = sea ? Wd + 11 : Math.max(s.hw + 1.5, Wd - 1.2), fw = sea ? dw : dw + 20;
+      ribs.push(arch(s, Wd + 0.9, 1.25, H + 1.1));
       const b = sea ? steel : berm, r0 = b.pos.length / 3;
       for (let a = 0; a <= segA; a++) {
-        const ang = Math.PI * a / segA, c = Math.cos(ang), sn = Math.sin(ang), nz = amp ? (vnoise(e * 0.2, a * 0.7) - 0.5) * amp : 0;
-        put(b, s, c * (Wd + nz), sn * (H + nz) + 1, c * 0.4 + 0.5, sn * 0.5);
-        const t = Math.min(1, sn / 0.62), ox = sn < 0.62 ? Math.sign(c) * (fw + (dw - fw) * t) : dw * c / 0.785, oy = fy + (D - fy) * t;
+        const ang = Math.PI * a / segA, c = Math.cos(ang), sn = Math.sin(ang);
+        const raw = amp ? (vnoise(e * 0.2, a * 0.7) - 0.5) * amp : 0, nz = sn > 0.5 ? Math.max(-0.35, raw + 0.35 * amp * sn) : raw;
+        put(b, s, c * (Wd + nz), sn * (H + nz) + (a === 0 || a === segA ? -2.2 : 1.5), c * 0.4 + 0.5, sn * 0.5);
+        const t = Math.min(1, sn / 0.62), ox = sn < 0.62 ? Math.sign(c) * (fw + (dw - fw) * t) : dw * c / 0.785;
+        const fy = sea ? -9 : bermFootUp(s, ox), oy = fy + (D - fy) * t;
         put(b, s, ox, oy, ox / 40 + 0.5, oy / 30 + 0.3);
       }
       for (let a = 0; a < segA; a++) { const k = r0 + a * 2; b.ind.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
@@ -510,19 +788,21 @@ function buildTunnel(path: Path, group: THREE.Group, mat: THREE.Material, roadMa
   const add = (g: THREE.BufferGeometry, m: THREE.Material, cast = false) => { const o = new THREE.Mesh(g, m); o.castShadow = cast; o.receiveShadow = true; group.add(o); return o; };
   const m2 = (mat as THREE.MeshStandardMaterial).clone(); m2.side = THREE.DoubleSide; disp.push(m2);
   const sg = geo(shell); add(sg, m2, true);
+  if (caveFloor.ind.length) add(geo(caveFloor), m2, false);
   if (winInd.length) { const wg = new THREE.BufferGeometry(); wg.setAttribute('position', sg.attributes.position); wg.setAttribute('uv', sg.attributes.uv); wg.setIndex(winInd); const wm = oceanWindowMaterial(seaY); add(wg, wm as unknown as THREE.Material); disp.push(wg, wm as unknown as { dispose: () => void }); }
   if (deck.ind.length) add(geo(deck), roadMat);
   if (berm.ind.length) add(geo(berm), m2, true);
   if (steel.ind.length) { const sm = (ribMat as THREE.MeshStandardMaterial).clone(); sm.side = THREE.DoubleSide; disp.push(sm); add(geo(steel), sm, true); }
   const lm = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.5), side: THREE.DoubleSide }); disp.push(lm);
   if (glowB.ind.length) add(geo(glowB), lm);
+  if (veinB.ind.length) add(geo(veinB), lm);
   if (ribs.length) { const rg = mergeGeometries(ribs)!; ribs.forEach(x => x.dispose()); const rm = new THREE.Mesh(rg, ribMat); rm.receiveShadow = true; group.add(rm); disp.push(rg); }
   const lg = new THREE.BoxGeometry(1.3, 0.28, 3.4); disp.push(lg);
   if (lamps.length) { const im = new THREE.InstancedMesh(lg, lm, lamps.length); lamps.forEach((mm, i) => im.setMatrixAt(i, mm)); group.add(im); }
   if (tites.length) { const tg = new THREE.ConeGeometry(1, 1, 6); disp.push(tg); const im = new THREE.InstancedMesh(tg, mat, tites.length); tites.forEach((mm, i) => im.setMatrixAt(i, mm)); im.receiveShadow = true; group.add(im); }
 }
 
-function addStartArea(td: TrackData, group: THREE.Group, theme: ThemeDef, disp: { dispose: () => void }[], rng: () => number, dOff = 0) {
+function addStartArea(td: TrackData, group: THREE.Group, theme: ThemeDef, disp: { dispose: () => void }[], rng: () => number, dOff = 0, heightAt: (x: number, z: number) => number = () => -20) {
   const S = td.main.samples;
   const mkGate = (idx: number, label: 'start' | 'finish') => {
     const s = S[idx]; const yaw = Math.atan2(s.tx, s.tz);
@@ -551,7 +831,10 @@ function addStartArea(td: TrackData, group: THREE.Group, theme: ThemeDef, disp: 
       gg.applyQuaternion(qS.setFromUnitVectors(UPV, dS)); gg.translate((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2); put(mat, gg);
     };
     for (const side of [-1, 1]) {
-      const px = side * pSpan;
+      const px = side * pSpan, wSide = -side;
+      const fx = s.x + s.rx * wSide * (pSpan + 3), fz = s.z + s.rz * wSide * (pSpan + 3);
+      const subH = theme.terrain === 'prison' ? 6 : Math.max(8, Math.min(28, s.y - heightAt(fx, fz) + 6));
+      put(dark, new THREE.BoxGeometry(10.8, subH, 8.2).translate(px + side * 1.6, 0.35 - subH * 0.5, 0)); // deep foundation pier into slope (never floats!)
       put(dark, new THREE.BoxGeometry(6.6, 1.3, 7.6).translate(px, -0.25, 0));
       put(metal, new THREE.BoxGeometry(5.3, 1.7, 6.3).translate(px, 1.15, 0));
       put(accent, new THREE.BoxGeometry(5.5, 0.22, 6.5).translate(px, 2.05, 0));
@@ -559,7 +842,7 @@ function addStartArea(td: TrackData, group: THREE.Group, theme: ThemeDef, disp: 
       for (let i = 0; i < tp.count; i++) { const x = tp.getX(i), z = tp.getZ(i); const k = 1 - 0.07 * Math.pow(0.5 + 0.5 * Math.cos(Math.atan2(z, x) * 14), 2); tp.setX(i, x * k); tp.setZ(i, z * k); }
       tower.computeVertexNormals(); put(metal, tower.translate(px, 12.9, 0));
       for (const [cy, cr] of [[2.6, 2.4], [9.2, 2.02], [15.6, 1.76], [22.2, 1.52]]) put(dark, new THREE.TorusGeometry(cr, 0.24, 8, 28).rotateX(Math.PI / 2).translate(px, cy, 0));
-      strut(dark, px + side * 4.7, 0.4, 0, px + side * 1.55, 17.6, 0, 0.72);
+      strut(dark, px + side * 4.7, 0.1, 0, px + side * 1.55, 17.6, 0, 0.72);
       for (let k = 0; k < 6; k++) { const y = 3.2 + k * 2.35, f = (y - 0.4) / 17.2; strut(dark, px + side * (4.7 - f * 3.15), y, 0, px + side * (2.1 - (y - 1.7) / 22.4 * 0.85), y, 0, 0.2, true); }
       put(metal, new THREE.SphereGeometry(2.3, 22, 14).scale(1, 0.84, 1).translate(px, 25.2, 0));
       put(dark, new THREE.TorusGeometry(2.33, 0.17, 8, 28).rotateX(Math.PI / 2).translate(px, 25.2, 0));
@@ -638,10 +921,19 @@ function addStartArea(td: TrackData, group: THREE.Group, theme: ThemeDef, disp: 
     ctx.fillStyle = theme.barrierColor; ctx.fillRect(0, 0, 512, 4); ctx.fillRect(0, 60, 512, 4);
     const ct = new THREE.CanvasTexture(c); ct.colorSpace = THREE.SRGBColorSpace; ct.anisotropy = 8;
     const lineMat = new THREE.MeshStandardMaterial({ map: ct, roughness: 0.58, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-    const lineGeo = new THREE.PlaneGeometry(s.hw * 1.94, 3.6);
+    // Road-crown & bank conforming checkered start/finish banner (flush from edge to edge, zero floating corners!)
+    const lineGeo = new THREE.PlaneGeometry(s.hw * 1.92, 3.6, 14, 2); lineGeo.rotateX(-Math.PI / 2);
+    const sPrev = S[Math.max(0, idx - 1)], sNext = S[Math.min(S.length - 1, idx + 1)];
+    const slopeZ = (sNext.y - sPrev.y) / Math.max(2, Math.hypot(sNext.x - sPrev.x, sNext.z - sPrev.z));
+    const lp = lineGeo.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < lp.count; i++) {
+      const lx = lp.getX(i), lz = lp.getZ(i), lat = -lx, e = Math.min(1, Math.abs(lat) / s.hw);
+      lp.setY(i, -lat * s.bank + (1 - e * e) * 0.2 + lz * slopeZ + 0.045 + dOff);
+    }
+    lineGeo.computeVertexNormals();
     disp.push(ct, lineMat, lineGeo);
     const line = new THREE.Mesh(lineGeo, lineMat);
-    line.rotation.x = -Math.PI / 2; line.position.y = 0.25 + dOff; line.receiveShadow = true; g.add(line);
+    line.receiveShadow = true; g.add(line);
   };
   mkGate(td.startIdx, 'start');
   if (!td.main.closed) mkGate(td.finishIdx, 'finish');
@@ -714,8 +1006,8 @@ function scatterDecor(
   const d1 = gq >= 2 ? 2 : 1; // detail=2 = 320 crisp faceted tris/rock (4× leaner than detail=3, identical with normal map)
   for (const kind of theme.decor) {
     switch (kind) {
-      case 'rocks': for (let v = 0; v < 3; v++) place(rockGeo(d1, 1 + v * 5, 0.66 + v * 0.1), rockMat, 160, 8, 320, 1.5, 7.2, { foot: 1.5, yOff: 0.2, tilt: 0.45 }); break;
-      case 'lavaRocks': for (let v = 0; v < 3; v++) place(rockGeo(d1, 4 + v * 3, 0.74 + v * 0.1), rockMat, 160, 8, 420, 2, 12.5, { foot: 1.5, yOff: 0.14, tilt: 0.45 }); break;
+      case 'rocks': for (let v = 0; v < 3; v++) place(rockGeo(d1, 1 + v * 5, 0.66 + v * 0.1), rockMat, 160, 8, 320, 1.5, 7.2, { foot: 1.5, yOff: -0.06, tilt: 0.38 }); break;
+      case 'lavaRocks': for (let v = 0; v < 3; v++) place(rockGeo(d1, 4 + v * 3, 0.74 + v * 0.1), rockMat, 160, 8, 420, 2, 12.5, { foot: 1.5, yOff: -0.08, tilt: 0.38 }); break;
       case 'spires': {
         // Stratified hoodoos (hard/soft ledges, flutes, talus skirt, caprock) – 3 seeded variants
         const per = [64, 52, 44];
@@ -747,52 +1039,7 @@ function scatterDecor(
         for (let v = 0; v < 2; v++) place(jungleTreeGeometry(5 + v * 8, gq), tm, 470, 10, 620, 1, 2.45, { foot: 6.5, keepDry: true, scaleY: [0.85, 1.2], colors: ['#dce8cf', '#ffffff', '#e8f0c8', '#c8dec0'], lod: { geo: jungleTreeGeometry(5 + v * 8, gq, true), dist: 240 } });
         break;
       }
-      case 'buildings': case 'towers': {
-        const wc = document.createElement('canvas'); wc.width = 256; wc.height = 512; const ctx = wc.getContext('2d')!;
-        ctx.fillStyle = '#07080d'; ctx.fillRect(0, 0, 256, 512);
-        const wCols = ['#ffd890', '#90d8ff', '#ffb0d8', '#fff0c0'];
-        for (let y = 0; y < 32; y++) for (let x = 0; x < 8; x++) {
-          const rv = h2(x + y * 13, 41);
-          if (rv < 0.38) { ctx.fillStyle = wCols[Math.floor(h2(x, y + 7) * 4)]; ctx.globalAlpha = 0.5 + h2(y, x) * 0.5; ctx.fillRect(x * 32 + 5, y * 16 + 4, 22, 8); }
-        }
-        ctx.globalAlpha = 1; ctx.fillStyle = '#1b202b'; for (let x = 0; x < 8; x++) ctx.fillRect(x * 32, 0, 3, 512);
-        for (let y = 0; y < 512; y += 64) { ctx.fillStyle = '#252b38'; ctx.fillRect(0, y, 256, 4); }
-        const wt = new THREE.CanvasTexture(wc); wt.colorSpace = THREE.SRGBColorSpace; wt.wrapS = wt.wrapT = THREE.RepeatWrapping; wt.repeat.set(1, 2); wt.anisotropy = 8;
-        const bm = new THREE.MeshStandardMaterial({ color: '#3b4252', metalness: 0.78, roughness: 0.34, envMapIntensity: 0.85, map: wt, emissiveMap: wt, emissive: '#ffffff', emissiveIntensity: 0.85 });
-        disp.push(bm, wt);
-        const B = (w: number, h: number, d: number, x: number, y: number, z: number) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
-        if (kind === 'buildings') {
-          // Session 9: Art-Deco megablocks with 4 setback tiers, corner buttress fins, sky-dock & roof mast (2 silhouettes)
-          const fins = [-1, 1].flatMap(sx => [-1, 1].map(sz => B(0.13, 0.68, 0.13, sx * 0.5, 0.34, sz * 0.5)));
-          const gA = mergeGeometries([
-            B(1, 0.6, 1, 0, 0.3, 0), B(0.82, 0.2, 0.82, 0, 0.7, 0), B(0.6, 0.14, 0.6, 0, 0.87, 0), B(0.36, 0.08, 0.36, 0, 0.98, 0), ...fins,
-            B(0.46, 0.012, 0.3, 0.66, 0.5, 0), B(0.05, 0.012, 0.05, 0.86, 0.494, 0),
-            new THREE.CylinderGeometry(0.012, 0.03, 0.24, 5).translate(0.07, 1.14, -0.05),
-          ].map(x => x.toNonIndexed()))!;
-          const gB = mergeGeometries([
-            B(1, 0.42, 0.72, 0, 0.21, 0), B(0.42, 0.56, 0.6, -0.27, 0.7, 0), B(0.36, 0.38, 0.5, 0.29, 0.61, 0), B(0.2, 0.05, 0.44, 0.01, 0.7, 0),
-            B(0.3, 0.1, 0.42, -0.27, 1.03, 0), B(0.26, 0.06, 0.36, 0.29, 0.83, 0),
-            new THREE.CylinderGeometry(0.01, 0.025, 0.2, 5).translate(-0.27, 1.18, 0), new THREE.CylinderGeometry(0.16, 0.16, 0.012, 10).translate(0.29, 0.87, 0),
-          ].map(x => x.toNonIndexed()))!;
-          place(gA, bm, 380, 30, 2200, 25, 70, { foot: 0.9, scaleY: [3, 9] });
-          place(gB, bm, 320, 30, 2200, 25, 70, { foot: 0.8, scaleY: [3, 8] });
-        } else {
-          // Session 9: tapered spire tower with 4 buttress fins, two ring decks, crown & needle
-          const g = mergeGeometries([
-            new THREE.CylinderGeometry(0.62, 1, 0.88, 14).translate(0, 0.44, 0),
-            ...[0, 1, 2, 3].map(k => B(0.1, 0.5, 0.62, 0, 0.25, 0.82).rotateY(k * Math.PI / 2)),
-            new THREE.CylinderGeometry(1.15, 0.9, 0.03, 14).translate(0, 0.52, 0),
-            new THREE.CylinderGeometry(1.38, 1.2, 0.04, 14).translate(0, 0.82, 0),
-            new THREE.TorusGeometry(1.36, 0.018, 4, 20).rotateX(Math.PI / 2).translate(0, 0.855, 0),
-            new THREE.CylinderGeometry(0.38, 0.58, 0.2, 12).translate(0, 0.96, 0),
-            new THREE.CylinderGeometry(0.5, 0.42, 0.03, 12).translate(0, 1.07, 0),
-            new THREE.ConeGeometry(0.2, 0.24, 8).translate(0, 1.2, 0),
-            new THREE.CylinderGeometry(0.008, 0.02, 0.26, 5).translate(0, 1.42, 0),
-          ].map(x => x.toNonIndexed()))!;
-          place(g, bm, 165, 60, 1800, 30, 60, { foot: 1.45, scaleY: [6, 11] });
-        }
-        break;
-      }
+
       case 'crystals': {
         const cm = new THREE.MeshStandardMaterial({ color: '#c8a0ff', roughness: 0.16, metalness: 0.14, emissive: '#8a3aff', emissiveIntensity: 0.72, flatShading: true }); disp.push(cm);
         for (let v = 0; v < 2; v++) place(crystalClusterGeometry(9 + v * 6, gq >= 2 ? 8 : 5, 5.4, 0.44, 2.6, 0.6), cm, 300, 6, 500, 1.5, 6, { foot: 1.4, tilt: 0.25, colors: ['#d0a0ff', '#90c0ff', '#ff90e0'] });
@@ -815,7 +1062,7 @@ function scatterDecor(
           new THREE.CylinderGeometry(0.42, 0.5, 1.1, 10).rotateX(1.2).translate(4.4, -0.45, 1.5),
         ].map(x => x.toNonIndexed()))!;
         const wm = new THREE.MeshStandardMaterial({ color: '#615044', metalness: 0.72, roughness: 0.56, side: THREE.DoubleSide }); disp.push(wm);
-        place(g, wm, 64, 10, 210, 0.85, 1.55, { foot: 3.5, tilt: 0.9, yOff: 0.28, keepDry: true }); break;
+        place(g, wm, 64, 10, 210, 0.85, 1.55, { foot: 3.5, tilt: 0.55, yOff: -0.05, keepDry: true }); break;
       }
       case 'balloons': {
         const bm = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.48, metalness: 0.22 }); disp.push(bm);
@@ -830,12 +1077,17 @@ function scatterDecor(
   return decorCells;
 }
 
-function addArches(td: TrackData, group: THREE.Group, mat: THREE.Material, disp: { dispose: () => void }[], rng: () => number, roadClear: (x: number, z: number, r: number, margin?: number) => boolean) {
+function addArches(
+  td: TrackData, group: THREE.Group, mat: THREE.Material, disp: { dispose: () => void }[], rng: () => number,
+  roadClear: (x: number, z: number, r: number, margin?: number) => boolean,
+  heightAt: (x: number, z: number) => number, waterY: number, isPrison: boolean,
+) {
   const S = td.main.samples; const list: THREE.BufferGeometry[] = [];
+  const upV = new THREE.Vector3(0, 1, 0);
   for (const idx of td.arches) {
     const s = S[idx]; const span = s.hw + 12;
-    if (s.roof > 0 || s.zeroG) continue;
-    const feetOk = [-1, 1].every(sd => roadClear(s.x + s.rx * sd * span, s.z + s.rz * sd * span, 5, 0));
+    if (s.roof > 0 || s.zeroG || s.bridge || s.underpass || s.openL || s.openR) continue;
+    const feetOk = [-1, 1].every(sd => roadClear(s.x + s.rx * sd * span, s.z + s.rz * sd * span, 5.5, 0.5));
     if (!feetOk) continue;
     const tube = 4.2 + rng() * 3.2;
     const g = new THREE.TorusGeometry(span, tube, 20, 56, Math.PI);
@@ -848,11 +1100,31 @@ function addArches(td: TrackData, group: THREE.Group, mat: THREE.Material, disp:
     }
     g.computeVertexNormals();
     const uv = g.attributes.uv as THREE.BufferAttribute; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 6, uv.getY(i) * 2.2);
-    const syR = 1.2 + rng() * 0.8;
-    g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y - 3, s.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, syR, 1)));
-    // Session 16: rock arches are solid (the bulk of the "arches without collision")
-    (td.overheads ??= []).push({ idx, y0: 0, y1: 0, half: tube * 1.35, arch: { R: span, sy: 0.76 * syR, inner: tube * 1.3, yOff: -3, thick: tube * 2 * 0.76 * syR } });
-    list.push(g);
+    const syR = 1.3 + rng() * 0.72, qY = new THREE.Quaternion().setFromAxisAngle(upV, Math.atan2(s.tx, s.tz));
+    g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y - 2.5, s.z), qY, new THREE.Vector3(1, syR, 1)));
+    (td.overheads ??= []).push({ idx, y0: 0, y1: 0, half: tube * 1.35, arch: { R: span, sy: 0.76 * syR, inner: tube * 1.3, yOff: -2.5, thick: tube * 2 * 0.76 * syR } });
+    list.push(g.index ? g.toNonIndexed() : g); if (g.index) g.dispose();
+    // Sculpted stratified rock pillar foundations extending from BOTH arch feet deep into the terrain/seabed below (0 floating arches!)
+    for (const sd of [-1, 1]) {
+      const fx = s.x + s.rx * sd * span, fz = s.z + s.rz * sd * span;
+      const top = s.y + 0.5;
+      const gMin = isPrison ? s.y - 14 : Math.min(
+        heightAt(fx, fz), heightAt(fx + 5, fz), heightAt(fx - 5, fz), heightAt(fx, fz + 5), heightAt(fx, fz - 5),
+        waterY > -1e8 ? Math.max(waterY - 10, heightAt(fx, fz) - 6) : 1e9,
+      ) - 9;
+      const bot = Math.max(s.y - 52, Math.min(s.y - 11, gMin)), pH = Math.max(8, top - bot);
+      const leg = new THREE.CylinderGeometry(tube * 1.05, tube * 1.62, pH, 14, 6);
+      const lp = leg.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < lp.count; i++) {
+        const lx = lp.getX(i), ly = lp.getY(i), lz = lp.getZ(i);
+        const k = 0.86 + fbm(lx * 0.16 + sd * 3, ly * 0.14 + lz * 0.18, 3) * 0.42;
+        lp.setXYZ(i, lx * k, ly, lz * k * 1.55);
+      }
+      leg.computeVertexNormals();
+      const luv = leg.attributes.uv as THREE.BufferAttribute; for (let i = 0; i < luv.count; i++) luv.setXY(i, luv.getX(i) * 2.4, pH / 16 * luv.getY(i));
+      leg.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(fx, bot + pH * 0.5, fz), qY, new THREE.Vector3(1, 1, 1)));
+      list.push(leg.toNonIndexed()); leg.dispose();
+    }
   }
   if (!list.length) return;
   const merged = mergeGeometries(list); list.forEach(g => g.dispose()); if (!merged) return;
@@ -879,28 +1151,39 @@ function addObstacles(td: TrackData, group: THREE.Group, theme: ThemeDef, rockMa
   // every instance remembers its obstacle so a smashed one can be removed from all instanced meshes
   let cur: Obstacle | null = null; const refs = new Map<Obstacle, [THREE.Matrix4[], number][]>();
   const add = (list: THREE.Matrix4[], m: THREE.Matrix4) => { let l = refs.get(cur!); if (!l) { l = []; refs.set(cur!, l); } l.push([list, list.length]); list.push(m); };
+  // Align ground warning rings & crates flush to the local 3D road slope + bank, and embed obstacle bases into the road slab!
+  const surfQ = (o: Obstacle) => {
+    const P = td.paths[o.path].samples, n = P.length, s = P[o.idx];
+    const sA = P[Math.max(0, o.idx - 2)], sB = P[Math.min(n - 1, o.idx + 2)];
+    const ds = Math.max(1, Math.hypot(sB.x - sA.x, sB.z - sA.z));
+    const sl = ((sB.y - o.lat * sB.bank) - (sA.y - o.lat * sA.bank)) / ds;
+    const fwd = new THREE.Vector3(s.tx, sl, s.tz).normalize();
+    const locX = new THREE.Vector3(-s.rx, s.bank, -s.rz).normalize();
+    const up = new THREE.Vector3().crossVectors(fwd, locX).normalize();
+    locX.crossVectors(up, fwd).normalize();
+    return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(locX, up, fwd));
+  };
   for (const o of td.obstacles) {
     if (o.kind >= 3) continue;
     cur = o;
-    // Glowing ground warning halo around EVERY track obstacle (unmistakable against sand, lava, ice & mud!)
-    add(rings, C(o.x, o.y + 0.28, o.z, I, o.r * 1.18, 1.3, o.r * 1.18));
+    const sq = surfQ(o);
+    add(rings, C(o.x, o.y + 0.1, o.z, sq, o.r * 1.18, 1.3, o.r * 1.18));
     if (o.kind === 0) {
-      e.set((o.idx * 0.13) % 0.3 - 0.15, o.idx * 1.3, 0); q.setFromEuler(e);
-      const hRock = o.r * 1.45;
-      add(rocks, C(o.x, o.y + hRock * 0.45, o.z, q.clone(), o.r * 1.05, hRock, o.r * 1.05));
-      // Tall race-marshal hazard beacon mounted atop every boulder
-      add(masts, C(o.x, o.y + hRock + 1.1, o.z, I, 1, 2.4, 1));
-      add(beacons, C(o.x, o.y + hRock + 2.45, o.z, I, 1.15, 1.15, 1.15));
+      e.set((o.idx * 0.13) % 0.24 - 0.12, o.idx * 1.3, 0); q.setFromEuler(e);
+      const hRock = o.r * 1.55;
+      add(rocks, C(o.x, o.y + hRock * 0.28, o.z, q.clone(), o.r * 1.08, hRock, o.r * 1.08)); // deeply embedded base (never floats on slopes!)
+      add(masts, C(o.x, o.y + hRock * 0.9 + 1.0, o.z, I, 1, 2.4, 1));
+      add(beacons, C(o.x, o.y + hRock * 0.9 + 2.35, o.z, I, 1.15, 1.15, 1.15));
     } else if (o.kind === 1) {
       add(cols, C(o.x, o.y, o.z, I, o.r, 1, o.r));
       for (const h of [2.0, 4.6, 7.2]) add(rings, C(o.x, o.y + h, o.z, I, o.r * 0.96, 1.1, o.r * 0.96));
       add(beacons, C(o.x, o.y + 9.8, o.z, I, 1.25, 1.25, 1.25));
     } else {
-      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), o.idx);
-      const bh = o.r * 1.38;
-      add(boxes, C(o.x, o.y + bh * 0.5, o.z, q.clone(), o.r * 1.42, bh, o.r * 1.42));
-      add(masts, C(o.x, o.y + bh + 0.9, o.z, I, 1, 1.8, 1));
-      add(beacons, C(o.x, o.y + bh + 1.95, o.z, I, 1.15, 1.15, 1.15));
+      const rq = sq.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), o.idx));
+      const bh = o.r * 1.48;
+      add(boxes, C(o.x, o.y + bh * 0.42 - 0.12, o.z, rq, o.r * 1.42, bh, o.r * 1.42)); // tilted with road + embedded bottom
+      add(masts, C(o.x, o.y + bh * 0.92 + 0.8, o.z, I, 1, 1.8, 1));
+      add(beacons, C(o.x, o.y + bh * 0.92 + 1.85, o.z, I, 1.15, 1.15, 1.15));
     }
   }
   const meshOf = new Map<THREE.Matrix4[], THREE.InstancedMesh>();
@@ -911,6 +1194,7 @@ function addObstacles(td: TrackData, group: THREE.Group, theme: ThemeDef, rockMa
   };
   inst(rockGeo(2, 9, 1.05), rockMat, rocks);
   const colGeo = mergeGeometries([
+    new THREE.CylinderGeometry(1.18, 1.32, 2.2, 12).translate(0, -1.05, 0), // buried plinth prevents slope under-gap
     new THREE.CylinderGeometry(1.02, 1.18, 1.4, 12).translate(0, 0.7, 0),
     new THREE.CylinderGeometry(0.84, 0.98, 7.6, 12).translate(0, 4.8, 0),
     new THREE.CylinderGeometry(1.05, 0.86, 1.0, 12).translate(0, 9.0, 0),

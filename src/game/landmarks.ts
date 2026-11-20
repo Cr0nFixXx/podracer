@@ -89,12 +89,16 @@ export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group,
   const B = {
     arch: (mat: THREE.Material) => {
       const span = 140 + rng() * 90, th = 14 + rng() * 10; const p = spot(320, 1150, span * 0.6); if (!p) return;
+      const bxL = p.x - Math.cos(p.yaw) * (span * 0.5), bzL = p.z + Math.sin(p.yaw) * (span * 0.5), yL = hMin(bxL, bzL);
+      const bxR = p.x + Math.cos(p.yaw) * (span * 0.5), bzR = p.z - Math.sin(p.yaw) * (span * 0.5), yR = hMin(bxR, bzR);
+      const archY = Math.max(yL, yR) - th * 0.45;
       const g = deform(new THREE.TorusGeometry(span / 2, th, 20, 60, Math.PI), th * 0.36, 0.045, rng() * 9); g.scale(1, 1.32, 1.55);
-      put(mat, g, TRS(p.x, p.y - th * 0.6, p.z, p.yaw));
-      // Flared basal rock buttresses anchoring both feet
-      for (const sd of [-1, 1]) {
-        const bx = p.x + Math.cos(p.yaw) * sd * (span * 0.5), bz = p.z - Math.sin(p.yaw) * sd * (span * 0.5);
-        put(mat, deform(new THREE.ConeGeometry(th * 1.9, th * 2.6, 14), th * 0.3, 0.06, sd + 4), TRS(bx, hMin(bx, bz) + th * 0.6, bz, rng() * 6));
+      put(mat, g, TRS(p.x, archY, p.z, p.yaw));
+      // Continuous vertical pillar columns + flared talus skirts anchoring BOTH arch feet deep below uneven terrain (never floats!)
+      for (const [sd, bx, bz, fy] of [[-1, bxL, bzL, yL], [1, bxR, bzR, yR]] as const) {
+        const bot = fy - 22, top = archY + th * 0.55, pH = Math.max(th * 1.6, top - bot);
+        put(mat, deform(new THREE.CylinderGeometry(th * 1.15, th * 1.75, pH, 14), th * 0.25, 0.05, sd + 2).scale(1, 1, 1.45), TRS(bx, bot + pH * 0.5, bz, p.yaw));
+        put(mat, deform(new THREE.ConeGeometry(th * 2.1, th * 2.6, 14), th * 0.3, 0.06, sd + 4), TRS(bx, fy + th * 0.4, bz, rng() * 6));
       }
     },
     butte: (mat: THREE.Material) => {
@@ -226,6 +230,7 @@ export function addLandmarks(td: TrackData, theme: ThemeDef, group: THREE.Group,
     ruin: () => {
       // Yavin-IV style stepped jungle temple with moss ledges, grand staircase, summit sanctuary & twin braziers
       const p = spot(300, 1000, 76); if (!p) return;
+      put(M.stone, new THREE.BoxGeometry(90, 18, 90), TRS(p.x, p.y - 9, p.z, p.yaw)); // deep plinth seats temple on mountain slopes
       for (let k = 0; k < 6; k++) {
         const s = 86 - k * 12.5;
         put(M.stone, new THREE.BoxGeometry(s, 9, s), TRS(p.x, p.y + 4.5 + k * 9, p.z, p.yaw));

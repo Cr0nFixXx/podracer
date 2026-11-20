@@ -154,26 +154,37 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   let path = td.paths[p.path];
   p.idx = nearestOnPath(path, p.pos.x, p.pos.z, p.idx);
   let fr = frameAt(path, p.idx, p.pos.x, p.pos.z);
+  // Helper: find closest main-path sample scoped to a branch's merge window (so tracks crossing over/under themselves never snap wrong!)
+  const nearestMainScoped = (br: typeof path, x: number, z: number) => {
+    const main = td.paths[0], M = main.samples, nm = M.length;
+    let best = ((br.mainTo % nm) + nm) % nm, bd = 1e12;
+    for (const center of [br.mainFrom, br.mainTo]) for (let k = -65; k <= 65; k++) {
+      let j = center + k; if (main.closed) j = ((j % nm) + nm) % nm; else if (j < 0 || j >= nm) continue;
+      const q = M[j], d = (q.x - x) ** 2 + (q.z - z) ** 2 + (q.y - p.pos.y) ** 2 * 4;
+      if (d < bd) { bd = d; best = j; }
+    }
+    return best;
+  };
   if (p.path > 0 && (p.idx >= path.samples.length - 3 || p.idx <= 1)) {
-    const main = td.paths[0];
-    const mi = nearestGlobal(main, p.pos.x, p.pos.z, 0, main.samples.length - 1);
+    const main = td.paths[0], mi = nearestMainScoped(path, p.pos.x, p.pos.z);
     p.path = 0; path = main; p.idx = mi; fr = frameAt(path, mi, p.pos.x, p.pos.z);
   }
   const s = fr.s;
   const sideOpen = fr.lat > 0 ? s.openR : s.openL;
   if (Math.abs(fr.lat) > fr.hw - 1 && sideOpen && s.link >= 0) {
     const other = td.paths[s.link];
-    const oi = nearestGlobal(other, p.pos.x, p.pos.z, 0, other.samples.length - 1);
+    const oi = other.id === 0 ? nearestMainScoped(path, p.pos.x, p.pos.z) : nearestGlobal(other, p.pos.x, p.pos.z, 0, other.samples.length - 1);
     const of = frameAt(other, oi, p.pos.x, p.pos.z);
-    if (Math.abs(of.lat) < of.hw - 0.5 && (other.id === 0 || (oi > 1 && oi < other.samples.length - 3))) { p.path = other.id; path = other; p.idx = oi; fr = of; }
+    if (Math.abs(of.lat) < of.hw - 0.5 && Math.abs(of.groundY - fr.groundY) < 9 && (other.id === 0 || (oi > 1 && oi < other.samples.length - 3))) {
+      p.path = other.id; path = other; p.idx = oi; fr = of;
+    }
   }
   p.lat = fr.lat;
   const S = fr.s;
-  // Session 17 – tunnels carry a drivable deck. A pod that arrives ABOVE the portal (jumped over it) lands on the deck and drives across the
-  // top; it is no longer pushed down into the tube. The decision is made once, when entering the roofed section. (Underwater tubes: no deck.)
+  // Session 17 – standard & cave tunnels carry a drivable top deck; underwater tubes (2) & bridge-underpass tunnels (4) do not.
   if (S.roof > 0 && !fr.gap) {
     if (!p.inRoof) {
-      p.inRoof = true; p.upper = S.tun !== 2 && p.pos.y > fr.groundY + S.roof - 1;
+      p.inRoof = true; p.upper = S.tun !== 2 && p.pos.y > fr.groundY + S.roof - 1.5;
       if (p.upper && p.pos.y < fr.groundY + S.roof + 2.4 && p.invuln <= 0) { // clipped the portal lip on the way up
         const dmg = 5 * P.sturdy; p.hpL -= dmg; p.hpR -= dmg; p.shake = Math.min(1, p.shake + 0.4);
         p.events.push({ type: 'wall', strength: 16, x: p.pos.x, y: p.pos.y, z: p.pos.z, nx: 0, nz: 0 });
@@ -235,10 +246,10 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
     landImpulse = imp;
     p.events.push({ type: 'land', strength: imp, x: p.pos.x, y: fr.groundY, z: p.pos.z, nx: 0, nz: 0 });
   }
-  // tunnel ceilings & zero-G tubes
+  // tunnel ceilings & zero-G tubes (matches wide-shouldered tunnel & chamber vault geometry Wd = hw + 3.4 + caveW)
   if (S.roof > 0 && !fr.gap && !p.upper) {
-    const l = Math.min(1, Math.abs(fr.lat) / (fr.hw + 1.5));
-    const ceil = fr.groundY + 1 + (S.roof - 1) * Math.sqrt(1 - l * l) - 1.1;
+    const l = Math.min(0.96, Math.abs(fr.lat) / (fr.hw + 3.4 + (S.caveW ?? 0)));
+    const ceil = fr.groundY + 1.5 + (S.roof - 1.5) * Math.sqrt(1 - l * l) - 1.1;
     if (p.pos.y > ceil) {
       const imp = Math.max(0, p.vel.y); p.pos.y = ceil; if (p.vel.y > 0) p.vel.y *= -0.3;
       if (imp > 6 && p.invuln <= 0) { const dmg = Math.min(20, (imp - 6) * 0.8 * P.sturdy); p.hpL -= dmg * 0.5; p.hpR -= dmg * 0.5; p.shake = Math.min(1, p.shake + 0.3); p.events.push({ type: 'wall', strength: imp, x: p.pos.x, y: p.pos.y + 1, z: p.pos.z, nx: 0, nz: 0 }); }
@@ -545,10 +556,10 @@ function collideSetPieces(p: PodState, td: TrackData, time: number, sturdy: numb
       const sgn = ((p.pos.x - sp.x) * s.tx + (p.pos.z - sp.z) * s.tz) >= 0 ? 1 : -1;
       for (const c of C) {
         const wx = p.pos.x + c.x * cy + c.z * sy, wz = p.pos.z - c.x * sy + c.z * cy;
-        const along = (wx - sp.x) * s.tx + (wz - sp.z) * s.tz; const pen = c.r + 0.35 - along * sgn;
+        const along = (wx - sp.x) * s.tx + (wz - sp.z) * s.tz; const pen = c.r + 0.55 - along * sgn;
         if (pen <= 0 || pen > c.r * 2 + 3) continue;
-        const lat = (wx - sp.x) * s.rx + (wz - sp.z) * s.rz; let blocked = false;
-        for (let k = 0; k < 3; k++) { const l0 = -sp.hw + k * w3; if (lat + c.r < l0 || lat - c.r > l0 + w3) continue; if (sp.y + 0.2 + (1 - gateDrop(sp, k, time)) * 9.5 < p.pos.y + 1.0) blocked = true; }
+        const lat = (wx - sp.x) * s.rx + (wz - sp.z) * s.rz; const gy = sp.y - Math.max(-sp.hw, Math.min(sp.hw, lat)) * s.bank; let blocked = false;
+        for (let k = 0; k < 3; k++) { const l0 = -sp.hw + k * w3; if (lat + c.r < l0 || lat - c.r > l0 + w3) continue; if (gy + 0.2 + (1 - gateDrop(sp, k, time)) * 12.6 < p.pos.y + 1.1) blocked = true; }
         if (!blocked) continue;
         const nx = s.tx * sgn, nz = s.tz * sgn; p.pos.x += nx * pen; p.pos.z += nz * pen;
         const vn = p.vel.x * nx + p.vel.z * nz;

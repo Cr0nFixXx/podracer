@@ -55,10 +55,15 @@ const PARAMS: Record<string, [number, number, number, number]> = {
 };
 
 export function makeTerrainField(td: TrackData, theme: ThemeDef): TerrainField {
-  const coarse: Sample[] = []; for (const p of td.paths) for (let i = 0; i < p.samples.length; i += 4) coarse.push(p.samples[i]);
-  const cell = 40; const grid = new Map<number, Sample[]>(); const key = (cx: number, cz: number) => cx * 100003 + cz;
+  // Ground-shaping samples skip elevated overpass bridges (`!s.bridge`) so terrain hugs the lower road cleanly beneath every viaduct!
+  // `allGrid` still holds bridges too so `roadClear()` keeps trees, rocks & bridge piers completely off both upper & lower roadways.
+  const coarse: Sample[] = [], allCoarse: Sample[] = [];
+  for (const p of td.paths) for (let i = 0; i < p.samples.length; i += 4) { const s = p.samples[i]; allCoarse.push(s); if (!s.bridge) coarse.push(s); }
+  const cell = 40; const grid = new Map<number, Sample[]>(), allGrid = new Map<number, Sample[]>();
+  const key = (cx: number, cz: number) => cx * 100003 + cz;
   for (const s of coarse) { const k = key(Math.floor(s.x / cell), Math.floor(s.z / cell)); let a = grid.get(k); if (!a) { a = []; grid.set(k, a); } a.push(s); }
-  const sparse: Sample[] = []; for (let i = 0; i < td.main.samples.length; i += 20) sparse.push(td.main.samples[i]);
+  for (const s of allCoarse) { const k = key(Math.floor(s.x / cell), Math.floor(s.z / cell)); let a = allGrid.get(k); if (!a) { a = []; allGrid.set(k, a); } a.push(s); }
+  const sparse: Sample[] = []; for (let i = 0; i < td.main.samples.length; i += 20) if (!td.main.samples[i].bridge) sparse.push(td.main.samples[i]);
   const avgY = td.main.samples.reduce((a, s) => a + s.y, 0) / td.N;
 
   const nearest = (x: number, z: number) => {
@@ -70,19 +75,19 @@ export function makeTerrainField(td: TrackData, theme: ThemeDef): TerrainField {
   const roadClear = (x: number, z: number, r: number, margin = 3) => {
     const cx = Math.floor(x / cell), cz = Math.floor(z / cell); const reach = Math.ceil((r + margin + 40) / cell) + 1;
     for (let i = -reach; i <= reach; i++) for (let j = -reach; j <= reach; j++) {
-      const arr = grid.get(key(cx + i, cz + j)); if (!arr) continue;
+      const arr = allGrid.get(key(cx + i, cz + j)); if (!arr) continue;
       for (const q of arr) if (Math.hypot(q.x - x, q.z - z) - q.hw - 1 < r + margin) return false;
     }
     return true;
   };
   const distToTrack = (x: number, z: number) => { const { d, s } = nearest(x, z); return d - s.hw; };
 
-  // regional level: Gaussian-weighted track height on a 64 m grid (smooth, no Voronoi creases)
+  // regional level: Gaussian-weighted ground-road height on a 64 m grid (excludes elevated bridge decks so valleys stay low)
   const b = td.bounds; const RM = 3400, G = 64;
   const gx0 = b.minX - RM, gz0 = b.minZ - RM;
   const gnx = Math.ceil((b.maxX - b.minX + 2 * RM) / G) + 2, gnz = Math.ceil((b.maxZ - b.minZ + 2 * RM) / G) + 2;
   const reg = new Float32Array(gnx * gnz); const sig2 = 2 * 240 * 240, cut2 = 720 * 720;
-  const regS: Sample[] = []; for (const p of td.paths) for (let i = 0; i < p.samples.length; i += 10) regS.push(p.samples[i]);
+  const regS: Sample[] = []; for (const p of td.paths) for (let i = 0; i < p.samples.length; i += 10) if (!p.samples[i].bridge) regS.push(p.samples[i]);
   for (let j = 0; j < gnz; j++) for (let i = 0; i < gnx; i++) {
     const x = gx0 + i * G, z = gz0 + j * G; let sw = 0.02, sy = 0.02 * avgY;
     for (const s of regS) { const dx = s.x - x, dz = s.z - z; const d2 = dx * dx + dz * dz; if (d2 > cut2) continue; const w = Math.exp(-d2 / sig2); sw += w; sy += w * s.y; }
@@ -100,7 +105,6 @@ export function makeTerrainField(td: TrackData, theme: ThemeDef): TerrainField {
 
   const evalWithSample = (x: number, z: number, s: Sample, d: number, writeSplat: boolean) => {
     if (writeSplat) { splat.g = 0; splat.b = 0; splat.c = 0; }
-    if (T === 'city') return -160;
     if (T === 'prison') return -400;
     const roadLow = s.y - 3.1 - Math.abs(s.bank) * s.hw;
     if (T === 'ocean') {
@@ -314,11 +318,7 @@ export function addSkyline(theme: ThemeDef, group: THREE.Group, disp: { dispose:
     for (let i = 0; i <= seg; i++) {
       const a = (i / seg) * Math.PI * 2; const px = Math.cos(a) * 3.2 + L.seed, pz = Math.sin(a) * 3.2;
       let h: number;
-      if (theme.terrain === 'city') {
-        const blk = Math.floor(i / 3), r0 = h2(blk, L.seed), r1 = h2(blk + 19, L.seed);
-        const spire = (i % 3 === 1 && r1 > 0.72) ? 140 : 0;
-        h = ((r0 > 0.22 ? 1 : 0.28) * (130 + Math.floor(r1 * 8) * 68) + spire) * L.amp;
-      } else if (theme.terrain === 'ocean') {
+      if (theme.terrain === 'ocean') {
         const isle = Math.max(0, ridged(px * 2.2, pz * 2.2, 5) - 0.36);
         h = (8 + isle * 280) * L.amp;
       } else if (theme.terrain === 'canyon') {

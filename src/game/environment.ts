@@ -29,7 +29,6 @@ const CLIMATE: Record<string, Climate> = {
   desert: { allowed: ['clear', 'dust'], calm: ['clear', 1], severe: ['dust', 1], auto: ['dust', 0.45], names: { dust: 'Sandsturm' } },
   mesa: { allowed: ['clear', 'dust'], calm: ['clear', 1], severe: ['dust', 0.9], auto: ['clear', 1], names: { dust: 'Sandsturm' } },
   ice: { allowed: ['clear', 'snow', 'fog'], calm: ['clear', 1], severe: ['snow', 1], auto: ['snow', 0.6], names: { fog: 'Eisnebel' } },
-  city: { allowed: ['clear', 'rain', 'storm', 'fog'], calm: ['rain', 0.3], severe: ['storm', 1], auto: ['rain', 0.7], names: { fog: 'Smog' } },
   lava: { allowed: ['clear', 'fog', 'dust'], calm: ['fog', 0.5], severe: ['dust', 1], auto: ['fog', 0.8], names: { fog: 'Smog', dust: 'Aschesturm mit Vulkanblitzen' } },
   jungle: { allowed: ['clear', 'rain', 'storm', 'fog'], calm: ['fog', 0.4], severe: ['storm', 1], auto: ['fog', 0.5] },
   aquilaris: { allowed: ['clear', 'rain', 'storm', 'fog'], calm: ['clear', 1], severe: ['storm', 1], auto: ['rain', 0.55], names: { fog: 'Seenebel' } },

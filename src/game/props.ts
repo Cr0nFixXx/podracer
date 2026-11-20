@@ -35,7 +35,13 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
   const darkMetal = new THREE.MeshStandardMaterial({ color: '#31353d', metalness: 0.8, roughness: 0.44 });
   const cyanGlow = new THREE.MeshBasicMaterial({ color: new THREE.Color('#42dcff').multiplyScalar(1.25) });
   disp.push(metal, darkMetal, cyanGlow);
-  const sideOK = (s: Sample, side: number) => !s.gap && s.ramp === 0 && !(side > 0 ? s.openR : s.openL) && !((side > 0 ? s.hR : s.hL) > 0);
+  const floatWorld = theme.terrain === 'prison' || theme.terrain === 'ocean';
+  const sideOK = (s: Sample, side: number) => !s.gap && s.ramp === 0 && !s.bridge && !s.underpass && !(s.roof > 0) && !(side > 0 ? s.openR : s.openL) && !((side > 0 ? s.hR : s.hL) > 0);
+  // Ground elevation for roadside posts: sinks into true terrain on land worlds, or seats into road-edge bracket on prison/ocean
+  const postBaseY = (s: Sample, side: number, x: number, z: number) => {
+    const ey = s.y - side * s.hw * s.bank;
+    return floatWorld ? ey - 1.4 : Math.min(ey - 0.4, heightAt(x, z) - 1.5);
+  };
   const nearStart = (i: number) => { const d = Math.abs(i - td.startIdx); return Math.min(d, N - d) < 70 || (!td.main.closed && Math.abs(i - td.finishIdx) < 70); };
   const inst = (geo: THREE.BufferGeometry, mat: THREE.Material, mats: THREE.Matrix4[], shadow = true, colors?: THREE.Color[]) => {
     if (!mats.length) { geo.dispose(); return null; }
@@ -71,12 +77,15 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
       const off = s.hw + 5; const x = s.x + s.rx * side * off, z = s.z + s.rz * side * off;
       if (!clear(x, z, 3.5, 0.3)) continue;
       lastI = i;
-      const gy = Math.max(heightAt(x, z), s.y - 4);
-      const top = s.y + 4.6;
+      const top = s.y - side * s.hw * s.bank + 4.6;
       boards.push(new THREE.Matrix4().compose(new THREE.Vector3(x, top, z), faceOncoming(s), new THREE.Vector3(s.curv > 0 ? -7.2 : 7.2, 1.8, 1)));
       backs.push(new THREE.Matrix4().compose(new THREE.Vector3(x + s.tx * 0.12, top, z + s.tz * 0.12), faceOncoming(s), new THREE.Vector3(7.4, 1.95, 0.16)));
-      const hgt = top - gy; const yaw = yawOf(s);
-      for (const o of [-2.6, 2.6]) posts.push(mtx(x + Math.cos(yaw) * o, gy + hgt / 2, z - Math.sin(yaw) * o, yaw, 1, hgt, 1));
+      const yaw = yawOf(s);
+      for (const o of [-2.6, 2.6]) {
+        const px = x + Math.cos(yaw) * o, pz = z - Math.sin(yaw) * o, gy = postBaseY(s, side, px, pz), hgt = Math.max(2, top - gy);
+        posts.push(mtx(px, gy + hgt / 2, pz, yaw, 1, hgt, 1));
+      }
+      if (floatWorld) backs.push(mtx(x - s.rx * side * 2.6, s.y - side * s.hw * s.bank - 0.85, z - s.rz * side * 2.6, yaw, 5.8, 0.45, 5.8));
     }
     inst(new THREE.PlaneGeometry(1, 1), mat, boards, false);
     inst(new THREE.BoxGeometry(1, 1, 1), darkMetal, backs, false);
@@ -98,9 +107,9 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
       const s = S[i]; const side = n % 2 ? 1 : -1; if (!sideOK(s, side)) continue;
       const x = s.x + s.rx * side * (s.hw + 3), z = s.z + s.rz * side * (s.hw + 3);
       if (!clear(x, z, 1, 0)) continue;
-      const gy = Math.max(heightAt(x, z), s.y - 4);
-      posts2.push(mtx(x, gy + 1.5, z, 0, 1, (s.y + 3 - gy) / 3, 1));
-      boards.push(new THREE.Matrix4().compose(new THREE.Vector3(x, s.y + 3.4, z), faceOncoming(s), new THREE.Vector3(1.9, 1.4, 1)));
+      const ey = s.y - side * s.hw * s.bank, gy = postBaseY(s, side, x, z), top = ey + 3.1, hgt = Math.max(2, top - gy);
+      posts2.push(mtx(x, gy + hgt / 2, z, 0, 1, hgt / 3, 1));
+      boards.push(new THREE.Matrix4().compose(new THREE.Vector3(x, ey + 3.4, z), faceOncoming(s), new THREE.Vector3(1.9, 1.4, 1)));
     }
     inst(new THREE.CylinderGeometry(0.11, 0.15, 3, 8), darkMetal, posts2, false);
     inst(new THREE.PlaneGeometry(1, 1), mat, boards, false);
@@ -127,23 +136,57 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
     padTex.wrapS = padTex.wrapT = THREE.RepeatWrapping;
     const mat = new THREE.MeshStandardMaterial({ map: padTex, emissiveMap: padTex, emissive: '#58e2ff', emissiveIntensity: 1.05, roughness: 0.32, metalness: 0.5 });
     disp.push(mat, padTex);
-    const pads: THREE.Matrix4[] = [], coils: THREE.Matrix4[] = [], coilRings: THREE.Matrix4[] = [];
-    for (let i = 400; i < N; i += 700) {
-      const s = S[i]; if (s.gap || s.ramp > 0 || s.zeroG) continue;
+    // Build every recharge/repair pad as a curved road-conforming surface mesh with tucked perimeter skirt:
+    // follows longitudinal hill crests, road crown AND up to 21° corner banking with 0.00 m floating anywhere!
+    const padPos: number[] = [], padUv: number[] = [], padInd: number[] = [];
+    const coils: THREE.Matrix4[] = [], coilRings: THREE.Matrix4[] = [];
+    const COLS = 12, ROWS = 5; // across (-0.71..+0.71 hw) with outer skirt tuck, along [i-2..i+2] (8 m)
+    for (let i = 400; i < N - 10; i += 700) {
+      const s = S[i];
+      let ok = true;
+      for (let r = -2; r <= 2; r++) {
+        const j = td.main.closed ? ((i + r) % N + N) % N : i + r;
+        if (j < 0 || j >= N || S[j].gap || S[j].ramp > 0 || S[j].zeroG || S[j].openL || S[j].openR) { ok = false; break; }
+      }
+      if (!ok) continue;
+      const v0 = padPos.length / 3;
+      for (let r = 0; r < ROWS; r++) {
+        const rs = S[td.main.closed ? ((i + r - 2) % N + N) % N : i + r - 2];
+        const vCoord = r / (ROWS - 1);
+        const endTuck = (r === 0 || r === ROWS - 1) ? -0.18 : 0.055 + dOff;
+        for (let c = 0; c <= COLS; c++) {
+          const uCoord = c / COLS;
+          const sideTuck = (c === 0 || c === COLS) ? -0.18 : endTuck;
+          const f = (c === 0 ? 0 : c === COLS ? 1 : (c - 1) / (COLS - 2));
+          const lat = (f * 2 - 1) * rs.hw * 0.71;
+          padPos.push(rs.x + rs.rx * lat, surfY(rs, lat) + sideTuck, rs.z + rs.rz * lat);
+          padUv.push(uCoord, vCoord);
+        }
+      }
+      const stride = COLS + 1;
+      for (let r = 0; r < ROWS - 1; r++) for (let c = 0; c < COLS; c++) {
+        const a = v0 + r * stride + c, b = a + 1, d = a + stride, e = d + 1;
+        padInd.push(a, b, d, b, e, d);
+      }
       const yaw = yawOf(s);
-      pads.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x, surfY(s, 0) + 0.14 + dOff, s.z), new THREE.Quaternion().setFromAxisAngle(UP, yaw), new THREE.Vector3(s.hw * 1.42, 1, 7.5)));
-      // Flanking service coil pylons safely outside guard rails
       for (const sd of [-1, 1]) {
         if (!sideOK(s, sd)) continue;
         const px = s.x + s.rx * sd * (s.hw + 2.2), pz = s.z + s.rz * sd * (s.hw + 2.2);
         if (!clear(px, pz, 1.2, 0)) continue;
-        const py = s.y - sd * s.hw * s.bank;
+        const py = floatWorld ? s.y - sd * s.hw * s.bank : Math.min(s.y - sd * s.hw * s.bank, heightAt(px, pz) + 0.6);
         coils.push(mtx(px, py, pz, yaw));
         for (const h of [2.4, 3.4, 4.4]) coilRings.push(mtx(px, py + h, pz, yaw));
       }
     }
-    inst(new THREE.BoxGeometry(1, 0.1, 1), mat, pads, false);
+    if (padInd.length) {
+      const pg = new THREE.BufferGeometry();
+      pg.setAttribute('position', new THREE.Float32BufferAttribute(padPos, 3));
+      pg.setAttribute('uv', new THREE.Float32BufferAttribute(padUv, 2));
+      pg.setIndex(padInd); pg.computeVertexNormals();
+      const pm = new THREE.Mesh(pg, mat); pm.receiveShadow = true; group.add(pm); disp.push(pg);
+    }
     const coilGeo = mergeGeometries([
+      new THREE.CylinderGeometry(0.85, 1.15, 3.4, 12).translate(0, -1.65, 0), // deep pedestal root so coils never float
       new THREE.CylinderGeometry(0.65, 0.85, 1.2, 12).translate(0, 0.6, 0),
       new THREE.CylinderGeometry(0.32, 0.42, 4.2, 12).translate(0, 3.1, 0),
       new THREE.SphereGeometry(0.48, 12, 8).translate(0, 5.3, 0),
@@ -217,9 +260,9 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
         if (!sideOK(s, side)) continue;
         const off = s.hw + 1.6; const x = s.x + s.rx * side * off, z = s.z + s.rz * side * off;
         if (!clear(x, z, 0.3, 0)) continue;
-        const gy = Math.max(heightAt(x, z), s.y - 3.8);
-        poles.push(mtx(x, gy, z, 0, 1, (s.y + 9.5 - gy) / 11, 1));
-        flagMats.push(mtx(x, s.y + 6, z, yawOf(s) + Math.PI / 2));
+        const ey = s.y - side * s.hw * s.bank, gy = postBaseY(s, side, x, z), top = ey + 9.5;
+        poles.push(mtx(x, gy, z, 0, 1, Math.max(0.5, (top - gy) / 11), 1));
+        flagMats.push(mtx(x, ey + 6, z, yawOf(s) + Math.PI / 2));
         colors.push(new THREE.Color(palette[Math.floor(rng() * palette.length)]));
       }
     }
@@ -235,11 +278,13 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
     const count = Math.round(N * 2 / 650);
     for (let g = 0; g < count; g++) {
       const i = Math.floor((g + 0.5) / count * N); const s = S[i];
-      if (s.gap || s.ramp > 0 || nearStart(i) || s.openL || s.openR || s.roof > 0 || s.zeroG) continue;
+      if (s.gap || s.ramp > 0 || nearStart(i) || s.openL || s.openR || s.roof > 0 || s.zeroG || s.bridge || s.underpass) continue;
       const R = s.hw + 5;
       if (![-1, 1].every(sd => clear(s.x + s.rx * sd * R, s.z + s.rz * sd * R, 2.6, -0.5))) continue;
-      const m = new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y, s.z), new THREE.Quaternion().setFromAxisAngle(UP, yawOf(s)), new THREE.Vector3(1, 0.82, 1)); // taller arch: clears pods flying high / on knife-edge
-      (td.overheads ??= []).push({ idx: i, y0: 0, y1: 0, half: 1.3, arch: { R, sy: 0.82 } }); // Session 15: checkpoint arches are solid
+      const qY = new THREE.Quaternion().setFromAxisAngle(UP, yawOf(s));
+      const m = new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y, s.z), qY, new THREE.Vector3(1, 0.82, 1));
+      const m1 = new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y, s.z), qY, new THREE.Vector3(1, 1, 1));
+      (td.overheads ??= []).push({ idx: i, y0: 0, y1: 0, half: 1.3, arch: { R, sy: 0.82 } });
       frames.push(new THREE.TorusGeometry(R, 1.15, 14, 72, Math.PI).applyMatrix4(m));
       rings.push(new THREE.TorusGeometry(R - 1.65, 0.26, 8, 96, Math.PI).applyMatrix4(m));
       for (let k = 1; k < 12; k++) {
@@ -247,9 +292,22 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
         frames.push(new THREE.BoxGeometry(0.9, 1.6, 2.2).rotateZ(a - Math.PI / 2).translate(Math.cos(a) * R, Math.sin(a) * R, 0).applyMatrix4(m));
         rings.push(new THREE.BoxGeometry(0.45, 0.45, 2.8).translate(Math.cos(a) * (R - 1.5), Math.sin(a) * (R - 1.5), 0).applyMatrix4(m));
       }
+      // Deep grounded foundation piers (or structural road-deck outrigger brackets on prison/ocean) so checkpoint arches NEVER float!
       for (const sd of [-1, 1]) {
-        feet.push(new THREE.CylinderGeometry(2.2, 3.1, 4.8, 16).translate(sd * R, -1.2, 0).applyMatrix4(m));
-        feet.push(new THREE.BoxGeometry(4.8, 0.8, 5.2).translate(sd * R, -3.2, 0).applyMatrix4(m));
+        const wSide = -sd; // local +X = world -rx
+        const fx = s.x + s.rx * wSide * R, fz = s.z + s.rz * wSide * R;
+        const edgeOff = -wSide * s.hw * s.bank;
+        if (floatWorld) {
+          const bot = Math.min(-3.8, edgeOff - 2.6), pH = 1.2 - bot;
+          feet.push(new THREE.CylinderGeometry(2.1, 2.9, pH, 16).translate(sd * R, bot + pH * 0.5, 0).applyMatrix4(m1));
+          feet.push(new THREE.BoxGeometry(7.8, 1.35, 3.6).translate(sd * (R - 3.2), edgeOff - 1.1, 0).applyMatrix4(m1));
+          feet.push(new THREE.BoxGeometry(4.8, 0.9, 5.2).translate(sd * R, bot, 0).applyMatrix4(m1));
+        } else {
+          const gyRel = Math.max(-32, Math.min(edgeOff - 0.8, heightAt(fx, fz) - s.y));
+          const bot = gyRel - 4.5, pH = Math.max(5.5, 1.2 - bot);
+          feet.push(new THREE.CylinderGeometry(2.1, 3.3, pH, 16).translate(sd * R, bot + pH * 0.5, 0).applyMatrix4(m1));
+          feet.push(new THREE.BoxGeometry(5.4, 1.4, 5.8).translate(sd * R, gyRel - 0.2, 0).applyMatrix4(m1));
+        }
       }
     }
     const merge = (list: THREE.BufferGeometry[], mat: THREE.Material, shadow: boolean) => {
@@ -334,7 +392,7 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
   }
 
   // ---------- 7. shoulder stones & weathered scree along road edges ----------
-  if (theme.terrain !== 'city' && theme.terrain !== 'prison') {
+  if (theme.terrain !== 'prison' && theme.terrain !== 'ocean') {
     const geo = new THREE.DodecahedronGeometry(1, 0);
     const mats: THREE.Matrix4[] = []; const cols: THREE.Color[] = [];
     const base = new THREE.Color(theme.palette.wall[1]);
@@ -365,11 +423,11 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
         // Front safety handrail + rear canopy masts + angled shade awning
         decks.push(mtx(x + Math.sin(yaw) * 4.8, deckY + 0.95, z + Math.cos(yaw) * 4.8, yaw, 30, 0.16, 0.16));
         awnings.push(mtx(x - Math.sin(yaw) * 0.5, deckY + 4.8, z - Math.cos(yaw) * 0.5, yaw, 31, 0.25, 11));
-        const gy = heightAt(x, z);
         for (const px of [-13, 0, 13]) for (const pz of [-4.2, 4.2]) {
           const lx = Math.cos(yaw) * px + Math.sin(yaw) * pz, lz = -Math.sin(yaw) * px + Math.cos(yaw) * pz;
           const topP = pz < 0 ? deckY + 4.7 : deckY;
-          decks.push(mtx(x + lx, (gy + topP) / 2, z + lz, yaw, 0.55, topP - gy, 0.55));
+          const colGround = floatWorld ? s.y - 28 : Math.min(deckY - 4, heightAt(x + lx, z + lz) - 2.5);
+          decks.push(mtx(x + lx, (colGround + topP) / 2, z + lz, yaw, 0.55, topP - colGround, 0.55));
         }
         for (let k = 0; k < 110 * det; k++) {
           const px = (rng() - 0.5) * 28, pz = (rng() - 0.5) * 8; const lx = Math.cos(yaw) * px + Math.sin(yaw) * pz, lz = -Math.sin(yaw) * px + Math.cos(yaw) * pz;
@@ -436,43 +494,7 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
     const ringG = new THREE.TorusGeometry(1.0, 0.03, 6, 40).rotateX(Math.PI / 2).translate(0, 0.08, 0);
     inst(ringG, cyanGlow, domes.map(m => m.clone()), false);
   }
-  if (theme.id === 'city') {
-    const words = ['BOONTA EVE', 'PODRACE LIVE', 'HYPERSPEED', 'NEON CUP', 'WATTO PARTS', 'GALACTIC GP', 'GRAND PRIX', 'OUTER RIM'];
-    const hues = ['#ff3ad0', '#3ad8ff', '#ffb43a', '#7aff5a'];
-    for (let b = 0; b < 14 * det; b++) {
-      const s = S[Math.floor(rng() * N)]; const side = rng() > 0.5 ? 1 : -1; const off = s.hw + 25 + rng() * 60;
-      const x = s.x + s.rx * side * off, z = s.z + s.rz * side * off; const yaw = Math.atan2(-s.rx * side, -s.rz * side);
-      if (!clear(x, z, 18, 2)) continue;
-      const hue = hues[b % hues.length]; const word = words[b % words.length];
-      const tex = canvasTex(512, 256, c => {
-        const g = c.createLinearGradient(0, 0, 512, 256); g.addColorStop(0, '#05030a'); g.addColorStop(1, '#140a20'); c.fillStyle = g; c.fillRect(0, 0, 512, 256);
-        c.strokeStyle = hue; c.lineWidth = 10; c.strokeRect(8, 8, 496, 240);
-        c.fillStyle = hue; c.font = 'bold 64px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(word, 256, 118);
-        c.font = '28px sans-serif'; c.fillStyle = '#ffffff'; c.fillText('★ ★ ★  CHAMPIONSHIP  ★ ★ ★', 256, 190);
-        c.fillStyle = 'rgba(255,255,255,0.06)'; for (let y = 0; y < 256; y += 4) c.fillRect(0, y, 512, 1);
-      });
-      const m = new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(1.15, 1.15, 1.15), side: THREE.DoubleSide });
-      const pl = new THREE.Mesh(new THREE.PlaneGeometry(36, 18), m); pl.position.set(x, s.y + 22 + rng() * 25, z); pl.rotation.y = yaw; group.add(pl);
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, pl.position.y + 160, 8), darkMetal); pole.position.set(x, (pl.position.y - 160) / 2 - 9, z); group.add(pole);
-      disp.push(m, tex, pl.geometry, pole.geometry);
-    }
-    const cars = Math.floor(160 * det);
-    const carG = mergeGeometries([new THREE.CapsuleGeometry(0.9, 2.6, 4, 10).rotateX(Math.PI / 2).toNonIndexed(), new THREE.BoxGeometry(2.6, 0.2, 1.2).translate(0, -0.2, -1).toNonIndexed()]);
-    const carM = new THREE.MeshStandardMaterial({ color: '#ffffff', metalness: 0.7, roughness: 0.3, emissive: '#ffcc88', emissiveIntensity: 0.28 });
-    const im = new THREE.InstancedMesh(carG, carM, cars); disp.push(carG, carM);
-    const b = td.bounds; const cx = (b.minX + b.maxX) / 2, cz = (b.minZ + b.maxZ) / 2; const rad = Math.max(b.maxX - b.minX, b.maxZ - b.minZ) * 0.6;
-    const lanes = Array.from({ length: cars }, () => ({ r: rad * (0.3 + rng() * 0.9), h: 40 + rng() * 120, sp: (0.01 + rng() * 0.03) * (rng() > 0.5 ? 1 : -1), ph: rng() * Math.PI * 2, wob: rng() * 30 }));
-    lanes.forEach((_, i) => im.setColorAt(i, new THREE.Color().setHSL(rng(), 0.6, 0.55)));
-    group.add(im);
-    anim.push(t => {
-      lanes.forEach((l, i) => {
-        const a = l.ph + t * l.sp; const r = l.r + Math.sin(a * 3) * l.wob;
-        tmpQ.setFromAxisAngle(UP, a + (l.sp > 0 ? 0 : Math.PI));
-        tmpM.compose(tmpV.set(cx + Math.cos(a) * r, l.h, cz - Math.sin(a) * r), tmpQ, tmpS.set(1, 1, 1)); im.setMatrixAt(i, tmpM);
-      });
-      im.instanceMatrix.needsUpdate = true;
-    });
-  }
+
   if (theme.id === 'jungle') {
     const stems: THREE.Matrix4[] = [], caps: THREE.Matrix4[] = [];
     scatterFar(70, 15, 300, 11, (x, y, z) => { const s = 1.5 + rng() * 3; stems.push(mtx(x, y, z, 0, s, s, s)); caps.push(mtx(x, y + 6 * s, z, rng() * 6, s, s, s)); });

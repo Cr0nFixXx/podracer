@@ -44,8 +44,8 @@ for (const def of TRACKS) {
   const nBreakable = td.obstacles.filter(o => o.breakable).length; const touch = new Set<number>();
   // tunnel report + deck self-test: pod 1 is lifted 24 m shortly before the first standard tunnel → must land on its deck, never inside
   const runs: string[] = []; let tunA = -1;
-  for (let i = 1; i < N; i++) if (S[i].roof > 0 && !(S[i - 1].roof > 0)) { let e = i; while (e < N - 1 && S[e + 1].roof > 0) e++; let lo = 1e9; for (let k = i; k <= e; k++) lo = Math.min(lo, S[k].y);
-    runs.push(`${['?', 'std', 'sea', 'cave'][S[i].tun ?? 1]} ${(e - i) * 2} m${td.seaY !== undefined ? ` (road ${(lo - td.seaY).toFixed(1)} m vs sea)` : ''}`); if (tunA < 0 && S[i].tun === 1 && i > 80) tunA = i; }
+  for (let i = 1; i < N; i++) if (S[i].roof > 0 && !(S[i - 1].roof > 0)) { let e = i; while (e < N - 1 && S[e + 1].roof > 0) e++; let lo = 1e9, rMax = 0; for (let k = i; k <= e; k++) { lo = Math.min(lo, S[k].y); rMax = Math.max(rMax, S[k].roof); }
+    runs.push(`${['?', 'std', 'sea', 'cave', 'under'][S[i].tun ?? 1]} ${(e - i) * 2}m(h${rMax.toFixed(0)})${td.seaY !== undefined && S[i].tun === 2 ? ` [${(lo - td.seaY).toFixed(1)}m vs sea]` : ''}`); if (tunA < 0 && S[i].tun === 1 && i > 80) tunA = i; }
   let lifted = false, deckFrames = 0, teleports = 0, dbgT = 0; const prevY = pods.map(p => p.pos.y);
   let tunnels = 0, tunLen = 0; for (let i = 1; i < N; i++) { if (S[i].roof > 0) { tunLen += 2; if (!(S[i - 1].roof > 0)) tunnels++; } }
   const prog0 = pods.map(p => p.prog); const wasDead = pods.map(() => false);
@@ -67,7 +67,7 @@ for (const def of TRACKS) {
       if (Math.abs(A.pos.y - B.pos.y) < 3 && Math.hypot(A.pos.x - B.pos.x, A.pos.z - B.pos.z) < R * 1.01) touch.add(a * 16 + b2);
     }
     for (const p of pods) { if (p.dead > 0) continue; const v = Math.hypot(p.vel.x, p.vel.z); if (p.zeroG) { zgV += v; zgN++; } else if (t > 6) { gV += v; gN++; } }
-    if (tunA >= 0 && !lifted) { const p = pods[1]; if (p.path === 0 && p.dead <= 0 && p.idx >= tunA - 12 && p.idx < tunA - 5) { p.pos.y += 24; p.vel.y = 0; lifted = true; if (process.env.DEBUG) dbgT = t; } }
+    if (tunA >= 0 && !lifted) { const p = pods[1]; if (p.path === 0 && p.dead <= 0 && p.idx >= tunA - 12 && p.idx < tunA - 5) { p.pos.y += S[tunA].roof + 9; p.vel.y = 0; lifted = true; if (process.env.DEBUG) dbgT = t; } }
     if (process.env.DEBUG && lifted && t - dbgT < 1.2 && f % 6 === 0) { const p = pods[1], q = td.paths[p.path].samples[p.idx]; console.log(`   dbg t=${(t - dbgT).toFixed(2)} path=${p.path} idx=${p.idx} tunA=${tunA} y-ground=${(p.pos.y - q.y).toFixed(1)} roof=${q.roof} upper=${p.upper} inRoof=${p.inRoof} dead=${p.dead.toFixed(1)} lat=${p.lat.toFixed(0)} hw=${q.hw.toFixed(0)}`); }
     for (let k = 0; k < 2; k++) { for (const p of pods) stepPod(p, td, h, t, GRIP, false); collidePods(pods, t); }
     pods.forEach((p, i) => { if (p.upper) deckFrames++; if (p.dead <= 0 && prevY[i] - p.pos.y > 4.5 && i !== 1) teleports++; prevY[i] = p.pos.y; }); // > 4.5 m down within one frame = teleport
@@ -102,7 +102,9 @@ for (const def of TRACKS) {
   const divePct = dives / Math.max(1, aiFrames) * 100;
   { let turns = 0, sg = 0, wide = 0; const med = S.map(q => q.hw).sort((a, b) => a - b)[N >> 1];
     for (let i = 0; i < N; i++) { const c = S[i].curv, g = Math.abs(c) > 1 / 420 ? Math.sign(c) : 0; if (g !== 0 && g !== sg) turns++; if (g !== 0) sg = g; if (S[i].hw > Math.min(med * 1.45, 45)) wide++; }
-    console.log(`  layout: ${(N * 2 / 1000).toFixed(2)} km · ${turns} corners · ${td.paths.length - 1} shortcut(s) · open flats ${wide * 2} m (max width ${(Math.max(...S.map(q => q.hw)) * 2).toFixed(0)} m)`); }
+    const nSc = td.paths.filter(p => p.id > 0 && !p.isCave).length, nCv = td.paths.filter(p => p.isCave).length;
+    const cxStr = td.crossings.length ? ` · ${td.crossings.length} crossing(s) (${td.crossings.map(c => `${c.tunnelUnder ? 'bridge+tunnel' : 'viaduct'} Δy=${c.clearance.toFixed(0)}m`).join(', ')})` : '';
+    console.log(`  layout: ${(N * 2 / 1000).toFixed(2)} km · ${turns} corners · ${nSc} shortcut(s) · ${nCv} cave-branch(es)${cxStr} · open flats ${wide * 2} m`); }
   if (runs.length && process.env.DEBUG !== '0') console.log(`  tunnels: ${runs.join(' · ')}`);
   if (lifted) console.log(`  deck self-test: ${deckFrames} frames on a tunnel deck (${deckFrames > 20 ? 'ok' : 'FAIL'}), downward teleports: ${teleports}`);
   if (zgN > 200) console.log(`  zero-G: avg ${(zgV / zgN).toFixed(0)} m/s in the tubes vs ${(gV / Math.max(1, gN)).toFixed(0)} m/s outside`);

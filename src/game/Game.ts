@@ -103,7 +103,7 @@ export class Game {
     this.baseGrip = theme.id === 'ice' ? 0.55 : theme.id === 'jungle' ? 0.85 : 1;
     this.gripMul = this.baseGrip * fx.grip;
     this.dustBase.set(theme.palette.ground[1]); this.dustCol.copy(this.dustBase);
-    this.dustAmt = theme.terrain === 'city' || theme.terrain === 'prison' ? 0.3 : theme.id === 'ice' ? 0.8 : 1; // little loose dust on metal decks
+    this.dustAmt = theme.terrain === 'prison' || theme.road === 'cityRoad' ? 0.35 : theme.id === 'ice' ? 0.8 : 1; // little loose dust on metal decks
     this.barrierGlow.set(theme.barrierColor).multiplyScalar(1.25);
 
     // Load-time optimisation: texture workers start NOW and run in parallel with renderer init, track build and sky/PMREM setup
@@ -164,7 +164,7 @@ export class Game {
     this.cb.onLoading(0.03, 'Berechne Streckenverlauf …');
     await new Promise(res => setTimeout(res, 0));
     this.td = buildTrack(trackDef);
-    { const avgY = this.td.main.samples.reduce((a, s) => a + s.y, 0) / this.td.N; this.fog = applyAtmosphere(this.scene, theme, theme.fogDensity / gfx.drawDistance, avgY - 12, this.sunDir, fx.volFog, gfx.volumetrics ?? 2); }
+    { const avgY = this.td.main.samples.reduce((a, s) => a + s.y, 0) / this.td.N; const fogFloor = Math.min(avgY - 14, this.td.bounds.minY - 6); this.fog = applyAtmosphere(this.scene, theme, theme.fogDensity / gfx.drawDistance, fogFloor, this.sunDir, fx.volFog, gfx.volumetrics ?? 2); }
     this.world = await buildWorld(this.td, theme, gfx, (p, m) => this.cb.onLoading(0.05 + p * 0.85, m));
     if (this.disposed) return;
     this.scene.add(this.world.group);

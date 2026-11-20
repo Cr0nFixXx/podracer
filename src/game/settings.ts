@@ -1,4 +1,4 @@
-import { PODS, STAT_KEYS, type StatKey } from './data';
+import { PODS, STAT_KEYS, TRACKS, type StatKey } from './data';
 
 import type { TimeOfDay, WeatherKind } from './environment';
 import { defaultKeys, defaultPad, normalizeKeys, normalizePad, type KeyMap, type PadMap } from './keymap';
@@ -88,7 +88,9 @@ export function loadProfile(): Profile {
     const raw = localStorage.getItem(KEY);
     if (!raw) return d;
     const p = JSON.parse(raw) as Partial<Profile>;
-    return { ...d, ...p, custom: { ...d.custom, ...(p.custom || {}) }, race: { ...d.race, ...(p.race || {}) }, gfx: { ...d.gfx, ...(p.gfx || {}) }, best: { ...(p.best || {}) }, keys: normalizeKeys(p.keys), pad: normalizePad(p.pad) };
+    const race = { ...d.race, ...(p.race || {}) };
+    if (!TRACKS.some(t => t.id === race.trackId)) race.trackId = TRACKS[0].id; // safe fallback if saved track (e.g. deleted neon) no longer exists
+    return { ...d, ...p, custom: { ...d.custom, ...(p.custom || {}) }, race, gfx: { ...d.gfx, ...(p.gfx || {}) }, best: { ...(p.best || {}) }, keys: normalizeKeys(p.keys), pad: normalizePad(p.pad) };
   } catch { return d; }
 }
 export function saveProfile(p: Profile) { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* ignore */ } }

@@ -23,7 +23,7 @@ const ssInv = (a: number, b: number, x: N) => oneMinus(smoothstep(b, a, x));
  *  - TV camera towers, angled space-truss sponsor gantries, and mineral-crater geyser/lava vents
  */
 type Disp = { dispose: () => void }[];
-export interface DetailOpts { across: number; disp: number; detail: number; tvCams: THREE.Vector3[]; batcher: StaticBatcher; groundTex?: TexSet; }
+export interface DetailOpts { across: number; disp: number; detail: number; tvCams: THREE.Vector3[]; batcher: StaticBatcher; groundTex?: TexSet; heightAt?: (x: number, z: number) => number; }
 
 function canvasTex(w: number, h: number, draw: (c: CanvasRenderingContext2D) => void, srgb = true) {
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h; draw(cv.getContext('2d')!);
@@ -39,6 +39,22 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
   const yawQ = (s: Sample) => new THREE.Quaternion().setFromAxisAngle(UP, Math.atan2(s.tx, s.tz));
   const M = (x: number, y: number, z: number, q: THREE.Quaternion, sx = 1, sy = 1, sz = 1) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(sx, sy, sz));
   const S = td.main.samples, N = S.length;
+  const floatWorld = theme.terrain === 'prison' || theme.terrain === 'ocean';
+  const gAt = o.heightAt ?? ((_x: number, _z: number) => -40);
+  // Exact 3D road-surface orientation at sample index `i` (aligns plates/studs/vents with BOTH longitudinal hill slope & lateral bank!)
+  const roadQ = (i: number, lat = 0) => {
+    const s = S[i];
+    const ia = td.main.closed ? ((i - 2) % N + N) % N : Math.max(0, i - 2);
+    const ib = td.main.closed ? ((i + 2) % N + N) % N : Math.min(N - 1, i + 2);
+    const a = S[ia], b = S[ib], ds = Math.max(1, (ib === ia ? 4 : Math.hypot(b.x - a.x, b.z - a.z)));
+    const slope = (surf(b, lat) - surf(a, lat)) / ds;
+    const fwd = new THREE.Vector3(s.tx, slope, s.tz).normalize();
+    // In Three.js local +X corresponds to -rx when +Z = fwd
+    const locX = new THREE.Vector3(-s.rx, s.bank, -s.rz).normalize();
+    const up = new THREE.Vector3().crossVectors(fwd, locX).normalize();
+    locX.crossVectors(up, fwd).normalize();
+    return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(locX, up, fwd));
+  };
 
   // ---------------- materials ----------------
   const railTex = canvasTex(512, 128, c => {
@@ -104,7 +120,7 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
   }
 
   // Theme-matched sculpted rumble kerb texture
-  const kerbColA = theme.id === 'ice' ? '#1c62b8' : theme.id === 'city' ? '#b81c88' : theme.id === 'lava' ? '#d47814' : theme.id === 'oovo' ? '#1a98c8' : '#b5241c';
+  const kerbColA = theme.id === 'ice' ? '#1c62b8' : theme.id === 'lava' ? '#d47814' : theme.id === 'oovo' ? '#1a98c8' : '#b5241c';
   const kerbColB = theme.id === 'lava' ? '#2c2622' : '#eae6de';
   const kerbTex = canvasTex(128, 256, c => {
     c.fillStyle = kerbColA; c.fillRect(0, 0, 128, 128); c.fillStyle = kerbColB; c.fillRect(0, 128, 128, 128);
@@ -172,12 +188,12 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
           }
         }
         prev = on;
-        if (path.id === 0 && i % 6 === 0 && !s.gap && s.ramp === 0) {
+        if (path.id === 0 && i % 6 === 0 && !s.gap && s.ramp === 0 && !(side > 0 ? s.openR : s.openL)) {
           const lat = side * (s.hw - 0.72);
-          (side > 0 ? studsA : studsB).push(M(s.x + s.rx * lat, surf(s, lat) + 0.055 + dOff, s.z + s.rz * lat, yawQ(s)));
+          (side > 0 ? studsA : studsB).push(M(s.x + s.rx * lat, surf(s, lat) + 0.015 + dOff, s.z + s.rz * lat, roadQ(i, lat)));
         }
-        // Armored guide-light sconces at the foot of canyon walls
-        if ((side > 0 ? s.hR : s.hL) > 0 && !s.gap && i % 8 === 0) {
+        // Armored guide-light sconces at the foot of canyon walls (skipped across open merge mouths)
+        if ((side > 0 ? s.hR : s.hL) > 2 && !(side > 0 ? s.openR : s.openL) && !s.gap && i % 8 === 0) {
           const lat = side * (s.hw + 0.55); const ly = s.y + s.ramp - side * s.hw * s.bank + 0.72;
           const lx = s.x + s.rx * lat, lz = s.z + s.rz * lat, q = yawQ(s);
           canyonLights.push(M(lx, ly, lz, q));
@@ -198,8 +214,8 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
   ].map(g => g.toNonIndexed()));
   inst(postGeo, postMat, posts, false); // skip rendering 900 track-wide 18cm posts into the 3K shadow map
   inst(new THREE.BoxGeometry(0.24, 0.1, 0.3), glowMat, caps, false);
-  inst(new THREE.BoxGeometry(0.32, 0.07, 0.6), studA, studsA, false);
-  inst(new THREE.BoxGeometry(0.32, 0.07, 0.6), studB, studsB, false);
+  inst(new THREE.BoxGeometry(0.32, 0.14, 0.6), studA, studsA, false);
+  inst(new THREE.BoxGeometry(0.32, 0.14, 0.6), studB, studsB, false);
   inst(new THREE.BoxGeometry(0.16, 0.13, 1.45), glowMat, canyonLights, false);
   inst(new THREE.BoxGeometry(0.26, 0.28, 1.7), postMat, sconceFrames, false);
 
@@ -268,7 +284,7 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
   // ---------------- sculpted chamfered kerbs on the inside of tight corners ----------------
   {
     const kp: number[] = [], ku: number[] = [], ki: number[] = []; let kv = 0;
-    const prof = [0, 0.07, 0.14, 0.15, 0.1, 0]; const PL = prof.length;
+    const prof = [-0.14, 0.07, 0.14, 0.15, 0.1, -0.14]; const PL = prof.length; // tucked inner/outer skirts never gap on hill crests
     let i = 0;
     while (i < N) {
       const c0 = S[i].curv;
@@ -298,17 +314,18 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
     const marks: THREE.Matrix4[] = [], gridLeds: THREE.Matrix4[] = [];
     for (let g = 0; g < 11; g++) {
       const row = Math.floor(g / 3), col = g % 3;
-      let idx = td.startIdx - 6 - row * 9; idx = td.main.closed ? ((idx % N) + N) % N : Math.max(0, idx);
-      const front = S[Math.min(N - 1, idx + 2)], s = S[idx]; const lat = (col - 1) * s.hw * 0.55;
-      marks.push(M(front.x + front.rx * lat, surf(front, lat) + 0.055 + dOff, front.z + front.rz * lat, yawQ(front), 7.2, 1, 0.45));
-      gridLeds.push(M(front.x + front.rx * lat, surf(front, lat) + 0.095 + dOff, front.z + front.rz * lat, yawQ(front), 2.2, 1, 0.18));
+      let idx = td.startIdx - 6 - row * 13; idx = td.main.closed ? ((idx % N) + N) % N : Math.max(0, idx);
+      const fIdx = Math.min(N - 1, idx + 2), front = S[fIdx], s = S[idx]; const lat = (col - 1) * s.hw * 0.55;
+      const qF = roadQ(fIdx, lat);
+      marks.push(M(front.x + front.rx * lat, surf(front, lat) + dOff, front.z + front.rz * lat, qF, 7.2, 1, 0.45));
+      gridLeds.push(M(front.x + front.rx * lat, surf(front, lat) + 0.02 + dOff, front.z + front.rz * lat, qF, 2.2, 1, 0.18));
       for (const sd of [-1, 1]) {
         const l2 = lat + sd * 3.6;
-        marks.push(M(s.x + s.rx * l2 + s.tx * 1.5, surf(s, l2) + 0.055 + dOff, s.z + s.rz * l2 + s.tz * 1.5, yawQ(s), 0.42, 1, 5.2));
+        marks.push(M(s.x + s.rx * l2 + s.tx * 1.5, surf(s, l2) + dOff, s.z + s.rz * l2 + s.tz * 1.5, roadQ(idx, l2), 0.42, 1, 5.2));
       }
     }
-    inst(new THREE.BoxGeometry(1, 0.03, 1), paintMat, marks, false);
-    inst(new THREE.BoxGeometry(1, 0.04, 1), glowMat, gridLeds, false);
+    inst(new THREE.BoxGeometry(1, 0.14, 1), paintMat, marks, false); // embedded 7 cm down into road surface (never floats!)
+    inst(new THREE.BoxGeometry(1, 0.14, 1), glowMat, gridLeds, false);
   }
 
   // ---------------- angular talus boulders & rock slabs at canyon wall feet ----------------
@@ -325,7 +342,7 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
     for (let i = 0; i < N; i += 3) {
       const s = S[i]; if (s.gap) continue;
       for (const side of [-1, 1]) {
-        if (!((side > 0 ? s.hR : s.hL) > 0) || rng() > 0.62 * o.detail) continue;
+        if (!((side > 0 ? s.hR : s.hL) > 5) || (side > 0 ? s.openR : s.openL) || rng() > 0.62 * o.detail) continue;
         const size = 0.7 + Math.pow(rng(), 1.9) * 2.5; const lat = side * (s.hw + 0.65 + size * 0.55);
         e.set((rng() - 0.5) * 0.8, rng() * 6.28, (rng() - 0.5) * 0.8); q.setFromEuler(e);
         mats.push(M(s.x + s.rx * lat, s.y + s.ramp - side * s.hw * s.bank + size * 0.22, s.z + s.rz * lat, q, size * (0.9 + rng() * 0.3), size * (0.55 + rng() * 0.55), size));
@@ -336,42 +353,55 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
 
   // ---------------- ramps: heavy truss substructure, launch/landing lights, chasm warning masts ----------------
   {
-    const cols: THREE.Matrix4[] = [], braces: THREE.Matrix4[] = [], crossBeams: THREE.Matrix4[] = [], reds: THREE.Matrix4[] = [], greens: THREE.Matrix4[] = [], lips: THREE.Matrix4[] = [], masts: THREE.Matrix4[] = [], mastLamps: THREE.Matrix4[] = [];
+    const cols: THREE.Matrix4[] = [], braces: THREE.Matrix4[] = [], crossBeams: THREE.Matrix4[] = [], reds: THREE.Matrix4[] = [], greens: THREE.Matrix4[] = [], masts: THREE.Matrix4[] = [], mastLamps: THREE.Matrix4[] = [];
+    const lipPos: number[] = [], lipUv: number[] = [], lipInd: number[] = [];
+    const addConformLip = (s0: Sample, widthZ: number, dirSign: number) => {
+      const segs = 12, v0 = lipPos.length / 3;
+      const sAdj = S[td.main.closed ? ((S.indexOf(s0) + dirSign) % N + N) % N : Math.max(0, Math.min(N - 1, S.indexOf(s0) + dirSign))];
+      const slope = (sAdj.y + sAdj.ramp - (s0.y + s0.ramp)) / 2 * dirSign;
+      for (const rz of [-widthZ * 0.5, widthZ * 0.5]) for (let c = 0; c <= segs; c++) {
+        const f = c / segs, lat = (f * 2 - 1) * s0.hw * 0.96;
+        lipPos.push(s0.x + s0.rx * lat + s0.tx * rz, surf(s0, lat) + slope * rz + 0.05 + dOff, s0.z + s0.rz * lat + s0.tz * rz);
+        lipUv.push(f * 6, rz > 0 ? 1 : 0);
+      }
+      for (let c = 0; c < segs; c++) { const a = v0 + c, b = a + segs + 1; lipInd.push(a, a + 1, b, a + 1, b + 1, b); }
+    };
     for (let i = 1; i < N; i++) {
       const s = S[i], pv = S[i - 1];
       if (s.ramp > 0 && pv.ramp === 0) {
         let j = i; while (j < N && S[j].ramp > 0) j++;
         for (let k = i; k < j; k += 3) {
           const r = S[k]; if (r.ramp < 1.2) continue; const q = yawQ(r);
-          crossBeams.push(M(r.x, r.y + r.ramp - 0.35, r.z, q, r.hw * 1.94, 0.55, 0.65));
+          crossBeams.push(M(r.x, r.y + r.ramp - Math.abs(r.bank) * r.hw - 0.35, r.z, q, r.hw * 1.92, 0.55, 0.65));
           for (const f of [-0.92, -0.45, 0, 0.45, 0.92]) {
-            const lat = f * r.hw; const top = r.y + r.ramp - lat * r.bank, bot = r.y - 3.8;
-            cols.push(M(r.x + r.rx * lat, (top + bot) / 2, r.z + r.rz * lat, q, 0.55, top - bot, 0.55));
+            const lat = f * r.hw, cx = r.x + r.rx * lat, cz = r.z + r.rz * lat;
+            const top = r.y + r.ramp - lat * r.bank, bot = floatWorld ? r.y - 6 : Math.min(r.y - 5, gAt(cx, cz) - 2.5);
+            cols.push(M(cx, (top + bot) / 2, cz, q, 0.55, Math.max(1, top - bot), 0.55));
           }
           if ((k - i) % 6 === 0) for (const sd of [-1, 1]) {
             const lat = sd * r.hw * 0.7; const top = r.y + r.ramp * 0.92 - lat * r.bank;
-            braces.push(M(r.x + r.rx * lat, (top + r.y - 3.6) / 2, r.z + r.rz * lat, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.55, Math.atan2(r.tx, r.tz), 0, 'YXZ')), 0.3, (top - r.y + 3.6) * 1.14, 0.3));
+            braces.push(M(r.x + r.rx * lat, (top + r.y - 4.2) / 2, r.z + r.rz * lat, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.55, Math.atan2(r.tx, r.tz), 0, 'YXZ')), 0.3, (top - r.y + 4.2) * 1.14, 0.3));
           }
         }
-        const lip = S[Math.max(i, j - 1)]; const q = yawQ(lip);
-        lips.push(M(lip.x, surf(lip, 0) + 0.06 + dOff, lip.z, q, lip.hw * 1.94, 1, 1.45));
-        for (let l = -1; l <= 1.001; l += 0.125) { const lat = l * lip.hw * 0.95; reds.push(M(lip.x + lip.rx * lat, surf(lip, lat) + 0.16 + dOff, lip.z + lip.rz * lat, q)); }
+        const lipIdx = Math.max(i, j - 1), lip = S[lipIdx]; const q = roadQ(lipIdx);
+        addConformLip(lip, 1.4, -1);
+        for (let l = -1; l <= 1.001; l += 0.125) { const lat = l * lip.hw * 0.95; reds.push(M(lip.x + lip.rx * lat, surf(lip, lat) + 0.08 + dOff, lip.z + lip.rz * lat, q)); }
       }
       if (!s.gap && pv.gap) {
-        const q = yawQ(s);
-        lips.push(M(s.x, surf(s, 0) + 0.05 + dOff, s.z, q, s.hw * 1.94, 1, 1.1));
-        for (let l = -1; l <= 1.001; l += 0.125) { const lat = l * s.hw * 0.95; greens.push(M(s.x + s.rx * lat, surf(s, lat) + 0.16 + dOff, s.z + s.rz * lat, q)); }
+        const q = roadQ(i);
+        addConformLip(s, 1.1, 1);
+        for (let l = -1; l <= 1.001; l += 0.125) { const lat = l * s.hw * 0.95; greens.push(M(s.x + s.rx * lat, surf(s, lat) + 0.08 + dOff, s.z + s.rz * lat, q)); }
       }
       if (s.gap !== pv.gap) for (const sd of [-1, 1]) {
-        const e = s.gap ? pv : s; const lat = sd * (e.hw + 1.3); const base = e.y + e.ramp - sd * e.hw * e.bank;
-        masts.push(M(e.x + e.rx * lat, base - 1.5, e.z + e.rz * lat, yawQ(e), 1, 13, 1));
+        const e = s.gap ? pv : s; const lat = sd * (e.hw + 1.2); const base = e.y + e.ramp - sd * e.hw * e.bank;
+        masts.push(M(e.x + e.rx * lat, base - 2.5, e.z + e.rz * lat, yawQ(e), 1, 15.4, 1));
         mastLamps.push(M(e.x + e.rx * lat, base + 5.2, e.z + e.rz * lat, yawQ(e)));
       }
     }
     inst(new THREE.BoxGeometry(1, 1, 1), trussMat, cols, false);
     inst(new THREE.BoxGeometry(1, 1, 1), trussMat, braces, false);
     inst(new THREE.BoxGeometry(1, 1, 1), postMat, crossBeams, false);
-    inst(new THREE.BoxGeometry(1, 0.04, 1), hazardMat, lips, false);
+    addStrip(lipPos, lipUv, lipInd, hazardMat, false, 1200);
     inst(new THREE.BoxGeometry(0.55, 0.2, 0.55), redL, reds, false);
     inst(new THREE.BoxGeometry(0.55, 0.2, 0.55), greenL, greens, false);
     inst(new THREE.CylinderGeometry(0.18, 0.28, 1, 8), postMat, masts, false);
@@ -383,9 +413,9 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
     const poles: THREE.Matrix4[] = [], heads: THREE.Matrix4[] = [], tallies: THREE.Matrix4[] = [];
     for (const c of o.tvCams) {
       let bi = 0, bd = 1e12; for (let i = 0; i < N; i += 4) { const d = (S[i].x - c.x) ** 2 + (S[i].z - c.z) ** 2; if (d < bd) { bd = d; bi = i; } }
-      const s = S[bi]; if (s.canyon || s.gap) continue;
-      const ground = s.y - 3.5; const q = new THREE.Quaternion().setFromAxisAngle(UP, Math.atan2(s.x - c.x, s.z - c.z));
-      poles.push(M(c.x, (ground + c.y - 0.5) / 2, c.z, q, 1, c.y - 0.5 - ground, 1));
+      const s = S[bi]; if (s.canyon || s.gap || s.bridge || s.roof > 0 || floatWorld) continue;
+      const ground = Math.min(s.y - 4, gAt(c.x, c.z) - 2.2); const q = new THREE.Quaternion().setFromAxisAngle(UP, Math.atan2(s.x - c.x, s.z - c.z));
+      poles.push(M(c.x, (ground + c.y - 0.5) / 2, c.z, q, 1, Math.max(2, c.y - 0.5 - ground), 1));
       heads.push(M(c.x, c.y, c.z, q)); tallies.push(M(c.x, c.y + 0.55, c.z, q));
     }
     const head = mergeGeometries([
@@ -414,15 +444,19 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
     let last = -1e9;
     for (let i = 60; i < N - 60; i += 10) {
       if (i - last < 280) continue;
-      let ok = true; for (let k = -20; k <= 20 && ok; k += 2) { const q = S[(i + k + N) % N]; if (Math.abs(q.curv) > 1 / 700 || q.canyon || q.gap || q.ramp > 0 || q.openL || q.openR || q.roof > 0 || q.zeroG) ok = false; }
+      let ok = true; for (let k = -20; k <= 20 && ok; k += 2) { const q = S[(i + k + N) % N]; if (Math.abs(q.curv) > 1 / 700 || q.canyon || q.gap || q.ramp > 0 || q.openL || q.openR || q.roof > 0 || q.zeroG || q.bridge || q.underpass) ok = false; }
       if (!ok || Math.abs(i - td.startIdx) < 90 || td.setPieces.some(sp => Math.abs(sp.idx - i) < 70)) continue;
-      last = i; const s = S[i]; const yaw = Math.atan2(s.tx, s.tz); const span = Math.max(s.wallL, s.wallR) + 1.8; const H = 21; // Session 14: was 11 m – the banner hung into the flight path (lift + knife-edge reach ~10 m)
-      (td.overheads ??= []).push({ idx: i, y0: s.y + H - 1.8 - span * 1.5 / 16, y1: s.y + H + 2.1, half: 1.0 }); // solid for pods (stepPod)
+      last = i; const s = S[i]; const yaw = Math.atan2(s.tx, s.tz); const span = Math.max(s.wallL, s.wallR) + 1.8; const H = 21;
+      (td.overheads ??= []).push({ idx: i, y0: s.y + H - 1.8 - span * 1.5 / 16, y1: s.y + H + 2.1, half: 1.0 });
       const m = new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y, s.z), new THREE.Quaternion().setFromAxisAngle(UP, yaw), new THREE.Vector3(1, 1, 1));
-      // Twin A-frame legs per side + box-truss bridge
+      // Twin A-frame legs per side sunk deep into real terrain (or road-deck cantilever on prison/ocean) so bases NEVER float!
       for (const sd of [-1, 1]) {
-        for (const dz of [-0.9, 0.9]) truss.push(new THREE.BoxGeometry(0.85, H + 4.2, 0.65).rotateX(dz * -0.07).translate(sd * span, H / 2 - 2, dz).applyMatrix4(m));
-        truss.push(new THREE.BoxGeometry(2.8, 0.6, 3.4).translate(sd * span, -1.8, 0).applyMatrix4(m));
+        const wSide = -sd, fx = s.x + s.rx * wSide * span, fz = s.z + s.rz * wSide * span, edgeOff = -wSide * s.hw * s.bank;
+        const gyRel = floatWorld ? edgeOff - 2.2 : Math.max(-28, Math.min(edgeOff - 0.6, gAt(fx, fz) - s.y));
+        const bot = gyRel - (floatWorld ? 0.4 : 4.2), legH = H + 1.8 - bot;
+        for (const dz of [-0.9, 0.9]) truss.push(new THREE.BoxGeometry(0.85, legH, 0.65).rotateX(dz * -0.05).translate(sd * span, bot + legH * 0.5, dz).applyMatrix4(m));
+        truss.push(new THREE.BoxGeometry(3.2, 1.1, 3.8).translate(sd * span, gyRel - 0.2, 0).applyMatrix4(m));
+        if (floatWorld) truss.push(new THREE.BoxGeometry(4.8, 0.9, 3.2).translate(sd * (span - 1.8), edgeOff - 1.0, 0).applyMatrix4(m));
       }
       for (const dy of [0, 1.7]) for (const dz of [-0.55, 0.55]) truss.push(new THREE.BoxGeometry(span * 2 + 1.4, 0.32, 0.32).translate(0, H + dy, dz).applyMatrix4(m));
       for (let x = -span; x < span; x += 2.2) truss.push(new THREE.BoxGeometry(0.16, 2.0, 0.16).rotateZ(((x / 2.2) | 0) % 2 ? 0.55 : -0.55).translate(x + 1.1, H + 0.85, -0.55).applyMatrix4(m));
@@ -438,18 +472,19 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
   let ventCore: THREE.InstancedMesh | null = null;
   if (td.hazards.length) {
     // Ragged volcanic/mineral crater cone collar + industrial grate bars
+    // Deeply skirted (-1.6 m) volcanic/mineral crater cone collar aligned to 3D road slope + bank (never floats on hills/turns!)
     const rimParts: THREE.BufferGeometry[] = [
-      new THREE.CylinderGeometry(4.1, 5.4, 0.55, 28, 1, true).translate(0, 0.22, 0),
+      new THREE.CylinderGeometry(4.1, 6.2, 2.0, 28, 1, true).translate(0, -0.55, 0),
       new THREE.TorusGeometry(4.2, 0.38, 8, 28).rotateX(Math.PI / 2).translate(0, 0.36, 0),
       ...Array.from({ length: 8 }, (_, k) => new THREE.BoxGeometry(8.1, 0.14, 0.24).rotateY((k / 8) * Math.PI).translate(0, 0.28, 0)),
     ];
     for (let k = 0; k < 10; k++) {
       const a = (k / 10) * Math.PI * 2;
-      rimParts.push(new THREE.DodecahedronGeometry(0.55 + (k % 3) * 0.18, 0).scale(1.2, 0.65, 1.1).translate(Math.cos(a) * 4.55, 0.25, Math.sin(a) * 4.55));
+      rimParts.push(new THREE.DodecahedronGeometry(0.55 + (k % 3) * 0.18, 0).scale(1.2, 0.85, 1.1).translate(Math.cos(a) * 4.55, 0.1, Math.sin(a) * 4.55));
     }
     const grate = mergeGeometries(rimParts.map(g => (g.index ? g.toNonIndexed() : g)));
     const vm = new THREE.MeshStandardMaterial({ color: theme.id === 'lava' ? '#241815' : '#333128', metalness: 0.55, roughness: 0.68, side: THREE.DoubleSide }); disp.push(vm);
-    const mats = td.hazards.map(h => { const s = S[h.idx]; return M(h.x, h.y + 0.08 + dOff, h.z, yawQ(s)); });
+    const mats = td.hazards.map(h => M(h.x, surf(S[h.idx], h.lat) + 0.02 + dOff, h.z, roadQ(h.idx, h.lat)));
     inst(grate, vm, mats, false);
     const rm = new THREE.MeshBasicMaterial({ color: '#ffffff' });
     const cm = new THREE.MeshBasicMaterial({ color: '#ffffff' });

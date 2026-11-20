@@ -25,9 +25,19 @@ export interface Sample {
   wallL: number; wallR: number; // barrier offsets from the centreline (rails / canyon rock) used for collision
   hL: number; hR: number; // cliff wall height per side (0 = no cliff → guard rail)
   roof: number; // tunnel ceiling height above the road (0 = open sky)
-  tun?: number; // tunnel kind: 1 = standard (drivable deck on top), 2 = underwater tube (Aquilaris), 3 = cave (Magma)
+  tun?: number; // tunnel kind: 1 = standard (drivable deck), 2 = underwater tube (Aquilaris), 3 = cave, 4 = underpass tunnel beneath bridge
+  caveW?: number; // extra lateral cavern width per side inside widened cave chambers (carries cave-floor mesh)
+  bridge?: boolean; // elevated overpass viaduct crossing over a lower stretch of the track
+  underpass?: boolean; // lower stretch passing beneath an elevated track bridge
   vmax: number; // ai reference speed
   s: number;
+}
+
+export interface Crossing {
+  upperIdx: number; lowerIdx: number;
+  upperFrom: number; upperTo: number;
+  lowerFrom: number; lowerTo: number;
+  x: number; z: number; clearance: number; tunnelUnder: boolean;
 }
 
 export interface Obstacle { path: number; idx: number; lat: number; r: number; kind: number; x: number; y: number; z: number; hz?: number; /** Session 14: small rocks & crates can be smashed at speed */ breakable?: boolean; broken?: boolean }
@@ -41,15 +51,17 @@ export interface Path {
   samples: Sample[];
   closed: boolean;
   length: number;
-  mainFrom: number; // for shortcuts: main idx range
+  mainFrom: number; // for shortcuts / cave branches: main idx range
   mainTo: number;
   side: number;
+  isCave?: boolean; // subterranean branching cave tube reuniting inside the cave system
 }
 
 export interface TrackData {
   def: TrackDef;
   seaY?: number; // fixed sea level of ocean worlds (set before the underwater tunnels dip the road)
   overheads?: Overhead[]; // filled by the world builder (trackDetail / start portal), read by stepPod
+  crossings: Crossing[]; // grade-separated bridge/tunnel self-crossings
   paths: Path[];
   main: Path;
   N: number;
@@ -86,16 +98,28 @@ function controlPoints(def: TrackDef): { pts: { x: number; z: number; y: number;
   const closed = def.type === 'circuit', segN = closed ? n : n - 1, rnd = mulberry32(hashStr(def.id + '|expand'));
   const P = (i: number) => base[((i % n) + n) % n];
   const segLen = (i: number) => Math.hypot(P(i + 1).x - P(i).x, P(i + 1).z - P(i).z);
-  // (1) open flats: the two longest segments away from the grid, the finish and the shortcut hints
-  const order: number[] = []; for (let i = 2; i < segN - 2; i++) if (!def.shortcuts.some(c => Math.abs(c - i) <= 1 || Math.abs(c - i - 1) <= 1)) order.push(i);
-  order.sort((a, b) => segLen(b) - segLen(a));
-  const flats: number[] = []; for (const i of order) { if (flats.length >= 2) break; if (flats.every(f => Math.abs(f - i) > 3)) flats.push(i); }
-  for (const f of flats) for (const i of [f, f + 1]) { const q = P(i); q.w = Math.max(q.w, Math.min(q.w * 1.9, 46 * WIDTH_SCALE)); } // → up to ~108 m of road width
-  // (2) meanders
+  // Detect segments involved in grade-separated self-crossings so crossings stay crisp straight bridges/tunnels (never widened to 108 m flats or kinked)
   const dSeg = (px: number, pz: number, a: { x: number; z: number }, b: { x: number; z: number }) => {
     const vx = b.x - a.x, vz = b.z - a.z, t = Math.max(0, Math.min(1, ((px - a.x) * vx + (pz - a.z) * vz) / (vx * vx + vz * vz || 1)));
     return Math.hypot(px - a.x - vx * t, pz - a.z - vz * t);
   };
+  const segCross = (a: { x: number; z: number }, b: { x: number; z: number }, c: { x: number; z: number }, d: { x: number; z: number }) => {
+    const ccw = (p: { x: number; z: number }, q: { x: number; z: number }, r: { x: number; z: number }) => (r.z - p.z) * (q.x - p.x) > (q.z - p.z) * (r.x - p.x);
+    if (ccw(a, c, d) !== ccw(b, c, d) && ccw(a, b, c) !== ccw(a, b, d)) return true;
+    return Math.min(dSeg(a.x, a.z, c, d), dSeg(b.x, b.z, c, d), dSeg(c.x, c.z, a, b), dSeg(d.x, d.z, a, b)) < 135;
+  };
+  const crossSeg = new Set<number>();
+  for (let i = 0; i < segN; i++) for (let j = i + 2; j < segN; j++) {
+    if (closed && Math.min(j - i, segN - (j - i)) <= 1) continue;
+    if (segCross(P(i), P(i + 1), P(j), P(j + 1))) { crossSeg.add(i); crossSeg.add(j); }
+  }
+  const nearCross = (i: number) => crossSeg.has(i) || crossSeg.has(((i - 1) % segN + segN) % segN) || crossSeg.has((i + 1) % segN);
+  // (1) open flats: the two longest segments away from the grid, finish, shortcut hints and bridge/tunnel crossings
+  const order: number[] = []; for (let i = 2; i < segN - 2; i++) if (!nearCross(i) && !def.shortcuts.some(c => Math.abs(c - i) <= 1 || Math.abs(c - i - 1) <= 1)) order.push(i);
+  order.sort((a, b) => segLen(b) - segLen(a));
+  const flats: number[] = []; for (const i of order) { if (flats.length >= 2) break; if (flats.every(f => Math.abs(f - i) > 3)) flats.push(i); }
+  for (const f of flats) for (const i of [f, f + 1]) { const q = P(i); q.w = Math.max(q.w, Math.min(q.w * 1.9, 46 * WIDTH_SCALE)); } // → up to ~108 m of road width
+  // (2) meanders
   const ins: { x: number; z: number }[] = [];
   const clear = (px: number, pz: number, i: number) => {
     for (let s2 = 0; s2 < segN; s2++) { const d = Math.abs(s2 - i), dd = closed ? Math.min(d, segN - d) : d; if (dd <= 1) continue; if (dSeg(px, pz, P(s2), P(s2 + 1)) < 185) return false; }
@@ -106,7 +130,7 @@ function controlPoints(def: TrackDef): { pts: { x: number; z: number; y: number;
     map.push(out.length); out.push(base[i]);
     if (i >= segN) continue;
     const a = base[i], b = P(i + 1), len = segLen(i);
-    if (i === 0 || i === segN - 1 || len < 330) continue;              // grid straight / closing or finish straight stay as designed
+    if (i === 0 || i === segN - 1 || len < 330 || crossSeg.has(i)) continue; // grid / finish / crossing spans stay crisp & straight
     const k = len > 640 ? 2 : 1, dx = (b.x - a.x) / len, dz = (b.z - a.z) / len;
     for (let j = 1; j <= k; j++) {
       const t = j / (k + 1), mx = a.x + (b.x - a.x) * t, mz = a.z + (b.z - a.z) * t, amp0 = Math.min(len * (k === 2 ? 0.17 : 0.25), 95);
@@ -126,9 +150,12 @@ function findStraight(S: Sample[], N: number, at: number, closed: boolean, taken
   // horizontal curvature estimate directly from positions
   const ang = (i: number) => { const a = S[((i - 3) % N + N) % N], b = S[(i % N + N) % N], c = S[((i + 3) % N + N) % N]; const ax = b.x - a.x, az = b.z - a.z, bx = c.x - b.x, bz = c.z - b.z; return Math.abs(Math.atan2(ax * bz - az * bx, ax * bx + az * bz)); };
   let best = Math.floor(at * N), bs = 1e9;
-  for (let k = -Math.floor(N * 0.12); k <= Math.floor(N * 0.12); k += 4) {
+  for (let k = -Math.floor(N * 0.16); k <= Math.floor(N * 0.16); k += 4) {
     const i0 = Math.floor(at * N) + k; if (!closed && (i0 < 120 || i0 + need > N - 60)) continue;
     if (taken.some(t => Math.abs(t - i0) < need + 60)) continue;
+    let crossBad = false;
+    for (let j = -35; j < need + 35; j += 4) { const q = S[((i0 + j) % N + N) % N]; if (q.bridge || q.underpass) { crossBad = true; break; } }
+    if (crossBad) continue;
     let sc = 0; for (let j = -20; j < need; j += 3) sc += ang(i0 + j);
     sc += Math.abs(k) * 0.0004;
     if (sc < bs) { bs = sc; best = i0; }
@@ -156,7 +183,7 @@ function finalizeSamples(S: Sample[], closed: boolean, banked = false) {
     for (let k = -W; k <= W; k++) { let j = i + k; if (closed) j = (j + n) % n; else if (j < 0 || j >= n) continue; s += raw[j]; c++; }
     S[i].curv = s / c;
     // Session 10: main circuits get real banked corners (up to ~21° / 6.2 m outer-edge rise); shortcuts keep the gentle camber
-    const bl = banked ? Math.min(0.39, 6.2 / Math.max(1, S[i].hw)) : Math.min(0.2, 2.4 / Math.max(1, S[i].hw));
+    const bl = S[i].bridge ? Math.min(0.16, 2.6 / Math.max(1, S[i].hw)) : banked ? Math.min(0.39, 6.2 / Math.max(1, S[i].hw)) : Math.min(0.2, 2.4 / Math.max(1, S[i].hw));
     S[i].bank = S[i].gap || S[i].zeroG ? 0 : Math.max(-bl, Math.min(bl, S[i].curv * (banked ? 46 : 14)));
   }
   // AI reference speeds
@@ -228,15 +255,73 @@ export function buildTrack(def: TrackDef): TrackData {
       samples[i].y = s / c;
     }
   }
-  // zero-gravity zones: the first two canyon ranges on the prison moon
-  if (def.theme === 'oovo') for (const [a, b] of def.canyons.slice(0, 2)) for (let i = Math.floor(a * N); i < Math.floor(b * N); i++) samples[(i + N) % N].zeroG = true;
-  // canyon flags
-  const hwMed = samples.map(q => q.hw).sort((a, b) => a - b)[N >> 1], wideLim = Math.min(hwMed * 1.45, 45); // wider = open flat: no canyon walls, no tunnels
-  for (const [a, b] of def.canyons) for (let i = Math.floor(a * N); i < Math.floor(b * N); i++) { const q = samples[(i + N) % N]; if (q.hw < wideLim) q.canyon = true; }
+  // ---------- Grade-separated self-crossings (elevated viaduct bridge over lower underpass / tunnel) ----------
+  const idxDist = (a: number, b: number) => { const d = Math.abs(a - b); return closed ? Math.min(d, N - d) : d; };
+  const crossings: Crossing[] = [];
+  {
+    const cell = 52, grid = new Map<string, number[]>();
+    for (let i = 0; i < N; i += 3) { const k = Math.floor(samples[i].x / cell) + ',' + Math.floor(samples[i].z / cell); let l = grid.get(k); if (!l) { l = []; grid.set(k, l); } l.push(i); }
+    const hits: { a: number; b: number; d: number }[] = [];
+    for (let i = 0; i < N; i += 3) {
+      const sa = samples[i], cx = Math.floor(sa.x / cell), cz = Math.floor(sa.z / cell);
+      for (let gx = cx - 2; gx <= cx + 2; gx++) for (let gz = cz - 2; gz <= cz + 2; gz++) {
+        const l = grid.get(gx + ',' + gz); if (!l) continue;
+        for (const j of l) {
+          if (j <= i || idxDist(i, j) < 160) continue;
+          const sb = samples[j], d = Math.hypot(sa.x - sb.x, sa.z - sb.z);
+          if (d < sa.hw + sb.hw + 16) hits.push({ a: i, b: j, d });
+        }
+      }
+    }
+    hits.sort((p, q) => p.d - q.d);
+    const TUNNEL_UNDER_IDS = new Set(['boonta', 'dunepass', 'jungle', 'crystal', 'mosespa']);
+    for (const h of hits) {
+      if (crossings.some(c => (idxDist(c.upperIdx, h.a) < 150 && idxDist(c.lowerIdx, h.b) < 150) || (idxDist(c.upperIdx, h.b) < 150 && idxDist(c.lowerIdx, h.a) < 150))) continue;
+      // Refine exact closest centerline sample pair around (h.a, h.b)
+      let ia = h.a, ib = h.b, bd = h.d;
+      for (let da = -4; da <= 4; da++) for (let db = -4; db <= 4; db++) {
+        const p = closed ? ((h.a + da) % N + N) % N : Math.max(0, Math.min(N - 1, h.a + da));
+        const q = closed ? ((h.b + db) % N + N) % N : Math.max(0, Math.min(N - 1, h.b + db));
+        const d = Math.hypot(samples[p].x - samples[q].x, samples[p].z - samples[q].z);
+        if (d < bd) { bd = d; ia = p; ib = q; }
+      }
+      const upper = samples[ia].y >= samples[ib].y ? ia : ib, lower = upper === ia ? ib : ia;
+      // Measure overlap span along upper and lower paths
+      const spanOf = (center: number, other: number, margin: number, extra: number): [number, number] => {
+        let lo = 0, hi = 0;
+        for (let k = -90; k <= 90; k++) {
+          const p = closed ? ((center + k) % N + N) % N : Math.max(0, Math.min(N - 1, center + k));
+          const sp = samples[p]; let near = false;
+          for (let m = -80; m <= 80; m += 3) {
+            const q = closed ? ((other + m) % N + N) % N : Math.max(0, Math.min(N - 1, other + m));
+            if (Math.hypot(sp.x - samples[q].x, sp.z - samples[q].z) < sp.hw + samples[q].hw + margin) { near = true; break; }
+          }
+          if (near) { lo = Math.min(lo, k); hi = Math.max(hi, k); }
+        }
+        return [center + lo - extra, center + hi + extra];
+      };
+      const [uFrom, uTo] = spanOf(upper, lower, 20, 22);
+      const [lFrom, lTo] = spanOf(lower, upper, 14, 14);
+      for (let k = uFrom; k <= uTo; k++) { if (!closed && (k < 0 || k >= N)) continue; samples[((k % N) + N) % N].bridge = true; }
+      for (let k = lFrom; k <= lTo; k++) { if (!closed && (k < 0 || k >= N)) continue; samples[((k % N) + N) % N].underpass = true; }
+      const tunnelUnder = def.theme !== 'oovo' && def.theme !== 'aquilaris' && (TUNNEL_UNDER_IDS.has(def.id) || crossings.length % 2 === 1);
+      crossings.push({
+        upperIdx: upper, lowerIdx: lower, upperFrom: uFrom, upperTo: uTo, lowerFrom: lFrom, lowerTo: lTo,
+        x: (samples[upper].x + samples[lower].x) * 0.5, z: (samples[upper].z + samples[lower].z) * 0.5,
+        clearance: 0, tunnelUnder,
+      });
+    }
+  }
+
+  // zero-gravity zones: the first two canyon ranges on the prison moon (kept clear of crossings)
+  if (def.theme === 'oovo') for (const [a, b] of def.canyons.slice(0, 2)) for (let i = Math.floor(a * N); i < Math.floor(b * N); i++) { const q = samples[(i + N) % N]; if (!q.bridge && !q.underpass) q.zeroG = true; }
+  // canyon flags (bridges stay open elevated viaducts with panoramic views over the track below)
+  const hwMed = samples.map(q => q.hw).sort((a, b) => a - b)[N >> 1], wideLim = Math.min(hwMed * 1.45, 45);
+  for (const [a, b] of def.canyons) for (let i = Math.floor(a * N); i < Math.floor(b * N); i++) { const q = samples[(i + N) % N]; if (q.hw < wideLim && !q.bridge) q.canyon = true; }
   // cliff mode per canyon range: 0 both walls, 1 left wall only, 2 right wall only (half-canyon with a view), 3 none (zero-G tube)
   const rngC = mulberry32(hashStr(def.id + '|cliff'));
   const canyonModes = def.canyons.map(([a, b], ci) => ({ a: Math.floor(a * N), b: Math.floor(b * N), mode: def.theme === 'oovo' && ci < 2 ? 3 : (() => { const r = rngC(); return r < 0.4 ? 0 : r < 0.7 ? 1 : 2; })() }));
-  // ramps & gaps
+  // ramps & gaps (automatically steer clear of crossings)
   const taken: number[] = []; const rampSpans: [number, number][] = [];
   for (const r of def.ramps) {
     const i0 = findStraight(samples, N, r.at, closed, taken, Math.round((r.len + r.gap + 80) / DS)); taken.push(i0);
@@ -245,8 +330,7 @@ export function buildTrack(def: TrackDef): TrackData {
     for (let k = 0; k < ng; k++) { const sm = samples[(i0 + nr + k) % N]; sm.gap = true; }
     rampSpans.push([i0, nr + ng]);
   }
-  // Session 10: rolling gradients on every map – two seeded long waves (±15 m / ±6.5 m → climbs & descents up to ~9 %),
-  // faded out at the grid, finish, ramps/gaps, zero-G tubes and wherever the track passes close to itself (over/underpasses keep their clearance)
+  // Session 10: rolling gradients on every map – faded out at grid, finish, ramps/gaps, zero-G tubes & all bridge/underpass crossings
   {
     const rh = mulberry32(hashStr(def.id + '|hills'));
     const flat = new Float32Array(N).fill(1);
@@ -259,23 +343,85 @@ export function buildTrack(def: TrackDef): TrackData {
     damp(closed ? 30 : 45, 60, 110);
     if (!closed) damp(N - 30, 50, 110);
     for (const [i0, len] of rampSpans) damp(i0 + Math.round(len / 2), Math.round(len / 2) + 50, 100);
-    for (let i = 0; i < N; i++) if (samples[i].zeroG && (i === 0 || !samples[i - 1].zeroG || i % 40 === 0)) damp(i, 40, 100);
-    const cell = 48, grid = new Map<string, number[]>();
-    for (let i = 0; i < N; i += 4) { const key = Math.floor(samples[i].x / cell) + ',' + Math.floor(samples[i].z / cell); let l = grid.get(key); if (!l) { l = []; grid.set(key, l); } l.push(i); }
-    for (let i = 0; i < N; i += 4) {
-      const a = samples[i], cx = Math.floor(a.x / cell), cz = Math.floor(a.z / cell); let near = false;
-      for (let gx = cx - 1; gx <= cx + 1 && !near; gx++) for (let gz = cz - 1; gz <= cz + 1 && !near; gz++) {
-        const l = grid.get(gx + ',' + gz); if (!l) continue;
-        for (const j of l) { const di = Math.abs(i - j), dIdx = closed ? Math.min(di, N - di) : di; if (dIdx < 110) continue; const b = samples[j]; if (Math.hypot(a.x - b.x, a.z - b.z) < a.hw + b.hw + 14) { near = true; break; } }
-      }
-      if (near) damp(i, 6, 110);
+    for (const c of crossings) {
+      damp(Math.round((c.upperFrom + c.upperTo) / 2), Math.round((c.upperTo - c.upperFrom) / 2) + 25, 115);
+      damp(Math.round((c.lowerFrom + c.lowerTo) / 2), Math.round((c.lowerTo - c.lowerFrom) / 2) + 25, 115);
     }
+    for (let i = 0; i < N; i++) if (samples[i].zeroG && (i === 0 || !samples[i - 1].zeroG || i % 40 === 0)) damp(i, 40, 100);
     const TAU = Math.PI * 2, k1 = 2 + Math.floor(rh() * 2), k2 = 5 + Math.floor(rh() * 3), p1 = rh() * TAU, p2 = rh() * TAU;
-    for (let i = 0; i < N; i++) { const u = i / N * TAU; samples[i].y = samples[i].y * 1.2 + (19 * Math.sin(u * (k1 + 1) + p1) + 8 * Math.sin(u * (k2 + 2) + p2)) * flat[i]; } // (longer tracks since Session 18: more and slightly higher waves)
+    for (let i = 0; i < N; i++) { const u = i / N * TAU; samples[i].y = samples[i].y * 1.2 + (19 * Math.sin(u * (k1 + 1) + p1) + 8 * Math.sin(u * (k2 + 2) + p2)) * flat[i]; }
+    // Guarantee generous ≥ 32 m vertical clearance at every self-crossing (fits a full 20–21.5 m underpass tunnel + 2.8 m bridge box girder + ≥ 7 m buffer!)
+    const bumpSpan = (a: number, b: number, dy: number, ease: number) => {
+      for (let k = a - ease; k <= b + ease; k++) {
+        if (!closed && (k < 45 || k >= N - 40)) continue;
+        const j = closed ? ((k % N) + N) % N : k;
+        const t = k < a ? (k - (a - ease)) / ease : k > b ? ((b + ease) - k) / ease : 1;
+        samples[j].y += dy * (0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, Math.min(1, t))));
+      }
+    };
+    for (const c of crossings) {
+      let minU = 1e9, maxL = -1e9;
+      for (let k = c.upperFrom; k <= c.upperTo; k++) if (closed || (k >= 0 && k < N)) minU = Math.min(minU, samples[((k % N) + N) % N].y);
+      for (let k = c.lowerFrom; k <= c.lowerTo; k++) if (closed || (k >= 0 && k < N)) maxL = Math.max(maxL, samples[((k % N) + N) % N].y);
+      const wantSep = c.tunnelUnder ? 33.5 : 30.0, cur = minU - maxL;
+      if (cur < wantSep) {
+        const need = wantSep - cur;
+        bumpSpan(c.upperFrom, c.upperTo, need * 0.56, 135);
+        bumpSpan(c.lowerFrom, c.lowerTo, -need * 0.44, 135);
+      }
+      c.clearance = samples[((c.upperIdx % N) + N) % N].y - samples[((c.lowerIdx % N) + N) % N].y;
+    }
   }
   finalizeSamples(samples, closed, true);
   const main: Path = { id: 0, samples, closed, length, mainFrom: 0, mainTo: N - 1, side: 0 };
   const paths: Path[] = [main];
+
+  // Helper: smoothly stitch a branch path's ends onto the banked main-road surface and open shared walls with zero cliff/skirt protrusion
+  const stitchBranch = (ss: Sample[], L2: number, ia: number, ib: number, side: number, pid: number, isCave = false) => {
+    const nearMain: Sample[] = [];
+    for (let k = ia - 65; k <= ib + 65; k++) {
+      if (!closed && (k < 0 || k >= N)) continue;
+      if (k > 52 && k < (ib - ia) - 52) continue;
+      nearMain.push(samples[((k % N) + N) % N]);
+    }
+    const closestMain = (x: number, z: number) => {
+      let bq = nearMain[0], bd = 1e12;
+      for (const q of nearMain) { const d = (q.x - x) ** 2 + (q.z - z) ** 2; if (d < bd) { bd = d; bq = q; } }
+      return { q: bq, d: Math.sqrt(bd) };
+    };
+    // Exact banked elevation match at both entrance and exit (eliminates road-deck / skirt steps at shortcut exits like Dschungelfluss-Sprint!)
+    const blendLen = Math.min(84, L2 * 0.24);
+    for (const s of ss) {
+      const dEnd = Math.min(s.s, L2 - s.s);
+      if (dEnd >= blendLen) continue;
+      const { q } = closestMain(s.x, s.z);
+      const latM = Math.max(-q.hw, Math.min(q.hw, (s.x - q.x) * q.rx + (s.z - q.z) * q.rz));
+      const mainY = q.y + q.ramp - latM * q.bank;
+      const u = Math.max(0, Math.min(1, 1 - dEnd / blendLen)), w = u * u * (3 - 2 * u);
+      s.y = s.y + (mainY - s.y) * w;
+      s.bank = s.bank * (1 - w * 0.85) + q.bank * (w * 0.85);
+    }
+    // Open main road edge where branch meets it
+    const nearestSc = (x: number, z: number) => { let bd = 1e9; for (const q of ss) { const d = (q.x - x) ** 2 + (q.z - z) ** 2; if (d < bd) bd = d; } return Math.sqrt(bd); };
+    for (let k = -34; k <= (ib - ia) + 34; k++) {
+      if (!closed && (ia + k < 0 || ia + k >= N)) continue;
+      if (k > 46 && k < (ib - ia) - 46) continue;
+      const s = samples[(((ia + k) % N) + N) % N];
+      const ex = s.x + s.rx * side * s.hw, ez = s.z + s.rz * side * s.hw;
+      if (nearestSc(ex, ez) < ss[0].hw + 6) { if (side > 0) s.openR = true; else s.openL = true; s.link = pid; if (!isCave) s.canyon = false; }
+    }
+    // Open branch inner edge (and outer edge where overlapping wide open-flat main road!) using EACH main sample's true half-width q.hw!
+    for (const s of ss) {
+      if (s.s > 140 && s.s < L2 - 140) continue;
+      const inX = s.x - s.rx * side * s.hw, inZ = s.z - s.rz * side * s.hw;
+      const cm = closestMain(inX, inZ);
+      if (cm.d < cm.q.hw + 7) { if (side > 0) s.openL = true; else s.openR = true; s.link = 0; }
+      // Also clear the outer edge right inside the merge mouth so its outer wall/rail never intrudes into the main track!
+      const outX = s.x + s.rx * side * s.hw, outZ = s.z + s.rz * side * s.hw;
+      const co = closestMain(outX, outZ);
+      if (co.d < co.q.hw - 0.5) { if (side > 0) s.openR = true; else s.openL = true; }
+    }
+  };
 
   // shortcuts
   const cpFrac = (ci: number) => { const p = pts[cpMap[ci] ?? ci]; let bi = 0, bd = 1e12; samples.forEach((s, i) => { const d = (s.x - p.x) ** 2 + (s.z - p.z) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi / N; };
@@ -288,16 +434,17 @@ export function buildTrack(def: TrackDef): TrackData {
     const scHw = SC_HW;
     const P = (i: number, extra: number) => {
       const s = samples[((i % N) + N) % N]; const off = side * (s.hw - scHw * 0.9 + extra);
-      return new THREE.Vector3(s.x + s.rx * off, s.y + 0.3, s.z + s.rz * off);
+      const clOff = Math.max(-s.hw, Math.min(s.hw, off));
+      return new THREE.Vector3(s.x + s.rx * off, s.y - clOff * s.bank + 0.05, s.z + s.rz * off);
     };
-    const cps: THREE.Vector3[] = [P(ia - 12, 0), P(ia, 0), P(ia + 14, 18)];
-    const s0 = P(ia + 14, 18), s1 = P(ib - 14, 18);
+    const cps: THREE.Vector3[] = [P(ia - 12, 0), P(ia, 0), P(ia + 16, 20)];
+    const s0 = P(ia + 16, 20), s1 = P(ib - 16, 20);
     const mids = 4;
     for (let m = 1; m < mids; m++) {
       const t = m / mids; const v = s0.clone().lerp(s1, t);
       const dx = s1.x - s0.x, dz = s1.z - s0.z, l = Math.hypot(dx, dz) || 1;
       const wig = Math.sin(t * Math.PI * 2) * 12;
-      v.x += (-dz / l) * wig; v.z += (dx / l) * wig; v.y += Math.sin(t * Math.PI) * 6;
+      v.x += (-dz / l) * wig; v.z += (dx / l) * wig; v.y += Math.sin(t * Math.PI) * 5;
       cps.push(v);
     }
     cps.push(s1, P(ib, 0), P(ib + 12, 0));
@@ -309,101 +456,127 @@ export function buildTrack(def: TrackDef): TrackData {
     const pid = paths.length;
     const path: Path = { id: pid, samples: ss, closed: false, length: L2, mainFrom: ia - 12, mainTo: ib + 12, side };
     paths.push(path);
-    // open zones
-    const nearest = (arr: Sample[], x: number, z: number) => { let bd = 1e9; for (const q of arr) { const d = (q.x - x) ** 2 + (q.z - z) ** 2; if (d < bd) bd = d; } return Math.sqrt(bd); };
-    for (let k = -30; k <= (ib - ia) + 30; k++) {
-      const s = samples[(((ia + k) % N) + N) % N];
-      if (k > 40 && k < (ib - ia) - 40) continue;
-      const ex = s.x + s.rx * side * s.hw, ez = s.z + s.rz * side * s.hw;
-      if (nearest(ss, ex, ez) < scHw + 4) { if (side > 0) s.openR = true; else s.openL = true; s.link = pid; s.canyon = false; }
-    }
-    const nearMain: Sample[] = []; for (let k = ia - 60; k <= ib + 60; k++) { if (closed || (k >= 0 && k < N)) nearMain.push(samples[((k % N) + N) % N]); }
-    for (const s of ss) {
-      const ex = s.x - s.rx * side * s.hw, ez = s.z - s.rz * side * s.hw;
-      if (s.s < 120 || s.s > L2 - 120) {
-        if (nearest(nearMain, ex, ez) < samples[ia].hw + 4) { if (side > 0) s.openL = true; else s.openR = true; s.link = 0; }
-      }
-    }
+    stitchBranch(ss, L2, ia, ib, side, pid, false);
   }
 
-  // cliff heights per side (tapered over 50 m at gorge entrances) – shared by walls, terrain plateaus, rails and collision
+  // cliff heights per side (tapered over 50 m at gorge entrances and smoothly down to 0 near every shortcut mouth)
   const cliffH = (s: Sample, side: number) => 14 + fbm1(s.s * 0.004 + side * 10) * 36;
   for (const cm of canyonModes) {
     const len = cm.b - cm.a; if (cm.mode === 3) continue;
     for (let k = 0; k < len; k++) {
-      const s = samples[((cm.a + k) % N + N) % N]; if (!s.canyon || s.zeroG) continue;
+      const s = samples[((cm.a + k) % N + N) % N]; if (!s.canyon || s.zeroG || s.bridge) continue;
       const tp0 = Math.max(0, Math.min(1, k / 25, (len - 1 - k) / 25)); const tp = tp0 * tp0 * (3 - 2 * tp0);
       if (cm.mode !== 2 && !s.openL) s.hL = 3 + (cliffH(s, -1) - 3) * tp;
       if (cm.mode !== 1 && !s.openR) s.hR = 3 + (cliffH(s, 1) - 3) * tp;
     }
   }
-  for (let pi = 1; pi < paths.length; pi++) {
-    const ss = paths[pi].samples, n2 = ss.length;
-    for (let i = 0; i < n2; i++) { const s = ss[i]; if (!s.openL) s.hL = cliffH(s, -1) * 0.8; if (!s.openR) s.hR = cliffH(s, 1) * 0.8; if (i >= Math.floor(n2 * 0.25) && i <= Math.floor(n2 * 0.75)) s.roof = 12; }
-  }
-  // collision walls: guard rails RAIL_INSET inside the edge, cliff rock CANYON_OUTSET outside, zero-G tube wall, open joins none
-  for (const p of paths) for (const s of p.samples) {
-    s.wallL = s.openL ? s.hw + 30 : s.zeroG ? s.hw + 1 : s.hL > 0 ? s.hw + CANYON_OUTSET : s.hw - RAIL_INSET;
-    s.wallR = s.openR ? s.hw + 30 : s.zeroG ? s.hw + 1 : s.hR > 0 ? s.hw + CANYON_OUTSET : s.hw - RAIL_INSET;
-  }
-  // obstacles: ~55% fewer, well-spaced (>= 52 m apart) so high-speed lines stay fair, readable & flowing
+  const applyShortcutWalls = (pa: Path, roofH: number, tunKind: number) => {
+    const ss = pa.samples, n2 = ss.length;
+    // Distance to nearest open sample per side so cliff walls taper gracefully to 0 instead of ending as a vertical slab in the road!
+    const distOpen = (i: number, right: boolean) => {
+      for (let d = 0; d <= 18; d++) {
+        for (const sg of [-1, 1]) {
+          const j = i + sg * d;
+          if (j < 0 || j >= n2) return d;
+          if (right ? ss[j].openR : ss[j].openL) return d;
+        }
+      }
+      return 19;
+    };
+    for (let i = 0; i < n2; i++) {
+      const s = ss[i];
+      const dL = distOpen(i, false), dR = distOpen(i, true);
+      if (dL > 2) { const t = Math.min(1, (dL - 2) / 16); s.hL = cliffH(s, -1) * 0.8 * (t * t * (3 - 2 * t)); } else s.hL = 0;
+      if (dR > 2) { const t = Math.min(1, (dR - 2) / 16); s.hR = cliffH(s, 1) * 0.8 * (t * t * (3 - 2 * t)); } else s.hR = 0;
+      if (pa.isCave) {
+        // Cave branch: full subterranean vaulted cavern from just past fork to just before reunion, swelling into a wide side chamber!
+        if (i >= 14 && i <= n2 - 15) {
+          const u = (i - 14) / Math.max(1, n2 - 29), sn = Math.sin(Math.PI * u);
+          s.roof = roofH + 9.5 * sn * sn; s.tun = 3; s.caveW = 7.5 * Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, (u - 0.15) / 0.7))), 2);
+        }
+      } else if (i >= Math.floor(n2 * 0.26) && i <= Math.floor(n2 * 0.74) && dL > 10 && dR > 10) {
+        s.roof = roofH; s.tun = tunKind;
+      }
+    }
+  };
+  for (let pi = 1; pi < paths.length; pi++) applyShortcutWalls(paths[pi], def.theme === 'ice' ? 20.5 : 18.5, 1);
+
   const obstacles: Obstacle[] = [];
   const startIdx = closed ? 30 : 45;
   const finishIdx = closed ? startIdx : N - 40;
   const okSpot = (s: Sample, i: number) => !s.gap && s.ramp === 0 && !s.openL && !s.openR && !samples[(i + 22) % N].gap && samples[(i + 18) % N].ramp === 0;
-  const idxDist = (a: number, b: number) => { const d = Math.abs(a - b); return closed ? Math.min(d, N - d) : d; };
 
-  // ---------- Session 17: tunnels – placed BEFORE obstacles / hazards / set pieces, so those see the final heights and keep out ----------
-  //  kind 1 standard: roofed passage with a DRIVABLE DECK on top (a pod that jumps over the portal lands up there instead of being
-  //         pushed into the tube); 2–4 per track.
-  //  kind 2 underwater tube (Aquilaris): the road dips below sea level, windows show the ocean. Never within 600 m after a ramp.
-  //  kind 3 cave system (Magma-Inferno): a 600 m section sunk 11 m into the ground, roofed in three parts with two open skylights.
-  let seaY: number | undefined; const cavePillars: [number, number][] = []; // [sample index, lateral position as a share of the half width]
+  // ---------- Tunnels, Underwater Tubes, Underpass Tunnels & Branching Cave Systems ----------
+  // Generous ceiling heights across all worlds (especially Ando Prime 22–38 m & Aquilaris 19.5 m) so lifts, jumps & 90° rolls feel roomy!
+  let seaY: number | undefined; const cavePillars: [number, number][] = [];
   if (!(globalThis as { NO_TUNNELS?: boolean }).NO_TUNNELS) {
     const rt = mulberry32(hashStr(def.id + '|tunnels'));
     const W = (i: number) => samples[((i % N) + N) % N];
     const clearRun = (i: number, len: number, pad: number) => {
       if (!closed && (i - pad < 0 || i + len + pad >= N)) return false;
-      for (let k = -pad; k <= len + pad; k += 2) { const q = W(i + k); if (q.gap || q.ramp > 0 || q.zeroG || q.openL || q.openR || q.link >= 0 || q.roof > 0 || q.hw > wideLim) return false; }
+      for (let k = -pad; k <= len + pad; k += 2) { const q = W(i + k); if (q.gap || q.ramp > 0 || q.zeroG || q.bridge || q.underpass || q.openL || q.openR || q.link >= 0 || q.roof > 0 || q.hw > wideLim) return false; }
       return true;
     };
     const awayFromGrid = (i: number, len: number) => idxDist(i + len / 2, startIdx) > 110 + len / 2 && (closed || idxDist(i + len / 2, finishIdx) > 90 + len / 2);
     const rampBefore = (i: number, back: number) => { for (let k = 0; k <= back; k += 3) { const j = i - k; if (!closed && j < 0) break; const q = W(j); if (q.ramp > 0 || q.gap) return true; } return false; };
-    const taken: { i: number; len: number }[] = [];
-    const clash = (i: number, len: number, gap = 150) => taken.some(t => idxDist(t.i + t.len / 2, i + len / 2) < gap + (t.len + len) / 2);
+    const tunTaken: { i: number; len: number }[] = [];
+    const clash = (i: number, len: number, gap = 140) => tunTaken.some(t => idxDist(t.i + t.len / 2, i + len / 2) < gap + (t.len + len) / 2);
     const dip = (i: number, len: number, depth: number, ease: number) => { for (let k = 0; k <= len; k++) { const t = Math.min(k, len - k) / ease; W(i + k).y -= depth * (t >= 1 ? 1 : 0.5 - 0.5 * Math.cos(Math.PI * t)); } };
     const roofRun = (i: number, len: number, h: number, kind: number) => { for (let k = 0; k <= len; k++) { const q = W(i + k); q.roof = h; q.tun = kind; } };
 
-    if (def.theme === 'aquilaris') {
-      seaY = samples.reduce((a, q) => a + q.y, 0) / N - 26;
-      const target = seaY - 13.5;
-      const cands: { i: number; len: number; depth: number; ease: number }[] = [];
-      for (const FLAT of [170, 115]) for (let f0 = 120; f0 < N - FLAT - 260; f0 += 8) { // Session 18: 340 m (or 230 m) of level tube, was 120 m
-        let top = -1e9; for (let k = 0; k <= FLAT; k += 2) top = Math.max(top, W(f0 + k).y);
-        const depth = top - target; if (depth < 6 || depth > 33) continue;
-        const ease = Math.ceil(7.85 * depth / DS), i0 = f0 - ease, len = FLAT + 2 * ease;   // 20 % max. gradient of the descent
-        if (!clearRun(i0, len, 14) || !awayFromGrid(i0, len) || rampBefore(i0, 300)) continue;
-        if (W(i0 + 4).y < seaY + 2.5 || W(i0 + len - 4).y < seaY + 2.5) continue;          // both portals stand above the waterline
-        cands.push({ i: i0, len, depth: depth + rt() * 0.5 + (FLAT < 150 ? 6 : 0), ease });  // prefer the long variant
+    // (0) Underpass tunnels where the track dives directly beneath its own elevated viaduct bridge
+    const underRoof = def.theme === 'ice' ? 21.5 : 20.0;
+    for (const c of crossings) {
+      const len = c.lowerTo - c.lowerFrom;
+      tunTaken.push({ i: c.lowerFrom, len });
+      tunTaken.push({ i: c.upperFrom, len: c.upperTo - c.upperFrom });
+      if (c.tunnelUnder) {
+        const ta = c.lowerFrom - 6, tb = c.lowerTo + 6;
+        for (let k = ta; k <= tb; k++) {
+          if (!closed && (k < 0 || k >= N)) continue;
+          const q = W(k); if (q.gap || q.ramp > 0 || q.openL || q.openR) continue;
+          q.roof = underRoof; q.tun = 4;
+        }
       }
-      cands.sort((a, b) => a.depth - b.depth);
+    }
+
+    // (1) Aquilaris high-vaulted panoramic underwater ocean tubes (roof = 19.5 m, was 9 m!)
+    if (def.theme === 'aquilaris') {
+      seaY = samples.reduce((a, q) => a + q.y, 0) / N - 24;
+      const SEA_ROOF = 19.5, target = seaY - (SEA_ROOF + 3.2);
+      const cands: { i: number; len: number; depth: number; ease: number; flat: number }[] = [];
+      for (const FLAT of [155, 105]) for (let f0 = 90; f0 < N - FLAT - 220; f0 += 8) {
+        let top = -1e9; for (let k = 0; k <= FLAT; k += 2) top = Math.max(top, W(f0 + k).y);
+        const depth = top - target; if (depth < 8 || depth > 46) continue;
+        const ease = Math.ceil(7.6 * depth / DS), i0 = f0 - ease, len = FLAT + 2 * ease;
+        if (!clearRun(i0, len, 12) || !awayFromGrid(i0, len) || rampBefore(i0, 260)) continue;
+        if (W(i0 + 4).y < seaY + 2.0 || W(i0 + len - 4).y < seaY + 2.0) continue;
+        cands.push({ i: i0, len, depth, ease, flat: FLAT });
+      }
+      cands.sort((a, b) => (a.depth - (a.flat > 130 ? 8 : 0)) - (b.depth - (b.flat > 130 ? 8 : 0)));
+      let seaPlaced = 0;
       for (const c of cands) {
-        if (taken.length >= 3) break; if (clash(c.i, c.len, 160)) continue;
-        taken.push(c); dip(c.i, c.len, c.depth - (c.len - 2 * c.ease < 150 ? 6 : 0), c.ease); roofRun(c.i + 3, c.len - 6, 9, 2);
+        if (seaPlaced >= 2) break; if (clash(c.i, c.len, 110)) continue;
+        tunTaken.push(c); seaPlaced++;
+        dip(c.i, c.len, c.depth, c.ease);
+        roofRun(c.i + 3, c.len - 6, SEA_ROOF, 2);
         for (let k = 0; k <= c.len; k++) { const q = W(c.i + k); q.hL = 0; q.hR = 0; q.canyon = false; q.wallL = q.wallR = q.hw - RAIL_INSET; }
       }
     }
-    // Cave systems (Session 18: longer and more complex, also on the ice and crystal worlds): the road is sunk into the ground and roofed
-    // in several CHAMBERS separated by open skylights; inside every chamber the ceiling swells up (12.5 → 18–24 m); rock pillars stand
-    // in the chambers (added to the obstacle list below). Magma: 5 chambers over ~1.1 km.
-    const CAVES: Record<string, [number, number, number]> = { lava: [540, 12, 5], ice: [300, 9, 3], crystal: [320, 10, 3] }; // samples, depth (m), chambers
+
+    // (2) Multi-chamber BRANCHING cave systems (Vulkan 5 chambers, Ando Prime 3, Kristall 3, Dschungel 3):
+    //     High vaulted ceilings (20.5–22 m → 29–37 m), widened chambers with cave-floor shelves (`caveW`), AND a real diverging
+    //     secondary cave tube (`Path.isCave`) that splits off in the cave and reunites further downstream!
+    const CAVES: Record<string, [number, number, number]> = { lava: [520, 12, 5], ice: [300, 9, 3], crystal: [310, 10, 3], jungle: [290, 9, 3] };
     const cv = CAVES[def.theme];
+    const caveBaseRoof = def.theme === 'ice' ? 22.0 : 20.5;
     if (cv) {
-      for (const shrink of [1, 0.78, 0.6]) {
-        const LEN = Math.round(cv[0] * shrink), CH = Math.max(2, Math.round(cv[2] * shrink)), DEPTH = cv[1], EASE = 60; let best = -1, bs = -1e9;
-        for (const back of [260, 160]) {
-          for (let i = 60; i < N - LEN - 60; i += 10) {
-            if (!clearRun(i, LEN, 14) || !awayFromGrid(i, LEN) || rampBefore(i, back)) continue;
+      for (const shrink of [1, 0.8, 0.62]) {
+        const LEN = Math.round(cv[0] * shrink), CH = Math.max(2, Math.round(cv[2] * shrink)), DEPTH = cv[1], EASE = 58;
+        let best = -1, bs = -1e9;
+        for (const back of [240, 140]) {
+          for (let i = 55; i < N - LEN - 55; i += 8) {
+            if (!clearRun(i, LEN, 12) || !awayFromGrid(i, LEN) || rampBefore(i, back) || clash(i, LEN, 100)) continue;
             let walls = 0, curv = 0; for (let k = 0; k <= LEN; k += 6) { const q = W(i + k); if (q.hL > 0 || q.hR > 0) walls++; curv += Math.abs(q.curv); }
             const sc = walls * 0.5 - curv * 40 + rt() * 4; if (sc > bs) { bs = sc; best = i; }
           }
@@ -412,26 +585,95 @@ export function buildTrack(def: TrackDef): TrackData {
         if (best < 0) continue;
         dip(best, LEN, DEPTH, EASE);
         const gap = 18, part = (LEN - 48 - gap * (CH - 1)) / CH;
+        const chSpans: [number, number][] = [];
         for (let c = 0; c < CH; c++) {
-          const a = 24 + Math.round(c * (part + gap)), b = a + Math.round(part), hi = 5.5 + rt() * 6;
-          for (let k = a; k <= b; k++) { const q = W(best + k), t = (k - a) / (b - a), sn = Math.sin(Math.PI * t); q.roof = 12.5 + hi * sn * sn; q.tun = 3; }
-          cavePillars.push([best + Math.round((a + b) / 2 + (rt() - 0.5) * part * 0.3), (c % 2 ? 1 : -1) * (0.25 + rt() * 0.2)]);
+          const a = 24 + Math.round(c * (part + gap)), b = a + Math.round(part), hi = 8.5 + rt() * 7.5, wi = 6.5 + rt() * 5.5;
+          chSpans.push([best + a, best + b]);
+          for (let k = a; k <= b; k++) {
+            const q = W(best + k), t = (k - a) / (b - a), sn = Math.sin(Math.PI * t), s2 = sn * sn;
+            q.roof = caveBaseRoof + hi * s2; q.tun = 3; q.caveW = wi * s2;
+          }
+          cavePillars.push([best + Math.round((a + b) / 2 + (rt() - 0.5) * part * 0.28), (c % 2 ? 1 : -1) * (0.28 + rt() * 0.18)]);
         }
-        taken.push({ i: best, len: LEN });
+        // Build diverging & reuniting subterranean cave branch tubes between chambers (5-chamber Magma gets 2 splits: 0→2 and 3→4!)
+        const tryCaveBranch = (c0: number, c1: number) => {
+          if (c0 < 0 || c1 >= chSpans.length || c1 <= c0) return false;
+          const brA = chSpans[c0][0] + Math.round((chSpans[c0][1] - chSpans[c0][0]) * 0.42);
+          const brB = chSpans[c1][0] + Math.round((chSpans[c1][1] - chSpans[c1][0]) * 0.58);
+          if (brB - brA < 82) return false;
+          const brHw = 13.5, sA = W(brA), sB = W(brB);
+          const prefSide = ((sB.x - sA.x) * sA.rx + (sB.z - sA.z) * sA.rz) >= 0 ? 1 : -1;
+          for (const side of [prefSide, -prefSide]) {
+            for (const bow of [40, 28, 20]) {
+              const mkP = (idx: number, extra: number) => {
+                const s = W(idx), off = side * (s.hw - brHw * 0.85 + extra);
+                const cl = Math.max(-s.hw, Math.min(s.hw, off));
+                return new THREE.Vector3(s.x + s.rx * off, s.y - cl * s.bank, s.z + s.rz * off);
+              };
+              const m1 = Math.round(brA + (brB - brA) * 0.34), m2 = Math.round(brA + (brB - brA) * 0.66);
+              const bcps = [mkP(brA - 10, 0), mkP(brA + 2, 2), mkP(brA + 16, bow * 0.65), mkP(m1, bow), mkP(m2, bow * 0.94), mkP(brB - 16, bow * 0.65), mkP(brB - 2, 2), mkP(brB + 10, 0)];
+              const bc = new THREE.CatmullRomCurve3(bcps, false, 'centripetal');
+              const BL = bc.getLength(); if (BL < 130) continue;
+              let bad = false;
+              for (let t = 0.17; t <= 0.83 && !bad; t += 0.06) {
+                const pt = bc.getPointAt(t);
+                for (let j = 0; j < N; j += 4) {
+                  if (idxDist(j, brA) < 32 || idxDist(j, brB) < 32) continue;
+                  const q = samples[j], inSpan = j > brA && j < brB;
+                  const minSep = inSpan ? q.hw + brHw + 4 : q.hw + brHw + 16;
+                  if (Math.hypot(q.x - pt.x, q.z - pt.z) < minSep) { bad = true; break; }
+                }
+                for (let pi = 1; pi < paths.length && !bad; pi++) for (let j = 0; j < paths[pi].samples.length; j += 4) {
+                  const q = paths[pi].samples[j]; if (Math.hypot(q.x - pt.x, q.z - pt.z) < q.hw + brHw + 12) { bad = true; break; }
+                }
+              }
+              if (bad) continue;
+              const bn = Math.round(BL / DS), bss: Sample[] = [];
+              for (let k = 0; k < bn; k++) { const pt = bc.getPointAt(k / (bn - 1)); const sm = makeSample(pt, brHw, k * DS); sm.canyon = true; bss.push(sm); }
+              finalizeSamples(bss, false);
+              const pid = paths.length;
+              const bPath: Path = { id: pid, samples: bss, closed: false, length: BL, mainFrom: brA - 10, mainTo: brB + 10, side, isCave: true };
+              paths.push(bPath);
+              stitchBranch(bss, BL, brA, brB, side, pid, true);
+              applyShortcutWalls(bPath, caveBaseRoof, 3);
+              return true;
+            }
+          }
+          return false;
+        };
+        if (chSpans.length >= 5) {
+          if (!tryCaveBranch(0, 2)) tryCaveBranch(0, 1);
+          if (!tryCaveBranch(3, 4)) tryCaveBranch(2, 4);
+        } else if (chSpans.length >= 2) {
+          if (!tryCaveBranch(0, chSpans.length - 1) && !tryCaveBranch(0, 1)) tryCaveBranch(1, chSpans.length - 1);
+        }
+        tunTaken.push({ i: best, len: LEN });
         break;
       }
     }
+
+    // (3) High-clearance standard tunnels with drivable top deck (22.5 m on Ando Prime, 19.5 m on all other worlds; was 13 m!)
+    const stdRoof = def.theme === 'ice' ? 22.5 : 19.5;
     const want = def.theme === 'aquilaris' ? 0 : ({ oovo: 3, ice: 3, malastare: 4 } as Record<string, number>)[def.theme] ?? 2;
     const cands: { i: number; len: number; score: number }[] = [];
     for (let i = 40; i < N - 440; i += 12) {
-      const len = 130 + Math.floor(rt() * 150); // Session 18: 260–560 m (was 120–240 m)
+      const len = 130 + Math.floor(rt() * 145);
       if (!clearRun(i, len, 14) || !awayFromGrid(i, len)) continue;
       let walls = 0; for (let k = 0; k <= len; k += 2) { const q = W(i + k); if (q.hL > 0 && q.hR > 0) walls++; }
       cands.push({ i, len, score: walls / (len / 2) + rt() * 0.6 });
     }
     cands.sort((a, b) => b.score - a.score);
     let placed = 0;
-    for (const c of cands) { if (placed >= want) break; if (clash(c.i, c.len)) continue; taken.push(c); roofRun(c.i, c.len, 13, 1); placed++; }
+    for (const c of cands) { if (placed >= want) break; if (clash(c.i, c.len, 130)) continue; tunTaken.push(c); roofRun(c.i, c.len, stdRoof, 1); placed++; }
+  }
+
+  // Recompute final collision wall offsets after all shortcuts, bridges, underwater tubes & branching caves are placed
+  for (const p of paths) for (const s of p.samples) {
+    if (s.openL) s.hL = 0;
+    if (s.openR) s.hR = 0;
+    if (s.bridge) { s.hL = 0; s.hR = 0; s.canyon = false; }
+    s.wallL = s.openL ? s.hw + 30 : s.zeroG ? s.hw + 1 : s.hL > 0 ? s.hw + CANYON_OUTSET : s.hw - RAIL_INSET;
+    s.wallR = s.openR ? s.hw + 30 : s.zeroG ? s.hw + 1 : s.hR > 0 ? s.hw + CANYON_OUTSET : s.hw - RAIL_INSET;
   }
   for (const [a, b, cnt] of def.obstacles) {
     const want = Math.max(2, Math.round(cnt * 0.62)); // (tracks are ~1.55× longer since Session 18)
@@ -456,27 +698,27 @@ export function buildTrack(def: TrackDef): TrackData {
   }
   for (let p = 1; p < paths.length; p++) {
     const ss = paths[p].samples;
-    const idx = Math.floor(ss.length * 0.52); const s = ss[idx]; const lat = 3.4;
-    obstacles.push({ path: p, idx, lat, r: 2.0, kind: 1, x: s.x + s.rx * lat, y: s.y + 0.15, z: s.z + s.rz * lat });
+    const idx = Math.floor(ss.length * 0.52); const s = ss[idx]; const lat = 3.6;
+    obstacles.push({ path: p, idx, lat, r: 2.0, kind: 1, x: s.x + s.rx * lat, y: s.y - lat * s.bank + 0.12, z: s.z + s.rz * lat });
   }
-  // hazards (geysers / vents) – also registered as kind-3 pseudo obstacles so the AI steers around them
+  // hazards (geysers / vents) – skipped inside tunnels and on elevated overpass bridges
   const hazards: Hazard[] = [];
   for (const [a, b, cnt] of def.hazards ?? []) {
     for (let c = 0; c < Math.round(cnt * 1.4); c++) {
       const idx = (Math.floor((a + (b - a) * rng()) * N) + N) % N; const s = samples[idx];
-      if (s.roof > 0 || !okSpot(s, idx) || Math.abs(idx - startIdx) < 80 || hazards.some(h => Math.abs(h.idx - idx) < 25)) continue;
+      if (s.roof > 0 || s.bridge || s.underpass || !okSpot(s, idx) || Math.abs(idx - startIdx) < 80 || hazards.some(h => Math.abs(h.idx - idx) < 25)) continue;
       const lat = (rng() * 2 - 1) * s.hw * 0.55; const x = s.x + s.rx * lat, z = s.z + s.rz * lat, y = s.y - lat * s.bank;
       hazards.push({ idx, lat, r: 4.5, x, y, z, period: 4 + rng() * 3, phase: rng() * 10, duty: 0.3, state: 0 });
       obstacles.push({ path: 0, idx, lat, r: 4.5, kind: 3, x, y, z, hz: hazards.length - 1 });
     }
   }
-  // set pieces: rotors / portcullis gates prefer straights, collapsing arches prefer gorges
+  // set pieces: rotors / futuristic airlock gates prefer straights, collapsing arches prefer gorges
   const setPieces: SetPiece[] = [];
   const cdist = (a: number, b: number) => { const d = Math.abs(a - b); return closed ? Math.min(d, N - d) : d; };
   const spOk = (i: number, type: string) => {
-    const s = samples[i]; if (!okSpot(s, i) || s.zeroG) return false;
+    const s = samples[i]; if (!okSpot(s, i) || s.zeroG || s.bridge || s.underpass) return false;
     if (closed ? cdist(i, startIdx) < 110 : (i < startIdx + 110 || i > finishIdx - 70)) return false;
-    for (let k = -68; k <= 42; k += 3) { const q = samples[((i + k) % N + N) % N]; if (q.gap || q.ramp > 0 || q.openL || q.openR || q.zeroG || q.roof > 0) return false; }
+    for (let k = -68; k <= 42; k += 3) { const q = samples[((i + k) % N + N) % N]; if (q.gap || q.ramp > 0 || q.openL || q.openR || q.zeroG || q.roof > 0 || q.bridge || q.underpass) return false; }
     if (hazards.some(h => cdist(h.idx, i) < 50) || setPieces.some(o => cdist(o.idx, i) < 120)) return false;
     if (obstacles.some(o => o.path === 0 && o.kind < 3 && cdist(o.idx, i) < 45)) return false; // never stack a set piece onto an obstacle field
     return type === 'arch' || type === 'icefall' || type === 'boulder' || Math.abs(s.curv) < 1 / 350;
@@ -514,9 +756,9 @@ export function buildTrack(def: TrackDef): TrackData {
     const m = obstaclesByPath[o.path]; const b = Math.floor(o.idx / 10);
     if (!m.has(b)) m.set(b, []); m.get(b)!.push(o);
   }
-  // arches inside canyon zones
+  // arches inside canyon zones (stay clear of tunnels, bridges, underpasses & shortcut mouths)
   const arches: number[] = [];
-  const canyonIdx = samples.map((s, i) => (s.canyon && !s.gap && s.ramp === 0 && !(s.roof > 0) ? i : -1)).filter(i => i >= 0);
+  const canyonIdx = samples.map((s, i) => (s.canyon && !s.gap && s.ramp === 0 && !(s.roof > 0) && !s.bridge && !s.underpass && !s.openL && !s.openR ? i : -1)).filter(i => i >= 0);
   for (let a = 0; a < Math.round(def.arches * 1.5) && canyonIdx.length; a++) {
     const idx = canyonIdx[Math.floor(rng() * canyonIdx.length)];
     if (arches.every(o => Math.abs(o - idx) > 40)) arches.push(idx);
@@ -528,24 +770,28 @@ export function buildTrack(def: TrackDef): TrackData {
     bounds.minY = Math.min(bounds.minY, s.y); bounds.maxY = Math.max(bounds.maxY, s.y);
   }
   for (const o of obstacles) if (o.kind === 2 || (o.kind === 0 && o.r < 2.9)) o.breakable = true; // crates + small rocks
-  return { def, paths, main, N, startIdx, finishIdx, obstacles, obstaclesByPath, hazards, setPieces, arches, bounds, overheads: [], seaY };
+  return { def, paths, main, N, startIdx, finishIdx, obstacles, obstaclesByPath, hazards, setPieces, arches, bounds, overheads: [], seaY, crossings };
 }
 
 function findShortcut(S: Sample[], N: number, fa: number, closed: boolean): [number, number] | null {
   let best: [number, number] | null = null, bestScore = 60;
   const c = Math.floor(fa * N);
-  for (let ia = c - 170; ia <= c + 170; ia += 6) {
+  for (let ia = c - 190; ia <= c + 190; ia += 6) {
     if (!closed && (ia < 80)) continue;
     for (let len = 110; len <= 470; len += 10) {
       const ib = ia + len; if (!closed && ib > N - 80) continue; if (closed && len > N / 3) continue;
-      const A = S[(ia + N) % N], B = S[(ib + N) % N];
+      const A = S[((ia % N) + N) % N], B = S[((ib % N) + N) % N];
       const chord = Math.hypot(B.x - A.x, B.z - A.z);
       if (chord < 120) continue;
       const score = len * DS - chord;
       if (score <= bestScore) continue;
-      // no ramps/gaps near ends
+      // no ramps/gaps/zero-G in bypassed span, and neither fork nor merge may sit on a bridge/underpass
       let bad = false;
-      for (let k = -20; k <= len + 20 && !bad; k += 4) { const s = S[((ia + k) % N + N) % N]; if (s.gap || s.ramp > 0) bad = true; }
+      for (let k = -24; k <= len + 24 && !bad; k += 4) {
+        const s = S[((ia + k) % N + N) % N];
+        if (s.gap || s.ramp > 0) bad = true;
+        if ((k < 36 || k > len - 36) && (s.bridge || s.underpass || s.zeroG)) bad = true;
+      }
       if (bad) continue;
       const side = ((B.x - A.x) * A.rx + (B.z - A.z) * A.rz) > 0 ? 1 : -1;
       const P = (i: number) => { const s = S[((i % N) + N) % N]; const off = side * (s.hw - SC_HW * 0.9 + 18); return [s.x + s.rx * off, s.z + s.rz * off]; };
