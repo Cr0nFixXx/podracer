@@ -109,6 +109,9 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 - **Bedienoberfläche:** alle Menüs haben dieselbe Schriftgröße und wachsen mit dem Fenster (Bezugsgröße 1180 × 720); keine Scrollbalken. In der Streckenwahl filtert ein Auswahlfeld nach Planet.
 - **Schnellere Folgestarts:** berechnete Texturen werden im Browser gespeichert (IndexedDB); ab dem zweiten Start einer Welt entfällt die Berechnung. `?nocache` an der Adresse schaltet das ab.
 - **Hangar (neu):** 8 Lackierungs-Vorlagen (z. B. „Boonta Gold", „Tarnkappe", „Neon-Nacht") neben der freien Farbwahl.
+- **Größere Strecken (neu):** alle 14 Kurse sind 7–14 km lang (vorher 5–10 km), mit zusätzlichen S-Kurven, zwei weiten offenen Flächen je Strecke (Fahrbahn bis über 100 m breit) und längeren Tunneln (260–560 m).
+- **Höhlensysteme (neu):** auf der Vulkanwelt (5 Kammern, rund 1,1 km), Ando Prime und in den Kristallschluchten – abgesenkte Fahrbahn, hohe Kammern, Lichtschächte, Felssäulen, Stalaktiten.
+- **HQ-Vegetation und echte Texturen (neu):** Urwaldbäume mit Blattwerk aus einzelnen Zweigen und fotografierter Rinde; Fels, Sand und Waldboden tragen Detail aus echten Fotos. Mehr Felsen, Bäume und Landmarken entlang der längeren Strecken.
 - **Sci-Fi-Ausstattung (neu):** laufende Licht-Leitstreifen an den Fahrbahnrändern, Holo-Tafeln, Schwebe-Baken und Energieleitungen auf Oovo IV, Aquilaris, Malastare und in Ökumenopolis; Leitstreifen in jedem Tunnel. Malastare fährt auf einem getäfelten Metall-Renndeck.
 - **Breitere Pisten & Renntechnik (neu):** alle Strecken sind 18 % breiter. Am Rand stehen Repulsor-Relaistürme mit gegenläufig drehenden Ringen, Patrouillen-Drohnen begleiten das Feld.
 - **Offene Welten & Schluchten:** Barchan-Dünen und Kies-Wadis (Tatooine), Gletschergrate (Ando Prime), Karsthügel und Flussläufe (Dschungel/Malastare), glühende Lavarinnen (Vulkanwelt), Atolle und Felsnadeln (Aquilaris), dreistufige Horizont-Silhouetten, Talnebel und **ziehende Wolkenschatten**.
@@ -155,3 +158,7 @@ Neue Änderungen sichern: `npm run save -- "Beschreibung"` (committet und erneue
 1. `npm run check` – Typecheck + Physik-Simulation aller 14 Strecken (11 Pods, 45 s, ca. 25 s Laufzeit, kein Browser nötig).
 2. `npm run check:gpu` – lädt Strecken im Headless-Chrome mit WebGPU und meldet jeden Shader-/Konsolenfehler (braucht Puppeteer, siehe `HANDOFF.md`).
 3. `npm run build` – erzeugt `dist/index.html`.
+
+## Bildnachweis
+
+Foto-Texturen von Pexels (freie Lizenz): Fels – Alfo Medeiros, Rinde – Marina Leonova, Sand – Alejandro Henriquez, Boden – Engin Akyurt.

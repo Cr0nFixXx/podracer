@@ -39,6 +39,14 @@ React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto 
 - **Decor LOD:** `place(geo, …, { lod: { geo, dist } })` builds a far twin per sector (forces sector chunking); LOD geometry must come from the same seed (`jungleTreeGeometry(seed, gq, true)`, `spireGeometry(seed, halfRadial, sameStrata)`).
 - **CSM** is opt-in (`gfx.csm`): `CSMShadowNode` on `sun.shadow.shadowNode`; call `csm.updateFrustums()` only after `csm.camera` exists (first render).
 
+## Session 18 rules
+- **Track layouts are expanded procedurally** in `trackBuilder.ts → controlPoints()` (scale `TRACK_SCALE`, meander insertion with clearance check, two open flats). `data.ts` control points stay the designer's base layout; index-based hints (`def.shortcuts`) must go through the returned `map`. `NO_EXPAND=1` (CI) builds the old layouts. Fraction-based fields (canyons, ramps, set pieces …) shift slightly – that is expected.
+- **Open flats** = samples with `hw > wideLim` (min(1.45 × median, 45 m)): no canyon flag, no tunnels. Keep anything that assumes a narrow road (tunnels, arches) out of them.
+- **Caves** are configured in `CAVES` (theme → [samples, depth, chambers]); roof height varies per sample inside a chamber, pillars come from `cavePillars` as kind-1 obstacles.
+- **Photo textures:** `photoTex.ts` (`KIND` map, `applyPhotoDetail` in `textures.wrap()` on COPIES – the persistent cache stores the pure procedural bytes), sources bundled in `photoAssets.ts`, registered by `main.tsx` and the harness only. Photos must be 512² power-of-two, tileable, lighting-flattened (`tools/photos/process.mjs`). Any esbuild call that bundles `Game` needs `--loader:.jpg=dataurl`.
+- **Tree material / atlas:** `foliage.ts → treeMaterial` (map + `alphaMap` + `alphaTest`; alpha must be a separate grey texture – the shadow pass only copies `alphaMap`). UV conventions in `decorGeo.ts`: `barkUV` (left half, mirror-tiled), `plainUV` (white strip), `LEAF_TILE(q)` (4 sprig tiles). Every part merged into a tree needs position, normal, uv, color.
+- **Decor density:** `dens` in `scatterDecor` (track length + 20 %, cap 2.6) multiplies every `place()` count – change counts there, not per call.
+
 ## Session 17 rules
 - **Tunnels have three kinds** (`Sample.tun`: 1 standard, 2 underwater, 3 cave) and are placed in `buildTrack` BEFORE obstacles / hazards / set pieces (those skip `roof > 0`). Underwater tubes and the cave dip the road (`dip()`); never put a ramp within 520–600 m before them (`rampBefore`).
 - **Never clamp a pod down to a ceiling it approached from outside.** Entering a roofed run decides once: `PodState.upper` (drive on the deck, ground = road + `roof + TUNNEL_DECK`) or inside (ceiling applies). Everything that asks "is this pod under a roof?" must use `roof > 0 && !p.upper`. CI: deck self-test + `downward teleports` must stay 0.
@@ -133,6 +141,7 @@ React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto 
 
 ## Testing
 - **`npm run check`** (≈ 25 s, node only): `tools/ci/sim.ts` – fails on NaN, deaths > 3, wall penetration > 0.6 m, ground clearance < 0.2 m, pod slower than 18 m/s. `DEBUG=1`, `TRACK=<id>`, `SECS=<n>`, `PITCH_AIR=1|0|-1` (jump experiment).
+- **Session 18 tests:** CI prints `layout:` per track; harness views `f` (first HQ tree close-up), `o` (widest open flat); `?nophoto` disables the photo detail for A/B shots.
 - **Session 17 tests:** CI prints a tunnel report per track + deck self-test; harness views `v` (inside first tunnel), `k` (above the first standard tunnel); pods harness item `3` = Quadra Lumber.
 - **Session 16 tests:** harness views `u` (first main tunnel), `w` (zero-G tube); pods harness `?boost`; `NOGRID=1 npm run check` = old start behaviour for A/B; `papp.mjs` fakes a gamepad and rebinds Boost.
 - **Session 15 tests:** `pui.mjs` prints scale + content height per screen and fails on non-uniform scale / emergency shrink; harness query `live` (runtime graphics switching), `ssr`, `wetnow`; views `x`/`y`/`z` = shortcut exit.

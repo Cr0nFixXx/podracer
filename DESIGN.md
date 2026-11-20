@@ -35,6 +35,13 @@ Schwarz/Dunkelbraun, Glas-Panels, Amber-Akzent (`#ffb040`), Orbitron + Rajdhani,
 | Vulkanwelt | `lava` (Pahoehoe-Stricke + Schlackeporen) | Basaltsäulen, Lavakrusten, treibendes Magmameer, glühende Schlucht-Lavafälle |
 | Kristall / Aquilaris | `crystal` / `beach` | Kristall-Spaltstufen / Atoll-Inseln, Felsnadeln, Uferschaum, Küsten-Wasserfälle |
 
+## Streckenrhythmus, Vegetation, Foto-Detail (Session 18)
+- **Rhythmus einer Strecke:** enge Passagen (Schlucht, Tunnel, Höhle) wechseln mit S-Kurven und zwei **weiten offenen Flächen**, auf denen das Feld auffächern kann. Tunnel sind lang genug, um als eigener Abschnitt zu wirken (≥ 260 m).
+- **Höhle:** Folge von Kammern statt gleichförmiger Röhre – Decke wölbt sich in jeder Kammer hoch, dazwischen Tageslicht durch Lichtschächte; Felssäulen stehen frei in den Kammern, Stalagmiten säumen den Rand.
+- **Baum (HQ):** Silhouette aus Schirmkronen bleibt; die Oberfläche besteht aus erkennbaren Zweigen mit Einzelblättern (hell- bis dunkelgrün gemischt), der Kern dahinter ist dunkel, der Stamm trägt fotografierte, leicht bemooste Rinde. Aus der Ferne wechselt der Baum auf glatte Kronenlappen gleicher Form.
+- **Foto-Detail:** echte Fotos liefern Feinstruktur (Risse, Körnung, Rippel), nie die Farbe – Farbe, Schichtung und Stimmung kommen weiter aus der Palette der Welt. So bleibt roter Fels rot und Dschungelfels grün, bekommt aber echte Oberfläche.
+- **Dichte:** mit der Streckenlänge wachsen Felsen, Bäume, Landmarken mit; nahe der Fahrbahn bleibt die Sicht frei.
+
 ## Tunnel-Typen, Hitze, Pendel (Session 17)
 | Thema | Gestaltung |
 |---|---|

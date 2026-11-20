@@ -1,7 +1,7 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-`npm run dev` → **Boonta-Kessel**, mit Schub + `↓` über die Schanze vor dem Tunnel springen: der Pod muss jetzt **auf dem Tunneldach landen und oben weiterfahren** (kein Teleport in die Röhre). Danach **Aquilaris**: Unterwassertunnel ansehen. (≈ 5 Min.)
+`npm run dev` → **Magma-Inferno** fahren: das Höhlensystem hat jetzt 5 Kammern mit Felssäulen. Danach **Dschungelfluss-Sprint**: Bäume aus der Nähe ansehen und auf die Bildrate achten (mehr Bäume, Blattwerk mit Alpha-Test). (≈ 5 Min.)
 
 ## Git-Stand (wichtig)
 - Lokales Repo im Projekt-Root, Branch **`B`**, Remote `origin` = `https://github.com/Cr0nFixXx/podracer.git`. **Pushen:** `git push origin B`.
@@ -10,6 +10,34 @@
 - **Committen immer mit `npm run save -- "Nachricht"`** (`tools/save.sh`): committet alles außer `.archiv/repo-sicherung`, schreibt die Textkopie neu und testet sie durch Probe-Wiederherstellung. Nie von Hand `git add -A`.
 - **Sitzungsbeginn ohne `.git`:** `npm run restore-git` (Textkopie → sonst GitHub; im zweiten Fall sind ungepushte Einzel-Commits weg, dann `npm run save`).
 - Commit-Autor ist der Platzhalter „Podracer Dev".
+
+## Stand: 2026-11-20 (Session 18) – Strecken erweitert, längere Tunnel/Höhlen, offene Flächen, HQ-Bäume, echte Foto-Texturen
+
+### Erledigt in Session 18
+1. **Alle 14 Strecken prozedural erweitert (`trackBuilder.ts → controlPoints`):** Layout ×1,3 skaliert (`TRACK_SCALE`), in lange Segmente werden **S-Kurven** eingefügt (mit Abstandsprüfung ≥ 185 m zum Rest des Layouts), die zwei längsten Segmente werden zu **offenen Flächen** (Fahrbahn bis ~108 m breit, ohne Schluchtwände/Tunnel). Start-/Zielgerade bleiben wie entworfen. Die Kontrollpunkte in `data.ts` sind unverändert; Abkürzungs-Hinweise werden über `map` umgerechnet.
+   - Ergebnis: **7,0–13,9 km** je Strecke (vorher 5,2–9,9 km), 11–27 Kurven (vorher 5–9 … gemessen an Richtungswechseln), 1,6–4,4 km offene Fläche, alle Abkürzungen weiter vorhanden.
+   - Mehr Wellen in der Höhe (±19 m / ±8 m), Hindernisse/Geysire/Felsbögen in der Anzahl angehoben.
+2. **Längere Tunnel:** Standard-Tunnel 260–560 m (vorher 120–240 m), Aquilaris-Unterwasserröhren 650–840 m, davon 230–340 m eben unter Wasser.
+3. **Komplexere Höhlen:** Höhlensysteme jetzt auf **Vulkan (5 Kammern, ~1,1 km), Ando Prime (3 Kammern) und Kristallschluchten (3 Kammern)**: abgesenkte Fahrbahn, Kammern mit hochgewölbter Decke (12,5 → 18–24 m), offene Lichtschächte dazwischen, **Felssäulen als Hindernisse** in den Kammern, Stalaktiten und Stalagmiten.
+4. **Mehr Deko:** Dekor-Anzahl skaliert mit der Streckenlänge + 20 % (`dens` in `scatterDecor`, max. ×2,6), mehr Landmarken auf langen Strecken.
+5. **HQ-Bäume (`decorGeo.ts → jungleTreeGeometry`, `foliage.ts`):** Stamm/Äste mit **echter Rinden-Textur**, dunkler Kronenkern + **Blattwerk-Karten** (Zweige mit Einzelblättern, Alpha-Test; 16 je Kronenlappen), Zweige in die Seitenkronen, Lianen. 986 Dreiecke (vorher 1 347), Fern-LOD 368. Ein Material mit Atlas (Rinde | 4 Zweig-Kacheln | weißer Streifen) + `alphaMap`.
+6. **Echte Foto-Texturen (`photoTex.ts`, `photoAssets.ts`, `src/assets/tex/*.jpg`):** vier Pexels-Fotos (Fels, Rinde, Sand, Boden), offline kachelbar gemacht und beleuchtungsbereinigt (`tools/photos/process.mjs`). Sie modulieren die prozeduralen Textursätze beim Einpacken: Albedo × Foto-Helligkeit, Normal + Foto-Relief, Höhe + Foto. Zuordnung `KIND` in `photoTex.ts`: rock/basalt → Fels, sand → Sand, jungle/mud/gravel/cracked → Boden. Paletten und Schichtbänder bleiben.
+   - Quellen: Fels Pexels 19786610 (Alfo Medeiros), Rinde 7717796 (Marina Leonova), Sand 19215109 (Alejandro Henriquez), Boden 3859201 (Engin Akyurt). Neu erzeugen: Fotos nach `/tmp/ph/{rock2,bark2,sand1,soil1}.jpg` laden, `node process.mjs <repo>/src/assets/tex`.
+   - Der Harness braucht jetzt `--loader:.jpg=dataurl` beim esbuild-Aufruf (in `run.sh` und `gpu.mjs` eingetragen).
+
+### Verifiziert
+- `npm run check`: 14/14 Strecken bestanden (0 Abstürze, 0 NaN, 0 m Wand-Durchdringung, Deck-Selbsttest ok, 0 Teleports). Layout-Report je Strecke in der CI-Ausgabe (`layout: … km · … corners · … shortcut(s) · open flats …`). Alt/Neu-Vergleich: `NO_EXPAND=1 npm run check`.
+- Standbilder (WebGL2): HQ-Baum nah + Wald, offene Fläche auf Boonta, Schluchtwand mit Foto-Relief, Magma-Höhlenkammer mit Säule, Magma-Übersicht.
+- WebGPU-Konsolencheck Dschungel (neues Baum-Material) + Magma (Höhle): 0 Fehler. Standbilder Ando-Prime-Tunnel und Aquilaris-Unterwassertunnel nach der Erweiterung in Ordnung.
+- App-Smoke-Test (gebaute App mit Foto-Texturen und Workern, Dschungel): bestanden (Rennen, HUD, Pause, Grafik-Menü, Tasten- und Gamepad-Belegung).
+
+### Nicht verifiziert
+- **Bildrate** auf echter GPU: größere Welten (Fläche ×1,7), bis ×2,6 Dekor, alpha-getestetes Blattwerk.
+- **Fahrgefühl** der neuen Kurven und Flächen; die S-Kurven sind nur per Simulation befahren.
+- Blattwerk-Schatten (Alpha in der Schatten-Pass) nicht gesichtet.
+- Build wuchs um ~0,55 MB (Fotos als Base64) auf ~2,8 MB.
+
+---
 
 ## Stand: 2026-11-19 (Session 17) – befahrbare Tunneldecks, Unterwassertunnel, Höhle, Quadra Lumber, Boost-Überziehen, Cockpit-Pendel
 

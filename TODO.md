@@ -1,11 +1,11 @@
 # TODO
 
-## 0. Direkt aus Session 17
-- [ ] **Probefahrt:** Sprung aufs Tunneldach (Boonta), Unterwassertunnel von außen/innen, Höhle, Boost überziehen, Cockpit-Pendel, Staubstärke
-- [ ] **Rampe am Deckende** (statt 14 m Sturz) und Geländer/Barrieren-Optik auf dem Deck
-- [ ] **Unterwassertunnel verfeinern:** echte Glasröhre mit Blick auf Meeresboden, Luftblasen, Portal-Insel
-- [ ] **Hitzeglühen + Cockpit-Pendel für Gegner** (Vertex-Animation im geteilten Gegner-Material)
-- [ ] **Kaskaden-Schatten live**, Pilotenköpfe, Touch-Steuerung
+## 0. Direkt aus Session 18
+- [ ] **Probefahrt + FPS-Messung:** längere Strecken, offene Flächen, Höhlenkammern, Wald mit Blattwerk-Karten
+- [ ] **Handgebaute Varianten:** einzelne Strecken in `data.ts` gezielt neu zeichnen (die Erweiterung ist prozedural)
+- [ ] **Mehr HQ-Assets:** Schneekiefern mit Nadel-Karten, Kakteen/Farne mit Fototextur, Felsbrocken mit Displacement
+- [ ] **Weitere Foto-Texturen:** Schnee/Eis, Metallplatten, Lava-Kruste; Fotos optional in 1024 px
+- [ ] **Höhlen verzweigen** (zwei Röhren, die sich wieder vereinen) und Kammern verbreitern (braucht Höhlenboden-Mesh)
 
 ## 1. Als Nächstes (Podracer & Ladezeit)
 - [ ] **Podracer-Aufwertung:** Livery-Vorlagen & Startnummern im Hangar; Hitzeflimmern auch für Gegner-Pods
@@ -20,6 +20,13 @@
 - [ ] **`npm run check` in GitHub Actions** (Push auf `B`), `check:gpu` als optionaler Job
 - [ ] **Harness:** WebGPU-Screenshots im headless Chrome reparieren (weiß; nur Konsolencheck möglich)
 - [ ] **Fern-LOD auch für Kiefern/Tafelberge**, falls die Messung es rechtfertigt
+
+## Erledigt (Session 18 – Erweiterung, Höhlen, HQ-Bäume, Foto-Texturen)
+- [x] **Alle Strecken länger** (7,0–13,9 km), **mehr Kurven** (eingefügte S-Kurven), **offene Flächen** (bis ~108 m breit)
+- [x] **Längere Tunnel** (260–560 m, Unterwasser 650–840 m), **Höhlensysteme mit Kammern** auf Vulkan, Ando Prime, Kristall
+- [x] **Mehr Deko** (dichteabhängig von der Streckenlänge), mehr Landmarken
+- [x] **HQ-Bäume:** Blattwerk-Karten + echte Rinde
+- [x] **Echte Foto-Texturen** für Fels, Sand, Boden, Rinde
 
 ## Erledigt (Session 17 – Tunneldecks, Unterwasser, Höhle, Quadra, Überziehen, Pendel)
 - [x] **Kein Teleport mehr:** befahrbares Tunneldeck + Erdwall; Tunnel vor Hindernissen platziert

@@ -19,7 +19,7 @@ export function treeMaterial(disp: { dispose: () => void }[]) {
   const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d')!;
   const a = document.createElement('canvas'); a.width = W; a.height = H; const ax = a.getContext('2d')!;
   const bark = photoImage('bark');
-  if (bark) x.drawImage(bark, 0, 0, 512, 512);
+  if (bark) { x.drawImage(bark, 0, 0, 512, 512); x.fillStyle = 'rgba(96,78,58,0.42)'; x.fillRect(0, 0, 512, 512); } // photo, contrast toned down
   else { x.fillStyle = '#6a5a48'; x.fillRect(0, 0, 512, 512); for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(${r() < 0.5 ? '30,22,14' : '150,130,104'},${0.1 + r() * 0.25})`; x.fillRect(r() * 512, r() * 512, 2 + r() * 5, 20 + r() * 90); } }
   ax.fillStyle = '#fff'; ax.fillRect(0, 0, 512, 512);
   x.fillStyle = '#2c5a1c'; x.fillRect(512, 0, 512, 512);   // leaf green under the alpha edges → no dark fringes in the mip chain
