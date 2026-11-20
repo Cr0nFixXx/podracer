@@ -255,7 +255,8 @@ export class Game {
       const custom = e.isPlayer ? prof.custom[e.def.id] : undefined;
       const colors = custom ? custom.colors : (g > 10 ? [e.def.colors[1], e.def.colors[0], e.def.colors[2]] as [string, string, string] : e.def.colors);
       const geo = this.profile.gfx.geometry;
-      const vis = buildPodModel(e.def, colors, geo, this.profile.gfx.texRes, !e.isPlayer);
+      const podOpts = e.isPlayer ? { pattern: custom?.pattern, finish: custom?.finish } : { pattern: (g + 1) % 6 };
+      const vis = buildPodModel(e.def, colors, geo, this.profile.gfx.texRes, !e.isPlayer, podOpts);
       this.scene.add(vis.group);
       const eLat = Math.min(1, Math.abs(lat) / s.hw);
       const gY = s.y - lat * s.bank + (1 - eLat * eLat) * 0.2 + 0.08;
@@ -834,23 +835,44 @@ export class Game {
       post.lens.flare.value = sp3.z < 1 ? THREE.MathUtils.smoothstep(facing, 0.0, 0.55) * this.env.flare * edge : 0;
     }
     post.lens.aspect.value = this.camera.aspect;
-    if (post.heat) { // heat haze follows the two nozzles of the player's pod
-      const hz = post.heat, v = p.visual; let str = 0;
-      if (v && p.dead <= 0) {
-        const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw), bz = v.body.position.z, cr = Math.cos(p.roll), sr = Math.sin(p.roll); let gotL = false, gotR = false;
+    if (post.heat) { // heat haze behind player's nozzles (slots 0–1) AND the 2 closest on-screen rival pods (slots 2–5)!
+      const hz = post.heat, P = hz.plumes, camP = this.camera.position;
+      for (let k = 0; k < P.length; k++) P[k].value.set(-2, -2, 30, 0);
+      const emitPod = (pod: PodState, slot: number, maxDist: number, scale: number) => {
+        const v = pod.visual; if (!v || pod.dead > 0) return false;
+        const sy = Math.sin(pod.yaw), cy = Math.cos(pod.yaw), bz = v.body.position.z, cr = Math.cos(pod.roll), sr = Math.sin(pod.roll);
+        const podSpd = Math.hypot(pod.vel.x, pod.vel.z);
+        const w0 = Math.min(1, 0.25 + pod.input.throttle * 0.55 + (pod.boosting ? 0.55 : 0) + pod.heat * 0.4) * (1 - 0.6 * Math.min(1, podSpd / 105)) * scale;
+        if (w0 < 0.03) return false;
+        let gotL = false, gotR = false, any = false;
         for (let i = 0; i < v.exhaustLocal.length && !(gotL && gotR); i++) {
           const loc = v.exhaustLocal[i], left = loc.x < 0; if (left ? gotL : gotR) continue;
-          const lz = loc.z + bz - 2.2, ly = loc.y + (left ? p.engYL ?? 0 : p.engYR ?? 0), x = loc.x * cr - ly * sr, y = loc.x * sr + ly * cr - lz * p.pitch;
-          this.tmpV3.set(p.pos.x + x * cy + lz * sy, p.pos.y + y, p.pos.z - x * sy + lz * cy);
-          const dist = this.tmpV3.distanceTo(this.camera.position); this.tmpV3.project(this.camera);
-          const tgt = left ? hz.a : hz.b;
-          if (this.tmpV3.z < 1 && dist > 3) { tgt.value.set(this.tmpV3.x * 0.5 + 0.5, 0.5 - this.tmpV3.y * 0.5); hz.radius.value = Math.max(0.012, Math.min(0.05, 0.8 / dist)); str = 1; } else tgt.value.set(-1, -1);
+          const lz = loc.z + bz - 2.2, ly = loc.y + (left ? pod.engYL ?? 0 : pod.engYR ?? 0), x = loc.x * cr - ly * sr, y = loc.x * sr + ly * cr - lz * pod.pitch;
+          this.tmpV3.set(pod.pos.x + x * cy + lz * sy, pod.pos.y + y, pod.pos.z - x * sy + lz * cy);
+          const dist = this.tmpV3.distanceTo(camP);
+          if (dist > 3 && dist < maxDist) {
+            this.tmpV3.project(this.camera);
+            if (this.tmpV3.z > 0 && this.tmpV3.z < 1 && Math.abs(this.tmpV3.x) < 1.12 && Math.abs(this.tmpV3.y) < 1.12) {
+              const rad = Math.max(0.01, Math.min(0.05, 0.85 / dist)), dFade = 1 - Math.max(0, dist - maxDist * 0.55) / (maxDist * 0.45);
+              P[slot + (left ? 0 : 1)].value.set(this.tmpV3.x * 0.5 + 0.5, 0.5 - this.tmpV3.y * 0.5, 1 / rad, w0 * dFade);
+              any = true;
+            }
+          }
           if (left) gotL = true; else gotR = true;
         }
-        // strongest on the grid / at low speed, fades to 35 % at racing speed so it never disturbs the view while flying
-        str *= Math.min(1, 0.25 + p.input.throttle * 0.55 + (p.boosting ? 0.5 : 0) + p.heat * 0.4) * (1 - 0.65 * Math.min(1, sp / 95));
+        return any;
+      };
+      let anyHaze = emitPod(p, 0, 55, 1.0);
+      // Pick the two closest living rival pods within 82 m for slots 2–3 and 4–5 (allocation-free)
+      let r1: PodState | null = null, r2: PodState | null = null, d1 = 82 * 82, d2 = 82 * 82;
+      for (let i = 0; i < this.pods.length; i++) {
+        const q = this.pods[i]; if (q.isPlayer || q.dead > 0) continue;
+        const dd = q.pos.distanceToSquared(camP);
+        if (dd < d1) { d2 = d1; r2 = r1; d1 = dd; r1 = q; } else if (dd < d2) { d2 = dd; r2 = q; }
       }
-      hz.strength.value += (str - hz.strength.value) * Math.min(1, dt * 6);
+      if (r1 && emitPod(r1, 2, 82, 0.92)) anyHaze = true;
+      if (r2 && emitPod(r2, 4, 82, 0.85)) anyHaze = true;
+      hz.strength.value += ((anyHaze ? 1 : 0) - hz.strength.value) * Math.min(1, dt * 6);
     }
     post.render();
   }
@@ -900,10 +922,19 @@ export class Game {
         const ps = path.samples;
         for (let i = 0; i < ps.length; i += 6) { if (i === 0) bc.moveTo(X(ps[i].x), Z(ps[i].z)); else bc.lineTo(X(ps[i].x), Z(ps[i].z)); }
         if (path.closed) bc.closePath();
-        bc.strokeStyle = path.id === 0 ? 'rgba(255,255,255,0.85)' : 'rgba(255,200,80,0.8)';
+        bc.strokeStyle = path.id === 0 ? 'rgba(255,255,255,0.82)' : path.isCave ? 'rgba(110,225,255,0.85)' : 'rgba(255,200,80,0.82)';
         bc.lineWidth = path.id === 0 ? 3 : 2; bc.setLineDash(path.id === 0 ? [] : [4, 3]); bc.stroke();
       }
       bc.setLineDash([]);
+      // Overdraw elevated overpass bridges with a dark separation casing so crossings read cleanly on the minimap!
+      const ms = this.td.main.samples;
+      for (const [col, lw] of [['rgba(0,0,0,0.9)', 6], ['#7fe8ff', 3.2]] as const) {
+        bc.strokeStyle = col; bc.lineWidth = lw; bc.beginPath(); let on = false;
+        for (let i = 0; i < ms.length; i += 3) {
+          if (ms[i].bridge) { if (!on) { bc.moveTo(X(ms[i].x), Z(ms[i].z)); on = true; } else bc.lineTo(X(ms[i].x), Z(ms[i].z)); } else on = false;
+        }
+        bc.stroke();
+      }
       const st = this.td.main.samples[this.td.startIdx];
       bc.fillStyle = '#ff4040'; bc.fillRect(X(st.x) - 3, Z(st.z) - 3, 6, 6);
       if (!this.td.main.closed) { const fn = this.td.main.samples[this.td.finishIdx]; bc.fillStyle = '#40ff60'; bc.fillRect(X(fn.x) - 3, Z(fn.z) - 3, 6, 6); }

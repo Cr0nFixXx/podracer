@@ -48,9 +48,17 @@ export const PRESETS: Record<'low' | 'medium' | 'high' | 'ultra', Omit<GfxSettin
 
 export const defaultGfx = (): GfxSettings => ({ preset: 'high', backend: 'auto', batching: true, fov: 75, showFps: true, bloomStrength: 0.5, ...PRESETS.high });
 
+export type PaintFinish = 0 | 1 | 2; // 0 = Klarlack, 1 = Chrom-Metallic, 2 = Carbon-Matt
+export const LIVERY_PATTERNS = ['Klassik', 'Streifen', 'Flammen', 'Rennringe', 'Chevron', 'Rallye'] as const;
+export const PAINT_FINISHES = ['Klarlack', 'Metallic', 'Matt'] as const;
+
 export interface PodCustom {
   colors: [string, string, string];
   tuning: Record<StatKey, number>; // 0..5
+  /** Optional hull livery pattern override (0..5); undefined uses the pod's factory pattern */
+  pattern?: number;
+  /** Hull clearcoat / metallic / satin-matte finish (0..2) */
+  finish?: PaintFinish;
 }
 
 export interface RaceConfig {

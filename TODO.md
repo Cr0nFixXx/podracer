@@ -1,15 +1,19 @@
 # TODO
 
-## 0. Direkt aus Session 18
-- [ ] **Probefahrt + FPS-Messung:** längere Strecken, offene Flächen, Höhlenkammern, Wald mit Blattwerk-Karten
-- [ ] **Handgebaute Varianten:** einzelne Strecken in `data.ts` gezielt neu zeichnen (die Erweiterung ist prozedural)
+## 0. Direkt aus Session 19
+- [ ] **Probefahrt + FPS-Messung:** Brücken-/Tunnel-Kreuzungen, futuristische Schleusen, verzweigte Höhlen, hohe Tunnel (Aquilaris/Ando Prime), feine Blitze
 - [ ] **Mehr HQ-Assets:** Schneekiefern mit Nadel-Karten, Kakteen/Farne mit Fototextur, Felsbrocken mit Displacement
 - [ ] **Weitere Foto-Texturen:** Schnee/Eis, Metallplatten, Lava-Kruste; Fotos optional in 1024 px
-- [ ] **Höhlen verzweigen** (zwei Röhren, die sich wieder vereinen) und Kammern verbreitern (braucht Höhlenboden-Mesh)
 
-## 1. Als Nächstes (Podracer & Ladezeit)
-- [ ] **Podracer-Aufwertung:** Livery-Vorlagen & Startnummern im Hangar; Hitzeflimmern auch für Gegner-Pods
-- [ ] **Schadensgeometrie & Pilot-Spezies:** sichtbare lose Klappen bei niedrigen HP, individuelle Pilotenköpfe im Cockpit
+## Erledigt (Session 19 – Bugfixes, Brücken/Kreuzungen, Schleusen, verzweigte Höhlen, Pod-Aufwertung)
+- [x] **Bugs behoben:** hohe Tunneldecken (Ando Prime 22,5 m, Aquilaris 19,5 m, Höhlen bis 38 m), C¹-stetiger Talnebel ohne schwebende Schicht am Hang, straßenkonforme Bodenplatten/Ladepads/Vents, tief verankerte Bögen & Strecken-Assets, saubere Abkürzungs-Einmündung auf Dschungelfluss-Sprint
+- [x] **Ökumenopolis (`city`/`neon`) entfernt** (13 Strecken auf 8 Planeten, Profil-Fallback aktiv)
+- [x] **Feinere fraktale Gewitterblitze** (64-Segment-Hauptkanal, 5 Hauptäste, 7 Haarverästelungen)
+- [x] **Strecken-Über-/Unterführungen:** 12 Brücken-/Tunnel-Kreuzungen (Δy = 35–41 m) mit Hohlkasten-Viadukten, Widerlagern, Pfeilern und Unterführungs-Tunneln + Kartendarstellung
+- [x] **Futuristische Schleusen/Tore** statt Fallgitter (3-spurige Panzerschotts mit Plasma-Dichtnaht, in Fels/Eis/Kristall/Stationsbau der Karte integriert)
+- [x] **Höhlen verzweigt & Kammern verbreitert:** echte zweite Höhlenröhre mit Wiedervereinigung + Gabelpfeiler (Vulkan ×2, Ando Prime, Kristall, Dschungel) und Höhlenboden-Mesh
+- [x] **Podracer-Aufwertung:** 6 Lackiermuster + 3 Lackfinishes + 8 Vorlagen im Hangar, individuelle Alien-Pilotenköpfe/-Helme, feinere Triebwerks-/Cockpit-Details, seitengetrennte lose Schadensklappen, Hitzeflimmern auch für Gegner-Pods
+- [x] **Git-Sicherung in `.archive/`** (`git`-Ordnerkopie + Base64-Textarchiv + Wiederherstellungsskripte), `canwelk.html` → `.archiv/`
 
 ## 2. Strecken & Spieltiefe
 - [ ] **Meisterschafts- / Cup-Modus:** 4-Rennen-Serien mit Gesamtpunkten und Siegerehrung

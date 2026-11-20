@@ -35,6 +35,13 @@ Schwarz/Dunkelbraun, Glas-Panels, Amber-Akzent (`#ffb040`), Orbitron + Rajdhani,
 | Vulkanwelt | `lava` (Pahoehoe-Stricke + Schlackeporen) | Basaltsäulen, Lavakrusten, treibendes Magmameer, glühende Schlucht-Lavafälle |
 | Kristall / Aquilaris | `crystal` / `beach` | Kristall-Spaltstufen / Atoll-Inseln, Felsnadeln, Uferschaum, Küsten-Wasserfälle |
 
+## Überführungen, Schleusen, verzweigte Höhlen, Blitze & Pods (Session 19)
+- **Über-/Unterführungen:** Wo sich eine Strecke kreuzt (≥ 35 m Höhenabstand), trägt die obere Piste einen abgeschrägten Stahl-Hohlkasten mit Querträgern, seitlichen Leuchtstreifen, Widerlagern und Zwillingspfeilern; die untere führt durch einen 20-m-Unterführungstunnel oder frei unter dem Viadukt hindurch. Auf Karte und Minimap hebt eine dunkle Kontur die Brücke ab.
+- **Futuristische Schleusen (statt Fallgitter):** 3-spurige Panzerschleuse mit Überkopf-Kammer, hydraulischen Verbund-Schotts, Plasma-Dichtnaht und dezentem Warn-Energiefeld; seitlich wachsen Fels-, Gletscher-, Kristall- oder Stations-Monolithen organisch in die Landschaft.
+- **Hohe Tunnel & verzweigte Höhlen:** Luftige Querschnitte (19,5 m Standard/Unterwasser, 22,5 m Ando Prime, 20,5–38 m Höhlen). Höhlenkammern weiten sich mit modelliertem Felsboden, Leuchtadern und Stalagmiten; an Gabelungen teilt ein Felspfeiler mit Doppel-Leuchtpfeil den Weg in zwei vollwertige Röhren, die sich wieder vereinen.
+- **Atmosphäre & Blitze:** Höhennebel bleibt unterhalb des Talbodens C¹-stetig dicht (keine schwebende Nebelkante am Hang). Gewitterblitze sind fein fraktal verästelt (64-Segment-Hauptkanal, 5 Hauptäste, 7 Haarzweige).
+- **Podracer-Aufwertung:** 6 Lackiermuster × 3 Finishes (Klarlack, Metallic, Matt), Spezies-spezifische Pilotenköpfe/-Helme, Überrollbügel, Einlass-Statoren, Plasma-Koppler, seitengetrennt flatternde Schadensklappen und dezentes Hitzeflimmern auch hinter nahen Gegner-Düsen (weiterhin ohne aufgesetzte Nummernschilder).
+
 ## Streckenrhythmus, Vegetation, Foto-Detail (Session 18)
 - **Rhythmus einer Strecke:** enge Passagen (Schlucht, Tunnel, Höhle) wechseln mit S-Kurven und zwei **weiten offenen Flächen**, auf denen das Feld auffächern kann. Tunnel sind lang genug, um als eigener Abschnitt zu wirken (≥ 260 m).
 - **Höhle:** Folge von Kammern statt gleichförmiger Röhre – Decke wölbt sich in jeder Kammer hoch, dazwischen Tageslicht durch Lichtschächte; Felssäulen stehen frei in den Kammern, Stalagmiten säumen den Rand.

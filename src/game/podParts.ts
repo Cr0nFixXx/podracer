@@ -96,6 +96,15 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
     const out = g.toNonIndexed(); g.dispose(); return out;
   })();
   pb.add('steel', torus(0.75 * R, 0.03 * R, 6, seg), M4.t(0, 0, Z(0.005)));
+  // Upgraded intake stator vanes + glowing inner intake telemetry ring + copper afterburner fuel manifold
+  if (detailHi) {
+    pb.add('glow', torus(rf * 0.895 * R, 0.012 * R, 5, seg), M4.t(0, 0, Z(split ? bodyEnd - 0.02 : 0.975)));
+    pb.add('copper', torus(0.77 * R, 0.022 * R, 6, seg), M4.t(0, 0, Z(0.055)));
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI * 0.5 + 0.38, rm = rf * 0.53 * R;
+      pb.add('chrome', rbox(0.024 * R, rf * 0.62 * R, 0.045 * R, 0.005), M4.trs(Math.sin(a) * rm, Math.cos(a) * rm, faceZ + 0.03 * L, 0, 0, -a));
+    }
+  }
 
   // ---------------- band rings + bolts ----------------
   bandTs.forEach((tb, i) => {
@@ -153,6 +162,13 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
   pb.add('chrome', torus(0.1, 0.03, 8, 16), M4.trs(0, py + 0.06, Z(0.58), 0, Math.PI / 2, 0));
   pb.add('dark', cyl(0.025, 0.025, 0.5, 6), M4.trs(0.18 * R, bodyR(0.85) * R + 0.22, Z(0.85), 0.25, 0, 0));
   pb.add('glow', sphere(0.045, 8, 6), M4.t(0.18 * R, bodyR(0.85) * R + 0.47, Z(0.85) + 0.06));
+  // Lateral plasma-binder induction coupler rings + copper field coils on both flanks (around Z = +0.12·L where the energy bolt anchors!)
+  const cR = bodyR(0.62) * R;
+  for (const sd of [-1, 1]) {
+    pb.add('dark', cyl(0.15 * R, 0.19 * R, 0.1 * R, 10), M4.trs(sd * (cR + 0.02 * R), 0.2 * R, Z(0.62), 0, 0, sd * -Math.PI / 2));
+    pb.add('copper', torus(0.13 * R, 0.024 * R, 5, 12), M4.trs(sd * (cR + 0.06 * R), 0.2 * R, Z(0.62), 0, Math.PI / 2, 0));
+    pb.add('glow', sphere(0.075 * R, 8, 6), M4.t(sd * (cR + 0.075 * R), 0.2 * R, Z(0.62)));
+  }
 
   // ---------------- style specific ----------------
   if (split) {

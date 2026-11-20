@@ -108,22 +108,53 @@ function sections(style: CockpitStyle, hw: number, len: number, perSpan: number)
   return out;
 }
 
-function pilotParts(pb: PartBuilder, s: number, hip: THREE.Vector3) {
+/** Builds pilot figure with species-authentic alien head & racing helmet/visor morphology! */
+function pilotParts(pb: PartBuilder, s: number, hip: THREE.Vector3, species = 'Mensch') {
   const base = new THREE.Matrix4().compose(hip, new THREE.Quaternion(), V(s, s, s));
   const at = (m: THREE.Matrix4) => base.clone().multiply(m);
   const torso = lathe(prof([[0, 0], [0.16, 0, 1], [0.19, 0.12], [0.21, 0.32], [0.19, 0.44], [0.12, 0.52], [0.06, 0.56], [0, 0.57]]), 18, 0);
   torso.rotateX(-Math.PI / 2); torso.scale(1.15, 1, 0.82);
   pb.add('suit', torso, at(M4.trs(0, 0, 0, 0.22, 0, 0)));
-  // harness straps
   for (const sd of [-1, 1]) pb.add('leather', rbox(0.05, 0.5, 0.02, 0.01), at(M4.trs(sd * 0.09, 0.27, 0.19, 0.22, 0, sd * 0.12)));
   pb.add('chrome', cyl(0.035, 0.035, 0.02, 10), at(M4.trs(0, 0.25, 0.205, Math.PI / 2 + 0.22, 0, 0)));
   const head = V(0, 0.71, 0.17);
-  pb.add('skin', sphere(0.112, 18, 14), at(M4.trs(head.x, head.y - 0.015, head.z + 0.02, 0, 0, 0, 0.95, 1.05, 1)));
-  pb.add('leather', sphere(0.128, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), at(M4.trs(head.x, head.y + 0.01, head.z - 0.015, -0.25, 0, 0, 1, 1.05, 1.08)));
-  pb.add('rubber', torus(0.122, 0.013, 6, 24), at(M4.trs(head.x, head.y + 0.035, head.z, Math.PI / 2 - 0.2, 0, 0)));
-  for (const sd of [-1, 1]) {
-    pb.add('dark', cyl(0.045, 0.048, 0.045, 14), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.105, Math.PI / 2, 0, 0)));
-    pb.add('visor', sphere(0.04, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.128, Math.PI / 2, 0, 0, 1, 0.45, 1)));
+  if (species === 'Dugkin') {
+    // Elongated predatory snout, swept brow horns & leather racing cap with oversized goggles
+    pb.add('skin', sphere(0.115, 16, 12), at(M4.trs(head.x, head.y, head.z + 0.03, 0.18, 0, 0, 0.88, 0.92, 1.38)));
+    pb.add('leather', sphere(0.124, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), at(M4.trs(head.x, head.y + 0.02, head.z - 0.02, -0.3, 0, 0, 0.94, 0.95, 1.15)));
+    for (const sd of [-1, 1]) {
+      pb.add('leather', cyl(0.012, 0.032, 0.14, 7), at(M4.trs(head.x + sd * 0.085, head.y + 0.09, head.z - 0.06, -0.75, 0, sd * -0.35)));
+      pb.add('chrome', cyl(0.048, 0.052, 0.05, 12), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.13, Math.PI / 2, 0, 0)));
+      pb.add('glow', sphere(0.038, 10, 8), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.15, 0, 0, 0, 1, 0.8, 0.45)));
+    }
+  } else if (species === 'Xantori' || species === 'Aleeni') {
+    // Tall swept alien cranial fin + twin trailing lekku / head-tails + sleek wrap visor
+    pb.add('skin', sphere(0.112, 16, 12), at(M4.trs(head.x, head.y, head.z, -0.25, 0, 0, 0.9, 1.15, 1.25)));
+    pb.add('suit', rbox(0.045, 0.14, 0.24, 0.018), at(M4.trs(head.x, head.y + 0.11, head.z - 0.06, -0.35, 0, 0)));
+    for (const sd of [-1, 1]) pb.add('skin', tube([V(head.x + sd * 0.08, head.y + 0.02, head.z - 0.06), V(head.x + sd * 0.11, head.y - 0.1, head.z - 0.18), V(head.x + sd * 0.09, head.y - 0.24, head.z - 0.22)], 0.032, 8, 7), base);
+    pb.add('visor', sphere(0.118, 16, 8, 0, Math.PI, Math.PI * 0.25, Math.PI * 0.32), at(M4.trs(head.x, head.y + 0.02, head.z + 0.02, 0, 0, 0, 1.02, 0.9, 1.05)));
+  } else if (species === 'Gurrani' || species === 'Kraveen' || species === 'Erriton') {
+    // Futuristic full-face armored aero-helmet with swept dorsal fin & glowing wrap visor
+    pb.add('suit', sphere(0.138, 18, 14), at(M4.trs(head.x, head.y + 0.015, head.z, 0, 0, 0, 0.98, 1.06, 1.22)));
+    pb.add('dark', rbox(0.04, 0.09, 0.26, 0.012), at(M4.trs(head.x, head.y + 0.13, head.z - 0.05, -0.2, 0, 0)));
+    pb.add('visor', sphere(0.141, 18, 8, 0, Math.PI, Math.PI * 0.28, Math.PI * 0.34), at(M4.trs(head.x, head.y + 0.015, head.z + 0.015, 0, 0, 0, 1.0, 0.95, 1.2)));
+    pb.add('glow', rbox(0.16, 0.016, 0.02, 0.004), at(M4.t(head.x, head.y + 0.02, head.z + 0.165)));
+  } else if (species === 'Lurbani' || species === 'Vexi') {
+    // Broad domed pressurized helmet + wide cyber-optic rangefinder bar + twin sensor antennae
+    pb.add('chrome', sphere(0.136, 18, 12), at(M4.trs(head.x, head.y + 0.01, head.z, 0, 0, 0, 1.12, 0.96, 1.08)));
+    pb.add('dark', rbox(0.24, 0.065, 0.09, 0.016), at(M4.t(head.x, head.y + 0.025, head.z + 0.11)));
+    pb.add('glow', rbox(0.2, 0.026, 0.02, 0.005), at(M4.t(head.x, head.y + 0.025, head.z + 0.156)));
+    for (const sd of [-1, 1]) pb.add('steel', cyl(0.008, 0.012, 0.16, 6), at(M4.trs(head.x + sd * 0.13, head.y + 0.11, head.z - 0.02, -0.3, 0, sd * -0.2)));
+  } else {
+    // Classic Outer-Rim flight helmet with chrome rim & twin reflective racing goggles
+    pb.add('skin', sphere(0.112, 18, 14), at(M4.trs(head.x, head.y - 0.015, head.z + 0.02, 0, 0, 0, 0.95, 1.05, 1)));
+    pb.add('leather', sphere(0.13, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.64), at(M4.trs(head.x, head.y + 0.012, head.z - 0.015, -0.25, 0, 0, 1, 1.05, 1.1)));
+    pb.add('chrome', rbox(0.032, 0.04, 0.22, 0.008), at(M4.trs(head.x, head.y + 0.135, head.z - 0.02, -0.18, 0, 0)));
+    pb.add('rubber', torus(0.122, 0.013, 6, 24), at(M4.trs(head.x, head.y + 0.035, head.z, Math.PI / 2 - 0.2, 0, 0)));
+    for (const sd of [-1, 1]) {
+      pb.add('chrome', cyl(0.046, 0.05, 0.046, 14), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.105, Math.PI / 2, 0, 0)));
+      pb.add('visor', sphere(0.041, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.128, Math.PI / 2, 0, 0, 1, 0.45, 1)));
+    }
   }
   pb.add('leather', torus(0.075, 0.03, 8, 18), at(M4.trs(0, 0.56, 0.12, Math.PI / 2 - 0.25, 0, 0)));
   const hands: THREE.Vector3[] = [];
@@ -139,9 +170,9 @@ function pilotParts(pb: PartBuilder, s: number, hip: THREE.Vector3) {
 
 const cockpitCache = new Map<string, { parts: Map<string, THREE.BufferGeometry>; info: CockpitInfo }>();
 
-/** Hollow lofted cockpit tub with interior, dashboard, windscreen, controls, pilot and fittings (cockpit-local space). */
-export function cockpitGeo(L: PodLayout, seg: number) {
-  const c = L.cockpit; const key = `${c.style}|${c.hw}|${c.len}|${c.pilot}|${seg}`;
+/** Hollow lofted cockpit tub with interior, dashboard, roll-hoop, windscreen, controls, species-specific pilot & fittings. */
+export function cockpitGeo(L: PodLayout, seg: number, species = 'Mensch') {
+  const c = L.cockpit; const key = `${c.style}|${c.hw}|${c.len}|${c.pilot}|${species}|${seg}`;
   const hit = cockpitCache.get(key); if (hit) return hit;
   const pb = new PartBuilder(); const hw = c.hw, len = c.len;
   const secs = sections(c.style, hw, len, seg >= 40 ? 6 : seg >= 28 ? 4 : 3);
@@ -165,7 +196,10 @@ export function cockpitGeo(L: PodLayout, seg: number) {
   pb.add('leather', rbox(0.56, 0.12, 0.5, 0.05), M4.t(0, hipY - 0.06, hipZ + 0.08));
   pb.add('leather', rbox(0.56, 0.7, 0.12, 0.06), M4.trs(0, hipY + 0.3, hipZ - 0.2, -0.15, 0, 0));
   pb.add('leather', rbox(0.3, 0.2, 0.12, 0.05), M4.trs(0, hipY + 0.78, hipZ - 0.27, -0.15, 0, 0));
-  const pil = pilotParts(pb, c.pilot, V(0, hipY, hipZ));
+  const pil = pilotParts(pb, c.pilot, V(0, hipY, hipZ), species);
+  // Chrome twin-strut racing roll-hoop behind the headrest + glowing HUD targeting reticle above dashboard
+  pb.add('chrome', torus(0.24 * c.pilot, 0.022, 7, 18, Math.PI), M4.t(0, hipY + 0.78 * c.pilot, hipZ - 0.34));
+  pb.add('glow', torus(0.055, 0.006, 5, 16), M4.t(0, rimY + 0.11, zB - 0.34 * (zB - zA)));
   // ---- control levers under the hands ----
   for (const hd of pil.hands) {
     const base = V(hd.x, floorY + 0.05, hd.z + 0.1);

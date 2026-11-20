@@ -689,16 +689,21 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
   let idealLat = -Math.sign(cAvg) * Math.min(0.58, Math.abs(cAvg) * 34) * t.hw * ai.skill + ai.lineOff * t.hw * 0.32;
   idealLat += Math.sin(time * 0.4 + ai.noiseT) * (1 - ai.skill) * t.hw * 0.3;
 
-  // Shortcut entry commitment
-  let enteringShortcut = false;
+  // Shortcut & branching-cave entry commitment (only at branch ENTRANCE, never at its exit merge!)
+  let enteringShortcut = false, entrySide = 0, entryNear = false;
   if (p.path === 0 && ai.takeShortcut) {
     for (let k = 0; k < 68; k += 2) {
-      const s2 = at(k);
+      const idx2 = path.closed ? ((p.idx + k) % n + n) % n : Math.min(n - 1, p.idx + k);
+      const s2 = S[idx2];
       if ((s2.openL || s2.openR) && s2.link > 0) {
-        const sideSign = s2.openR ? 1 : -1;
-        idealLat = sideSign * (k < 12 ? t.hw + 8 : t.hw - 2.5);
-        enteringShortcut = true;
-        break;
+        const br = td.paths[s2.link];
+        const dEnt = Math.abs(idx2 - br.mainFrom), dEntC = path.closed ? Math.min(dEnt, n - dEnt) : dEnt;
+        if (br && dEntC < 52) {
+          entrySide = s2.openR ? 1 : -1; entryNear = k < 18;
+          idealLat = entrySide * (entryNear ? s2.hw + 6 : t.hw - 2.0);
+          enteringShortcut = true;
+          break;
+        }
       }
     }
   }
@@ -783,7 +788,9 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
     const sk = at(k); if (!sk.openL && !sk.openR) wallMin = Math.min(wallMin, sk.wallL, sk.wallR);
   }
   const safeLim = Math.max(2, wallMin - P.width - 1.35);
-  let lat = Math.max(-safeLim, Math.min(safeLim, idealLat));
+  const limL = enteringShortcut && entryNear && entrySide < 0 ? s0.hw + 7 : safeLim;
+  const limR = enteringShortcut && entryNear && entrySide > 0 ? s0.hw + 7 : safeLim;
+  let lat = Math.max(-limL, Math.min(limR, idealLat));
   let denseField = false;
 
   const hasHazards = obs.length > 0 || nearRotors.length > 0 || nearGates.length > 0 || nearBridges.length > 0;

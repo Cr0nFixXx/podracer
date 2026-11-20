@@ -4,11 +4,11 @@ import { PODS, THEMES } from '../game/data';
 import { buildPodModel, type PodVisual } from '../game/podModel';
 import { makeSky } from '../game/sky';
 
-interface Props { podId: string; colors: [string, string, string]; className?: string; autoRotate?: boolean; }
+interface Props { podId: string; colors: [string, string, string]; pattern?: number; finish?: number; className?: string; autoRotate?: boolean; }
 interface St { scene: THREE.Scene; cam: THREE.PerspectiveCamera; pod: PodVisual | null; podId: string; drag: boolean; rot: number; lastX: number; zoom: number; }
 
 /** Rotating hangar preview – WebGPURenderer (WebGPU, automatic WebGL2 fallback). */
-export default function PodPreview({ podId, colors, className, autoRotate = true }: Props) {
+export default function PodPreview({ podId, colors, pattern, finish, className, autoRotate = true }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const stateRef = useRef<St | null>(null);
 
@@ -71,9 +71,9 @@ export default function PodPreview({ podId, colors, className, autoRotate = true
     const st = stateRef.current; if (!st) return;
     if (st.pod) { st.scene.remove(st.pod.group); st.pod.dispose(); }
     const def = PODS.find(p => p.id === podId)!;
-    const pod = buildPodModel(def, colors, 3);
+    const pod = buildPodModel(def, colors, 3, 1024, false, { pattern, finish });
     st.scene.add(pod.group); st.pod = pod; st.podId = podId;
-  }, [podId, colors]);
+  }, [podId, colors, pattern, finish]);
 
   return <div ref={ref} className={className} style={{ cursor: 'grab', touchAction: 'none' }} />;
 }

@@ -51,9 +51,9 @@ In der Ansicht „Cockpit" (`C`) blickt man ohne Cockpit-Rahmen frei über die T
 
 **Schwerelosigkeit (Oovo IV):** In den Röhren gibt es keine Schwerkraft und keinen Luftwiderstand: der Pod wird schneller, schwebt frei und driftet seitlich nach. `↓` und `↑` schieben ihn dort wie Steuerdüsen nach oben und unten. Kurz vor dem Röhrenende sinkt er von selbst auf Schwebehöhe.
 
-**Tunnel:** Jede Strecke hat Tunnel. Die Decke ist massiv – und **oben befahrbar**: wer vor dem Portal abhebt und darüber fliegt, landet auf dem Tunneldach, fährt dort weiter und springt am Ende wieder auf die Strecke hinunter.
-- **Aquilaris:** zwei Unterwassertunnel; die Fahrbahn taucht unter den Meeresspiegel, durch die Fenster sieht man den Ozean.
-- **Magma-Inferno:** ein Höhlensystem – 600 m teils unterirdisch, mit zwei offenen Lichtschächten.
+**Tunnel, Brücken & verzweigte Höhlen:** Jede Strecke hat hohe Tunnel (19,5–22,5 m; oben befahrbar). Zehn Strecken kreuzen sich über/unter sich selbst über **Hohlkasten-Viaduktbrücken** und **Unterführungstunnel**.
+- **Aquilaris:** zwei hohe (19,5 m) Panorama-Unterwassertunnel mit Ozeanfenstern, Kaustik und Fischschwärmen sowie zwei Skyway-Überführungen.
+- **Verzweigte Höhlensysteme** (Vulkanwelt, Ando Prime, Kristallschluchten, Dschungelmond): bis zu 38 m hohe, verbreiterte Kammern mit Höhlenboden, Stalagmiten/Stalaktiten und **echten Höhlengabelungen** (zwei Röhren, die sich weiter hinten wieder vereinen).
 
 ## Tageszeit & Wetter
 
@@ -74,7 +74,7 @@ Im Menü **Renneinstellungen** gibt es die Auswahlfelder „Tageszeit" und „We
 | Tatooine, Rote Tafelberge | Klar, Sandsturm |
 | Ando Prime | Klar, Schneeböen, Eisnebel |
 | Vulkanwelt | Klar, Smog, Aschesturm mit Vulkanblitzen |
-| Ökumenopolis, Dschungelmond, Aquilaris, Kristallschluchten, Malastare | Klar, Regen, Gewitter, Nebel |
+| Dschungelmond, Aquilaris, Kristallschluchten, Malastare | Klar, Regen, Gewitter, Nebel |
 
 Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → heftig in 75 s), „Aufklarend" (umgekehrt) und „Wechselhaft" (beides im Wechsel). Was „heftig" ist, hängt von der Welt ab: Gewitter, Sandsturm, Schneesturm oder Aschesturm.
 
@@ -93,7 +93,7 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 | Markierte Hindernisse | Felsen, Säulen und Frachtblöcke mit Leuchtring am Boden und Warnbake auf der Spitze – mit klarem Abstand für Highspeed-Linien |
 | Leitplanken & Energiefeld | harter Aufprall an den Doppelplanken (Seiten-Schaden); darüber leuchtendes Plasma-Energiefeld mit Schockwellen-Aufblitzen bei Kontakt |
 | Rotoren & Schwenkbrücken | rotierende Warnbalken bzw. gegenläufige Brücken-Ausleger mit Signallampen und hörbarem Wummern |
-| Fallgitter | drei Torsektionen fallen der Reihe nach (Grün → Gelb blinkend → Rot mit Metallschlag) |
+| Futuristische Schleusen | drei in die Landschaft integrierte Panzerschotts mit Plasma-Dichtnaht schließen der Reihe nach (Grün/Cyan → Gelb blinkend → Rot mit Druckstoß) |
 | Rollende Felsen | Schluchtrinnen schleudern nach gelber Warnlampe springende Felsbrocken quer über die Piste |
 | Einsturz-Fels- & Eisbögen | brechen beim Anflug der Spitze und hinterlassen einen Slalom aus Fels- bzw. Gletscherblöcken |
 | Geysire / Lava-Schlote | Sinterkrater mit 1 s Warnring, dann Ausbruch (Schaden, Hitze, Auftrieb, Dampf-/Magmagrollen) |
@@ -101,18 +101,18 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 
 ## Inhalte
 
-**10 Podracer** (alle freigeschaltet, Tuning, Lackierung) · **14 Strecken: 8 Rundkurse, 6 Sprints** auf Tatooine, Ando Prime, Ökumenopolis, Vulkanwelt, Dschungelmond, Aquilaris, Oovo IV, Kristallschluchten und Malastare · bis zu 10 Gegner mit vorausschauender Korridor-KI, 4 Schwierigkeitsstufen · 6 Kameras.
+**10 Podracer** (alle freigeschaltet, Tuning, 6 Lackiermuster, 3 Lackfinishes, 8 Vorlagen, individuelle Piloten-Spezies) · **13 Strecken: 7 Rundkurse, 6 Sprints** auf Tatooine, Ando Prime, Vulkanwelt, Dschungelmond, Aquilaris, Oovo IV, Kristallschluchten und Malastare · bis zu 10 Gegner mit vorausschauender Korridor-KI und Düsen-Hitzeflimmern, 4 Schwierigkeitsstufen · 6 Kameras.
 
 ## Landschaft & Atmosphäre
 
-- **Steigungen & Schrägkurven (neu):** jede der 14 Strecken hat lange Anstiege und Gefälle (bis 11–17 %) mit Kuppen zum Abheben sowie überhöhte Kurven (bis ca. 21°), die spürbar mehr Haftung geben.
-- **Bedienoberfläche:** alle Menüs haben dieselbe Schriftgröße und wachsen mit dem Fenster (Bezugsgröße 1180 × 720); keine Scrollbalken. In der Streckenwahl filtert ein Auswahlfeld nach Planet.
+- **Über-/Unterführungen & Steigungen (neu):** 10 Strecken kreuzen sich auf Hohlkasten-Viaduktbrücken und durch Unterführungstunnel (35–41 m Höhenabstand); alle 13 Strecken bieten lange Anstiege/Gefälle sowie überhöhte Kurven (bis ca. 21°).
+- **Bedienoberfläche:** alle Menüs haben dieselbe Schriftgröße und wachsen mit dem Fenster (Bezugsgröße 1180 × 720); keine Scrollbalken. In der Streckenwahl filtert ein Auswahlfeld nach Planet; die Karte markiert Brücken und Höhlenabzweige.
 - **Schnellere Folgestarts:** berechnete Texturen werden im Browser gespeichert (IndexedDB); ab dem zweiten Start einer Welt entfällt die Berechnung. `?nocache` an der Adresse schaltet das ab.
-- **Hangar (neu):** 8 Lackierungs-Vorlagen (z. B. „Boonta Gold", „Tarnkappe", „Neon-Nacht") neben der freien Farbwahl.
-- **Größere Strecken (neu):** alle 14 Kurse sind 7–14 km lang (vorher 5–10 km), mit zusätzlichen S-Kurven, zwei weiten offenen Flächen je Strecke (Fahrbahn bis über 100 m breit) und längeren Tunneln (260–560 m).
-- **Höhlensysteme (neu):** auf der Vulkanwelt (5 Kammern, rund 1,1 km), Ando Prime und in den Kristallschluchten – abgesenkte Fahrbahn, hohe Kammern, Lichtschächte, Felssäulen, Stalaktiten.
-- **HQ-Vegetation und echte Texturen (neu):** Urwaldbäume mit Blattwerk aus einzelnen Zweigen und fotografierter Rinde; Fels, Sand und Waldboden tragen Detail aus echten Fotos. Mehr Felsen, Bäume und Landmarken entlang der längeren Strecken.
-- **Sci-Fi-Ausstattung (neu):** laufende Licht-Leitstreifen an den Fahrbahnrändern, Holo-Tafeln, Schwebe-Baken und Energieleitungen auf Oovo IV, Aquilaris, Malastare und in Ökumenopolis; Leitstreifen in jedem Tunnel. Malastare fährt auf einem getäfelten Metall-Renndeck.
+- **Hangar & Podracer (neu):** 6 Lackiermuster (Klassik, Streifen, Flammen, Rennringe, Chevron, Rallye), 3 Finishes (Klarlack, Metallic, Matt) und 8 Vorlagen neben freier Farbwahl; individuelle Piloten-Spezies, seitengetrennte lose Schadensklappen und Hitzeflimmern auch hinter Gegner-Pods.
+- **Größere Strecken:** alle 13 Kurse sind 7–16 km lang, mit S-Kurven, zwei weiten offenen Flächen je Strecke (bis über 100 m breit) und hohen Tunneln (19,5–22,5 m).
+- **Verzweigte Höhlensysteme (neu):** auf Vulkanwelt (5 Kammern, 2 Gabelungen), Ando Prime, Kristallschluchten und Dschungelmond – bis 38 m hohe, verbreiterte Kammern mit Höhlenboden, Lichtschächten, Felssäulen, Leuchtadern und wieder zusammenführenden Seitenröhren.
+- **HQ-Vegetation und echte Texturen:** Urwaldbäume mit Blattwerk aus einzelnen Zweigen und fotografierter Rinde; Fels, Sand und Waldboden tragen Detail aus echten Fotos.
+- **Sci-Fi-Ausstattung:** bündig eingelassene Licht-Leitstreifen an den Fahrbahnrändern (Oovo IV, Aquilaris, Malastare, auf allen Brücken und in jedem Tunnel), Holo-Tafeln, Schwebe-Baken, Energieleitungen und futuristische 3-Spur-Panzerschleusen.
 - **Breitere Pisten & Renntechnik (neu):** alle Strecken sind 18 % breiter. Am Rand stehen Repulsor-Relaistürme mit gegenläufig drehenden Ringen, Patrouillen-Drohnen begleiten das Feld.
 - **Offene Welten & Schluchten:** Barchan-Dünen und Kies-Wadis (Tatooine), Gletschergrate (Ando Prime), Karsthügel und Flussläufe (Dschungel/Malastare), glühende Lavarinnen (Vulkanwelt), Atolle und Felsnadeln (Aquilaris), dreistufige Horizont-Silhouetten, Talnebel und **ziehende Wolkenschatten**.
 - **Mehrschichtiger Boden & Detail-Normalmaps:** Sand/Gras/Schnee wechselt mit **Kiesbanketten**, **Salzpfannen**, **gefrorenen Seen**, **Sümpfen**, **Lavakrusten mit glühenden Rissen** und geschichtetem Fels (Schnee-, Moos- und Sandauflage auf flachen Felsabsätzen); jede Welt hat eigene Nah-/Mitteldistanz-Normalmaps (Windrippel, Sastrugi, Humus/Wurzeln, Pahoehoe-Lava, Kristallfacetten, Strandsand) sowie Uferschaum am Wasser.

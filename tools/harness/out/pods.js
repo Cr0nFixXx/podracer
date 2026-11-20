@@ -4,7 +4,7 @@ var __export = (target, all2) => {
     __defProp(target, name, { get: all2[name], enumerable: true });
 };
 
-// ../../node_modules/three/build/three.core.js
+// node_modules/three/build/three.core.js
 var REVISION = "187";
 var CullFaceNone = 0;
 var CullFaceBack = 1;
@@ -20437,7 +20437,7 @@ if (typeof window !== "undefined") {
   }
 }
 
-// ../../node_modules/three/build/three.tsl.js
+// node_modules/three/build/three.tsl.js
 var three_tsl_exports = {};
 __export(three_tsl_exports, {
   AONode: () => AONode,
@@ -41198,7 +41198,7 @@ var Three_TSL = /* @__PURE__ */ Object.freeze({
   xor
 });
 
-// ../../node_modules/three/build/three.webgpu.js
+// node_modules/three/build/three.webgpu.js
 var _defaultValues$d = /* @__PURE__ */ new LineBasicMaterial();
 var LineBasicNodeMaterial = class extends NodeMaterial {
   static get type() {
@@ -70129,7 +70129,7 @@ LightProbe.registerNode(LightProbeNode);
 IESSpotLight.registerNode(IESSpotLightNode);
 ProjectorLight.registerNode(ProjectorLightNode);
 
-// ../../src/game/data.ts
+// src/game/data.ts
 var PILOTS = [
   { id: "kai", name: "Kai Varrin", species: "Mensch", skill: 0.9, aggression: 0.4, color: "#4aa3ff" },
   { id: "zeb", name: "Zebulox Vrak", species: "Dugkin", skill: 0.95, aggression: 0.95, color: "#ff9a2e" },
@@ -70334,30 +70334,6 @@ var THEMES = {
     terrain: "mountains",
     barrierColor: "#5ad8ff"
   },
-  city: {
-    id: "city",
-    name: "\xD6kumenopolis",
-    skyTop: "#140c2e",
-    skyHorizon: "#ff7a4a",
-    sunColor: "#ffb080",
-    sunElev: 6,
-    sunAz: 250,
-    clouds: 0.4,
-    fogColor: "#5a3a5a",
-    fogDensity: 6e-4,
-    sunIntensity: 2.6,
-    hemiSky: "#6a5aa0",
-    hemiGround: "#40303a",
-    exposure: 1.1,
-    road: "cityRoad",
-    wall: "metal",
-    ground: "metal",
-    palette: { road: ["#2a2c34", "#3c404c", "#5a6070"], wall: ["#30343e", "#555c6c", "#8a94a8"], ground: ["#1a1c24", "#2a2e38", "#3a4050"] },
-    decor: ["buildings", "towers", "pylons", "balloons"],
-    ambient: "rain",
-    terrain: "city",
-    barrierColor: "#ff3ad0"
-  },
   lava: {
     id: "lava",
     name: "Vulkanwelt",
@@ -70530,7 +70506,7 @@ var THEMES = {
   }
 };
 
-// ../../node_modules/three/build/three.module.js
+// node_modules/three/build/three.module.js
 var alphahash_fragment = "#ifdef USE_ALPHAHASH\n	if ( diffuseColor.a < getAlphaHashThreshold( vPosition ) ) discard;\n#endif";
 var alphahash_pars_fragment = "#ifdef USE_ALPHAHASH\n	const float ALPHA_HASH_SCALE = 0.05;\n	float hash2D( vec2 value ) {\n		return fract( 1.0e4 * sin( 17.0 * value.x + 0.1 * value.y ) * ( 0.1 + abs( sin( 13.0 * value.y + value.x ) ) ) );\n	}\n	float hash3D( vec3 value ) {\n		return hash2D( vec2( hash2D( value.xy ), value.z ) );\n	}\n	float getAlphaHashThreshold( vec3 position ) {\n		float maxDeriv = max(\n			length( dFdx( position.xyz ) ),\n			length( dFdy( position.xyz ) )\n		);\n		float pixScale = 1.0 / ( ALPHA_HASH_SCALE * maxDeriv );\n		vec2 pixScales = vec2(\n			exp2( floor( log2( pixScale ) ) ),\n			exp2( ceil( log2( pixScale ) ) )\n		);\n		vec2 alpha = vec2(\n			hash3D( floor( pixScales.x * position.xyz ) ),\n			hash3D( floor( pixScales.y * position.xyz ) )\n		);\n		float lerpFactor = fract( log2( pixScale ) );\n		float x = ( 1.0 - lerpFactor ) * alpha.x + lerpFactor * alpha.y;\n		float a = min( lerpFactor, 1.0 - lerpFactor );\n		vec3 cases = vec3(\n			x * x / ( 2.0 * a * ( 1.0 - a ) ),\n			( x - 0.5 * a ) / ( 1.0 - a ),\n			1.0 - ( ( 1.0 - x ) * ( 1.0 - x ) / ( 2.0 * a * ( 1.0 - a ) ) )\n		);\n		float threshold = ( x < ( 1.0 - a ) )\n			? ( ( x < a ) ? cases.x : cases.y )\n			: cases.z;\n		return clamp( threshold , 1.0e-6, 1.0 );\n	}\n#endif";
 var alphamap_fragment = "#ifdef USE_ALPHAMAP\n	diffuseColor.a *= texture2D( alphaMap, vAlphaMapUv ).g;\n#endif";
@@ -71826,7 +71802,7 @@ var DATA2 = new Uint16Array([
   1183
 ]);
 
-// ../../node_modules/three/examples/jsm/utils/BufferGeometryUtils.js
+// node_modules/three/examples/jsm/utils/BufferGeometryUtils.js
 function mergeGeometries(geometries, useGroups = false) {
   const isIndexed = geometries[0].index !== null;
   const attributesUsed = new Set(Object.keys(geometries[0].attributes));
@@ -71987,7 +71963,7 @@ function mergeAttributes(attributes) {
   return result;
 }
 
-// ../../node_modules/three/examples/jsm/geometries/RoundedBoxGeometry.js
+// node_modules/three/examples/jsm/geometries/RoundedBoxGeometry.js
 var _tempNormal = new Vector3();
 function getUv(faceDirVector, normal2, uvAxis, projectionAxis, radius, sideLength) {
   const totArcLength = 2 * Math.PI * radius / 4;
@@ -72108,7 +72084,7 @@ var RoundedBoxGeometry = class _RoundedBoxGeometry extends BoxGeometry {
   }
 };
 
-// ../../src/game/podKit.ts
+// src/game/podKit.ts
 var TILE = 2.4;
 var V3 = Vector3;
 function ensureAttrs(g, liv) {
@@ -72474,7 +72450,7 @@ function boltRing(R, count, r2, z, radialOut = false) {
   }, count, Math.PI / count);
 }
 
-// ../../src/game/podParts.ts
+// src/game/podParts.ts
 var cache2 = /* @__PURE__ */ new Map();
 function flameGeo(rn, len, seg) {
   const pts = [];
@@ -72579,6 +72555,14 @@ function engineGeo(spec2, seg) {
     return out2;
   })();
   pb.add("steel", torus(0.75 * R, 0.03 * R, 6, seg), M4.t(0, 0, Z(5e-3)));
+  if (detailHi) {
+    pb.add("glow", torus(rf * 0.895 * R, 0.012 * R, 5, seg), M4.t(0, 0, Z(split2 ? bodyEnd - 0.02 : 0.975)));
+    pb.add("copper", torus(0.77 * R, 0.022 * R, 6, seg), M4.t(0, 0, Z(0.055)));
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI * 0.5 + 0.38, rm = rf * 0.53 * R;
+      pb.add("chrome", rbox(0.024 * R, rf * 0.62 * R, 0.045 * R, 5e-3), M4.trs(Math.sin(a) * rm, Math.cos(a) * rm, faceZ + 0.03 * L, 0, 0, -a));
+    }
+  }
   bandTs.forEach((tb, i) => {
     if (tb > bodyEnd - 0.04) return;
     const rb = bodyR(tb) * 0.955 * R;
@@ -72634,6 +72618,12 @@ function engineGeo(spec2, seg) {
   pb.add("chrome", torus(0.1, 0.03, 8, 16), M4.trs(0, py2 + 0.06, Z(0.58), 0, Math.PI / 2, 0));
   pb.add("dark", cyl(0.025, 0.025, 0.5, 6), M4.trs(0.18 * R, bodyR(0.85) * R + 0.22, Z(0.85), 0.25, 0, 0));
   pb.add("glow", sphere(0.045, 8, 6), M4.t(0.18 * R, bodyR(0.85) * R + 0.47, Z(0.85) + 0.06));
+  const cR = bodyR(0.62) * R;
+  for (const sd of [-1, 1]) {
+    pb.add("dark", cyl(0.15 * R, 0.19 * R, 0.1 * R, 10), M4.trs(sd * (cR + 0.02 * R), 0.2 * R, Z(0.62), 0, 0, sd * -Math.PI / 2));
+    pb.add("copper", torus(0.13 * R, 0.024 * R, 5, 12), M4.trs(sd * (cR + 0.06 * R), 0.2 * R, Z(0.62), 0, Math.PI / 2, 0));
+    pb.add("glow", sphere(0.075 * R, 8, 6), M4.t(sd * (cR + 0.075 * R), 0.2 * R, Z(0.62)));
+  }
   if (split2) {
     const petal = prof([[rf * 1.02 * R, Z(bodyEnd), 1], [rf * 1.06 * R, Z(0.9)], [rf * 1.05 * R, Z(0.98)], [rf * 0.98 * R, Z(1), 1], [rf * 0.93 * R, Z(1), 1], [rf * 0.95 * R, Z(bodyEnd), 1], [rf * 1.02 * R, Z(bodyEnd)]]);
     for (let q = 0; q < 4; q++) {
@@ -72698,7 +72688,7 @@ function engineGeo(spec2, seg) {
   return out;
 }
 
-// ../../src/game/podDesigns.ts
+// src/game/podDesigns.ts
 var V = (x, y, z) => new Vector3(x, y, z);
 var spec = (L, R, style, bands, blades, spike = true, fins = 0) => ({ L, R, style, bands, blades, spike, fins });
 function podLayout(def) {
@@ -72845,7 +72835,7 @@ function sections(style, hw, len, perSpan) {
   out.push({ z: l[0] * len, w: l[1] * hw, hT: l[2] * hw, hB: l[3] * hw, n: l[4], open: 0 });
   return out;
 }
-function pilotParts(pb, s, hip) {
+function pilotParts(pb, s, hip, species = "Mensch") {
   const base = new Matrix4().compose(hip, new Quaternion(), V(s, s, s));
   const at = (m) => base.clone().multiply(m);
   const torso = lathe(prof([[0, 0], [0.16, 0, 1], [0.19, 0.12], [0.21, 0.32], [0.19, 0.44], [0.12, 0.52], [0.06, 0.56], [0, 0.57]]), 18, 0);
@@ -72855,12 +72845,38 @@ function pilotParts(pb, s, hip) {
   for (const sd of [-1, 1]) pb.add("leather", rbox(0.05, 0.5, 0.02, 0.01), at(M4.trs(sd * 0.09, 0.27, 0.19, 0.22, 0, sd * 0.12)));
   pb.add("chrome", cyl(0.035, 0.035, 0.02, 10), at(M4.trs(0, 0.25, 0.205, Math.PI / 2 + 0.22, 0, 0)));
   const head = V(0, 0.71, 0.17);
-  pb.add("skin", sphere(0.112, 18, 14), at(M4.trs(head.x, head.y - 0.015, head.z + 0.02, 0, 0, 0, 0.95, 1.05, 1)));
-  pb.add("leather", sphere(0.128, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), at(M4.trs(head.x, head.y + 0.01, head.z - 0.015, -0.25, 0, 0, 1, 1.05, 1.08)));
-  pb.add("rubber", torus(0.122, 0.013, 6, 24), at(M4.trs(head.x, head.y + 0.035, head.z, Math.PI / 2 - 0.2, 0, 0)));
-  for (const sd of [-1, 1]) {
-    pb.add("dark", cyl(0.045, 0.048, 0.045, 14), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.105, Math.PI / 2, 0, 0)));
-    pb.add("visor", sphere(0.04, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.128, Math.PI / 2, 0, 0, 1, 0.45, 1)));
+  if (species === "Dugkin") {
+    pb.add("skin", sphere(0.115, 16, 12), at(M4.trs(head.x, head.y, head.z + 0.03, 0.18, 0, 0, 0.88, 0.92, 1.38)));
+    pb.add("leather", sphere(0.124, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), at(M4.trs(head.x, head.y + 0.02, head.z - 0.02, -0.3, 0, 0, 0.94, 0.95, 1.15)));
+    for (const sd of [-1, 1]) {
+      pb.add("leather", cyl(0.012, 0.032, 0.14, 7), at(M4.trs(head.x + sd * 0.085, head.y + 0.09, head.z - 0.06, -0.75, 0, sd * -0.35)));
+      pb.add("chrome", cyl(0.048, 0.052, 0.05, 12), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.13, Math.PI / 2, 0, 0)));
+      pb.add("glow", sphere(0.038, 10, 8), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.15, 0, 0, 0, 1, 0.8, 0.45)));
+    }
+  } else if (species === "Xantori" || species === "Aleeni") {
+    pb.add("skin", sphere(0.112, 16, 12), at(M4.trs(head.x, head.y, head.z, -0.25, 0, 0, 0.9, 1.15, 1.25)));
+    pb.add("suit", rbox(0.045, 0.14, 0.24, 0.018), at(M4.trs(head.x, head.y + 0.11, head.z - 0.06, -0.35, 0, 0)));
+    for (const sd of [-1, 1]) pb.add("skin", tube([V(head.x + sd * 0.08, head.y + 0.02, head.z - 0.06), V(head.x + sd * 0.11, head.y - 0.1, head.z - 0.18), V(head.x + sd * 0.09, head.y - 0.24, head.z - 0.22)], 0.032, 8, 7), base);
+    pb.add("visor", sphere(0.118, 16, 8, 0, Math.PI, Math.PI * 0.25, Math.PI * 0.32), at(M4.trs(head.x, head.y + 0.02, head.z + 0.02, 0, 0, 0, 1.02, 0.9, 1.05)));
+  } else if (species === "Gurrani" || species === "Kraveen" || species === "Erriton") {
+    pb.add("suit", sphere(0.138, 18, 14), at(M4.trs(head.x, head.y + 0.015, head.z, 0, 0, 0, 0.98, 1.06, 1.22)));
+    pb.add("dark", rbox(0.04, 0.09, 0.26, 0.012), at(M4.trs(head.x, head.y + 0.13, head.z - 0.05, -0.2, 0, 0)));
+    pb.add("visor", sphere(0.141, 18, 8, 0, Math.PI, Math.PI * 0.28, Math.PI * 0.34), at(M4.trs(head.x, head.y + 0.015, head.z + 0.015, 0, 0, 0, 1, 0.95, 1.2)));
+    pb.add("glow", rbox(0.16, 0.016, 0.02, 4e-3), at(M4.t(head.x, head.y + 0.02, head.z + 0.165)));
+  } else if (species === "Lurbani" || species === "Vexi") {
+    pb.add("chrome", sphere(0.136, 18, 12), at(M4.trs(head.x, head.y + 0.01, head.z, 0, 0, 0, 1.12, 0.96, 1.08)));
+    pb.add("dark", rbox(0.24, 0.065, 0.09, 0.016), at(M4.t(head.x, head.y + 0.025, head.z + 0.11)));
+    pb.add("glow", rbox(0.2, 0.026, 0.02, 5e-3), at(M4.t(head.x, head.y + 0.025, head.z + 0.156)));
+    for (const sd of [-1, 1]) pb.add("steel", cyl(8e-3, 0.012, 0.16, 6), at(M4.trs(head.x + sd * 0.13, head.y + 0.11, head.z - 0.02, -0.3, 0, sd * -0.2)));
+  } else {
+    pb.add("skin", sphere(0.112, 18, 14), at(M4.trs(head.x, head.y - 0.015, head.z + 0.02, 0, 0, 0, 0.95, 1.05, 1)));
+    pb.add("leather", sphere(0.13, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.64), at(M4.trs(head.x, head.y + 0.012, head.z - 0.015, -0.25, 0, 0, 1, 1.05, 1.1)));
+    pb.add("chrome", rbox(0.032, 0.04, 0.22, 8e-3), at(M4.trs(head.x, head.y + 0.135, head.z - 0.02, -0.18, 0, 0)));
+    pb.add("rubber", torus(0.122, 0.013, 6, 24), at(M4.trs(head.x, head.y + 0.035, head.z, Math.PI / 2 - 0.2, 0, 0)));
+    for (const sd of [-1, 1]) {
+      pb.add("chrome", cyl(0.046, 0.05, 0.046, 14), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.105, Math.PI / 2, 0, 0)));
+      pb.add("visor", sphere(0.041, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.128, Math.PI / 2, 0, 0, 1, 0.45, 1)));
+    }
   }
   pb.add("leather", torus(0.075, 0.03, 8, 18), at(M4.trs(0, 0.56, 0.12, Math.PI / 2 - 0.25, 0, 0)));
   const hands = [];
@@ -72874,9 +72890,9 @@ function pilotParts(pb, s, hip) {
   return { head: head.clone().multiplyScalar(s).add(hip), hands };
 }
 var cockpitCache = /* @__PURE__ */ new Map();
-function cockpitGeo(L, seg) {
+function cockpitGeo(L, seg, species = "Mensch") {
   const c = L.cockpit;
-  const key = `${c.style}|${c.hw}|${c.len}|${c.pilot}|${seg}`;
+  const key = `${c.style}|${c.hw}|${c.len}|${c.pilot}|${species}|${seg}`;
   const hit = cockpitCache.get(key);
   if (hit) return hit;
   const pb = new PartBuilder();
@@ -72910,7 +72926,9 @@ function cockpitGeo(L, seg) {
   pb.add("leather", rbox(0.56, 0.12, 0.5, 0.05), M4.t(0, hipY - 0.06, hipZ + 0.08));
   pb.add("leather", rbox(0.56, 0.7, 0.12, 0.06), M4.trs(0, hipY + 0.3, hipZ - 0.2, -0.15, 0, 0));
   pb.add("leather", rbox(0.3, 0.2, 0.12, 0.05), M4.trs(0, hipY + 0.78, hipZ - 0.27, -0.15, 0, 0));
-  const pil = pilotParts(pb, c.pilot, V(0, hipY, hipZ));
+  const pil = pilotParts(pb, c.pilot, V(0, hipY, hipZ), species);
+  pb.add("chrome", torus(0.24 * c.pilot, 0.022, 7, 18, Math.PI), M4.t(0, hipY + 0.78 * c.pilot, hipZ - 0.34));
+  pb.add("glow", torus(0.055, 6e-3, 5, 16), M4.t(0, rimY + 0.11, zB - 0.34 * (zB - zA)));
   for (const hd of pil.hands) {
     const base = V(hd.x, floorY + 0.05, hd.z + 0.1);
     pb.add("steel", tube([base, V(hd.x, (base.y + hd.y) / 2, hd.z + 0.08), V(hd.x, hd.y - 0.07, hd.z)], 0.022, 8, 6));
@@ -72959,7 +72977,7 @@ function cockpitGeo(L, seg) {
   return out;
 }
 
-// ../../src/game/podTextures.ts
+// src/game/podTextures.ts
 function mulberry(a) {
   return () => {
     a |= 0;
@@ -73577,7 +73595,7 @@ function carbonTexture() {
   return carbonCache;
 }
 
-// ../../src/game/podMaterials.ts
+// src/game/podMaterials.ts
 var TSL = three_tsl_exports;
 var {
   userData: userDataN,
@@ -73636,15 +73654,18 @@ function safeHullNormal(nTex, tuv, scale3) {
   const sc2 = inverseSqrt2(max2(det2, float2(1e-7))).mul(valid);
   return normalize3(T2.mul(tsN.x.mul(sc2)).add(B2.mul(tsN.y.mul(sc2)).add(Nn.mul(max2(tsN.z, float2(0.4))))));
 }
-function hullMaterial(c1, c2, glow, livery, texSize) {
+function hullMaterial(c1, c2, glow, livery, texSize, finish = 0) {
   const tex = hullTextures(texSize);
   const mat = new MeshPhysicalNodeMaterial();
+  const baseMet = finish === 1 ? 0.88 : finish === 2 ? 0.2 : 0.48;
+  const baseRgh = finish === 1 ? 0.17 : finish === 2 ? 0.62 : 0.32;
+  const baseCoat = finish === 1 ? 0.95 : finish === 2 ? 0.06 : 0.84;
   mat.color = new Color(c1);
-  mat.metalness = 0.48;
-  mat.roughness = 0.34;
-  mat.clearcoat = 0.82;
-  mat.clearcoatRoughness = 0.14;
-  mat.envMapIntensity = 0.95;
+  mat.metalness = baseMet;
+  mat.roughness = baseRgh;
+  mat.clearcoat = baseCoat;
+  mat.clearcoatRoughness = finish === 2 ? 0.45 : 0.12;
+  mat.envMapIntensity = finish === 1 ? 1.2 : 0.95;
   const u = {
     uPaint2: uniform2(new Color(c2)),
     uGlowCol: uniform2(new Color(glow)),
@@ -73664,12 +73685,19 @@ function hullMaterial(c1, c2, glow, livery, texSize) {
   const side0 = abs2(cd.sub(0.25).add(a.sub(0.5).mul(0.12))), side1 = abs2(cd.sub(0.25));
   const aaS0 = fwidth2(side0).mul(1.5).add(1e-4), aaS1 = fwidth2(side1).mul(1.5).add(1e-4);
   const band = (x, cc, w, aa) => oneMinus2(smoothstep2(float2(w).sub(aa), float2(w).add(aa), abs2(x.sub(cc))));
-  const eng = livery === 0 ? max2(band(cd, 0, 0.06, aaC), band(a, 0.8, 0.035, aaA)) : livery === 1 ? max2(max2(band(cd, 0.05, 0.018, aaC), band(cd, 0, 0.012, aaC)), step2(0.86, a)) : livery === 2 ? (() => {
+  const lv = (livery % 6 + 6) % 6;
+  const eng = lv === 0 ? max2(band(cd, 0, 0.06, aaC), band(a, 0.8, 0.035, aaA)) : lv === 1 ? max2(max2(band(cd, 0.055, 0.02, aaC), band(cd, 0, 0.014, aaC)), step2(0.86, a)) : lv === 2 ? (() => {
     const ez = float2(0.12).add(abs2(fract2(a.mul(5)).sub(0.5)).mul(0.16));
     return oneMinus2(smoothstep2(ez.sub(aaC), ez.add(aaC), cd)).mul(step2(0.14, a));
-  })() : max2(max2(band(a, 0.25, 0.04, aaA), band(a, 0.7, 0.04, aaA)), band(side1, 0, 0.03, aaS1).mul(step2(0.3, a)).mul(step2(a, 0.65)));
+  })() : lv === 3 ? max2(max2(band(a, 0.25, 0.042, aaA), band(a, 0.7, 0.042, aaA)), band(side1, 0, 0.03, aaS1).mul(step2(0.3, a)).mul(step2(a, 0.65))) : lv === 4 ? (() => {
+    const ch = fract2(a.mul(3.5).sub(cd.mul(1.8)));
+    return max2(smoothstep2(0.58, 0.62, ch).mul(ssInv(0.9, 0.86, ch)).mul(step2(0.12, a)).mul(step2(a, 0.9)), step2(0.91, a));
+  })() : (() => {
+    const gx = step2(0.5, fract2(cd.mul(8))), gy = step2(0.5, fract2(a.mul(9))), chk = abs2(gx.sub(gy)).mul(step2(0.56, a)).mul(step2(a, 0.86));
+    return max2(chk, band(cd, 0, 0.045, aaC));
+  })();
   const ck0 = max2(band(side0, 0, a.mul(0.02).add(0.035), aaS0), step2(0.9, a));
-  const ck = livery >= 2 ? max2(ck0, band(cd, 0, 0.05, aaC)) : ck0;
+  const ck = lv === 4 ? max2(ck0, band(fract2(a.mul(3).sub(cd.mul(1.5))), 0.5, float2(0.16), aaA)) : lv === 5 ? max2(ck0, max2(band(cd, 0.035, 0.016, aaC), band(cd, 0.085, 0.01, aaC))) : lv >= 2 ? max2(ck0, band(cd, 0, 0.05, aaC)) : ck0;
   const livM = clamp3(select2(L.z.lessThan(0.5), float2(0), select2(L.z.greaterThan(2.5), float2(1), select2(L.z.lessThan(1.5), eng, ck))), 0, 1);
   const wt = oneMinus2(u.uWear);
   const hWear = smoothstep2(wt.sub(0.06), wt.add(0.06), hMask.b);
@@ -73682,9 +73710,9 @@ function hullMaterial(c1, c2, glow, livery, texSize) {
   const hScorch = clamp3(u.uScorch.mul(ssInv(0.72, 0, a)).mul(hMask.a.mul(0.7).add(0.55)), 0, 0.95);
   col = mix2(col, vec32(0.02, 0.018, 0.016), hScorch);
   mat.colorNode = col.mul(hMask.r);
-  mat.roughnessNode = clamp3(mix2(materialRoughness2.mul(hMask.g.mul(0.55).add(0.72)), hMask.g.mul(0.28).add(0.3), hWear).add(hGrime.mul(0.34)).add(hScorch.mul(0.42)), 0.12, 1);
+  mat.roughnessNode = clamp3(mix2(materialRoughness2.mul(hMask.g.mul(0.55).add(0.72)), hMask.g.mul(0.28).add(0.3), hWear).add(hGrime.mul(0.34)).add(hScorch.mul(0.42)), 0.1, 1);
   mat.metalnessNode = mix2(materialMetalness2, float2(0.95), hWear).mul(oneMinus2(hScorch.mul(0.7))).mul(oneMinus2(hGrime.mul(0.3)));
-  mat.clearcoatNode = float2(0.82).mul(oneMinus2(hWear)).mul(oneMinus2(hGrime.mul(0.7))).mul(oneMinus2(hScorch));
+  mat.clearcoatNode = float2(baseCoat).mul(oneMinus2(hWear)).mul(oneMinus2(hGrime.mul(0.7))).mul(oneMinus2(hScorch));
   mat.normalNode = safeHullNormal(tex.normal, tuv, 0.85);
   const hT = clamp3(u.uHeat.mul(1.3).sub(a.mul(1.45)), 0, 1.3);
   const hCol = mix2(mix2(vec32(0.5, 0.03, 0), vec32(1, 0.3, 0.04), smoothstep2(0.1, 0.5, hT)), vec32(1, 0.88, 0.4), smoothstep2(0.55, 1.05, hT));
@@ -73871,7 +73899,7 @@ function petalMaterial() {
   return m;
 }
 
-// ../../src/game/podModel.ts
+// src/game/podModel.ts
 var SHADOW_KEYS = /* @__PURE__ */ new Set(["hull", "steel", "dark", "chrome", "carbon"]);
 var OPP_SHADOW_KEYS = /* @__PURE__ */ new Set(["hull", "steel", "dark"]);
 var BINDER_PTS = 18;
@@ -73944,6 +73972,8 @@ function bakeHullVertexColors(g, c1Hex, c2Hex, livery) {
   const n = g.attributes.position.count;
   const col = new Float32Array(n * 3);
   const band = (x, cc, w) => Math.abs(x - cc) < w ? 1 : 0;
+  const fr = (x) => x - Math.floor(x);
+  const lv = (livery % 6 + 6) % 6;
   for (let i = 0; i < n; i++) {
     let m = 0;
     if (liv) {
@@ -73951,13 +73981,20 @@ function bakeHullVertexColors(g, c1Hex, c2Hex, livery) {
       const cd = Math.min(c, 1 - c);
       if (z > 2.5) m = 1;
       else if (z >= 0.5 && z < 1.5) {
-        if (livery === 0) m = Math.max(band(cd, 0, 0.06), band(a, 0.8, 0.035));
-        else if (livery === 1) m = Math.max(band(cd, 0.05, 0.018), band(cd, 0, 0.012), a >= 0.86 ? 1 : 0);
-        else if (livery === 2) m = a >= 0.14 && cd < 0.12 + Math.abs(a * 5 % 1 - 0.5) * 0.16 ? 1 : 0;
-        else m = Math.max(band(a, 0.25, 0.04), band(a, 0.7, 0.04), a >= 0.3 && a <= 0.65 ? band(Math.abs(cd - 0.25), 0, 0.03) : 0);
+        if (lv === 0) m = Math.max(band(cd, 0, 0.06), band(a, 0.8, 0.035));
+        else if (lv === 1) m = Math.max(band(cd, 0.055, 0.02), band(cd, 0, 0.014), a >= 0.86 ? 1 : 0);
+        else if (lv === 2) m = a >= 0.14 && cd < 0.12 + Math.abs(fr(a * 5) - 0.5) * 0.16 ? 1 : 0;
+        else if (lv === 3) m = Math.max(band(a, 0.25, 0.042), band(a, 0.7, 0.042), a >= 0.3 && a <= 0.65 ? band(Math.abs(cd - 0.25), 0, 0.03) : 0);
+        else if (lv === 4) {
+          const ch = fr(a * 3.5 - cd * 1.8);
+          m = a >= 0.12 && a <= 0.9 && ch > 0.6 && ch < 0.88 || a >= 0.91 ? 1 : 0;
+        } else {
+          const chk = a >= 0.56 && a <= 0.86 && fr(cd * 8) >= 0.5 !== fr(a * 9) >= 0.5 ? 1 : 0;
+          m = Math.max(chk, band(cd, 0, 0.045));
+        }
       } else if (z >= 1.5) {
         const ck0 = Math.max(band(Math.abs(cd - 0.25 + (a - 0.5) * 0.12), 0, a * 0.02 + 0.035), a >= 0.9 ? 1 : 0);
-        m = livery >= 2 ? Math.max(ck0, band(cd, 0, 0.05)) : ck0;
+        m = lv === 4 ? Math.max(ck0, band(fr(a * 3 - cd * 1.5), 0.5, 0.16)) : lv === 5 ? Math.max(ck0, band(cd, 0.035, 0.016), band(cd, 0.085, 0.01)) : lv >= 2 ? Math.max(ck0, band(cd, 0, 0.05)) : ck0;
       }
     }
     col[i * 3] = c1.r + (c2.r - c1.r) * m;
@@ -74051,10 +74088,12 @@ function getOppGlow() {
 function getOppFarHull() {
   return sharedOppFarHull ?? (sharedOppFarHull = new MeshStandardMaterial({ vertexColors: true, metalness: 0.48, roughness: 0.34 }));
 }
-function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = false) {
+function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = false, opts) {
   const seg = isOpponent ? quality >= 3 ? 18 : 14 : quality >= 3 ? 40 : quality === 2 ? 28 : 20;
   const texSize = texRes >= 2048 && !isOpponent ? 2048 : 1024;
   const L = podLayout(def);
+  const liv = opts?.pattern !== void 0 && opts.pattern >= 0 ? opts.pattern : L.livery;
+  const fin = opts?.finish ?? 0;
   const shared = sharedPodMaterials(texSize);
   const glowCol = new Color(colors[2]);
   const pilot = PILOTS.find((p) => p.id === def.pilotId) ?? PILOTS[0];
@@ -74072,7 +74111,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     topY = Math.max(topY, em.y + eg.R);
     sumY += em.y;
   }
-  const ckBuilt = cockpitGeo(L, seg);
+  const ckBuilt = cockpitGeo(L, seg, pilot.species);
   const eye = new Vector3(0, L.cockpit.y, L.cockpit.z).add(ckBuilt.info.head).add(new Vector3(0, 0.24, 0.32));
   const hood = new Vector3(0, sumY / Math.max(1, L.engines.length) + topY * 0.35 + 0.35, frontZ - 1.2);
   const extraPB = new PartBuilder();
@@ -74094,7 +74133,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
         const mg = mergeGeometries(list, false);
         list.forEach((x) => x.dispose());
         if (!mg) continue;
-        if (k === "hull") bakeHullVertexColors(mg, colors[0], colors[1], L.livery);
+        if (k === "hull") bakeHullVertexColors(mg, colors[0], colors[1], liv);
         else if (k === "glow") bakeSolidColor(mg, glowBoost);
         mg.computeBoundingSphere();
         ownedGeos.push(mg);
@@ -74224,7 +74263,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     farGrp.visible = false;
     body.add(farGrp);
     const far = buildOpponentFarGeo(def, L);
-    const fhGeo = bakeHullVertexColors(far.hull.clone(), colors[0], colors[1], L.livery);
+    const fhGeo = bakeHullVertexColors(far.hull.clone(), colors[0], colors[1], liv);
     ownedGeos.push(fhGeo);
     const fgGeo = bakeSolidColor(far.glow.clone(), glowBoost);
     ownedGeos.push(fgGeo);
@@ -74272,9 +74311,9 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     };
     return { group, body, engines: engines2, exhaustLocal, eye, hood, update: update2, setEngineMotion: setEngineMotion2, setDistance, dispose: dispose2 };
   }
-  const hullL = hullMaterial(colors[0], colors[1], colors[2], L.livery, texSize);
-  const hullR = hullMaterial(colors[0], colors[1], colors[2], L.livery, texSize);
-  const hullC = hullMaterial(colors[0], colors[1], colors[2], L.livery, texSize);
+  const hullL = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
+  const hullR = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
+  const hullC = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
   const ckGrp = new Group();
   const glow = new MeshBasicMaterial({ color: glowCol.clone().multiplyScalar(1.2) });
   const flameL = flameMaterial(glowCol, false), coreL = flameMaterial(glowCol, true);
@@ -74355,7 +74394,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
         m.castShadow = false;
         m.receiveShadow = true;
         engGrp.add(m);
-        flaps.push({ m, sign: f.sign });
+        flaps.push({ m, sign: f.sign, side });
       }
       for (const core of [false, true]) {
         const m = new Mesh(core ? eg.flameCore : eg.flameOuter, side < 0 ? core ? coreL : flameL : core ? coreR : flameR);
@@ -74509,13 +74548,17 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     glow.color.copy(hc).multiplyScalar(1.1 + boost * 0.3);
     const fanAng = t * (16 + throttle * 42);
     for (let i = 0; i < fans.length; i++) fans[i].rotation.z = fanAng + i * 0.7;
-    const dmgF = Math.max(0, 0.45 - Math.min(dmgL, dmgR)) / 0.45;
+    const dmgFL = Math.max(0, 0.55 - dmgL) / 0.55, dmgFR = Math.max(0, 0.55 - dmgR) / 0.55;
     const dtF = Math.max(0, Math.min(0.1, t - flapT));
     flapT = t;
     boostK += (boost - boostK) * Math.min(1, dtF * (boost > boostK ? 9 : 4));
     const open = 0.1 * throttle + 0.9 * boostK * (1 + 0.04 * Math.sin(t * 43));
     for (let i = 0; i < petals.length; i++) petals[i].userData.open = open;
-    for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (airbrake * 1.05 + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
+    for (let i = 0; i < flaps.length; i++) {
+      const flp = flaps[i], df = flp.side < 0 ? dmgFL : dmgFR;
+      flp.m.rotation.y = flp.sign * (airbrake * 1.05 + (df > 0 ? (0.18 + 0.14 * Math.sin(t * 39 + i * 2.1)) * df : 0));
+      flp.m.rotation.z = df > 0.25 ? flp.sign * (df - 0.25) * 0.34 : 0;
+    }
     glowH += (heat - glowH) * Math.min(1, dtF * (heat > glowH ? 1.5 : 0.55));
     const uL = hullL.userData.u, uR = hullR.userData.u, uC = hullC.userData.u;
     uL.uScorch.value = Math.min(1, (1 - dmgL) * 1.1 + Math.max(0, heat - 0.75) * 0.8);
@@ -74541,7 +74584,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
   }, setCockpitSway, setCockpitVisible, dispose };
 }
 
-// ../../src/game/texCore.ts
+// src/game/texCore.ts
 var TileNoise = class {
   perm = new Uint8Array(512);
   vals = new Float32Array(256);
@@ -74642,10 +74685,10 @@ var TileNoise = class {
   }
 };
 
-// ../../src/game/texStore.ts
+// src/game/texStore.ts
 var MAX_BYTES = 420 * 1024 * 1024;
 
-// ../../src/game/textures.ts
+// src/game/textures.ts
 function toTex(data, size, srgb, aniso) {
   const t = new DataTexture(data, size, size, RGBAFormat);
   t.wrapS = t.wrapT = RepeatWrapping;
@@ -74675,7 +74718,7 @@ function macroTexture() {
   return macroTex;
 }
 
-// ../../src/game/sky.ts
+// src/game/sky.ts
 var TSL2 = three_tsl_exports;
 var { atan: atan2, cameraProjectionMatrix: cameraProjectionMatrix2, cross: cross3, dot: dot3, exp: exp3, float: float3, floor: floor2, fract: fract3, length: length3, max: max3, mix: mix3, modelViewMatrix: modelViewMatrix2, normalize: normalize4, oneMinus: oneMinus3, positionLocal: positionLocal3, pow: pow6, sin: sin3, smoothstep: smoothstep3, step: step3, texture: texture3, uniform: uniform3, vec2: vec23, vec3: vec33, vec4: vec42 } = TSL2;
 var ssInv2 = (a, b, x) => oneMinus3(smoothstep3(b, a, x));
@@ -74775,7 +74818,7 @@ function makeSky(theme, forEnv = false) {
   return { mesh, uniforms };
 }
 
-// pods.ts
+// tools/harness/pods.ts
 var W = 1280;
 var H = 720;
 var FORCE_WEBGL = location.search.includes("webgl");

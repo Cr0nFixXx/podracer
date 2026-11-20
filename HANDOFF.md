@@ -1,15 +1,46 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-`npm run dev` → **Magma-Inferno** fahren: das Höhlensystem hat jetzt 5 Kammern mit Felssäulen. Danach **Dschungelfluss-Sprint**: Bäume aus der Nähe ansehen und auf die Bildrate achten (mehr Bäume, Blattwerk mit Alpha-Test). (≈ 5 Min.)
+`npm run dev` → **Aquilaris-Küstenlauf** (19,5-m-Unterwassertunnel, 2 Skyway-Brücken, Flutschleuse) und **Frostspalt-Ring** (22,5-m-Gletschertunnel, verzweigte Eishöhle, Eisschleuse, Viadukt) Probe fahren; im **Hangar** die 6 Lackiermuster & 3 Finishes testen (≈ 6 Min.).
 
 ## Git-Stand (wichtig)
 - Lokales Repo im Projekt-Root, Branch **`B`**, Remote `origin` = `https://github.com/Cr0nFixXx/podracer.git`. **Pushen:** `git push origin B`.
-- **Der Ordner `.git` fehlt im Download und nach jedem Sandbox-Neustart – ebenso Binärdateien ohne bekannte Endung** (Git-Packs, Bundles). Zu Beginn von Session 14 geprüft: Ordner-Kopie war ohne Packs (kaputt), das Bundle fehlte, **die Base64-Textdatei war intakt und hat alle Commits wiederhergestellt.**
-- Deshalb gibt es nur noch **eine** Kopie, als Text: **`.archiv/repo-sicherung/podracer-git.tar.gz.b64.txt`** (+ `LIESMICH.txt`, `wiederherstellen.sh`, `wiederherstellen.ps1`).
-- **Committen immer mit `npm run save -- "Nachricht"`** (`tools/save.sh`): committet alles außer `.archiv/repo-sicherung`, schreibt die Textkopie neu und testet sie durch Probe-Wiederherstellung. Nie von Hand `git add -A`.
-- **Sitzungsbeginn ohne `.git`:** `npm run restore-git` (Textkopie → sonst GitHub; im zweiten Fall sind ungepushte Einzel-Commits weg, dann `npm run save`).
+- Fremde Alt-Dateien (`canblatt.html`, `canwelk.html`) liegen sauber in `.archiv/` (git-ignoriert).
+- **Doppelte `.git`-Sicherung in `.archive/`** (+ kompatible Spiegelkopie in `.archiv/repo-sicherung/`):
+  1. `.archive/git` – direkte vollständige Ordnerkopie von `.git`
+  2. `.archive/podracer-git.tar.gz.b64.txt` – vollständiges `.git` als Base64-Text (falls Binär-Packdateien beim Download gefiltert werden) + `wiederherstellen.sh` / `wiederherstellen.ps1` / `LIESMICH.txt`.
+- **Committen immer mit `npm run save -- "Nachricht"`** (`tools/save.sh`): committet alles außer `.archive`/`.archiv`, aktualisiert beide Sicherungen und führt Probe-Wiederherstellungen aus.
 - Commit-Autor ist der Platzhalter „Podracer Dev".
+
+## Stand: 2026-11-20 (Session 19) – Bugfixes, Brücken/Unterführungen, futuristische Schleusen, verzweigte Höhlen, Pod-Aufwertung
+
+### Erledigt in Session 19
+**Bugs**
+1. **Tunnel-Deckenhöhen deutlich erhöht (`trackBuilder.ts`, `world.ts`, `physics.ts`):** Aquilaris-Unterwasserröhren **19,5 m** (vorher 9 m; weiterhin 858 m voll unter Wasser mit Panorama-Ozeanfenstern), Ando-Prime-Gletschertunnel **22,5 m** (vorher 13 m), übrige Standard-Tunnel **19,5 m**, Abkürzungstunnel **18,5–20,5 m**, Höhlen **20,5–22 m** am Eingang bis **30–38 m** in den Kammern; breitere Schulterwölbung (`hw + 3,4 m`), Decken-Stalaktiten strikt ≥ 17,5 m über der Fahrbahn.
+2. **Schwebende Bodenplatten an Erhebungen/Schrägkurven behoben (`props.ts`, `trackDetail.ts`, `world.ts`, `scifi.ts`):** Reparatur-/Ladepads, Rampen-Warnpfeile, Rampen-Abschlussleisten und Start-/Ziellinien folgen jetzt Vertex-für-Vertex exakt Steigung, Straßenkrone und Querneigung (mit eingezogenem Randflansch); Geysir-/Lavaschlote, Startboxen, Straßen-Studs, Hindernis-Warnringe und Kisten sind an 3D-Steigung + Querneigung ausgerichtet und im Belag verankert; Licht-Leitstreifen bündig eingelassen statt +36 cm schwebend.
+3. **Schwebende Nebelschicht bei Gefälle behoben (`atmosphere.ts`, `Game.ts`):** Ursache war `max(y - baseY, 0)` (ergab unterhalb von `baseY` schlagartig 0 Höhennebel und darüber eine scharfe horizontale Kante). Ersetzt durch die exakte C¹-stetige Stammfunktion `F(u) = min(u, 0) + (1 - exp(-b·max(u, 0))) / b` mit weicher L'Hôpital-Überblendung für flache Sehstrahlen und tieferem Talboden `min(avgY - 14, minY - 6)`.
+4. **Schwebende Bögen & Strecken-Assets verankert (`world.ts`, `props.ts`, `setPieces.ts`, `trackDetail.ts`, `scifi.ts`, `landmarks.ts`):** Felsbögen, Einsturz-/Eisbögen, Vista-Naturbögen, Checkpoint-Tore, Sponsoren-Traversen, Startportale, Schleusen, Schwenkbrücken, Felsrinnen, Tribünenstützen, Holo-Masten, Schwebe-Baken, Schilderpfosten und Felsen/Wracks erhalten tiefe Geländefundamente bzw. Ausleger-Konsolen an der Fahrbahnunterseite (Oovo IV / Aquilaris).
+5. **Dschungelfluss-Sprint Abkürzungs-Ende behoben (`trackBuilder.ts`, `world.ts`):** `openL`/`openR` prüfte gegen `samples[ia].hw` statt der tatsächlichen Breite am Ausgang (offene Fläche 108 m → 24-m-Felswand stand mitten in der Piste) und ignorierte die Querneigung (−4,66 m Höhenversatz). Jetzt exakte Höhen-/Querneigungs-Anpassung (`stitchBranch`), sanft auslaufende Klippenwände und ausgesparte Böschungsschürzen auf allen 13 Strecken.
+
+**Verbesserungen / Soll**
+6. **Welt/Map „Ökumenopolis" (`city` / `neon`) vollständig entfernt:** 13 Strecken auf 8 Planeten; gespeicherte Profile mit `trackId: 'neon'` fallen sauber auf `boonta` zurück.
+7. **Feinere Gewitterblitze (`weather.ts`):** 64-teiliger fraktaler Hauptkanal (~3,4× feiner, kamera-senkrechtes 3D-Ribbon mit Quer-Falloff) + 5 sich verjüngende Hauptäste + 7 haardünne Zweigverästelungen + dezente Korona.
+8. **Strecken kreuzen sich über/unter sich selbst (`data.ts`, `trackBuilder.ts`, `terrain.ts`, `world.ts`, `physics.ts`, `screens.tsx`):** 12 höhengetrennte Kreuzungen (Δy = 35–41 m) auf 10 Strecken – obere Führung als Hohlkasten-Viaduktbrücke (`buildBridges`) mit Querträgern, Leuchtkanten, Widerlagern und Zwillingspfeilern (frei von der unteren Piste), untere Führung als Unterführungs-Tunnel (`tun = 4`) oder offene Schlucht; Terrain folgt der unteren Ebene; Karten/Minimap zeigen Brücken abgesetzt.
+9. **Futuristische, in die Szenerie verschmolzene Schleusen statt Fallgitter (`setPieces.ts`):** 3-spurige Panzerschleusen mit seitlichen Fels-/Eis-/Kristall-/Stations-Monolithen, Überkopf-Schleusenbrücke (solide Kollision), hydraulischen Verbund-Schottplatten, Plasma-Dichtnaht, dezentem Warn-Kraftfeld und Statusleisten.
+
+**TODO-Punkte**
+10. **Verzweigte & verbreiterte Höhlen (`trackBuilder.ts`, `world.ts`, `physics.ts`):** Höhlen auf Vulkan (2 Abzweige!), Ando Prime (`frost`, `howler`), Kristall und Dschungel verzweigen in eine echte zweite unterirdische Höhlenröhre (`Path.isCave`), die sich weiter hinten wieder vereint (inkl. Fels-Gabelpfeiler mit Doppel-Leuchtpfeil und KI-Feldaufteilung); Kammern verbreitern sich seitlich (`caveW`) mit modelliertem Höhlenboden-Mesh, Leuchtadern und Stalagmiten.
+11. **Podracer-Aufwertung (`settings.ts`, `podMaterials.ts`, `podParts.ts`, `podDesigns.ts`, `podModel.ts`, `post.ts`, `Game.ts`, `screens.tsx`):** 6 wählbare Lackiermuster + 3 Lackfinishes (Klarlack, Metallic, Matt) + 8 Vorlagen im Hangar, individuelle Alien-Pilotenköpfe/-Helme je Spezies, Cockpit-Überrollbügel & HUD-Ring, feinere Einlass-Statoren & Plasma-Koppler, seitengetrennte verbogene/flatternde Schadensklappen und Düsen-Hitzeflimmern auch für die zwei nächsten Gegner-Pods.
+
+### Verifiziert
+- `npm run check` (45 s Standard **und** 90 s Sturm-Haftung `GRIP=0.88`): 13/13 Strecken bestanden, **0 Tode, 0 NaN, 0,00 m Wand-Durchdringung, 0 Teleports**, Deck- & Overhead-Selbsttests grün.
+- Node-Geometrie- & 3D-Welt-Audit: alle 13 kompletten 3D-Welten + alle 10 Podracer (Hero & Rival, 6 Muster, 3 Finishes) + Blitz + Nebel gebaut (12 410 Meshes, 0 NaN/Inf, 0 Abkürzungs-/Kreuzungsfehler); KI-Befahrung aller Höhlenabzweige und der Dschungel-Abkürzung bestanden.
+- `npm run build` → `dist/index.html` fehlerfrei; `npm run save` → `.archive/git` + `.archive/podracer-git.tar.gz.b64.txt` (beide Wiederherstellungstests ok).
+
+### Nicht verifiziert
+- Optische Probefahrt & FPS auf echter GPU (kein Browser in dieser Sandbox): Brücken-Unteransichten, neue Schleusen, Höhlengabelungen, feine Blitze und Gegner-Hitzeflimmern im Live-Rennen sichten.
+
+---
 
 ## Stand: 2026-11-20 (Session 18) – Strecken erweitert, längere Tunnel/Höhlen, offene Flächen, HQ-Bäume, echte Foto-Texturen
 

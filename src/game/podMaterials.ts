@@ -35,12 +35,15 @@ function safeHullNormal(nTex: THREE.Texture, tuv: N, scale: number) {
 
 export interface HullU { uPaint2: { value: THREE.Color }; uGlowCol: { value: THREE.Color }; uWear: { value: number }; uScorch: { value: number }; uHeat: { value: number }; uGrime: { value: number }; uLivery: { value: number }; }
 
-/** Full hero hull material (player pod & Hangar showcase): clearcoat, chipped metal, grime, scorch, heat glow & LEDs. */
-export function hullMaterial(c1: string, c2: string, glow: string, livery: number, texSize: number) {
+/** Full hero hull material (player pod & Hangar showcase): 6 racing livery patterns, 3 paint finishes, chipped metal, scorch, heat glow & LEDs. */
+export function hullMaterial(c1: string, c2: string, glow: string, livery: number, texSize: number, finish = 0) {
   const tex = hullTextures(texSize);
   const mat = new THREE.MeshPhysicalNodeMaterial();
-  mat.color = new THREE.Color(c1); mat.metalness = 0.48; mat.roughness = 0.34;
-  mat.clearcoat = 0.82; mat.clearcoatRoughness = 0.14; mat.envMapIntensity = 0.95;
+  const baseMet = finish === 1 ? 0.88 : finish === 2 ? 0.2 : 0.48;
+  const baseRgh = finish === 1 ? 0.17 : finish === 2 ? 0.62 : 0.32;
+  const baseCoat = finish === 1 ? 0.95 : finish === 2 ? 0.06 : 0.84;
+  mat.color = new THREE.Color(c1); mat.metalness = baseMet; mat.roughness = baseRgh;
+  mat.clearcoat = baseCoat; mat.clearcoatRoughness = finish === 2 ? 0.45 : 0.12; mat.envMapIntensity = finish === 1 ? 1.2 : 0.95;
   const u = {
     uPaint2: uniform(new THREE.Color(c2)), uGlowCol: uniform(new THREE.Color(glow)), uWear: uniform(0.28),
     uScorch: uniform(0), uHeat: uniform(0), uGrime: uniform(0.75), uLivery: uniform(livery),
@@ -54,12 +57,19 @@ export function hullMaterial(c1: string, c2: string, glow: string, livery: numbe
   const side0 = abs(cd.sub(0.25).add(a.sub(0.5).mul(0.12))), side1 = abs(cd.sub(0.25));
   const aaS0 = fwidth(side0).mul(1.5).add(1e-4), aaS1 = fwidth(side1).mul(1.5).add(1e-4);
   const band = (x: N, cc: number, w: N, aa: N) => oneMinus(smoothstep(float(w).sub(aa), float(w).add(aa), abs(x.sub(cc))));
-  const eng = livery === 0 ? max(band(cd, 0.0, 0.06, aaC), band(a, 0.8, 0.035, aaA))
-    : livery === 1 ? max(max(band(cd, 0.05, 0.018, aaC), band(cd, 0.0, 0.012, aaC)), step(0.86, a))
-    : livery === 2 ? (() => { const ez = float(0.12).add(abs(fract(a.mul(5)).sub(0.5)).mul(0.16)); return oneMinus(smoothstep(ez.sub(aaC), ez.add(aaC), cd)).mul(step(0.14, a)); })()
-    : max(max(band(a, 0.25, 0.04, aaA), band(a, 0.7, 0.04, aaA)), band(side1, 0.0, 0.03, aaS1).mul(step(0.3, a)).mul(step(a, 0.65)));
+  const lv = ((livery % 6) + 6) % 6;
+  // 6 distinct anti-aliased motorsport / Outer-Rim hull patterns:
+  // 0 Klassik · 1 Doppelstreifen · 2 Flammenzacken · 3 Rennringe · 4 V-Chevron · 5 Karo-Rallye
+  const eng = lv === 0 ? max(band(cd, 0.0, 0.06, aaC), band(a, 0.8, 0.035, aaA))
+    : lv === 1 ? max(max(band(cd, 0.055, 0.02, aaC), band(cd, 0.0, 0.014, aaC)), step(0.86, a))
+    : lv === 2 ? (() => { const ez = float(0.12).add(abs(fract(a.mul(5)).sub(0.5)).mul(0.16)); return oneMinus(smoothstep(ez.sub(aaC), ez.add(aaC), cd)).mul(step(0.14, a)); })()
+    : lv === 3 ? max(max(band(a, 0.25, 0.042, aaA), band(a, 0.7, 0.042, aaA)), band(side1, 0.0, 0.03, aaS1).mul(step(0.3, a)).mul(step(a, 0.65)))
+    : lv === 4 ? (() => { const ch = fract(a.mul(3.5).sub(cd.mul(1.8))); return max(smoothstep(0.58, 0.62, ch).mul(ssInv(0.9, 0.86, ch)).mul(step(0.12, a)).mul(step(a, 0.9)), step(0.91, a)); })()
+    : (() => { const gx = step(0.5, fract(cd.mul(8.0))), gy = step(0.5, fract(a.mul(9.0))), chk = abs(gx.sub(gy)).mul(step(0.56, a)).mul(step(a, 0.86)); return max(chk, band(cd, 0.0, 0.045, aaC)); })();
   const ck0 = max(band(side0, 0.0, a.mul(0.02).add(0.035), aaS0), step(0.9, a));
-  const ck = livery >= 2 ? max(ck0, band(cd, 0.0, 0.05, aaC)) : ck0;
+  const ck = lv === 4 ? max(ck0, band(fract(a.mul(3.0).sub(cd.mul(1.5))), 0.5, float(0.16), aaA))
+    : lv === 5 ? max(ck0, max(band(cd, 0.035, 0.016, aaC), band(cd, 0.085, 0.01, aaC)))
+    : lv >= 2 ? max(ck0, band(cd, 0.0, 0.05, aaC)) : ck0;
   const livM = clamp(select(L.z.lessThan(0.5), float(0), select(L.z.greaterThan(2.5), float(1), select(L.z.lessThan(1.5), eng, ck))), 0.0, 1.0);
 
   const wt = oneMinus(u.uWear);
@@ -73,9 +83,9 @@ export function hullMaterial(c1: string, c2: string, glow: string, livery: numbe
   const hScorch = clamp(u.uScorch.mul(ssInv(0.72, 0.0, a)).mul(hMask.a.mul(0.7).add(0.55)), 0.0, 0.95);
   col = mix(col, vec3(0.02, 0.018, 0.016), hScorch);
   mat.colorNode = col.mul(hMask.r);
-  mat.roughnessNode = clamp(mix(materialRoughness.mul(hMask.g.mul(0.55).add(0.72)), hMask.g.mul(0.28).add(0.3), hWear).add(hGrime.mul(0.34)).add(hScorch.mul(0.42)), 0.12, 1.0);
+  mat.roughnessNode = clamp(mix(materialRoughness.mul(hMask.g.mul(0.55).add(0.72)), hMask.g.mul(0.28).add(0.3), hWear).add(hGrime.mul(0.34)).add(hScorch.mul(0.42)), 0.1, 1.0);
   mat.metalnessNode = mix(materialMetalness, float(0.95), hWear).mul(oneMinus(hScorch.mul(0.7))).mul(oneMinus(hGrime.mul(0.3)));
-  mat.clearcoatNode = float(0.82).mul(oneMinus(hWear)).mul(oneMinus(hGrime.mul(0.7))).mul(oneMinus(hScorch));
+  mat.clearcoatNode = float(baseCoat).mul(oneMinus(hWear)).mul(oneMinus(hGrime.mul(0.7))).mul(oneMinus(hScorch));
   mat.normalNode = safeHullNormal(tex.normal, tuv, 0.85);
   // Session 17 – heat glow as the overheating indicator: it starts dull red at the nozzle (a = 0) and creeps forward along the engine as
   // the heat rises; the local temperature fades towards the front, so the colour runs yellow-white → orange → dark red and only reaches the

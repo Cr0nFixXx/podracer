@@ -97,6 +97,8 @@ function bakeHullVertexColors(g: THREE.BufferGeometry, c1Hex: string, c2Hex: str
   const n = g.attributes.position.count;
   const col = new Float32Array(n * 3);
   const band = (x: number, cc: number, w: number) => Math.abs(x - cc) < w ? 1 : 0;
+  const fr = (x: number) => x - Math.floor(x);
+  const lv = ((livery % 6) + 6) % 6;
   for (let i = 0; i < n; i++) {
     let m = 0;
     if (liv) {
@@ -104,13 +106,15 @@ function bakeHullVertexColors(g: THREE.BufferGeometry, c1Hex: string, c2Hex: str
       const cd = Math.min(c, 1 - c);
       if (z > 2.5) m = 1;
       else if (z >= 0.5 && z < 1.5) {
-        if (livery === 0) m = Math.max(band(cd, 0, 0.06), band(a, 0.8, 0.035));
-        else if (livery === 1) m = Math.max(band(cd, 0.05, 0.018), band(cd, 0, 0.012), a >= 0.86 ? 1 : 0);
-        else if (livery === 2) m = (a >= 0.14 && cd < 0.12 + Math.abs(((a * 5) % 1) - 0.5) * 0.16) ? 1 : 0;
-        else m = Math.max(band(a, 0.25, 0.04), band(a, 0.7, 0.04), (a >= 0.3 && a <= 0.65) ? band(Math.abs(cd - 0.25), 0, 0.03) : 0);
+        if (lv === 0) m = Math.max(band(cd, 0, 0.06), band(a, 0.8, 0.035));
+        else if (lv === 1) m = Math.max(band(cd, 0.055, 0.02), band(cd, 0, 0.014), a >= 0.86 ? 1 : 0);
+        else if (lv === 2) m = (a >= 0.14 && cd < 0.12 + Math.abs(fr(a * 5) - 0.5) * 0.16) ? 1 : 0;
+        else if (lv === 3) m = Math.max(band(a, 0.25, 0.042), band(a, 0.7, 0.042), (a >= 0.3 && a <= 0.65) ? band(Math.abs(cd - 0.25), 0, 0.03) : 0);
+        else if (lv === 4) { const ch = fr(a * 3.5 - cd * 1.8); m = ((a >= 0.12 && a <= 0.9 && ch > 0.6 && ch < 0.88) || a >= 0.91) ? 1 : 0; }
+        else { const chk = (a >= 0.56 && a <= 0.86 && ((fr(cd * 8) >= 0.5) !== (fr(a * 9) >= 0.5))) ? 1 : 0; m = Math.max(chk, band(cd, 0, 0.045)); }
       } else if (z >= 1.5) {
         const ck0 = Math.max(band(Math.abs(cd - 0.25 + (a - 0.5) * 0.12), 0, a * 0.02 + 0.035), a >= 0.9 ? 1 : 0);
-        m = livery >= 2 ? Math.max(ck0, band(cd, 0, 0.05)) : ck0;
+        m = lv === 4 ? Math.max(ck0, band(fr(a * 3 - cd * 1.5), 0.5, 0.16)) : lv === 5 ? Math.max(ck0, band(cd, 0.035, 0.016), band(cd, 0.085, 0.01)) : lv >= 2 ? Math.max(ck0, band(cd, 0, 0.05)) : ck0;
       }
     }
     col[i * 3] = c1.r + (c2.r - c1.r) * m;
@@ -182,10 +186,12 @@ let sharedOppFarHull: THREE.MeshStandardMaterial | null = null;
 function getOppGlow() { return sharedOppGlow ?? (sharedOppGlow = new THREE.MeshBasicMaterial({ vertexColors: true })); }
 function getOppFarHull() { return sharedOppFarHull ?? (sharedOppFarHull = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.48, roughness: 0.34 })); }
 
-export function buildPodModel(def: PodDef, colors: [string, string, string], quality = 2, texRes = 1024, isOpponent = false): PodVisual {
+export function buildPodModel(def: PodDef, colors: [string, string, string], quality = 2, texRes = 1024, isOpponent = false, opts?: { pattern?: number; finish?: number }): PodVisual {
   const seg = isOpponent ? (quality >= 3 ? 18 : 14) : (quality >= 3 ? 40 : quality === 2 ? 28 : 20);
   const texSize = texRes >= 2048 && !isOpponent ? 2048 : 1024;
   const L = podLayout(def);
+  const liv = opts?.pattern !== undefined && opts.pattern >= 0 ? opts.pattern : L.livery;
+  const fin = opts?.finish ?? 0;
   const shared = sharedPodMaterials(texSize) as Record<string, THREE.Material>;
   const glowCol = new THREE.Color(colors[2]);
   const pilot = PILOTS.find(p => p.id === def.pilotId) ?? PILOTS[0];
@@ -201,7 +207,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     exhaustLocal.push(new THREE.Vector3(em.x, em.y, em.z + eg.exhaustZ));
     frontZ = Math.max(frontZ, em.z + eg.frontZ); topY = Math.max(topY, em.y + eg.R); sumY += em.y;
   }
-  const ckBuilt = cockpitGeo(L, seg);
+  const ckBuilt = cockpitGeo(L, seg, pilot.species);
   const eye = new THREE.Vector3(0, L.cockpit.y, L.cockpit.z).add(ckBuilt.info.head).add(new THREE.Vector3(0, 0.24, 0.32));
   const hood = new THREE.Vector3(0, sumY / Math.max(1, L.engines.length) + topY * 0.35 + 0.35, frontZ - 1.2);
 
@@ -223,7 +229,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     const addBucket = (buckets: Map<string, THREE.BufferGeometry[]>, parent: THREE.Object3D) => {
       for (const [k, list] of buckets) {
         const mg = mergeGeometries(list, false); list.forEach(x => x.dispose()); if (!mg) continue;
-        if (k === 'hull') bakeHullVertexColors(mg, colors[0], colors[1], L.livery);
+        if (k === 'hull') bakeHullVertexColors(mg, colors[0], colors[1], liv);
         else if (k === 'glow') bakeSolidColor(mg, glowBoost);
         mg.computeBoundingSphere(); ownedGeos.push(mg);
         const mat = k === 'hull' ? oppHull : k === 'glow' ? oppGlow : k === 'suit' ? suit : shared[k];
@@ -304,7 +310,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     // Far LOD (> 48 m): 3 shared-material draws, ~380 tris!
     const farGrp = new THREE.Group(); farGrp.visible = false; body.add(farGrp);
     const far = buildOpponentFarGeo(def, L);
-    const fhGeo = bakeHullVertexColors(far.hull.clone(), colors[0], colors[1], L.livery); ownedGeos.push(fhGeo);
+    const fhGeo = bakeHullVertexColors(far.hull.clone(), colors[0], colors[1], liv); ownedGeos.push(fhGeo);
     const fgGeo = bakeSolidColor(far.glow.clone(), glowBoost); ownedGeos.push(fgGeo);
     const fhM = new THREE.Mesh(fhGeo, getOppFarHull()); fhM.receiveShadow = true; farGrp.add(fhM);
     farGrp.add(new THREE.Mesh(far.dark, shared.dark));
@@ -334,9 +340,9 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
   }
 
   // ==================== FULL HERO PLAYER / HANGAR POD ====================
-  const hullL = hullMaterial(colors[0], colors[1], colors[2], L.livery, texSize);
-  const hullR = hullMaterial(colors[0], colors[1], colors[2], L.livery, texSize);
-  const hullC = hullMaterial(colors[0], colors[1], colors[2], L.livery, texSize); // cockpit: own instance (no engine heat glow)
+  const hullL = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
+  const hullR = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
+  const hullC = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin); // cockpit: own instance (no engine heat glow)
   const ckGrp = new THREE.Group(); // cockpit hangs on its cables and sways (setCockpitSway)
   const glow = new THREE.MeshBasicMaterial({ color: glowCol.clone().multiplyScalar(1.2) });
   const flameL = flameMaterial(glowCol, false), coreL = flameMaterial(glowCol, true);
@@ -359,7 +365,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
   const attachExtraToEngines = def.id === 'aurora' || def.id === 'brute' || def.id === 'gasvaro' || def.id === 'bomquad' || def.id === 'teemo';
   const engines: THREE.Object3D[] = [];
   const fans: THREE.Mesh[] = [];
-  const flaps: { m: THREE.Mesh; sign: number }[] = []; const petals: THREE.Mesh[] = [];
+  const flaps: { m: THREE.Mesh; sign: number; side: number }[] = []; const petals: THREE.Mesh[] = [];
   const flames: { m: THREE.Mesh; side: number }[] = [];
   const sideGeos: THREE.BufferGeometry[] = [];
   const hc = new THREE.Color(), hot = new THREE.Color('#ff5a1a');
@@ -385,7 +391,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
       }
       const fan = new THREE.Mesh(eg.fan, shared.dark); fan.position.set(ox, oy, oz + eg.fanZ); fan.castShadow = false; engGrp.add(fan); fans.push(fan);
       { const pm = new THREE.Mesh(eg.petals, petalMaterial()); pm.position.set(ox, oy, oz); pm.userData.open = 0; pm.castShadow = false; engGrp.add(pm); petals.push(pm); }
-      for (const f of eg.flaps) { const m = new THREE.Mesh(f.geo, hull); m.position.set(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z); m.castShadow = false; m.receiveShadow = true; engGrp.add(m); flaps.push({ m, sign: f.sign }); }
+      for (const f of eg.flaps) { const m = new THREE.Mesh(f.geo, hull); m.position.set(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z); m.castShadow = false; m.receiveShadow = true; engGrp.add(m); flaps.push({ m, sign: f.sign, side }); }
       for (const core of [false, true]) {
         const m = new THREE.Mesh(core ? eg.flameCore : eg.flameOuter, side < 0 ? (core ? coreL : flameL) : (core ? coreR : flameR));
         m.position.set(ox, oy, oz + eg.flameZ); m.renderOrder = 2; engGrp.add(m); flames.push({ m, side });
@@ -475,13 +481,17 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     for (let i = 0; i < fans.length; i++) fans[i].rotation.z = fanAng + i * 0.7;
     // Session 13: on a badly damaged pod the air-brake flaps rattle loose in the airstream
     // (dmgL / dmgR are HEALTH fractions: 1 = intact – the first version read them as damage and rattled on every healthy pod)
-    const dmgF = Math.max(0, 0.45 - Math.min(dmgL, dmgR)) / 0.45;
-    // Session 16 fix: boosting opens the NOZZLE PETALS at the engine exit (afterburner), not the side air-brake flaps.
+    // Per-engine battle damage: below 55 % HP on an engine, THAT engine's cowling flaps bend ajar, twist & shudder in the airstream!
+    const dmgFL = Math.max(0, 0.55 - dmgL) / 0.55, dmgFR = Math.max(0, 0.55 - dmgR) / 0.55;
     const dtF = Math.max(0, Math.min(0.1, t - flapT)); flapT = t;
     boostK += (boost - boostK) * Math.min(1, dtF * (boost > boostK ? 9 : 4));
     const open = 0.1 * throttle + 0.9 * boostK * (1 + 0.04 * Math.sin(t * 43));
     for (let i = 0; i < petals.length; i++) petals[i].userData.open = open;
-    for (let i = 0; i < flaps.length; i++) flaps[i].m.rotation.y = flaps[i].sign * (airbrake * 1.05 + (dmgF > 0 ? (0.12 + 0.1 * Math.sin(t * 37 + i * 1.9)) * dmgF : 0));
+    for (let i = 0; i < flaps.length; i++) {
+      const flp = flaps[i], df = flp.side < 0 ? dmgFL : dmgFR;
+      flp.m.rotation.y = flp.sign * (airbrake * 1.05 + (df > 0 ? (0.18 + 0.14 * Math.sin(t * 39 + i * 2.1)) * df : 0));
+      flp.m.rotation.z = df > 0.25 ? flp.sign * (df - 0.25) * 0.34 : 0; // bent hinge droop when badly damaged
+    }
     // The hull glow lags the heat value (metal warms up slowly and stays hot for a while) – a readable overheating indicator
     glowH += (heat - glowH) * Math.min(1, dtF * (heat > glowH ? 1.5 : 0.55));
     const uL = hullL.userData.u as HullU, uR = hullR.userData.u as HullU, uC = hullC.userData.u as HullU;

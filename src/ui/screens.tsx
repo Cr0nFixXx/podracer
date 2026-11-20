@@ -4,19 +4,23 @@ import { KeyBindings, PadBindings } from './KeyBindings';
 import { sanitizeEnv, timeOptionsFor, weatherOptionsFor, type TimeOfDay, type WeatherKind } from '../game/environment';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, STAT_LABELS, THEMES, TRACKS, type StatKey } from '../game/data';
-import { effectiveStats, type Profile } from '../game/settings';
+import { effectiveStats, LIVERY_PATTERNS, PAINT_FINISHES, type PaintFinish, type Profile } from '../game/settings';
 import { buildTrack, type TrackData } from '../game/trackBuilder';
 import { CAMERA_NAMES, fmt } from '../game/Game';
 import { Btn, Panel, Slider, StatBar } from './common';
 import PodPreview from './PodPreview';
 import bg from '../assets/menu-bg.jpg';
 
-/** Livery presets (primary, secondary, engine glow) */
-const LIVERIES: { name: string; colors: [string, string, string] }[] = [
-  { name: 'Boonta Gold', colors: ['#d8a21c', '#2a2622', '#ffd24a'] }, { name: 'Tarnkappe', colors: ['#1c1f26', '#3a4250', '#4ad2ff'] },
-  { name: 'Hutt-Kartell', colors: ['#5a7a2a', '#c9a24a', '#b4ff5a'] }, { name: 'Imperial', colors: ['#d9dde3', '#20242c', '#ff4a4a'] },
-  { name: 'Mos Espa Rost', colors: ['#a8502a', '#d8c8a8', '#ff9a3a'] }, { name: 'Neon-Nacht', colors: ['#3a1c6a', '#ff3ad0', '#c87aff'] },
-  { name: 'Gletscher', colors: ['#cfe8f8', '#2d6fd6', '#7fe8ff'] }, { name: 'Rennrot', colors: ['#c21c1c', '#f0ece4', '#ffb347'] },
+/** Curated livery presets (primary, secondary, engine glow + pattern & finish) */
+const LIVERIES: { name: string; colors: [string, string, string]; pattern: number; finish: PaintFinish }[] = [
+  { name: 'Boonta Gold', colors: ['#d8a21c', '#24201c', '#ffd24a'], pattern: 1, finish: 1 },
+  { name: 'Tarnkappe', colors: ['#1c2028', '#424c5c', '#4ad2ff'], pattern: 4, finish: 2 },
+  { name: 'Hutt-Kartell', colors: ['#527426', '#d2aa4c', '#b4ff5a'], pattern: 2, finish: 0 },
+  { name: 'Imperial', colors: ['#dce0e8', '#1e222a', '#ff4a4a'], pattern: 3, finish: 0 },
+  { name: 'Mos Espa Rost', colors: ['#a8502a', '#dfd0b2', '#ff9a3a'], pattern: 0, finish: 2 },
+  { name: 'Naboo Chrom', colors: ['#cfd8e6', '#d8a828', '#68e8ff'], pattern: 1, finish: 1 },
+  { name: 'Gletscher', colors: ['#cfe8f8', '#2466cc', '#7fe8ff'], pattern: 4, finish: 0 },
+  { name: 'Apex-Rallye', colors: ['#c21c22', '#f2eee6', '#ffb347'], pattern: 5, finish: 0 },
 ];
 
 type Upd = (fn: (p: Profile) => Profile) => void;
@@ -50,7 +54,7 @@ export function MainMenu({ profile, go }: { profile: Profile; go: (s: string) =>
         <div className="mt-12 text-stone-400 text-xs tracking-widest uppercase">Aktueller Pod: <span className="text-amber-300">{pod.name}</span></div>
       </div>
       <div className="relative w-1/2">
-        <PodPreview podId={profile.podId} colors={profile.custom[profile.podId].colors} className="absolute inset-0" />
+        <PodPreview podId={profile.podId} colors={profile.custom[profile.podId].colors} pattern={profile.custom[profile.podId].pattern} finish={profile.custom[profile.podId].finish} className="absolute inset-0" />
       </div>
       </div>
       </Fit>
@@ -73,13 +77,23 @@ function TrackMap({ id, className }: { id: string; className?: string }) {
     for (const path of td.paths) {
       for (let i = 0; i < path.samples.length - 4; i += 4) {
         const a = path.samples[i], bb = path.samples[i + 4];
+        if (path.id === 0 && a.bridge) continue; // bridges drawn cleanly on top below
         const t = (a.y - minY) / (maxY - minY);
-        ctx.strokeStyle = a.gap ? 'rgba(255,60,60,0.9)' : path.id ? '#ffd27a' : `hsl(${40 - t * 30}, 90%, ${55 + t * 25}%)`;
-        ctx.lineWidth = path.id ? 2 : 4; ctx.setLineDash(path.id ? [3, 3] : []);
+        ctx.strokeStyle = a.gap ? 'rgba(255,60,60,0.9)' : path.isCave ? '#67e8f9' : path.id ? '#ffd27a' : `hsl(${40 - t * 30}, 90%, ${52 + t * 26}%)`;
+        ctx.lineWidth = path.id ? 2.2 : 4; ctx.setLineDash(path.id ? [3, 3] : []);
         ctx.beginPath(); ctx.moveTo(X(a.x), Z(a.z)); ctx.lineTo(X(bb.x), Z(bb.z)); ctx.stroke();
       }
     }
     ctx.setLineDash([]);
+    // Overdraw elevated viaduct bridges with dark casing so self-crossings are unmistakable
+    const ms = td.main.samples;
+    for (const [col, lw] of [['rgba(0,0,0,0.92)', 8], ['#7dd3fc', 4.4]] as const) {
+      ctx.strokeStyle = col; ctx.lineWidth = lw;
+      for (let i = 0; i < ms.length - 4; i += 4) {
+        if (!ms[i].bridge) continue;
+        ctx.beginPath(); ctx.moveTo(X(ms[i].x), Z(ms[i].z)); ctx.lineTo(X(ms[i + 4].x), Z(ms[i + 4].z)); ctx.stroke();
+      }
+    }
     const st = td.main.samples[td.startIdx]; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(X(st.x), Z(st.z), 6, 0, Math.PI * 2); ctx.fill();
     if (!td.main.closed) { const f = td.main.samples[td.finishIdx]; ctx.fillStyle = '#4ade80'; ctx.beginPath(); ctx.arc(X(f.x), Z(f.z), 6, 0, Math.PI * 2); ctx.fill(); }
   }, [id]);
@@ -125,7 +139,7 @@ export function RaceSetup({ profile, update, go, start }: { profile: Profile; up
           <Panel title={track.name}>
             <div className="relative h-[330px] w-full rounded overflow-hidden" style={{ background: `radial-gradient(ellipse at 30% 20%, ${theme.skyHorizon}33, ${theme.skyTop}22 60%, #000a)` }}>
               <TrackMap id={track.id} className="w-full h-full" />
-              <div className="absolute top-3 left-3 text-[10px] uppercase tracking-widest text-stone-300 bg-black/50 px-2 py-1">● Start {track.type === 'sprint' && <span className="text-green-400 ml-2">● Ziel</span>} <span className="text-amber-300 ml-2">┅ Abkürzung</span> <span className="text-red-400 ml-2">▬ Sprung</span></div>
+              <div className="absolute top-3 left-3 text-[10px] uppercase tracking-widest text-stone-300 bg-black/50 px-2 py-1">● Start {track.type === 'sprint' && <span className="text-green-400 ml-2">● Ziel</span>} <span className="text-amber-300 ml-2">┅ Abkürzung</span> {td.crossings.length > 0 && <span className="text-sky-300 ml-2">▬ Brücke</span>} {td.paths.some(p => p.isCave) && <span className="text-cyan-300 ml-2">┅ Höhle</span>} <span className="text-red-400 ml-2">▬ Sprung</span></div>
             </div>
             <p className="text-stone-300 mt-4 leading-relaxed">{track.desc}</p>
             <div className="grid grid-cols-2 @3xl:grid-cols-4 gap-3 mt-4 text-center">
@@ -205,32 +219,44 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
           </Panel>
           <div className="flex flex-col gap-4 min-h-0">
             <div className="relative flex-1 min-h-[210px] border border-amber-500/20 bg-black/40 clip-corner overflow-hidden">
-              <PodPreview podId={sel} colors={custom.colors} className="absolute inset-0" />
-              <div className="absolute top-4 left-5 pointer-events-none">
-                <div className="font-display text-3xl text-amber-100">{pod.name}</div>
-                <div className="text-stone-300 text-sm max-w-md">{pod.desc}</div>
+              <PodPreview podId={sel} colors={custom.colors} pattern={custom.pattern} finish={custom.finish} className="absolute inset-0" />
+              <div className="absolute top-3 left-4 pointer-events-none">
+                <div className="font-display text-2xl text-amber-100">{pod.name}</div>
+                <div className="text-stone-300 text-xs max-w-md">{pod.desc}</div>
               </div>
-              <div className="absolute bottom-3 right-4 text-[10px] uppercase tracking-widest text-stone-400">Ziehen zum Drehen</div>
+              <div className="absolute bottom-2.5 right-3 text-[10px] uppercase tracking-widest text-stone-400">Ziehen · Mausrad Zoom</div>
             </div>
-            <Panel title="Lackierung">
-              <div className="grid grid-cols-1 @3xl:grid-cols-3 gap-4">
-                {['Primär', 'Sekundär', 'Triebwerksglühen'].map((l, i) => (
+            <Panel title="Lackierung & Design">
+              <div className="grid grid-cols-3 gap-3">
+                {['Primär', 'Sekundär', 'Glühen'].map((l, i) => (
                   <div key={l}>
-                    <div className="flex items-center justify-between mb-2"><span className="text-[11px] uppercase tracking-widest text-stone-300">{l}</span><input type="color" value={custom.colors[i]} onChange={e => setColor(i, e.target.value)} className="w-8 h-8 bg-transparent cursor-pointer" /></div>
-                    <div className="flex flex-wrap gap-1.5">{SWATCHES.map(s => <button key={s} onClick={() => setColor(i, s)} className={`w-6 h-6 border ${custom.colors[i] === s ? 'border-white scale-110' : 'border-black/50'}`} style={{ background: s }} />)}</div>
+                    <div className="flex items-center justify-between mb-1"><span className="text-[10px] uppercase tracking-widest text-stone-300">{l}</span><input type="color" value={custom.colors[i]} onChange={e => setColor(i, e.target.value)} className="w-6 h-6 bg-transparent cursor-pointer" /></div>
+                    <div className="flex flex-wrap gap-1">{SWATCHES.map(s => <button key={s} onClick={() => setColor(i, s)} className={`w-5 h-5 border ${custom.colors[i] === s ? 'border-white scale-110' : 'border-black/50'}`} style={{ background: s }} />)}</div>
                   </div>
                 ))}
               </div>
-              <div className="text-[11px] uppercase tracking-widest text-stone-300 mt-4 mb-2">Lackierungs-Vorlagen</div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex items-center justify-between gap-2 mt-2.5">
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-[10px] uppercase tracking-widest text-stone-400 mr-1">Muster</span>
+                  {LIVERY_PATTERNS.map((pn, i) => (
+                    <button key={pn} onClick={() => setCustom({ ...custom, pattern: i })} className={`px-1.5 py-0.5 border text-[10px] ${custom.pattern === i ? 'border-amber-300 bg-amber-400/15 text-amber-200' : 'border-stone-700 text-stone-300 hover:border-stone-400'}`}>{pn}</button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {PAINT_FINISHES.map((fn, i) => (
+                    <button key={fn} onClick={() => setCustom({ ...custom, finish: i as PaintFinish })} className={`px-1.5 py-0.5 border text-[10px] ${(custom.finish ?? 0) === i ? 'border-cyan-400 bg-cyan-400/15 text-cyan-200' : 'border-stone-700 text-stone-400 hover:border-stone-400'}`}>{fn}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mt-2">
                 {LIVERIES.map(l => (
-                  <button key={l.name} onClick={() => setCustom({ ...custom, colors: [...l.colors] as [string, string, string] })} title={l.name}
-                    className={`flex items-center gap-2 px-2 py-1.5 border text-[11px] ${custom.colors.join() === l.colors.join() ? 'border-amber-400 text-amber-200' : 'border-stone-700 text-stone-300 hover:border-stone-400'}`}>
-                    <span className="flex">{l.colors.map((c, i) => <span key={i} className="w-3.5 h-3.5 border border-black/50" style={{ background: c }} />)}</span>{l.name}
+                  <button key={l.name} onClick={() => setCustom({ ...custom, colors: [...l.colors] as [string, string, string], pattern: l.pattern, finish: l.finish })} title={l.name}
+                    className={`flex items-center gap-1.5 px-1.5 py-1 border text-[10px] ${custom.colors.join() === l.colors.join() && custom.pattern === l.pattern ? 'border-amber-400 text-amber-200' : 'border-stone-700 text-stone-300 hover:border-stone-400'}`}>
+                    <span className="flex">{l.colors.map((c, i) => <span key={i} className="w-3 h-3 border border-black/50" style={{ background: c }} />)}</span>{l.name}
                   </button>
                 ))}
-                <button onClick={() => setCustom({ ...custom, colors: [...pod.colors] as [string, string, string] })}
-                  className={`px-2 py-1.5 border text-[11px] ${custom.colors.join() === pod.colors.join() ? 'border-amber-400 text-amber-200' : 'border-stone-700 text-stone-300 hover:border-stone-400'}`}>Werkslackierung</button>
+                <button onClick={() => setCustom({ ...custom, colors: [...pod.colors] as [string, string, string], pattern: undefined, finish: 0 })}
+                  className={`px-1.5 py-1 border text-[10px] ${custom.colors.join() === pod.colors.join() && custom.pattern === undefined && (custom.finish ?? 0) === 0 ? 'border-amber-400 text-amber-200' : 'border-stone-700 text-stone-300 hover:border-stone-400'}`}>Werk</button>
               </div>
             </Panel>
           </div>

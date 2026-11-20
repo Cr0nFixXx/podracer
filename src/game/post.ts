@@ -41,8 +41,8 @@ export class PostFX {
   godRays: { uniforms: { sunPos: { value: THREE.Vector2 }; intensity: { value: number } } } | null = null;
   /** Session 11 lens effects: sun glare/flare strength, viewport aspect, rain droplets on the lens (0..1), sun colour */
   lens!: { flare: { value: number }; aspect: { value: number }; rain: { value: number }; sunColor: { value: THREE.Color } | null };
-  /** Session 12 heat haze behind the player's two engine nozzles: screen positions (uv, origin top-left), radius (uv), strength 0..1 */
-  heat: { a: { value: THREE.Vector2 }; b: { value: THREE.Vector2 }; radius: { value: number }; strength: { value: number } } | null = null;
+  /** Exhaust heat-haze plumes (6 slots: player L/R + 2 nearest rival pods L/R): vec4(screenU, screenV, 1/radius, weight 0..1) */
+  heat: { plumes: { value: THREE.Vector4 }[]; strength: { value: number } } | null = null;
   private disposables: { dispose?: () => void }[] = [];
 
   constructor(renderer: THREE.WebGPURenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, gfx: GfxSettings, env: { rain?: number; flare?: boolean } = {}) {
@@ -176,8 +176,9 @@ export class PostFX {
       this.godRays = { uniforms: { sunPos: sunPosU, intensity: sunIntU } };
     }
     this.lens = { flare: flareU, aspect: aspectU, rain: rainU, sunColor: sunColU };
-    const heatA = uniform(new THREE.Vector2(-1, -1)), heatB = uniform(new THREE.Vector2(-1, -1)), heatR = uniform(0.05), heatS = uniform(0);
-    if (lensOn) this.heat = { a: heatA, b: heatB, radius: heatR, strength: heatS };
+    // 6 exhaust plume uniforms (slots 0–1 = player L/R, slots 2–5 = two nearest visible rival pods' L/R nozzles)
+    const heatP = Array.from({ length: 6 }, () => uniform(new THREE.Vector4(-2, -2, 25, 0))), heatS = uniform(0);
+    if (lensOn) this.heat = { plumes: heatP, strength: heatS };
 
     // ---- Single-pass cinematic grading + speed blur + god rays (ZERO film grain) ----
     const src = convertToTexture(col);
@@ -225,13 +226,13 @@ export class PostFX {
         uvS = clamp(uvv.sub(off), vec2(0.001), vec2(0.999));
         dropM = max(max(max(m1, m2), trail), max(m3, tail3));
       }
-      // ---- Heat haze: shimmering refraction in the exhaust plume of both engines (pure UV offset, no extra taps, no control flow) ----
+      // ---- Heat haze: shimmering exhaust refraction behind player AND nearest rival pods (pure UV offset, 0 extra taps, 0 branches!) ----
       if (lensOn) {
         const asp2 = vec2(aspectU, 1.0);
-        const fall = (pos: N) => { const dd = uvv.sub(pos).mul(asp2).div(heatR); return exp(dot(dd, dd).negate()); };
-        const amt = fall(heatA).add(fall(heatB)).mul(heatS);
+        const fall = (hp: N) => { const dd = uvv.sub(hp.xy).mul(asp2).mul(hp.z); return exp(dot(dd, dd).negate()).mul(hp.w); };
+        const amt = clamp(fall(heatP[0]).add(fall(heatP[1])).add(fall(heatP[2])).add(fall(heatP[3])).add(fall(heatP[4])).add(fall(heatP[5])), 0.0, 1.35).mul(heatS);
         const wob = vec2(sin(uvv.y.mul(240.0).add(u.time.mul(31.0))).add(sin(uvv.y.mul(97.0).sub(u.time.mul(17.0)))), sin(uvv.x.mul(210.0).sub(u.time.mul(26.0))));
-        uvS = clamp(uvS.add(wob.mul(amt).mul(0.00065)), vec2(0.001), vec2(0.999)); // subtle: < 0.15 % of the image width
+        uvS = clamp(uvS.add(wob.mul(amt).mul(0.00068)), vec2(0.001), vec2(0.999)); // crisp subtle distortion, never smears sightline
       }
       const base = vec3(src.sample(uvS).level(0).rgb).toVar();
       if (motion) {

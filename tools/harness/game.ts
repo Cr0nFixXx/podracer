@@ -66,6 +66,13 @@ let g: Game | null = null; let cur = -1;
     let found: THREE.InstancedMesh | null = null;
     G.scene.traverse(o => { const im = o as THREE.InstancedMesh; if (!found && im.isInstancedMesh && im.visible && (im.material as THREE.MeshStandardMaterial).alphaMap && im.count > 0) found = im; });
     if (found) { const m = new THREE.Matrix4(); (found as THREE.InstancedMesh).getMatrixAt(0, m); const p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3(); m.decompose(p, q, sc); (found as THREE.InstancedMesh).visible = true; G.camera.position.set(p.x + 21 * sc.x, p.y + 9 * sc.y, p.z + 17 * sc.x); G.camera.lookAt(p.x, p.y + 11.5 * sc.y, p.z); }
+  } else if (view === 'j' && G.td.crossings.length) { // crossing: from the lower approach looking at the overpass bridge + underpass
+    const cx = G.td.crossings[0], S = G.td.main.samples, N = S.length;
+    const a = S[((cx.lowerFrom - 26) % N + N) % N], b = S[((cx.lowerIdx) % N + N) % N];
+    G.camera.position.set(a.x, a.y + 5.5, a.z); G.camera.lookAt(b.x, b.y + 14, b.z);
+  } else if (view === 'q') { // branching cave Y-junction view
+    const cb = G.td.paths.find(p => p.isCave);
+    if (cb) { const S = G.td.main.samples, N = S.length, a = S[((cb.mainFrom - 4) % N + N) % N], b = cb.samples[Math.min(28, cb.samples.length - 1)]; G.camera.position.set(a.x, a.y + 4.8, a.z); G.camera.lookAt(b.x, b.y + 3.2, b.z); }
   } else if (view === 'o') { // the widest point of the track (open flat), seen from 16 m above the road edge
     const S = G.td.main.samples, N = S.length; let k = 0; for (let j = 0; j < N; j++) if (S[j].hw > S[k].hw) k = j;
     const a = S[(k - 60 + N) % N], b = S[(k + 40) % N]; G.camera.position.set(a.x + a.rx * a.hw * 0.7, a.y + 16, a.z + a.rz * a.hw * 0.7); G.camera.lookAt(b.x, b.y, b.z);
