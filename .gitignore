@@ -4,5 +4,3 @@ dist/
 tools/harness/out/*.png
 tools/harness/out/*.jpg
 tools/ci/out/
-.archiv/
-.archive/
