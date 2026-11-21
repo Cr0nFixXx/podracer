@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three/webgpu';
 import { PODS, THEMES } from '../game/data';
 import { buildPodModel, type PodVisual } from '../game/podModel';
+import { podEnvelope } from '../game/podDesigns';
 import { makeSky } from '../game/sky';
 
 interface Props { podId: string; colors: [string, string, string]; pattern?: number; finish?: number; className?: string; autoRotate?: boolean; }
@@ -44,7 +45,7 @@ export default function PodPreview({ podId, colors, pattern, finish, className, 
         st.pod.setEngineMotion(sw, -sw, 0, 0, 0);
         st.pod.update(t, 0.4, 0, 0, 1, 1, 0);
       }
-      const def = PODS.find(p => p.id === st.podId) ?? PODS[0]; const dist = ((def.cable + def.engineLen) * 0.95 + 6) * st.zoom;
+      const def = PODS.find(p => p.id === st.podId) ?? PODS[0]; const dist = (podEnvelope(def).length * 1.12 + 6) * st.zoom; // frame by the pod's real length
       cam.position.set(dist * 0.75, dist * 0.32, dist * 0.75); cam.lookAt(0, 0.3, 0);
       r.render(scene, cam);
     };

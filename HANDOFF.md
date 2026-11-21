@@ -29,7 +29,7 @@
 | # | Inhalt | Stand |
 |---|---|---|
 | 0 | Setup + Sicherheitsnetz | ✅ erledigt |
-| 1 | Refactoring ohne Spieländerung: Layout-Registry (`podLayouts.ts`), `engineExtent`, `podCockpits.ts`, `applyDamage` + Wirkungs-Struct, Profil v2 | offen |
+| 1 | Refactoring ohne Spieländerung: Layout-Registry (`podLayouts.ts`), `engineExtent`, `podCockpits.ts`, `applyDamage` + Wirkungs-Struct, Profil v2 | ✅ erledigt |
 | 2 | 10 neue Cockpits + Detailpass + Cockpit-Innenansicht → **Stopp: Nutzer sichtet** | offen |
 | 3 | 4 neue Pods (Cyclone → Halo → Manta → Voltspire), Hangar-Liste für 14, Gegner-Auslosung → **Stopp** | offen |
 | 4 | Tuning-Optik: `PodCustom.kit`, `podKitParts.ts`, Hangar-Reiter „Lack \| Teile" | offen |
@@ -49,6 +49,21 @@
 - `npm run check` vorher/nachher: Sim-Ausgabe **zeilengleich** (56 Zeilen, 13/13 Strecken, 0 Tode); Pod-Audit 10/10.
 - Browser (WebGPU): `statsAll()` nach dem Umbau identisch zu den Goldwerten; vier Vorher/Nachher-Bögen (Spieler/Gegner, ganz/Cockpit) **bytegleich**.
 - `npm run build` → `dist/index.html` (2,81 MB).
+
+### Erledigt in Phase 1 (Refactoring, kein verändertes Fahrverhalten, kein verändertes Bild)
+1. **`src/game/podLayouts.ts` (neu):** ein Eintrag je Pod-ID in `LAYOUTS`; eine unbekannte ID wirft einen Fehler (vorher wurde stillschweigend der Mandrel Ram gebaut). Neue Layout-Felder ersetzen alle fest verdrahteten Pod-IDs: `engineExtras` / `cockpitExtras`, `extraCircles`, `envelope`, `binders: { a, b, zOff }[]`, `cockpit.design`, `cockpit.topY`.
+2. **`src/game/podCockpits.ts` (neu):** Cockpit- und Pilotengeometrie (unverändert verschoben). Der Kopf hängt an `PilotDef.head` (`goggles | snout | crest | aero | dome`), nicht mehr am Spezies-Namen.
+3. **`engineExtent(spec)` in `podParts.ts`:** eine Quelle für Kollisionsradius, Bodenklemme (unten/außen) und Kabelhöhe; `EngineGeo` kennt `binder` (Ankerpunkt) und `breakParts` (noch leer).
+4. **`podDesigns.ts`** enthält nur noch `podCollision` / `podEnvelope` (neu: `axisY`, `cockpit.topY`, `length`). Die Alt-Felder `engine`, `engineLen`, `engineRad`, `spread`, `cable`, `cockpit` in `PodDef` sind entfernt; Positionslichter, Hangar-Kamera und Harness lesen das Layout.
+5. **Schaden:** einzige Stelle für Zustandsverlust ist `applyDamage(p, side | 'both', amount, zone)` (Zonen `front | side | top | belly | heat`); Fahrwirkungen verlorener Teile laufen über `PodState.fx` (noch überall 1). `collidePods` liest die Breite direkt aus der gecachten Kollisionsform.
+6. **Spielstand:** Schlüssel `podracer-profile-v2` mit einmaligem Import des v1-Stands; `sanitizeCustom` (Farben, Tuning 0–5, Muster, Finish), unbekannte Pod-ID → erster Pod, `MAX_OPPONENTS`.
+7. **Tests:** `tools/ci/unit.ts` (17 Prüfungen: Layout-Registry, `applyDamage`, `podParams`, Profil) und `tools/ci/pods-shapes.json` (Kollisionskreise + Bodenform aller Pods als Goldwerte) – beides Teil von `npm run check`.
+
+### Verifiziert (Phase 1)
+- `npm run check`: Typecheck, 17/17 Unit-Prüfungen, Pod-Audit 10/10 (Zahlen und Physikformen identisch), **Sim-Ausgabe zeilengleich zur Ausgangslage**.
+- Browser (WebGPU): `statsAll()` identisch zu den Goldwerten, vier Bögen **bytegleich** zu den Vorher-Bildern.
+- Echte App im In-App-Browser: v1-Spielstand wird importiert (Pod, Farben, Tuning – Wert 9 auf 5 begrenzt), v1 bleibt unangetastet; Hangar ohne Schrumpfen/Scrollen; Rennen Boonta bei Nacht mit 10 Gegnern 28 Rennsekunden per Hand getaktet: 0 Fehler, 0 NaN, Treffer landen auf der richtigen Seite.
+- Bekannt: bei verdecktem Browser-Bereich läuft `requestAnimationFrame` nicht – das Rennen bleibt im Countdown, bis man die Schleife von Hand taktet (siehe `CLAUDE.md`).
 
 ### Messwerte vor der Überholung (Meshes / Dreiecke)
 | Pod | Spieler „Hoch" | Spieler „Ultra" | Gegner nah | Gegner fern |

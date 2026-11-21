@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { DIFFICULTIES, PILOTS, PODS, TRACKS } from '../../src/game/data';
 import { buildTrack, roadSurfaceAt } from '../../src/game/trackBuilder';
-import { aiInputs, collidePods, podParams, respawn, stepPod, HOVER, type PodState } from '../../src/game/physics';
+import { aiInputs, applyDamage, collidePods, podParams, respawn, stepPod, HOVER, type PodState } from '../../src/game/physics';
 import { effectiveStats } from '../../src/game/settings';
 import { podEnvelope } from '../../src/game/podDesigns';
 
@@ -74,7 +74,7 @@ for (const def of TRACKS) {
     for (const hz of td.hazards) {
       const ph = (((t + hz.phase) % hz.period) + hz.period) % hz.period; hz.state = ph < hz.period * hz.duty ? 1 : ph > hz.period - 1 ? 0.5 : 0;
       if (hz.state < 1) continue;
-      for (const p of pods) { if (p.dead > 0) continue; const dx = p.pos.x - hz.x, dz = p.pos.z - hz.z; if (dx * dx + dz * dz > hz.r ** 2 || p.pos.y > hz.y + 18) continue; const P = podParams(p); if (p.invuln <= 0) { p.hpL -= 12 / 60 * P.sturdy; p.hpR -= 12 / 60 * P.sturdy; } p.heat = Math.min(1, p.heat + 0.55 / 60); p.vel.y += 28 / 60; }
+      for (const p of pods) { if (p.dead > 0) continue; const dx = p.pos.x - hz.x, dz = p.pos.z - hz.z; if (dx * dx + dz * dz > hz.r ** 2 || p.pos.y > hz.y + 18) continue; const P = podParams(p); if (p.invuln <= 0) applyDamage(p, 'both', 12 / 60 * P.sturdy, 'heat'); p.heat = Math.min(1, p.heat + 0.55 / 60); p.vel.y += 28 / 60; }
     }
     pods.forEach((p, i) => {
       for (const ev of p.events) { if (ev.type === 'break') breaks++; if (ev.type === 'wall' && ev.nx === 0 && ev.nz === 0 && ev.y > 0 && ohIdx >= 0 && Math.abs(p.idx - ohIdx) < 8) ohHits++; }

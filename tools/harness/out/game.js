@@ -55295,7 +55295,7 @@ var BRDF_GGX = /* @__PURE__ */ Fn(({ lightDirection, f0, f90, roughness: roughne
   const dotNH = normalView$1.dot(halfDir).clamp();
   const dotVH = viewDirection.dot(halfDir).clamp();
   let F = F_Schlick({ f0, f90, dotVH });
-  let V2, D;
+  let V4, D;
   if (defined(USE_IRIDESCENCE)) {
     F = iridescence.mix(F, f);
   }
@@ -55307,13 +55307,13 @@ var BRDF_GGX = /* @__PURE__ */ Fn(({ lightDirection, f0, f90, roughness: roughne
     const dotBV = anisotropyB.dot(viewDirection);
     const dotBH = anisotropyB.dot(halfDir);
     const clampedAlphaT = alphaT.max(alpha);
-    V2 = V_GGX_SmithCorrelated_Anisotropic({ alphaT: clampedAlphaT, alphaB: alpha, dotTV, dotBV, dotTL, dotBL, dotNV, dotNL });
+    V4 = V_GGX_SmithCorrelated_Anisotropic({ alphaT: clampedAlphaT, alphaB: alpha, dotTV, dotBV, dotTL, dotBL, dotNV, dotNL });
     D = D_GGX_Anisotropic({ alphaT: clampedAlphaT, alphaB: alpha, dotNH, dotTH, dotBH });
   } else {
-    V2 = V_GGX_SmithCorrelated({ alpha, dotNL, dotNV });
+    V4 = V_GGX_SmithCorrelated({ alpha, dotNL, dotNV });
     D = D_GGX({ alpha, dotNH });
   }
-  return F.mul(V2).mul(D);
+  return F.mul(V4).mul(D);
 });
 var BRDF_Lambert = /* @__PURE__ */ Fn((inputs) => {
   return inputs.diffuseColor.mul(1 / Math.PI);
@@ -55334,8 +55334,8 @@ var BRDF_Sheen = /* @__PURE__ */ Fn(({ lightDirection }) => {
   const dotNV = normalView.dot(positionViewDirection).clamp();
   const dotNH = normalView.dot(halfDir).clamp();
   const D = D_Charlie({ roughness: sheenRoughness, dotNH });
-  const V2 = V_Neubelt({ dotNV, dotNL });
-  return sheen.mul(D).mul(V2);
+  const V4 = V_Neubelt({ dotNV, dotNL });
+  return sheen.mul(D).mul(V4);
 });
 var DATA2 = new Uint16Array([
   12469,
@@ -55877,11 +55877,11 @@ var Schlick_to_F0 = /* @__PURE__ */ Fn(({ f, f90, dotVH }) => {
   const x5 = x.mul(x2, x2).clamp(0, 0.9999);
   return f.sub(vec3(f90).mul(x5)).div(x5.oneMinus());
 }, { f: "vec3", f90: "float", dotVH: "float", return: "vec3" });
-var LTC_Uv = /* @__PURE__ */ Fn(({ N: N3, V: V2, roughness: roughness3 }) => {
+var LTC_Uv = /* @__PURE__ */ Fn(({ N: N3, V: V4, roughness: roughness3 }) => {
   const LUT_SIZE = 64;
   const LUT_SCALE = (LUT_SIZE - 1) / LUT_SIZE;
   const LUT_BIAS = 0.5 / LUT_SIZE;
-  const dotNV = N3.dot(V2).saturate();
+  const dotNV = N3.dot(V4).saturate();
   const uv11 = vec2(roughness3, dotNV.oneMinus().sqrt());
   uv11.assign(uv11.mul(LUT_SCALE).add(LUT_BIAS));
   return uv11;
@@ -55899,13 +55899,13 @@ var LTC_EdgeVectorFormFactor = /* @__PURE__ */ Fn(({ v1, v2 }) => {
   const theta_sintheta = x.greaterThan(0).select(v, max(x.mul(x).oneMinus(), 1e-7).inverseSqrt().mul(0.5).sub(v));
   return v1.cross(v2).mul(theta_sintheta);
 }, { v1: "vec3", v2: "vec3", return: "vec3" });
-var LTC_Evaluate = /* @__PURE__ */ Fn(({ N: N3, V: V2, P, mInv, p0, p1, p2, p3 }) => {
+var LTC_Evaluate = /* @__PURE__ */ Fn(({ N: N3, V: V4, P, mInv, p0, p1, p2, p3 }) => {
   const v1 = p1.sub(p0).toVar();
   const v2 = p3.sub(p0).toVar();
   const lightNormal = v1.cross(v2);
   const result = vec3().toVar();
   If(lightNormal.dot(P.sub(p0)).greaterThanEqual(0), () => {
-    const T1 = V2.sub(N3.mul(V2.dot(N3))).normalize();
+    const T1 = V4.sub(N3.mul(V4.dot(N3))).normalize();
     const T2 = N3.cross(T1).negate();
     const mat = mInv.mul(mat3(T1, T2, N3).transpose()).toVar();
     const coords0 = mat.mul(p0.sub(P)).normalize().toVar();
@@ -57932,9 +57932,9 @@ var PhysicalLightingModel = class extends LightingModel {
     const p2 = lightPosition2.sub(halfWidth).add(halfHeight);
     const p3 = lightPosition2.add(halfWidth).add(halfHeight);
     const N3 = normalView;
-    const V2 = positionViewDirection;
+    const V4 = positionViewDirection;
     const P = positionView.toVar();
-    const uv11 = LTC_Uv({ N: N3, V: V2, roughness });
+    const uv11 = LTC_Uv({ N: N3, V: V4, roughness });
     const t1 = ltc_1.sample(uv11).toVar();
     const t2 = ltc_2.sample(uv11).toVar();
     const mInv = mat3(
@@ -57943,11 +57943,11 @@ var PhysicalLightingModel = class extends LightingModel {
       vec3(t1.z, 0, t1.w)
     ).toVar();
     const fresnel = specularColorBlended.mul(t2.x).add(specularF90.sub(specularColorBlended).mul(t2.y)).toVar();
-    reflectedLight.directSpecular.addAssign(lightColor.mul(fresnel).mul(LTC_Evaluate({ N: N3, V: V2, P, mInv, p0, p1, p2, p3 })));
-    reflectedLight.directDiffuse.addAssign(lightColor.mul(diffuseContribution).mul(LTC_Evaluate({ N: N3, V: V2, P, mInv: mat3(1, 0, 0, 0, 1, 0, 0, 0, 1), p0, p1, p2, p3 })));
+    reflectedLight.directSpecular.addAssign(lightColor.mul(fresnel).mul(LTC_Evaluate({ N: N3, V: V4, P, mInv, p0, p1, p2, p3 })));
+    reflectedLight.directDiffuse.addAssign(lightColor.mul(diffuseContribution).mul(LTC_Evaluate({ N: N3, V: V4, P, mInv: mat3(1, 0, 0, 0, 1, 0, 0, 0, 1), p0, p1, p2, p3 })));
     if (this.clearcoat === true) {
       const Ncc = clearcoatNormalView;
-      const uvClearcoat = LTC_Uv({ N: Ncc, V: V2, roughness: clearcoatRoughness });
+      const uvClearcoat = LTC_Uv({ N: Ncc, V: V4, roughness: clearcoatRoughness });
       const t1Clearcoat = ltc_1.sample(uvClearcoat);
       const t2Clearcoat = ltc_2.sample(uvClearcoat);
       const mInvClearcoat = mat3(
@@ -57956,7 +57956,7 @@ var PhysicalLightingModel = class extends LightingModel {
         vec3(t1Clearcoat.z, 0, t1Clearcoat.w)
       );
       const fresnelClearcoat = clearcoatF0.mul(t2Clearcoat.x).add(clearcoatF90.sub(clearcoatF0).mul(t2Clearcoat.y));
-      this.clearcoatSpecularDirect.addAssign(lightColor.mul(fresnelClearcoat).mul(LTC_Evaluate({ N: Ncc, V: V2, P, mInv: mInvClearcoat, p0, p1, p2, p3 })));
+      this.clearcoatSpecularDirect.addAssign(lightColor.mul(fresnelClearcoat).mul(LTC_Evaluate({ N: Ncc, V: V4, P, mInv: mInvClearcoat, p0, p1, p2, p3 })));
     }
   }
   /**
@@ -87449,8 +87449,8 @@ function pomUV(mapWithH, uvIn, scale3, maxLayers) {
     const out = vec23(uvIn).toVar();
     If2(fade.greaterThan(0.01), () => {
       const invmax = inverseSqrt2(max3(det2, float3(1e-7)));
-      const V2 = normalize4(p.negate());
-      const Vt = vec33(dot2(V2, T2.mul(invmax)), dot2(V2, B2.mul(invmax)), dot2(V2, Nn));
+      const V4 = normalize4(p.negate());
+      const Vt = vec33(dot2(V4, T2.mul(invmax)), dot2(V4, B2.mul(invmax)), dot2(V4, Nn));
       const layers = mix3(float3(peakL), float3(baseL), clamp4(abs3(Vt.z), 0, 1));
       const layerDepth = float3(1).div(layers);
       const P = clamp4(Vt.xy.div(max3(Vt.z, 0.35)), vec23(-1.4), vec23(1.4)).mul(scale3).mul(fade);
@@ -88872,7 +88872,7 @@ function padValue(gp, binds) {
   return v;
 }
 
-// src/game/podDesigns.ts
+// src/game/podParts.ts
 init_three_module();
 
 // src/game/podKit.ts
@@ -89528,294 +89528,387 @@ function boltRing(R, count, r, z, radialOut = false) {
   }, count, Math.PI / count);
 }
 
-// src/game/podDesigns.ts
+// src/game/podParts.ts
+function engineExtent(spec2) {
+  const { R, L, style } = spec2;
+  return {
+    coll: R * 1.05 + (style === "blade" ? 0.45 : 0) + (style === "ring" ? 0.3 : 0),
+    bottom: R * (style === "ring" ? 1.36 : 1.12) + 0.1,
+    side: R * (style === "blade" ? 2.1 : 1.1),
+    top: R,
+    halfL: L * 0.5
+  };
+}
+var cache3 = /* @__PURE__ */ new Map();
+function flameGeo(rn, len, seg) {
+  const pts = [];
+  for (let i = 0; i <= 12; i++) {
+    const t = 1 - i / 12;
+    const r = rn * Math.pow(1 - t, 0.55) * (1 + 0.18 * Math.sin(Math.PI * t)) + 0.01;
+    pts.push([r, -t * len, 0]);
+  }
+  return lathe(prof(pts), seg, 0);
+}
+function engineGeo(spec2, seg) {
+  const key = `${spec2.L}|${spec2.R}|${spec2.style}|${spec2.bands}|${spec2.blades}|${spec2.spike}|${spec2.fins}|${seg}`;
+  const hit = cache3.get(key);
+  if (hit) return hit;
+  const { L, R, style } = spec2;
+  const pb = new PartBuilder();
+  const Z = (t) => -L / 2 + t * L;
+  const segS = Math.max(10, Math.round(seg * 0.5));
+  const bodyR = (t) => {
+    switch (style) {
+      case "needle":
+        return t < 0.3 ? 0.66 + 0.34 * Math.sin(t / 0.3 * Math.PI / 2) : 1 - 0.26 * Math.pow((t - 0.3) / 0.7, 1.5);
+      case "heavy":
+        return 0.86 + 0.14 * Math.sin(Math.PI * t);
+      case "long":
+        return t < 0.45 ? 0.82 + 0.18 * (t / 0.45) : 1;
+      case "ring":
+        return 0.92;
+      case "blade":
+        return 0.95;
+      default:
+        return 1;
+    }
+  };
+  const split2 = style === "split";
+  const bodyEnd = split2 ? 0.8 : 1;
+  const pts = [];
+  const P = (t, r, hard = false) => pts.push([r * R, Z(t), hard ? 1 : 0]);
+  P(0, 0.74, true);
+  P(0.025, 0.8);
+  P(0.08, bodyR(0.08) * 0.94);
+  P(0.13, bodyR(0.13));
+  const bandTs = [];
+  for (let i = 0; i < spec2.bands; i++) bandTs.push(0.2 + (i + 0.5) / spec2.bands * 0.6);
+  let t0 = 0.13;
+  for (const tb of bandTs) {
+    if (tb > bodyEnd - 0.04) break;
+    for (let s = t0 + 0.05; s < tb - 0.03; s += 0.05) P(s, bodyR(s));
+    const rb = bodyR(tb);
+    P(tb - 0.013, rb, true);
+    P(tb - 7e-3, rb * 0.955, true);
+    P(tb + 7e-3, rb * 0.955, true);
+    P(tb + 0.013, rb, true);
+    t0 = tb + 0.013;
+  }
+  for (let s = t0 + 0.05; s < bodyEnd - 0.07; s += 0.05) P(s, bodyR(s));
+  const rf = bodyR(0.93);
+  if (!split2) {
+    P(0.92, rf);
+    P(0.955, rf * 1.035);
+    P(0.985, rf * 1.02);
+    P(1, rf * 0.95, true);
+  } else {
+    P(bodyEnd - 0.02, rf, true);
+    P(bodyEnd, rf * 0.97, true);
+  }
+  pb.add("hull", lathe(prof(pts), seg, 1));
+  const thr = rf * 0.95 * R, faceZ = Z(0.915);
+  pb.add("steel", lathe(prof([[split2 ? rf * 0.97 * R : thr, split2 ? Z(bodyEnd) : Z(1)], [rf * 0.885 * R, split2 ? Z(bodyEnd - 0.01) : Z(0.992)], [rf * 0.86 * R, split2 ? Z(bodyEnd - 0.03) : Z(0.97)], [rf * 0.86 * R, faceZ, 1], [rf * 0.6 * R, faceZ]]), seg, 0));
+  pb.add("dark", lathe(prof([[rf * 0.6 * R, faceZ], [0.2 * R, faceZ]]), seg, 0));
+  if (spec2.spike) pb.add("chrome", lathe(prof([[0.22 * R, faceZ, 1], [0.2 * R, faceZ + L * 0.03], [0.12 * R, Z(1)], [0.015 * R, Z(1) + L * 0.26]]), segS, 0));
+  else pb.add("chrome", lathe(prof([[0.22 * R, faceZ, 1], [0.21 * R, faceZ + L * 0.035], [0.14 * R, faceZ + L * 0.07], [0, faceZ + L * 0.085]]), segS, 0));
+  const detailHi = seg >= 24;
+  if (!split2 && detailHi) pb.add("chrome", boltRing(rf * 0.985 * R, Math.round(seg * 0.5), 0.02 * R, Z(1) - 0.01));
+  if (style === "heavy" || style === "turbine") pb.add("hazard", torus(rf * 1.005 * R, 0.022 * R, 5, seg), M4.t(0, 0, Z(0.965)));
+  const nb = detailHi ? spec2.blades : Math.max(8, Math.round(spec2.blades * 0.65));
+  const rMid = 0.52 * R;
+  const fan = radial(() => blade(0.21 * R, 0.83 * rf * R, Math.PI * 2 * rMid / nb * 1.25, 0.03 * R, 1, 0.38, 3), nb);
+  fan.computeBoundingSphere();
+  pb.add("dark", lathe(prof([[0, Z(0.07)], [0.58 * R, Z(0.07), 1], [0.6 * R, Z(0.06)], [0.66 * R, Z(0), 1], [0.74 * R, Z(0)]]), seg, 0));
+  pb.add("glow", new CircleGeometry(0.5 * R, seg).rotateY(Math.PI).translate(0, 0, Z(0.07) - 0.01));
+  pb.add("glow", torus(0.6 * R, 0.018 * R, 6, seg), M4.t(0, 0, Z(0.035)));
+  const np = Math.max(10, Math.round(seg * 0.35));
+  const petals = (() => {
+    const pos = [], pet = [], idx = [];
+    const zH = Z(0) + 0.012 * L, zT = Z(0) - 0.085 * L, rH = 0.745 * R, rT = 0.6 * R;
+    for (let q = 0; q < np; q++) {
+      const a0 = (q + 0.05) / np * Math.PI * 2, a1 = (q + 0.95) / np * Math.PI * 2, am = (a0 + a1) / 2, b = pos.length / 3;
+      for (const [a, z, r, d] of [[a0, zH, rH, 0], [a1, zH, rH, 0], [a0, zT, rT, 0.42 * R], [a1, zT, rT, 0.42 * R]]) {
+        pos.push(Math.cos(a) * r, Math.sin(a) * r, z);
+        pet.push(Math.cos(am), Math.sin(am), d);
+      }
+      idx.push(b, b + 2, b + 1, b + 1, b + 2, b + 3);
+    }
+    const g2 = new BufferGeometry();
+    g2.setAttribute("position", new Float32BufferAttribute(pos, 3));
+    g2.setAttribute("aPet", new Float32BufferAttribute(pet, 3));
+    g2.setIndex(idx);
+    g2.computeVertexNormals();
+    const out2 = g2.toNonIndexed();
+    g2.dispose();
+    return out2;
+  })();
+  pb.add("steel", torus(0.75 * R, 0.03 * R, 6, seg), M4.t(0, 0, Z(5e-3)));
+  if (detailHi) {
+    pb.add("glow", torus(rf * 0.895 * R, 0.012 * R, 5, seg), M4.t(0, 0, Z(split2 ? bodyEnd - 0.02 : 0.975)));
+    pb.add("copper", torus(0.77 * R, 0.022 * R, 6, seg), M4.t(0, 0, Z(0.055)));
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI * 0.5 + 0.38, rm = rf * 0.53 * R;
+      pb.add("chrome", rbox(0.024 * R, rf * 0.62 * R, 0.045 * R, 5e-3), M4.trs(Math.sin(a) * rm, Math.cos(a) * rm, faceZ + 0.03 * L, 0, 0, -a));
+    }
+  }
+  bandTs.forEach((tb, i) => {
+    if (tb > bodyEnd - 0.04) return;
+    const rb = bodyR(tb) * 0.955 * R;
+    pb.add(style === "heavy" ? "dark" : "steel", torus(rb + 0.012 * R, (style === "heavy" ? 0.045 : 0.032) * R, 6, seg), M4.t(0, 0, Z(tb)));
+    if (detailHi && i % 2 === 0) pb.add("chrome", boltRing(rb + 0.035 * R, Math.round(seg * 0.45), 0.018 * R, Z(tb), true));
+  });
+  {
+    const a0 = 0.3, a1 = split2 ? 0.62 : 0.7;
+    let rmax = 0;
+    for (let s = a0; s <= a1; s += 0.02) rmax = Math.max(rmax, bodyR(s));
+    const r0 = rmax * R + 0.01, r1 = r0 + (style === "heavy" ? 0.06 : 0.035) * R;
+    const plate = prof([[r1, Z(a0), 1], [r1, Z(a1), 1], [r0, Z(a1), 1], [r0, Z(a0), 1], [r1, Z(a0), 1]]);
+    const span = style === "heavy" ? 1.1 : 0.8;
+    for (const c of [Math.PI / 2, Math.PI * 1.5]) pb.add("hull", lathe(plate, Math.max(6, Math.round(seg * 0.2)), 3, c - span / 2, span));
+    if (detailHi) for (const sd of [-1, 1]) for (let s = a0 + 0.04; s < a1 - 0.01; s += 0.08) for (const dy of [-0.3, 0.3]) {
+      pb.add("chrome", cyl(0.018 * R, 0.018 * R, 0.02 * R, 6), M4.trs(sd * (r1 + 5e-3) * Math.cos(dy), r1 * Math.sin(dy), Z(s), 0, 0, Math.PI / 2));
+    }
+  }
+  const pipeSides = style === "needle" ? [1] : [-1, 1];
+  const pipeSeg = Math.max(12, Math.round(seg * 0.55));
+  for (const sd of pipeSides) for (const [ang, mat, rad] of [[0.62, "copper", 0.036], [0.85, "steel", 0.028]]) {
+    const pp = [];
+    const tA = 0.16, tB = split2 ? 0.74 : 0.86;
+    for (let k = 0; k <= 8; k++) {
+      const tt = tA + (tB - tA) * (k / 8);
+      const lift = Math.sin(k / 8 * Math.PI);
+      const rr = bodyR(tt) * R * (0.985 + 0.1 * lift) + rad * R * 1.2;
+      const a = sd * ang;
+      pp.push(new Vector3(Math.sin(a) * rr, Math.cos(a) * rr, Z(tt)));
+    }
+    pb.add(mat, tube(pp, rad * R, pipeSeg, 6));
+    if (detailHi) for (let k = 1; k < 8; k += 2) {
+      const p = pp[k];
+      pb.add("dark", torus(rad * R * 1.5, rad * R * 0.45, 5, 10), M4.t(p.x, p.y, p.z));
+    }
+  }
+  for (const sd of [-1, 1]) for (let i = 0; i < 6; i++) {
+    const tt = 0.17 + i * 0.022;
+    const r = bodyR(tt) * R;
+    pb.add("dark", rbox(0.03 * R, 0.34 * R, 0.016 * L, 6e-3), M4.trs(sd * (r + 0.01 * R), -0.05 * R, Z(tt), 0, sd * 0.5, 0));
+  }
+  if (style === "long" || style === "heavy" || spec2.fins > 0) {
+    const nf = Math.max(12, spec2.fins * 3);
+    const rr = bodyR(0.22) * R;
+    pb.add("dark", radial(() => rbox(0.022 * R, 0.2 * R, 0.13 * L, 6e-3).translate(0, rr + 0.09 * R, Z(0.22)), nf, 0.13));
+  }
+  const bellyR = bodyR(0.5) * R;
+  pb.add("dark", rbox(0.34 * R, 0.08 * R, 0.5 * L, 0.03), M4.t(0, -bellyR - 0.02 * R, Z(0.5)));
+  pb.add("glow", rbox(0.2 * R, 0.03 * R, 0.44 * L, 0.01), M4.t(0, -bellyR - 0.07 * R, Z(0.5)));
+  const topR = bodyR(0.58) * R;
+  const py2 = topR + 0.42;
+  pb.add("steel", rbox(0.16, 0.46, 0.34, 0.04), M4.t(0, topR + 0.2, Z(0.58)));
+  pb.add("chrome", torus(0.1, 0.03, 8, 16), M4.trs(0, py2 + 0.06, Z(0.58), 0, Math.PI / 2, 0));
+  pb.add("dark", cyl(0.025, 0.025, 0.5, 6), M4.trs(0.18 * R, bodyR(0.85) * R + 0.22, Z(0.85), 0.25, 0, 0));
+  pb.add("glow", sphere(0.045, 8, 6), M4.t(0.18 * R, bodyR(0.85) * R + 0.47, Z(0.85) + 0.06));
+  const cR = bodyR(0.62) * R;
+  for (const sd of [-1, 1]) {
+    pb.add("dark", cyl(0.15 * R, 0.19 * R, 0.1 * R, 10), M4.trs(sd * (cR + 0.02 * R), 0.2 * R, Z(0.62), 0, 0, sd * -Math.PI / 2));
+    pb.add("copper", torus(0.13 * R, 0.024 * R, 5, 12), M4.trs(sd * (cR + 0.06 * R), 0.2 * R, Z(0.62), 0, Math.PI / 2, 0));
+    pb.add("glow", sphere(0.075 * R, 8, 6), M4.t(sd * (cR + 0.075 * R), 0.2 * R, Z(0.62)));
+  }
+  if (split2) {
+    const petal = prof([[rf * 1.02 * R, Z(bodyEnd), 1], [rf * 1.06 * R, Z(0.9)], [rf * 1.05 * R, Z(0.98)], [rf * 0.98 * R, Z(1), 1], [rf * 0.93 * R, Z(1), 1], [rf * 0.95 * R, Z(bodyEnd), 1], [rf * 1.02 * R, Z(bodyEnd)]]);
+    for (let q = 0; q < 4; q++) {
+      const c = Math.PI / 4 + q * Math.PI / 2;
+      const gap = 0.12;
+      const g2 = lathe(petal, Math.max(8, Math.round(seg / 4)), 3, c - Math.PI / 4 + gap / 2, Math.PI / 2 - gap);
+      const hinge = new Vector3(Math.sin(c) * rf * R, Math.cos(c) * rf * R, Z(bodyEnd));
+      const axis = new Vector3(Math.cos(c), -Math.sin(c), 0);
+      const m = new Matrix4().makeTranslation(hinge.x, hinge.y, hinge.z).multiply(new Matrix4().makeRotationAxis(axis, -0.22)).multiply(new Matrix4().makeTranslation(-hinge.x, -hinge.y, -hinge.z));
+      pb.add("hull", g2, m);
+      pb.add("steel", rbox(0.12 * R, 0.12 * R, 0.08 * L, 0.02), new Matrix4().makeTranslation(hinge.x * 1.02, hinge.y * 1.02, hinge.z));
+    }
+    for (let i = 0; i < 9; i++) pb.add("steel", rbox(0.035 * R, 0.32 * R, 0.4 * L, 0.01), M4.t((i - 4) * 0.11 * R, R * 1.08, Z(0.45)));
+  }
+  if (style === "ring") {
+    const rr = 1.24 * R;
+    pb.add("hull", torus(rr, 0.11 * R, 12, seg), M4.t(0, 0, Z(0.95)), [0, 0, 3]);
+    pb.add("chrome", torus(rr - 0.11 * R, 0.025 * R, 6, seg), M4.t(0, 0, Z(0.95) + 0.06 * R));
+    for (let q = 0; q < 4; q++) {
+      const a = Math.PI / 4 + q * Math.PI / 2;
+      const mid = (rr + rf * R) / 2;
+      pb.add("steel", rbox(0.08 * R, rr - rf * R + 0.1 * R, 0.1 * R, 0.02), M4.trs(Math.sin(a) * mid, Math.cos(a) * mid, Z(0.95), 0, 0, -a));
+    }
+  }
+  if (style === "blade") {
+    for (const sd of [-1, 1]) {
+      const g2 = extrude([[0, 0], [1.25 * R, -0.25 * L], [1.3 * R, -0.42 * L], [0, -0.6 * L]], 0.05 * R, 0.015);
+      g2.rotateX(-Math.PI / 2);
+      if (sd < 0) g2.scale(-1, 1, 1);
+      pb.add("hull", g2, M4.t(sd * bodyR(0.6) * R * 0.9, 0, Z(0.8)), [0, 0, 3]);
+    }
+  }
+  if (style === "needle") pb.add("chrome", torus(rf * 0.75 * R, 0.02 * R, 6, seg), M4.t(0, 0, Z(0.97)));
+  const flaps = [];
+  {
+    const fr = bodyR(0.5) * R;
+    const len = 0.22 * L;
+    for (const sd of [-1, 1]) {
+      const g2 = rbox(0.045 * R, 0.62 * R, len, 0.015).translate(0, 0, -len / 2);
+      const gg = new PartBuilder().add("hull", g2, void 0, [0, 0, 3]).build().get("hull");
+      flaps.push({ geo: gg, pivot: new Vector3(sd * (fr + 0.06 * R), 0.05 * R, Z(0.62)), sign: -sd });
+    }
+  }
+  const rn = 0.5 * R;
+  const out = {
+    parts: pb.build(),
+    fan,
+    fanZ: faceZ + 0.06 * L * 0.5,
+    flaps,
+    petals,
+    flameOuter: flameGeo(rn, L * 0.75, Math.max(12, Math.round(seg * 0.5))),
+    flameCore: flameGeo(rn * 0.42, L * 0.38, 12),
+    flameZ: Z(0.07) - 0.02,
+    exhaustZ: Z(0) - 0.12 * L,
+    pylon: new Vector3(0, py2 + 0.06, Z(0.58)),
+    frontZ: Z(1),
+    top: py2,
+    R,
+    L,
+    binder: new Vector3(R * 0.97, R * 0.2, L * 0.12),
+    breakParts: []
+  };
+  cache3.set(key, out);
+  return out;
+}
+
+// src/game/podLayouts.ts
+init_three_module();
 var V = (x, y, z) => new Vector3(x, y, z);
 var spec = (L, R, style, bands, blades2, spike = true, fins = 0) => ({ L, R, style, bands, blades: blades2, spike, fins });
-function podLayout(def) {
-  const pair = (s, sp, y, z) => [{ spec: s, x: -sp, y, z }, { spec: s, x: sp, y, z }];
-  switch (def.id) {
-    case "aurora": {
-      const s = spec(9, 1.15, "turbine", 6, 18);
-      return {
-        engines: pair(s, 2.5, 0, 4),
-        cockpit: { style: "pod", hw: 0.95, len: 3.4, y: 0.1, z: -6, pilot: 1 },
-        binder: [0, 1],
-        livery: 0,
-        extras: (pb) => {
-          for (const sd of [-1, 1]) for (const s2 of [-1, 1]) {
-            pb.add("hull", rbox(0.95, 0.08, 8.2, 0.03), M4.trs(sd * 2.5 + s2 * 1.5, -0.32, 4, 0, 0, s2 * -0.12), [0, 0, 3]);
-            pb.add("steel", rbox(0.06, 0.12, 8.3, 0.02), M4.trs(sd * 2.5 + s2 * 1.97, -0.38, 4, 0, 0, s2 * -0.12));
-          }
+var pair = (s, sp, y, z) => [{ spec: s, x: -sp, y, z }, { spec: s, x: sp, y, z }];
+var MAIN = [{ a: 0, b: 1 }];
+var LAYOUTS = {
+  aurora: () => {
+    const s = spec(9, 1.15, "turbine", 6, 18);
+    return {
+      engines: pair(s, 2.5, 0, 4),
+      cockpit: { style: "pod", hw: 0.95, len: 3.4, y: 0.1, z: -6, pilot: 1 },
+      binders: MAIN,
+      livery: 0,
+      engineExtras: (pb) => {
+        for (const sd of [-1, 1]) for (const s2 of [-1, 1]) {
+          pb.add("hull", rbox(0.95, 0.08, 8.2, 0.03), M4.trs(sd * 2.5 + s2 * 1.5, -0.32, 4, 0, 0, s2 * -0.12), [0, 0, 3]);
+          pb.add("steel", rbox(0.06, 0.12, 8.3, 0.02), M4.trs(sd * 2.5 + s2 * 1.97, -0.38, 4, 0, 0, s2 * -0.12));
         }
-      };
-    }
-    case "brute": {
-      const s = spec(8, 1.5, "split", 7, 20, false);
-      return {
-        engines: pair(s, 2.4, 0, 2),
-        cockpit: { style: "wedge", hw: 1.1, len: 3, y: 0.25, z: -9, pilot: 1.05 },
-        binder: [0, 1],
-        livery: 2,
-        extras: (pb) => {
-          const fin = extrude([[0, 0], [2.2, 0], [2.7, 2.7], [1.6, 2.7]], 0.12, 0.03);
-          fin.rotateY(Math.PI / 2);
-          pb.add("hull", fin, M4.t(-2.4, 1.45, 1.2), [0, 0, 3]);
-          pb.add("steel", rbox(0.3, 0.4, 1.6, 0.05), M4.t(-2.4, 1.6, 0.2));
+      },
+      // the wing plates reach further out and lower than the turbines
+      extraCircles: [-1, 1].flatMap((sd) => [2.5, -2.5].map((f) => ({ x: sd * 4, z: 4 + f, r: 0.6, side: sd }))),
+      envelope: { outerX: 4.45, minY: -0.62 }
+    };
+  },
+  brute: () => {
+    const s = spec(8, 1.5, "split", 7, 20, false);
+    return {
+      engines: pair(s, 2.4, 0, 2),
+      cockpit: { style: "wedge", hw: 1.1, len: 3, y: 0.25, z: -9, pilot: 1.05 },
+      binders: MAIN,
+      livery: 2,
+      engineExtras: (pb) => {
+        const fin = extrude([[0, 0], [2.2, 0], [2.7, 2.7], [1.6, 2.7]], 0.12, 0.03);
+        fin.rotateY(Math.PI / 2);
+        pb.add("hull", fin, M4.t(-2.4, 1.45, 1.2), [0, 0, 3]);
+        pb.add("steel", rbox(0.3, 0.4, 1.6, 0.05), M4.t(-2.4, 1.6, 0.2));
+      }
+    };
+  },
+  gasvaro: () => {
+    const s = spec(6, 0.8, "quad", 4, 12);
+    return {
+      engines: [...pair(s, 1.6, 0, 3), ...pair(s, 3.4, 0, 3), ...pair(s, 2.5, 1.55, 4)],
+      cockpit: { style: "long", hw: 0.75, len: 3.6, y: 0, z: -7, pilot: 0.95 },
+      binders: MAIN,
+      livery: 1,
+      engineExtras: (pb) => {
+        for (const sd of [-1, 1]) {
+          pb.add("steel", tube([V(sd * 1.6, 0.7, 3.4), V(sd * 2.05, 1.3, 3.7), V(sd * 2.5, 2.1, 4)], 0.07, 12, 8));
+          pb.add("steel", tube([V(sd * 3.4, 0.7, 3.4), V(sd * 2.95, 1.3, 3.7), V(sd * 2.5, 2.1, 4)], 0.07, 12, 8));
         }
-      };
-    }
-    case "gasvaro": {
-      const s = spec(6, 0.8, "quad", 4, 12);
-      return {
-        engines: [...pair(s, 1.6, 0, 3), ...pair(s, 3.4, 0, 3), ...pair(s, 2.5, 1.55, 4)],
-        cockpit: { style: "long", hw: 0.75, len: 3.6, y: 0, z: -7, pilot: 0.95 },
-        binder: [0, 1],
-        livery: 1,
-        extras: (pb) => {
-          for (const sd of [-1, 1]) {
-            pb.add("steel", tube([V(sd * 1.6, 0.7, 3.4), V(sd * 2.05, 1.3, 3.7), V(sd * 2.5, 2.1, 4)], 0.07, 12, 8));
-            pb.add("steel", tube([V(sd * 3.4, 0.7, 3.4), V(sd * 2.95, 1.3, 3.7), V(sd * 2.5, 2.1, 4)], 0.07, 12, 8));
-          }
+      }
+    };
+  },
+  bomquad: () => {
+    const s = spec(7.6, 0.66, "ring", 5, 12);
+    return {
+      engines: [{ spec: s, x: -2.3, y: -0.35, z: 3 }, { spec: s, x: 2.3, y: -0.35, z: 3 }, { spec: s, x: -2.3, y: 2.05, z: 3 }, { spec: s, x: 2.3, y: 2.05, z: 3 }],
+      cockpit: { style: "saucer", hw: 1, len: 2.4, y: 0.2, z: -6, pilot: 0.95 },
+      binders: [{ a: 0, b: 3 }, { a: 2, b: 1 }],
+      livery: 3,
+      engineExtras: (pb) => {
+        for (const sd of [-1, 1]) for (const z of [1, 4.8]) pb.add("steel", tube([V(sd * 2.3, 0.35, z), V(sd * 2.3, 1.35, z)], 0.08, 4, 6));
+      }
+    };
+  },
+  mavik: () => {
+    const s = spec(8, 0.62, "needle", 6, 10);
+    return { engines: pair(s, 1.7, 0, 3), cockpit: { style: "pod", hw: 0.72, len: 2.5, y: -0.05, z: -5.5, pilot: 0.92 }, binders: MAIN, livery: 1 };
+  },
+  rattis: () => {
+    const s = spec(6, 0.85, "blade", 4, 14);
+    return { engines: pair(s, 1.7, 0, 2.5), cockpit: { style: "wedge", hw: 0.78, len: 2.6, y: -0.1, z: -3.2, pilot: 0.92 }, binders: MAIN, livery: 2 };
+  },
+  aldo: () => {
+    const s = spec(9, 1, "long", 7, 16, true, 6);
+    return { engines: pair(s, 2.3, 0, 3.5), cockpit: { style: "long", hw: 0.85, len: 3.2, y: 0, z: -6, pilot: 1 }, binders: MAIN, livery: 0 };
+  },
+  teemo: () => {
+    const s = spec(5, 1.25, "heavy", 4, 20, true);
+    return {
+      engines: [{ spec: s, x: -2.3, y: -0.4, z: 0 }, { spec: s, x: 2.3, y: -0.4, z: 0 }, { spec: s, x: -2.3, y: 1.45, z: 6 }, { spec: s, x: 2.3, y: 1.45, z: 6 }],
+      cockpit: { style: "saucer", hw: 0.82, len: 2.2, y: 0.35, z: -5.5, pilot: 0.95 },
+      binders: MAIN,
+      livery: 3,
+      engineExtras: (pb) => {
+        for (const sd of [-1, 1]) {
+          pb.add("dark", rbox(0.3, 0.3, 3.6, 0.06), M4.trs(sd * 2.3, 0.55, 3, -0.31, 0, 0));
+          pb.add("hazard", rbox(0.32, 0.06, 1.2, 0.02), M4.trs(sd * 2.3, 0.73, 3, -0.31, 0, 0));
         }
-      };
-    }
-    case "bomquad": {
-      const s = spec(7.6, 0.66, "ring", 5, 12);
-      return {
-        engines: [{ spec: s, x: -2.3, y: -0.35, z: 3 }, { spec: s, x: 2.3, y: -0.35, z: 3 }, { spec: s, x: -2.3, y: 2.05, z: 3 }, { spec: s, x: 2.3, y: 2.05, z: 3 }],
-        cockpit: { style: "saucer", hw: 1, len: 2.4, y: 0.2, z: -6, pilot: 0.95 },
-        binder: [0, 3],
-        binders: [[0, 3], [2, 1]],
-        livery: 3,
-        extras: (pb) => {
-          for (const sd of [-1, 1]) for (const z of [1, 4.8]) pb.add("steel", tube([V(sd * 2.3, 0.35, z), V(sd * 2.3, 1.35, z)], 0.08, 4, 6));
-        }
-      };
-    }
-    case "mavik": {
-      const s = spec(8, 0.62, "needle", 6, 10);
-      return { engines: pair(s, 1.7, 0, 3), cockpit: { style: "pod", hw: 0.72, len: 2.5, y: -0.05, z: -5.5, pilot: 0.92 }, binder: [0, 1], livery: 1 };
-    }
-    case "rattis": {
-      const s = spec(6, 0.85, "blade", 4, 14);
-      return { engines: pair(s, 1.7, 0, 2.5), cockpit: { style: "wedge", hw: 0.78, len: 2.6, y: -0.1, z: -3.2, pilot: 0.92 }, binder: [0, 1], livery: 2 };
-    }
-    case "aldo": {
-      const s = spec(9, 1, "long", 7, 16, true, 6);
-      return { engines: pair(s, 2.3, 0, 3.5), cockpit: { style: "long", hw: 0.85, len: 3.2, y: 0, z: -6, pilot: 1 }, binder: [0, 1], livery: 0 };
-    }
-    case "teemo": {
-      const s = spec(5, 1.25, "heavy", 4, 20, true);
-      return {
-        engines: [{ spec: s, x: -2.3, y: -0.4, z: 0 }, { spec: s, x: 2.3, y: -0.4, z: 0 }, { spec: s, x: -2.3, y: 1.45, z: 6 }, { spec: s, x: 2.3, y: 1.45, z: 6 }],
-        cockpit: { style: "saucer", hw: 0.82, len: 2.2, y: 0.35, z: -5.5, pilot: 0.95 },
-        binder: [0, 1],
-        livery: 3,
-        extras: (pb) => {
-          for (const sd of [-1, 1]) {
-            pb.add("dark", rbox(0.3, 0.3, 3.6, 0.06), M4.trs(sd * 2.3, 0.55, 3, -0.31, 0, 0));
-            pb.add("hazard", rbox(0.32, 0.06, 1.2, 0.02), M4.trs(sd * 2.3, 0.73, 3, -0.31, 0, 0));
-          }
-        }
-      };
-    }
-    case "elana": {
-      const s = spec(8.5, 0.78, "needle", 6, 12);
-      return {
-        engines: pair(s, 2, 0, 3),
-        cockpit: { style: "long", hw: 0.8, len: 3.3, y: 0, z: -6, pilot: 0.95 },
-        binder: [0, 1],
-        livery: 1,
-        extras: (pb, L) => {
-          const fin = extrude([[0, 0], [1.1, 0], [1.4, 1.3], [0.9, 1.3]], 0.07, 0.02);
-          fin.rotateY(Math.PI / 2);
-          pb.add("hull", fin, M4.t(0, L.cockpit.y + 0.3, L.cockpit.z - 0.7), [0, 0, 3]);
-        }
-      };
-    }
-    default: {
-      const s = spec(7, 1.3, "heavy", 5, 16, false);
-      return {
-        engines: pair(s, 2.4, 0, 3),
-        cockpit: { style: "wedge", hw: 1, len: 2.8, y: 0, z: -5.5, pilot: 1 },
-        binder: [0, 1],
-        livery: 2,
-        extras: (pb, L) => {
-          const z = L.cockpit.z + L.cockpit.len * 0.5 + 0.35;
-          pb.add("steel", rbox(3, 0.5, 0.35, 0.06), M4.trs(0, L.cockpit.y - 0.25, z, 0.35, 0, 0));
-          pb.add("hazard", rbox(3.02, 0.16, 0.37, 0.03), M4.trs(0, L.cockpit.y - 0.08, z + 0.06, 0.35, 0, 0));
-          for (const sd of [-1, 1]) pb.add("dark", rbox(0.12, 0.12, 0.9, 0.03), M4.t(sd * 0.9, L.cockpit.y - 0.3, z - 0.45));
-        }
-      };
-    }
+      }
+    };
+  },
+  elana: () => {
+    const s = spec(8.5, 0.78, "needle", 6, 12);
+    return {
+      engines: pair(s, 2, 0, 3),
+      cockpit: { style: "long", hw: 0.8, len: 3.3, y: 0, z: -6, pilot: 0.95 },
+      binders: MAIN,
+      livery: 1,
+      cockpitExtras: (pb, L) => {
+        const fin = extrude([[0, 0], [1.1, 0], [1.4, 1.3], [0.9, 1.3]], 0.07, 0.02);
+        fin.rotateY(Math.PI / 2);
+        pb.add("hull", fin, M4.t(0, L.cockpit.y + 0.3, L.cockpit.z - 0.7), [0, 0, 3]);
+      }
+    };
+  },
+  odo: () => {
+    const s = spec(7, 1.3, "heavy", 5, 16, false);
+    return {
+      engines: pair(s, 2.4, 0, 3),
+      cockpit: { style: "wedge", hw: 1, len: 2.8, y: 0, z: -5.5, pilot: 1 },
+      binders: MAIN,
+      livery: 2,
+      cockpitExtras: (pb, L) => {
+        const z = L.cockpit.z + L.cockpit.len * 0.5 + 0.35;
+        pb.add("steel", rbox(3, 0.5, 0.35, 0.06), M4.trs(0, L.cockpit.y - 0.25, z, 0.35, 0, 0));
+        pb.add("hazard", rbox(3.02, 0.16, 0.37, 0.03), M4.trs(0, L.cockpit.y - 0.08, z + 0.06, 0.35, 0, 0));
+        for (const sd of [-1, 1]) pb.add("dark", rbox(0.12, 0.12, 0.9, 0.03), M4.t(sd * 0.9, L.cockpit.y - 0.3, z - 0.45));
+      }
+    };
   }
-}
-var TEMPLATES = {
-  pod: [[-0.5, 0.3, 0.26, 0.26, 2.2, 0], [-0.45, 0.7, 0.46, 0.44, 2.4, 0], [-0.36, 0.9, 0.46, 0.52, 2.6, 0], [-0.24, 0.98, 0.4, 0.55, 2.6, 0.5], [-0.08, 1, 0.36, 0.56, 2.6, 0.6], [0.06, 0.96, 0.36, 0.54, 2.6, 0.5], [0.18, 0.86, 0.42, 0.48, 2.4, 0], [0.32, 0.64, 0.38, 0.38, 2.3, 0], [0.44, 0.34, 0.24, 0.24, 2.2, 0], [0.5, 0.08, 0.07, 0.08, 2, 0]],
-  wedge: [[-0.5, 0.55, 0.3, 0.3, 4, 0], [-0.44, 0.92, 0.38, 0.4, 4, 0], [-0.3, 1, 0.34, 0.42, 4, 0.5], [-0.1, 1, 0.3, 0.4, 4, 0.58], [0.06, 0.96, 0.28, 0.36, 4, 0.5], [0.18, 0.88, 0.3, 0.3, 3.6, 0], [0.34, 0.66, 0.2, 0.22, 3.2, 0], [0.5, 0.3, 0.05, 0.08, 3, 0]],
-  saucer: [[-0.5, 0.4, 0.3, 0.3, 2, 0], [-0.4, 0.85, 0.5, 0.5, 2.1, 0], [-0.25, 1, 0.46, 0.58, 2.2, 0.5], [-0.05, 1.04, 0.42, 0.6, 2.2, 0.6], [0.12, 0.98, 0.42, 0.58, 2.2, 0.5], [0.26, 0.84, 0.48, 0.5, 2.1, 0], [0.4, 0.58, 0.4, 0.4, 2, 0], [0.5, 0.2, 0.16, 0.16, 2, 0]],
-  long: [[-0.5, 0.3, 0.24, 0.24, 2.4, 0], [-0.44, 0.74, 0.4, 0.4, 2.5, 0], [-0.32, 0.9, 0.36, 0.46, 2.6, 0.5], [-0.16, 0.92, 0.32, 0.48, 2.6, 0.58], [-0.02, 0.88, 0.32, 0.46, 2.6, 0.5], [0.1, 0.78, 0.36, 0.42, 2.5, 0], [0.26, 0.58, 0.32, 0.34, 2.4, 0], [0.4, 0.36, 0.22, 0.22, 2.2, 0], [0.5, 0.08, 0.06, 0.07, 2, 0]]
 };
-function catmull(p0, p1, p2, p3, t) {
-  const t2 = t * t, t3 = t2 * t;
-  return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
+function podLayout(def) {
+  const make = LAYOUTS[def.id];
+  if (!make) throw new Error(`No layout for pod "${def.id}" \u2013 add it to LAYOUTS in src/game/podLayouts.ts`);
+  return make(def);
 }
-function sections(style, hw, len, perSpan) {
-  const T2 = TEMPLATES[style];
-  const out = [];
-  for (let i = 0; i < T2.length - 1; i++) for (let k = 0; k < perSpan; k++) {
-    const t = k / perSpan;
-    const g2 = (j) => T2[Math.max(0, Math.min(T2.length - 1, j))];
-    const f = (c) => catmull(g2(i - 1)[c], g2(i)[c], g2(i + 1)[c], g2(i + 2)[c], t);
-    const e = t * t * (3 - 2 * t);
-    const open2 = g2(i)[5] + (g2(i + 1)[5] - g2(i)[5]) * e;
-    out.push({ z: f(0) * len, w: Math.max(0.02, f(1)) * hw, hT: Math.max(0.02, f(2)) * hw, hB: Math.max(0.02, f(3)) * hw, n: f(4), open: Math.max(0, Math.min(0.85, open2)) });
-  }
-  const l = T2[T2.length - 1];
-  out.push({ z: l[0] * len, w: l[1] * hw, hT: l[2] * hw, hB: l[3] * hw, n: l[4], open: 0 });
-  return out;
-}
-function pilotParts(pb, s, hip, species = "Mensch") {
-  const base2 = new Matrix4().compose(hip, new Quaternion(), V(s, s, s));
-  const at = (m) => base2.clone().multiply(m);
-  const torso = lathe(prof([[0, 0], [0.16, 0, 1], [0.19, 0.12], [0.21, 0.32], [0.19, 0.44], [0.12, 0.52], [0.06, 0.56], [0, 0.57]]), 18, 0);
-  torso.rotateX(-Math.PI / 2);
-  torso.scale(1.15, 1, 0.82);
-  pb.add("suit", torso, at(M4.trs(0, 0, 0, 0.22, 0, 0)));
-  for (const sd of [-1, 1]) pb.add("leather", rbox(0.05, 0.5, 0.02, 0.01), at(M4.trs(sd * 0.09, 0.27, 0.19, 0.22, 0, sd * 0.12)));
-  pb.add("chrome", cyl(0.035, 0.035, 0.02, 10), at(M4.trs(0, 0.25, 0.205, Math.PI / 2 + 0.22, 0, 0)));
-  const head = V(0, 0.71, 0.17);
-  if (species === "Dugkin") {
-    pb.add("skin", sphere(0.115, 16, 12), at(M4.trs(head.x, head.y, head.z + 0.03, 0.18, 0, 0, 0.88, 0.92, 1.38)));
-    pb.add("leather", sphere(0.124, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), at(M4.trs(head.x, head.y + 0.02, head.z - 0.02, -0.3, 0, 0, 0.94, 0.95, 1.15)));
-    for (const sd of [-1, 1]) {
-      pb.add("leather", cyl(0.012, 0.032, 0.14, 7), at(M4.trs(head.x + sd * 0.085, head.y + 0.09, head.z - 0.06, -0.75, 0, sd * -0.35)));
-      pb.add("chrome", cyl(0.048, 0.052, 0.05, 12), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.13, Math.PI / 2, 0, 0)));
-      pb.add("glow", sphere(0.038, 10, 8), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.15, 0, 0, 0, 1, 0.8, 0.45)));
-    }
-  } else if (species === "Xantori" || species === "Aleeni") {
-    pb.add("skin", sphere(0.112, 16, 12), at(M4.trs(head.x, head.y, head.z, -0.25, 0, 0, 0.9, 1.15, 1.25)));
-    pb.add("suit", rbox(0.045, 0.14, 0.24, 0.018), at(M4.trs(head.x, head.y + 0.11, head.z - 0.06, -0.35, 0, 0)));
-    for (const sd of [-1, 1]) pb.add("skin", tube([V(head.x + sd * 0.08, head.y + 0.02, head.z - 0.06), V(head.x + sd * 0.11, head.y - 0.1, head.z - 0.18), V(head.x + sd * 0.09, head.y - 0.24, head.z - 0.22)], 0.032, 8, 7), base2);
-    pb.add("visor", sphere(0.118, 16, 8, 0, Math.PI, Math.PI * 0.25, Math.PI * 0.32), at(M4.trs(head.x, head.y + 0.02, head.z + 0.02, 0, 0, 0, 1.02, 0.9, 1.05)));
-  } else if (species === "Gurrani" || species === "Kraveen" || species === "Erriton") {
-    pb.add("suit", sphere(0.138, 18, 14), at(M4.trs(head.x, head.y + 0.015, head.z, 0, 0, 0, 0.98, 1.06, 1.22)));
-    pb.add("dark", rbox(0.04, 0.09, 0.26, 0.012), at(M4.trs(head.x, head.y + 0.13, head.z - 0.05, -0.2, 0, 0)));
-    pb.add("visor", sphere(0.141, 18, 8, 0, Math.PI, Math.PI * 0.28, Math.PI * 0.34), at(M4.trs(head.x, head.y + 0.015, head.z + 0.015, 0, 0, 0, 1, 0.95, 1.2)));
-    pb.add("glow", rbox(0.16, 0.016, 0.02, 4e-3), at(M4.t(head.x, head.y + 0.02, head.z + 0.165)));
-  } else if (species === "Lurbani" || species === "Vexi") {
-    pb.add("chrome", sphere(0.136, 18, 12), at(M4.trs(head.x, head.y + 0.01, head.z, 0, 0, 0, 1.12, 0.96, 1.08)));
-    pb.add("dark", rbox(0.24, 0.065, 0.09, 0.016), at(M4.t(head.x, head.y + 0.025, head.z + 0.11)));
-    pb.add("glow", rbox(0.2, 0.026, 0.02, 5e-3), at(M4.t(head.x, head.y + 0.025, head.z + 0.156)));
-    for (const sd of [-1, 1]) pb.add("steel", cyl(8e-3, 0.012, 0.16, 6), at(M4.trs(head.x + sd * 0.13, head.y + 0.11, head.z - 0.02, -0.3, 0, sd * -0.2)));
-  } else {
-    pb.add("skin", sphere(0.112, 18, 14), at(M4.trs(head.x, head.y - 0.015, head.z + 0.02, 0, 0, 0, 0.95, 1.05, 1)));
-    pb.add("leather", sphere(0.13, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.64), at(M4.trs(head.x, head.y + 0.012, head.z - 0.015, -0.25, 0, 0, 1, 1.05, 1.1)));
-    pb.add("chrome", rbox(0.032, 0.04, 0.22, 8e-3), at(M4.trs(head.x, head.y + 0.135, head.z - 0.02, -0.18, 0, 0)));
-    pb.add("rubber", torus(0.122, 0.013, 6, 24), at(M4.trs(head.x, head.y + 0.035, head.z, Math.PI / 2 - 0.2, 0, 0)));
-    for (const sd of [-1, 1]) {
-      pb.add("chrome", cyl(0.046, 0.05, 0.046, 14), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.105, Math.PI / 2, 0, 0)));
-      pb.add("visor", sphere(0.041, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.128, Math.PI / 2, 0, 0, 1, 0.45, 1)));
-    }
-  }
-  pb.add("leather", torus(0.075, 0.03, 8, 18), at(M4.trs(0, 0.56, 0.12, Math.PI / 2 - 0.25, 0, 0)));
-  const hands = [];
-  for (const sd of [-1, 1]) {
-    const sh = V(sd * 0.22, 0.46, 0.09), el = V(sd * 0.3, 0.27, 0.3), hd = V(sd * 0.21, 0.31, 0.5);
-    pb.add("suit", sphere(0.085, 12, 10), at(M4.t(sh.x, sh.y, sh.z)));
-    pb.add("suit", tube([sh, el, hd], 0.055, 14, 10), base2);
-    pb.add("leather", sphere(0.062, 12, 10), at(M4.trs(hd.x, hd.y, hd.z + 0.02, 0, 0, 0, 1, 0.9, 1.2)));
-    hands.push(hd.clone().multiplyScalar(s).add(hip));
-  }
-  return { head: head.clone().multiplyScalar(s).add(hip), hands };
-}
-var cockpitCache = /* @__PURE__ */ new Map();
-function cockpitGeo(L, seg, species = "Mensch") {
-  const c = L.cockpit;
-  const key = `${c.style}|${c.hw}|${c.len}|${c.pilot}|${species}|${seg}`;
-  const hit = cockpitCache.get(key);
-  if (hit) return hit;
-  const pb = new PartBuilder();
-  const hw = c.hw, len = c.len;
-  const secs = sections(c.style, hw, len, seg >= 40 ? 6 : seg >= 28 ? 4 : 3);
-  const segC = Math.max(24, seg);
-  pb.add("hull", loft(secs, segC, 2));
-  let iA = secs.findIndex((s) => (s.open ?? 0) > 1e-3) - 1;
-  let iB = secs.length - 1;
-  for (let j = secs.length - 1; j >= 0; j--) if ((secs[j].open ?? 0) > 1e-3) {
-    iB = j + 1;
-    break;
-  }
-  iA = Math.max(0, iA);
-  iB = Math.min(secs.length - 1, iB);
-  const th = 0.05 * hw + 0.02;
-  const outerSub = secs.slice(iA, iB + 1);
-  const inner = outerSub.map((s) => ({ ...s, w: s.w - th, hT: s.hT - th, hB: s.hB - th }));
-  pb.add("interior", loft(inner, segC, 0, [true, true], true));
-  pb.add("chrome", loftRim(outerSub, inner, segC));
-  const zA = secs[iA].z, zB = secs[iB].z;
-  let wMax = 0, hBm = 0;
-  for (const s of outerSub) {
-    wMax = Math.max(wMax, s.w);
-    hBm = Math.max(hBm, s.hB);
-  }
-  const mid = outerSub[Math.floor(outerSub.length / 2)];
-  const rimY = mid.hT * Math.pow(Math.cos((mid.open ?? 0.5) * Math.PI / 2), 2 / (mid.n ?? 2.4));
-  const floorY = -(mid.hB - th);
-  const hipZ = zA + (zB - zA) * 0.4, hipY = floorY * 0.5;
-  pb.add("leather", rbox(0.56, 0.12, 0.5, 0.05), M4.t(0, hipY - 0.06, hipZ + 0.08));
-  pb.add("leather", rbox(0.56, 0.7, 0.12, 0.06), M4.trs(0, hipY + 0.3, hipZ - 0.2, -0.15, 0, 0));
-  pb.add("leather", rbox(0.3, 0.2, 0.12, 0.05), M4.trs(0, hipY + 0.78, hipZ - 0.27, -0.15, 0, 0));
-  const pil = pilotParts(pb, c.pilot, V(0, hipY, hipZ), species);
-  pb.add("chrome", torus(0.24 * c.pilot, 0.022, 7, 18, Math.PI), M4.t(0, hipY + 0.78 * c.pilot, hipZ - 0.34));
-  pb.add("glow", torus(0.055, 6e-3, 5, 16), M4.t(0, rimY + 0.11, zB - 0.34 * (zB - zA)));
-  for (const hd of pil.hands) {
-    const base2 = V(hd.x, floorY + 0.05, hd.z + 0.1);
-    pb.add("steel", tube([base2, V(hd.x, (base2.y + hd.y) / 2, hd.z + 0.08), V(hd.x, hd.y - 0.07, hd.z)], 0.022, 8, 6));
-    pb.add("rubber", cyl(0.032, 0.032, 0.12, 10), M4.t(hd.x, hd.y - 0.06, hd.z));
-    pb.add("glow", sphere(0.018, 8, 6), M4.t(hd.x, hd.y + 0.01, hd.z + 0.03));
-  }
-  const D = new Matrix4().compose(V(0, rimY - 0.06, zB - 0.16 * len * 0.3 - 0.12), new Quaternion().setFromEuler(new Euler(-0.65, 0, 0)), V(1, 1, 1));
-  const dw = Math.min(wMax * 1.3, 1.5);
-  pb.add("interior", rbox(dw, 0.06, 0.34, 0.03), D);
-  for (let i = 0; i < 5; i++) {
-    const gx = (i - 2) * dw * 0.18;
-    const m = D.clone().multiply(M4.trs(gx, 0.032, 0.02 * (i % 2), -Math.PI / 2, 0, 0));
-    pb.add("glow", new CircleGeometry(0.04, 16), m);
-    pb.add("chrome", torus(0.045, 8e-3, 6, 18), m);
-  }
-  const ws = c.style === "wedge" ? [0.85, 0.2, 0.42] : c.style === "saucer" ? [1, 0.45, 0.7] : c.style === "long" ? [0.72, 0.34, 0.58] : [0.9, 0.32, 0.48];
-  const wsM = M4.trs(0, rimY - 0.02, zB - 0.42 * (zB - zA), 0, 0, 0, wMax * ws[0], ws[1], ws[2]);
-  pb.add("glass", sphere(1, 28, 10, 0, Math.PI, 0, Math.PI / 2), wsM);
-  pb.add("chrome", torus(1, 0.022, 6, 28, Math.PI), wsM.clone().multiply(new Matrix4().makeRotationX(Math.PI / 2)));
-  const spZ = zA + (zB - zA) * 0.25;
-  for (const sd of [-1, 1]) {
-    pb.add("hull", rbox(0.3 * hw, 0.34 * hw, 0.42 * len, 0.06), M4.t(sd * wMax * 0.97, -0.08 * hw, spZ), [0, 0, 3]);
-    for (let i = 0; i < 5; i++) pb.add("dark", rbox(0.02, 0.22 * hw, 0.03, 6e-3), M4.trs(sd * (wMax * 0.97 + 0.15 * hw + 0.01), -0.08 * hw, spZ - 0.12 * len + i * 0.06 * len, 0, sd * 0.6, 0));
-    pb.add("dark", lathe(prof([[0.11 * hw, -0.1, 1], [0.11 * hw, 0.05, 1], [0.08 * hw, 0.05, 1], [0, -0.05]]), 16, 0), M4.t(sd * wMax * 0.97, -0.08 * hw, spZ + 0.21 * len + 0.02));
-  }
-  pb.add("dark", rbox(wMax * 1.1, 0.07, len * 0.5, 0.03), M4.t(0, -hBm - 0.03, zA + (zB - zA) * 0.5));
-  pb.add("glow", rbox(wMax * 0.7, 0.025, len * 0.42, 0.01), M4.t(0, -hBm - 0.075, zA + (zB - zA) * 0.5));
-  const rear = secs[1];
-  for (const sd of [-1, 1]) {
-    const fin = extrude([[0, 0], [0.55, 0], [0.75, 0.55 * hw], [0.45, 0.55 * hw]], 0.04, 0.012);
-    fin.rotateY(Math.PI / 2);
-    pb.add("hull", fin, M4.trs(sd * rear.w * 0.45, rear.hT * 0.6, secs[2].z, 0, 0, sd * -0.35), [0, 0, 3]);
-    pb.add("glow", sphere(0.045, 10, 8), M4.t(sd * rear.w * 0.62, 0, secs[0].z + 0.06));
-  }
-  pb.add("dark", cyl(0.012, 0.016, 0.9, 6), M4.t(-rear.w * 0.3, rear.hT + 0.45, rear.z + 0.15));
-  pb.add("glow", sphere(0.03, 8, 6), M4.t(-rear.w * 0.3, rear.hT + 0.92, rear.z + 0.15));
-  pb.add("chrome", lathe(prof([[0.07 * hw, 0], [0.05 * hw, 0.12], [0, 0.3]]), 16, 0), M4.t(0, 0, len * 0.5 - 0.02));
-  const fr = secs[Math.min(secs.length - 1, iB + 2)];
-  const anchors = [V(-fr.w * 0.45, fr.hT * 0.75 + 0.06, fr.z), V(fr.w * 0.45, fr.hT * 0.75 + 0.06, fr.z)];
-  for (const a of anchors) {
-    pb.add("chrome", torus(0.06, 0.02, 6, 14), M4.trs(a.x, a.y, a.z, 0, Math.PI / 2, 0));
-    pb.add("steel", rbox(0.1, 0.1, 0.16, 0.02), M4.t(a.x, a.y - 0.07, a.z));
-  }
-  const out = { parts: pb.build(), info: { head: pil.head, anchors } };
-  cockpitCache.set(key, out);
-  return out;
-}
+
+// src/game/podDesigns.ts
 var collCache = /* @__PURE__ */ new Map();
 function podCollision(def) {
   const hit = collCache.get(def.id);
@@ -89825,10 +89918,10 @@ function podCollision(def) {
   const circles = [];
   for (const e of L.engines) {
     const side = e.x < 0 ? -1 : 1;
-    const R = e.spec.R * 1.05 + (e.spec.style === "blade" ? 0.45 : 0) + (e.spec.style === "ring" ? 0.3 : 0);
+    const R = engineExtent(e.spec).coll;
     for (const f of [0.3, -0.3]) circles.push({ x: e.x, z: e.z + e.spec.L * f + bz, r: R, side });
   }
-  if (def.id === "aurora") for (const sd of [-1, 1]) for (const f of [2.5, -2.5]) circles.push({ x: sd * 4, z: 4 + f + bz, r: 0.6, side: sd });
+  for (const c of L.extraCircles ?? []) circles.push({ x: c.x, z: c.z + bz, r: c.r, side: c.side });
   circles.push({ x: 0, z: L.cockpit.z + bz, r: L.cockpit.hw * 1.05, side: 0 });
   let halfW = 0;
   for (const c of circles) halfW = Math.max(halfW, Math.abs(c.x) + c.r);
@@ -89844,26 +89937,28 @@ function podEnvelope(def) {
   const bz = -L.cockpit.z * 0.25;
   const sideEnv = (sign3) => {
     const ms = L.engines.filter((e) => (e.x < 0 ? -1 : 1) === sign3);
-    let sx = 0, outerX = 0, frontZ = -1e9, backZ = 1e9, minY = 0;
+    let sx = 0, outerX = 0, frontZ = -1e9, backZ = 1e9, minY = 0, axisY = 1e9;
     for (const e of ms) {
-      const rBot = e.spec.R * (e.spec.style === "ring" ? 1.36 : 1.12) + 0.1;
+      const x = engineExtent(e.spec);
       sx += e.x;
-      outerX = Math.max(outerX, Math.abs(e.x) + e.spec.R * (e.spec.style === "blade" ? 2.1 : 1.1));
-      frontZ = Math.max(frontZ, e.z + bz + e.spec.L * 0.5);
-      backZ = Math.min(backZ, e.z + bz - e.spec.L * 0.5);
-      minY = Math.min(minY, e.y - rBot);
+      outerX = Math.max(outerX, Math.abs(e.x) + x.side);
+      frontZ = Math.max(frontZ, e.z + bz + x.halfL);
+      backZ = Math.min(backZ, e.z + bz - x.halfL);
+      minY = Math.min(minY, e.y - x.bottom);
+      axisY = Math.min(axisY, e.y);
     }
-    if (def.id === "aurora") {
-      outerX = Math.max(outerX, 4.45);
-      minY = Math.min(minY, -0.62);
-    }
-    return { x: sx / Math.max(1, ms.length), outerX: sign3 * outerX, frontZ, backZ, minY };
+    if (L.envelope?.outerX !== void 0) outerX = Math.max(outerX, L.envelope.outerX);
+    if (L.envelope?.minY !== void 0) minY = Math.min(minY, L.envelope.minY);
+    return { x: sx / Math.max(1, ms.length), outerX: sign3 * outerX, frontZ, backZ, minY, axisY: ms.length ? axisY : 0 };
   };
   const ck = L.cockpit;
+  const ckMinY = ck.y - ck.hw * 0.68 - 0.14;
+  const engL = sideEnv(-1), engR = sideEnv(1);
   const out = {
-    engL: sideEnv(-1),
-    engR: sideEnv(1),
-    cockpit: { z: ck.z + bz, minY: ck.y - ck.hw * 0.68 - 0.14 }
+    engL,
+    engR,
+    cockpit: { z: ck.z + bz, minY: ckMinY, topY: ck.topY !== void 0 ? ck.y + ck.topY : ckMinY + 1.75 },
+    length: Math.max(engL.frontZ, engR.frontZ) - (ck.z + bz - ck.len * 0.5)
   };
   envCache.set(def.id, out);
   return out;
@@ -90596,17 +90691,17 @@ var CSMShadowNode = class extends ShadowBaseNode {
 // src/game/data.ts
 var STAT_KEYS = ["topSpeed", "accel", "turn", "traction", "airbrake", "cooling", "repair"];
 var PILOTS = [
-  { id: "kai", name: "Kai Varrin", species: "Mensch", skill: 0.9, aggression: 0.4, color: "#4aa3ff" },
-  { id: "zeb", name: "Zebulox Vrak", species: "Dugkin", skill: 0.95, aggression: 0.95, color: "#ff9a2e" },
-  { id: "gas", name: "Gasvaro Ten", species: "Xantori", skill: 0.8, aggression: 0.3, color: "#3fe0a0" },
-  { id: "bom", name: "Bomquad Rii", species: "Lurbani", skill: 0.55, aggression: 0.2, color: "#e3e04a" },
-  { id: "mav", name: "Mavik Hollo", species: "Gurrani", skill: 0.75, aggression: 0.6, color: "#ff4a6e" },
-  { id: "rat", name: "Rattis Tyr", species: "Aleeni", skill: 0.7, aggression: 0.8, color: "#b46bff" },
-  { id: "ald", name: "Aldo Beerak", species: "Kraveen", skill: 0.85, aggression: 0.7, color: "#7fd3ff" },
-  { id: "tee", name: "Teemo Pagali", species: "Vexi", skill: 0.65, aggression: 0.5, color: "#ff7b2e" },
-  { id: "ela", name: "Elana Mak", species: "Mensch", skill: 0.78, aggression: 0.35, color: "#ff5ad1" },
-  { id: "ody", name: "Odo Mandrel", species: "Erriton", skill: 0.6, aggression: 0.55, color: "#9fff5a" },
-  { id: "cle", name: "Clegg Halden", species: "Mensch", skill: 0.68, aggression: 0.45, color: "#ffd27a" }
+  { id: "kai", name: "Kai Varrin", species: "Mensch", head: "goggles", skill: 0.9, aggression: 0.4, color: "#4aa3ff" },
+  { id: "zeb", name: "Zebulox Vrak", species: "Dugkin", head: "snout", skill: 0.95, aggression: 0.95, color: "#ff9a2e" },
+  { id: "gas", name: "Gasvaro Ten", species: "Xantori", head: "crest", skill: 0.8, aggression: 0.3, color: "#3fe0a0" },
+  { id: "bom", name: "Bomquad Rii", species: "Lurbani", head: "dome", skill: 0.55, aggression: 0.2, color: "#e3e04a" },
+  { id: "mav", name: "Mavik Hollo", species: "Gurrani", head: "aero", skill: 0.75, aggression: 0.6, color: "#ff4a6e" },
+  { id: "rat", name: "Rattis Tyr", species: "Aleeni", head: "crest", skill: 0.7, aggression: 0.8, color: "#b46bff" },
+  { id: "ald", name: "Aldo Beerak", species: "Kraveen", head: "aero", skill: 0.85, aggression: 0.7, color: "#7fd3ff" },
+  { id: "tee", name: "Teemo Pagali", species: "Vexi", head: "dome", skill: 0.65, aggression: 0.5, color: "#ff7b2e" },
+  { id: "ela", name: "Elana Mak", species: "Mensch", head: "goggles", skill: 0.78, aggression: 0.35, color: "#ff5ad1" },
+  { id: "ody", name: "Odo Mandrel", species: "Erriton", head: "aero", skill: 0.6, aggression: 0.55, color: "#9fff5a" },
+  { id: "cle", name: "Clegg Halden", species: "Mensch", head: "goggles", skill: 0.68, aggression: 0.45, color: "#ffd27a" }
 ];
 var PODS = [
   {
@@ -90615,12 +90710,6 @@ var PODS = [
     pilotId: "kai",
     desc: "Ausgewogener Allrounder mit gro\xDFen Turbinen-Triebwerken.",
     stats: { topSpeed: 0.7, accel: 0.75, turn: 0.75, traction: 0.65, airbrake: 0.7, cooling: 0.7, repair: 0.6 },
-    engine: "turbine",
-    engineLen: 7,
-    engineRad: 1.15,
-    spread: 4.2,
-    cable: 9,
-    cockpit: "pod",
     colors: ["#2d6fd6", "#d9dde3", "#4ad2ff"]
   },
   {
@@ -90629,12 +90718,6 @@ var PODS = [
     pilotId: "zeb",
     desc: "Riesige Split-X Triebwerke \u2013 brutale Geschwindigkeit.",
     stats: { topSpeed: 0.95, accel: 0.8, turn: 0.45, traction: 0.55, airbrake: 0.5, cooling: 0.55, repair: 0.5 },
-    engine: "split",
-    engineLen: 10,
-    engineRad: 1.25,
-    spread: 5.2,
-    cable: 10,
-    cockpit: "wedge",
     colors: ["#d07a1c", "#3a3a3a", "#ffb347"]
   },
   {
@@ -90643,12 +90726,6 @@ var PODS = [
     pilotId: "gas",
     desc: "Sechs Triebwerke, extreme Beschleunigung, empfindlich.",
     stats: { topSpeed: 0.8, accel: 0.95, turn: 0.6, traction: 0.6, airbrake: 0.65, cooling: 0.45, repair: 0.45 },
-    engine: "quad",
-    engineLen: 8.5,
-    engineRad: 0.9,
-    spread: 4.8,
-    cable: 11,
-    cockpit: "long",
     colors: ["#27a36d", "#e8d27a", "#5affb4"]
   },
   {
@@ -90657,12 +90734,6 @@ var PODS = [
     pilotId: "bom",
     desc: "Vier schlanke Triebwerke im Quadrat, gekoppelt \xFCber ein X aus Energieblitzen. Wild, aber schnell.",
     stats: { topSpeed: 0.85, accel: 0.55, turn: 0.4, traction: 0.4, airbrake: 0.45, cooling: 0.8, repair: 0.7 },
-    engine: "ring",
-    engineLen: 7.6,
-    engineRad: 0.7,
-    spread: 4.6,
-    cable: 12,
-    cockpit: "saucer",
     colors: ["#c9b23a", "#5d4a2c", "#fff07a"]
   },
   {
@@ -90671,12 +90742,6 @@ var PODS = [
     pilotId: "mav",
     desc: "Schlanke Nadel-Triebwerke f\xFCr maximale Wendigkeit.",
     stats: { topSpeed: 0.6, accel: 0.7, turn: 0.95, traction: 0.85, airbrake: 0.85, cooling: 0.65, repair: 0.6 },
-    engine: "needle",
-    engineLen: 8,
-    engineRad: 0.75,
-    spread: 3.6,
-    cable: 8,
-    cockpit: "pod",
     colors: ["#c2263f", "#efe9e1", "#ff5a7a"]
   },
   {
@@ -90685,12 +90750,6 @@ var PODS = [
     pilotId: "rat",
     desc: "Klein, leicht und agil \u2013 hohe Traktion.",
     stats: { topSpeed: 0.65, accel: 0.85, turn: 0.85, traction: 0.9, airbrake: 0.75, cooling: 0.6, repair: 0.55 },
-    engine: "blade",
-    engineLen: 6.5,
-    engineRad: 0.85,
-    spread: 3.4,
-    cable: 7.5,
-    cockpit: "wedge",
     colors: ["#8a3ad6", "#20212a", "#c48bff"]
   },
   {
@@ -90699,12 +90758,6 @@ var PODS = [
     pilotId: "ald",
     desc: "Hochleistungsk\xFChlung \u2013 Dauer-Boost-Spezialist.",
     stats: { topSpeed: 0.75, accel: 0.65, turn: 0.6, traction: 0.7, airbrake: 0.6, cooling: 0.95, repair: 0.75 },
-    engine: "long",
-    engineLen: 9.5,
-    engineRad: 1,
-    spread: 4.4,
-    cable: 9.5,
-    cockpit: "long",
     colors: ["#2a8fb5", "#c7c2b8", "#7fe8ff"]
   },
   {
@@ -90713,12 +90766,6 @@ var PODS = [
     pilotId: "tee",
     desc: "Schwer gepanzert \u2013 steckt Kollisionen weg.",
     stats: { topSpeed: 0.7, accel: 0.5, turn: 0.5, traction: 0.75, airbrake: 0.55, cooling: 0.7, repair: 0.95 },
-    engine: "heavy",
-    engineLen: 7.5,
-    engineRad: 1.45,
-    spread: 5,
-    cable: 9,
-    cockpit: "saucer",
     colors: ["#7a4a2a", "#b5b5b5", "#ff8c3a"]
   },
   {
@@ -90727,12 +90774,6 @@ var PODS = [
     pilotId: "ela",
     desc: "Elegant und pr\xE4zise \u2013 perfekte Luftbremse.",
     stats: { topSpeed: 0.72, accel: 0.72, turn: 0.8, traction: 0.75, airbrake: 0.95, cooling: 0.6, repair: 0.6 },
-    engine: "needle",
-    engineLen: 9,
-    engineRad: 0.85,
-    spread: 4,
-    cable: 9,
-    cockpit: "long",
     colors: ["#e6e6ee", "#d63aa8", "#ff7ae0"]
   },
   {
@@ -90741,12 +90782,6 @@ var PODS = [
     pilotId: "ody",
     desc: "Rammbock mit Turbinen \u2013 aggressive Rennen.",
     stats: { topSpeed: 0.78, accel: 0.6, turn: 0.55, traction: 0.6, airbrake: 0.5, cooling: 0.75, repair: 0.85 },
-    engine: "heavy",
-    engineLen: 8,
-    engineRad: 1.3,
-    spread: 4.6,
-    cable: 8.5,
-    cockpit: "wedge",
     colors: ["#4c7a1e", "#2b2b2b", "#b4ff5a"]
   }
 ];
@@ -91209,6 +91244,7 @@ var PRESETS = {
   ultra: { renderScale: 1.5, shadows: 3, texRes: 2048, parallax: true, ao: true, bloom: true, godRays: true, ssr: true, motionBlur: true, cinematic: true, particles: 1.5, detail: 1.6, geometry: 3, aa: "smaa", drawDistance: 1.5, anisotropy: 16, shaderDetail: 2, bumpMapping: true, tessellation: 2, csm: true, lensFx: true, lodBias: 2, podDetail: 3, weatherFx: 2, volumetrics: 2, reflRes: 1 }
 };
 var defaultGfx = () => ({ preset: "high", backend: "auto", batching: true, fov: 75, showFps: true, bloomStrength: 0.5, ...PRESETS.high });
+var MAX_OPPONENTS = 10;
 function defaultProfile() {
   const custom = {};
   for (const p of PODS) custom[p.id] = { colors: [...p.colors], tuning: Object.fromEntries(STAT_KEYS.map((k) => [k, 0])) };
@@ -92536,17 +92572,32 @@ var GRAVITY = 34;
 var HOVER = 2.85;
 var TUNNEL_DECK = 1.2;
 var MIN_ROAD_CLEAR = 0.68;
+var FX_NONE = { vmax: 1, accel: 1, turn: 1, grip: 1, abDecel: 1, cool: 1, heatRate: 1 };
+function applyDamage(p, side, amount, _zone) {
+  if (side === "both") {
+    p.hpL -= amount;
+    p.hpR -= amount;
+  } else if (side < 0) p.hpL -= amount;
+  else if (side > 0) p.hpR -= amount;
+  else {
+    p.hpL -= amount * 0.5;
+    p.hpR -= amount * 0.5;
+  }
+}
+function hitZone(p, nx, nz) {
+  return nx * Math.sin(p.yaw) + nz * Math.cos(p.yaw) < -0.5 ? "front" : "side";
+}
 function podParams(p) {
-  const s = p.stats;
+  const s = p.stats, f = p.fx ?? FX_NONE;
   return {
-    vmax: 108 + 50 * s.topSpeed,
-    accel: 24 + 30 * s.accel,
-    turn: 1.05 + 0.75 * s.turn,
-    grip: 2.6 + 5.2 * s.traction,
-    abDecel: 22 + 38 * s.airbrake,
+    vmax: (108 + 50 * s.topSpeed) * f.vmax,
+    accel: (24 + 30 * s.accel) * f.accel,
+    turn: (1.05 + 0.75 * s.turn) * f.turn,
+    grip: (2.6 + 5.2 * s.traction) * f.grip,
+    abDecel: (22 + 38 * s.airbrake) * f.abDecel,
     abTurn: 1.45 + 0.6 * s.airbrake,
-    cool: 0.16 + 0.3 * s.cooling,
-    heatRate: 0.38 - 0.16 * s.cooling,
+    cool: (0.16 + 0.3 * s.cooling) * f.cool,
+    heatRate: (0.38 - 0.16 * s.cooling) * f.heatRate,
     repair: 6 + 16 * s.repair,
     sturdy: 1.25 - 0.5 * s.repair,
     width: podCollision(p.def).halfW
@@ -92603,8 +92654,7 @@ function stepPod(p, td, dt, time12, gripMul, frozen) {
     p.heat = 1;
     if (p.boosting && (p.overT ?? 0) < 3) {
       p.overT = (p.overT ?? 0) + dt;
-      p.hpL -= 3.2 * dt * P.sturdy;
-      p.hpR -= 3.2 * dt * P.sturdy;
+      applyDamage(p, "both", 3.2 * dt * P.sturdy, "heat");
     }
     if ((p.overT ?? 0) >= 3) {
       p.overheat = true;
@@ -92702,8 +92752,7 @@ function stepPod(p, td, dt, time12, gripMul, frozen) {
       p.upper = S.tun !== 2 && p.pos.y > fr.groundY + S.roof - 1.5;
       if (p.upper && p.pos.y < fr.groundY + S.roof + 2.4 && p.invuln <= 0) {
         const dmg = 5 * P.sturdy;
-        p.hpL -= dmg;
-        p.hpR -= dmg;
+        applyDamage(p, "both", dmg, "belly");
         p.shake = Math.min(1, p.shake + 0.4);
         p.events.push({ type: "wall", strength: 16, x: p.pos.x, y: p.pos.y, z: p.pos.z, nx: 0, nz: 0 });
       }
@@ -92771,8 +92820,7 @@ function stepPod(p, td, dt, time12, gripMul, frozen) {
   if (!wasGrounded && p.grounded && (p.vel.y < -14 || landImpulse > 14)) {
     const imp = Math.max(-p.vel.y, landImpulse);
     const dmg = (imp - 14) * 0.9 * P.sturdy;
-    p.hpL -= dmg * 0.5;
-    p.hpR -= dmg * 0.5;
+    applyDamage(p, 0, dmg, "belly");
     p.shake = Math.min(1, p.shake + 0.4);
     landImpulse = imp;
     p.events.push({ type: "land", strength: imp, x: p.pos.x, y: fr.groundY, z: p.pos.z, nx: 0, nz: 0 });
@@ -92786,8 +92834,7 @@ function stepPod(p, td, dt, time12, gripMul, frozen) {
       if (p.vel.y > 0) p.vel.y *= -0.3;
       if (imp > 6 && p.invuln <= 0) {
         const dmg = Math.min(20, (imp - 6) * 0.8 * P.sturdy);
-        p.hpL -= dmg * 0.5;
-        p.hpR -= dmg * 0.5;
+        applyDamage(p, 0, dmg, "top");
         p.shake = Math.min(1, p.shake + 0.3);
         p.events.push({ type: "wall", strength: imp, x: p.pos.x, y: p.pos.y + 1, z: p.pos.z, nx: 0, nz: 0 });
       }
@@ -92859,12 +92906,7 @@ function stepPod(p, td, dt, time12, gripMul, frozen) {
         if (vt > 4 && p.invuln <= 0 && !(wc.wCd > 0)) {
           wc.wCd = 0.2;
           const dmg = Math.min(28, Math.max(0, vt - 9) * 0.7 * P.sturdy);
-          if (side < 0) p.hpL -= dmg;
-          else if (side > 0) p.hpR -= dmg;
-          else {
-            p.hpL -= dmg * 0.5;
-            p.hpR -= dmg * 0.5;
-          }
+          applyDamage(p, side, dmg, "side");
           p.shake = Math.min(1, p.shake + vt * 0.02);
           p.events.push({ type: "wall", strength: vt, x: hx, y: p.pos.y, z: hz, nx, nz });
         }
@@ -92902,8 +92944,7 @@ function stepPod(p, td, dt, time12, gripMul, frozen) {
       if (p.invuln <= 0 && !(wc.wCd > 0)) {
         wc.wCd = 0.5;
         const spd = Math.hypot(p.vel.x, p.vel.z), dmg = Math.min(18, 5 + spd * 0.07) * P.sturdy;
-        p.hpL -= dmg * 0.5;
-        p.hpR -= dmg * 0.5;
+        applyDamage(p, 0, dmg, "top");
         p.vel.x *= 0.9;
         p.vel.z *= 0.9;
         p.shake = Math.min(1, p.shake + 0.5);
@@ -93116,12 +93157,7 @@ function collideObstacle(p, o, sturdy) {
     if (o.breakable && vn3 < -5 && Math.hypot(p.vel.x, p.vel.z) > 38) {
       if (p.invuln <= 0) {
         const dmg = (4 + o.r * 2.6) * sturdy * (p.isPlayer ? 1 : 0.6);
-        if (c.side < 0) p.hpL -= dmg;
-        else if (c.side > 0) p.hpR -= dmg;
-        else {
-          p.hpL -= dmg * 0.5;
-          p.hpR -= dmg * 0.5;
-        }
+        applyDamage(p, c.side, dmg, hitZone(p, nx, nz));
       }
       p.vel.x *= 0.93;
       p.vel.z *= 0.93;
@@ -93147,12 +93183,7 @@ function collideObstacle(p, o, sturdy) {
       if (p.invuln <= 0 && !(pc.obCd > 0)) {
         pc.obCd = 0.35;
         const dmg = Math.min(38, Math.max(0, -vn3 - 6) * 0.9 * sturdy) * (p.isPlayer ? 1 : 0.45);
-        if (c.side < 0) p.hpL -= dmg;
-        else if (c.side > 0) p.hpR -= dmg;
-        else {
-          p.hpL -= dmg * 0.5;
-          p.hpR -= dmg * 0.5;
-        }
+        applyDamage(p, c.side, dmg, hitZone(p, nx, nz));
         p.shake = Math.min(1, p.shake + 0.5);
         p.events.push({ type: "obstacle", strength: -vn3, x: o.x + nx * o.r, y: p.pos.y, z: o.z + nz * o.r, nx, nz });
       }
@@ -93163,18 +93194,13 @@ function collideObstacle(p, o, sturdy) {
 function collideSetPieces(p, td, time12, sturdy) {
   const C = podCollision(p.def).circles;
   const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
-  const hurt = (dmg, side, x, z, nx, nz, strength) => {
+  const hurt = (dmg, side, x, z, nx, nz, strength, zone) => {
     if (p.invuln > 0) return;
     const hp = p;
     if (time12 - (hp.spHit ?? -9) < 0.7) return;
     hp.spHit = time12;
     if (!p.isPlayer) dmg *= 0.45;
-    if (side < 0) p.hpL -= dmg;
-    else if (side > 0) p.hpR -= dmg;
-    else {
-      p.hpL -= dmg * 0.5;
-      p.hpR -= dmg * 0.5;
-    }
+    applyDamage(p, side, dmg, zone ?? hitZone(p, nx, nz));
     p.shake = Math.min(1, p.shake + 0.45);
     p.events.push({ type: "obstacle", strength, x, y: p.pos.y, z, nx, nz });
   };
@@ -93311,7 +93337,7 @@ function collideSetPieces(p, td, time12, sturdy) {
           p.vel.x += nx * 8;
           p.vel.z += nz * 8;
           p.vel.y -= 6;
-          hurt(22 * sturdy, c.side, r.x, r.z, nx, nz, 30);
+          hurt(22 * sturdy, c.side, r.x, r.z, nx, nz, 30, "top");
           break;
         }
       }
@@ -93703,7 +93729,7 @@ function collidePods(ps, time12) {
     const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z, dy = b.pos.y - a.pos.y;
     const ka = Math.abs(Math.sin((a.rollCtl ?? 0) * Math.PI / 2)), kb = Math.abs(Math.sin((b.rollCtl ?? 0) * Math.PI / 2));
     if (Math.abs(dy) > 3 + (ka + kb) * 1.8) continue;
-    const ra = podParams(a).width * 0.8 * Math.max(0.3, 1 - ka * 0.7), rb = podParams(b).width * 0.8 * Math.max(0.3, 1 - kb * 0.7);
+    const ra = podCollision(a.def).halfW * 0.8 * Math.max(0.3, 1 - ka * 0.7), rb = podCollision(b.def).halfW * 0.8 * Math.max(0.3, 1 - kb * 0.7);
     const R = ra + rb;
     const d2 = dx * dx + dz * dz;
     if (d2 > R * R || d2 < 1e-6) continue;
@@ -93726,10 +93752,8 @@ function collidePods(ps, time12) {
       if (dmg > 0 && time12 - (ac.pCd ?? -1) > 0.2 && time12 - (bc.pCd ?? -1) > 0.2) {
         ac.pCd = time12;
         bc.pCd = time12;
-        a.hpL -= dmg * 0.5;
-        a.hpR -= dmg * 0.5;
-        b.hpL -= dmg * 0.5;
-        b.hpR -= dmg * 0.5;
+        applyDamage(a, 0, dmg, "side");
+        applyDamage(b, 0, dmg, "side");
         a.shake = Math.min(1, a.shake + 0.3);
         b.shake = Math.min(1, b.shake + 0.3);
         a.events.push({ type: "pod", strength: -rv, x: a.pos.x + nx * ra, y: a.pos.y, z: a.pos.z + nz * ra, nx: -nx, nz: -nz });
@@ -99415,242 +99439,173 @@ init_three_module();
 // src/game/podAssembly.ts
 init_three_module();
 
-// src/game/podParts.ts
+// src/game/podCockpits.ts
 init_three_module();
-var cache3 = /* @__PURE__ */ new Map();
-function flameGeo(rn, len, seg) {
-  const pts = [];
-  for (let i = 0; i <= 12; i++) {
-    const t = 1 - i / 12;
-    const r = rn * Math.pow(1 - t, 0.55) * (1 + 0.18 * Math.sin(Math.PI * t)) + 0.01;
-    pts.push([r, -t * len, 0]);
-  }
-  return lathe(prof(pts), seg, 0);
+var V2 = (x, y, z) => new Vector3(x, y, z);
+var TEMPLATES = {
+  pod: [[-0.5, 0.3, 0.26, 0.26, 2.2, 0], [-0.45, 0.7, 0.46, 0.44, 2.4, 0], [-0.36, 0.9, 0.46, 0.52, 2.6, 0], [-0.24, 0.98, 0.4, 0.55, 2.6, 0.5], [-0.08, 1, 0.36, 0.56, 2.6, 0.6], [0.06, 0.96, 0.36, 0.54, 2.6, 0.5], [0.18, 0.86, 0.42, 0.48, 2.4, 0], [0.32, 0.64, 0.38, 0.38, 2.3, 0], [0.44, 0.34, 0.24, 0.24, 2.2, 0], [0.5, 0.08, 0.07, 0.08, 2, 0]],
+  wedge: [[-0.5, 0.55, 0.3, 0.3, 4, 0], [-0.44, 0.92, 0.38, 0.4, 4, 0], [-0.3, 1, 0.34, 0.42, 4, 0.5], [-0.1, 1, 0.3, 0.4, 4, 0.58], [0.06, 0.96, 0.28, 0.36, 4, 0.5], [0.18, 0.88, 0.3, 0.3, 3.6, 0], [0.34, 0.66, 0.2, 0.22, 3.2, 0], [0.5, 0.3, 0.05, 0.08, 3, 0]],
+  saucer: [[-0.5, 0.4, 0.3, 0.3, 2, 0], [-0.4, 0.85, 0.5, 0.5, 2.1, 0], [-0.25, 1, 0.46, 0.58, 2.2, 0.5], [-0.05, 1.04, 0.42, 0.6, 2.2, 0.6], [0.12, 0.98, 0.42, 0.58, 2.2, 0.5], [0.26, 0.84, 0.48, 0.5, 2.1, 0], [0.4, 0.58, 0.4, 0.4, 2, 0], [0.5, 0.2, 0.16, 0.16, 2, 0]],
+  long: [[-0.5, 0.3, 0.24, 0.24, 2.4, 0], [-0.44, 0.74, 0.4, 0.4, 2.5, 0], [-0.32, 0.9, 0.36, 0.46, 2.6, 0.5], [-0.16, 0.92, 0.32, 0.48, 2.6, 0.58], [-0.02, 0.88, 0.32, 0.46, 2.6, 0.5], [0.1, 0.78, 0.36, 0.42, 2.5, 0], [0.26, 0.58, 0.32, 0.34, 2.4, 0], [0.4, 0.36, 0.22, 0.22, 2.2, 0], [0.5, 0.08, 0.06, 0.07, 2, 0]]
+};
+function catmull(p0, p1, p2, p3, t) {
+  const t2 = t * t, t3 = t2 * t;
+  return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
 }
-function engineGeo(spec2, seg) {
-  const key = `${spec2.L}|${spec2.R}|${spec2.style}|${spec2.bands}|${spec2.blades}|${spec2.spike}|${spec2.fins}|${seg}`;
-  const hit = cache3.get(key);
-  if (hit) return hit;
-  const { L, R, style } = spec2;
-  const pb = new PartBuilder();
-  const Z = (t) => -L / 2 + t * L;
-  const segS = Math.max(10, Math.round(seg * 0.5));
-  const bodyR = (t) => {
-    switch (style) {
-      case "needle":
-        return t < 0.3 ? 0.66 + 0.34 * Math.sin(t / 0.3 * Math.PI / 2) : 1 - 0.26 * Math.pow((t - 0.3) / 0.7, 1.5);
-      case "heavy":
-        return 0.86 + 0.14 * Math.sin(Math.PI * t);
-      case "long":
-        return t < 0.45 ? 0.82 + 0.18 * (t / 0.45) : 1;
-      case "ring":
-        return 0.92;
-      case "blade":
-        return 0.95;
-      default:
-        return 1;
-    }
-  };
-  const split2 = style === "split";
-  const bodyEnd = split2 ? 0.8 : 1;
-  const pts = [];
-  const P = (t, r, hard = false) => pts.push([r * R, Z(t), hard ? 1 : 0]);
-  P(0, 0.74, true);
-  P(0.025, 0.8);
-  P(0.08, bodyR(0.08) * 0.94);
-  P(0.13, bodyR(0.13));
-  const bandTs = [];
-  for (let i = 0; i < spec2.bands; i++) bandTs.push(0.2 + (i + 0.5) / spec2.bands * 0.6);
-  let t0 = 0.13;
-  for (const tb of bandTs) {
-    if (tb > bodyEnd - 0.04) break;
-    for (let s = t0 + 0.05; s < tb - 0.03; s += 0.05) P(s, bodyR(s));
-    const rb = bodyR(tb);
-    P(tb - 0.013, rb, true);
-    P(tb - 7e-3, rb * 0.955, true);
-    P(tb + 7e-3, rb * 0.955, true);
-    P(tb + 0.013, rb, true);
-    t0 = tb + 0.013;
+function sections(style, hw, len, perSpan) {
+  const T2 = TEMPLATES[style];
+  const out = [];
+  for (let i = 0; i < T2.length - 1; i++) for (let k = 0; k < perSpan; k++) {
+    const t = k / perSpan;
+    const g2 = (j) => T2[Math.max(0, Math.min(T2.length - 1, j))];
+    const f = (c) => catmull(g2(i - 1)[c], g2(i)[c], g2(i + 1)[c], g2(i + 2)[c], t);
+    const e = t * t * (3 - 2 * t);
+    const open2 = g2(i)[5] + (g2(i + 1)[5] - g2(i)[5]) * e;
+    out.push({ z: f(0) * len, w: Math.max(0.02, f(1)) * hw, hT: Math.max(0.02, f(2)) * hw, hB: Math.max(0.02, f(3)) * hw, n: f(4), open: Math.max(0, Math.min(0.85, open2)) });
   }
-  for (let s = t0 + 0.05; s < bodyEnd - 0.07; s += 0.05) P(s, bodyR(s));
-  const rf = bodyR(0.93);
-  if (!split2) {
-    P(0.92, rf);
-    P(0.955, rf * 1.035);
-    P(0.985, rf * 1.02);
-    P(1, rf * 0.95, true);
+  const l = T2[T2.length - 1];
+  out.push({ z: l[0] * len, w: l[1] * hw, hT: l[2] * hw, hB: l[3] * hw, n: l[4], open: 0 });
+  return out;
+}
+function pilotParts(pb, s, hip, kind) {
+  const base2 = new Matrix4().compose(hip, new Quaternion(), V2(s, s, s));
+  const at = (m) => base2.clone().multiply(m);
+  const torso = lathe(prof([[0, 0], [0.16, 0, 1], [0.19, 0.12], [0.21, 0.32], [0.19, 0.44], [0.12, 0.52], [0.06, 0.56], [0, 0.57]]), 18, 0);
+  torso.rotateX(-Math.PI / 2);
+  torso.scale(1.15, 1, 0.82);
+  pb.add("suit", torso, at(M4.trs(0, 0, 0, 0.22, 0, 0)));
+  for (const sd of [-1, 1]) pb.add("leather", rbox(0.05, 0.5, 0.02, 0.01), at(M4.trs(sd * 0.09, 0.27, 0.19, 0.22, 0, sd * 0.12)));
+  pb.add("chrome", cyl(0.035, 0.035, 0.02, 10), at(M4.trs(0, 0.25, 0.205, Math.PI / 2 + 0.22, 0, 0)));
+  const head = V2(0, 0.71, 0.17);
+  if (kind === "snout") {
+    pb.add("skin", sphere(0.115, 16, 12), at(M4.trs(head.x, head.y, head.z + 0.03, 0.18, 0, 0, 0.88, 0.92, 1.38)));
+    pb.add("leather", sphere(0.124, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), at(M4.trs(head.x, head.y + 0.02, head.z - 0.02, -0.3, 0, 0, 0.94, 0.95, 1.15)));
+    for (const sd of [-1, 1]) {
+      pb.add("leather", cyl(0.012, 0.032, 0.14, 7), at(M4.trs(head.x + sd * 0.085, head.y + 0.09, head.z - 0.06, -0.75, 0, sd * -0.35)));
+      pb.add("chrome", cyl(0.048, 0.052, 0.05, 12), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.13, Math.PI / 2, 0, 0)));
+      pb.add("glow", sphere(0.038, 10, 8), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.15, 0, 0, 0, 1, 0.8, 0.45)));
+    }
+  } else if (kind === "crest") {
+    pb.add("skin", sphere(0.112, 16, 12), at(M4.trs(head.x, head.y, head.z, -0.25, 0, 0, 0.9, 1.15, 1.25)));
+    pb.add("suit", rbox(0.045, 0.14, 0.24, 0.018), at(M4.trs(head.x, head.y + 0.11, head.z - 0.06, -0.35, 0, 0)));
+    for (const sd of [-1, 1]) pb.add("skin", tube([V2(head.x + sd * 0.08, head.y + 0.02, head.z - 0.06), V2(head.x + sd * 0.11, head.y - 0.1, head.z - 0.18), V2(head.x + sd * 0.09, head.y - 0.24, head.z - 0.22)], 0.032, 8, 7), base2);
+    pb.add("visor", sphere(0.118, 16, 8, 0, Math.PI, Math.PI * 0.25, Math.PI * 0.32), at(M4.trs(head.x, head.y + 0.02, head.z + 0.02, 0, 0, 0, 1.02, 0.9, 1.05)));
+  } else if (kind === "aero") {
+    pb.add("suit", sphere(0.138, 18, 14), at(M4.trs(head.x, head.y + 0.015, head.z, 0, 0, 0, 0.98, 1.06, 1.22)));
+    pb.add("dark", rbox(0.04, 0.09, 0.26, 0.012), at(M4.trs(head.x, head.y + 0.13, head.z - 0.05, -0.2, 0, 0)));
+    pb.add("visor", sphere(0.141, 18, 8, 0, Math.PI, Math.PI * 0.28, Math.PI * 0.34), at(M4.trs(head.x, head.y + 0.015, head.z + 0.015, 0, 0, 0, 1, 0.95, 1.2)));
+    pb.add("glow", rbox(0.16, 0.016, 0.02, 4e-3), at(M4.t(head.x, head.y + 0.02, head.z + 0.165)));
+  } else if (kind === "dome") {
+    pb.add("chrome", sphere(0.136, 18, 12), at(M4.trs(head.x, head.y + 0.01, head.z, 0, 0, 0, 1.12, 0.96, 1.08)));
+    pb.add("dark", rbox(0.24, 0.065, 0.09, 0.016), at(M4.t(head.x, head.y + 0.025, head.z + 0.11)));
+    pb.add("glow", rbox(0.2, 0.026, 0.02, 5e-3), at(M4.t(head.x, head.y + 0.025, head.z + 0.156)));
+    for (const sd of [-1, 1]) pb.add("steel", cyl(8e-3, 0.012, 0.16, 6), at(M4.trs(head.x + sd * 0.13, head.y + 0.11, head.z - 0.02, -0.3, 0, sd * -0.2)));
   } else {
-    P(bodyEnd - 0.02, rf, true);
-    P(bodyEnd, rf * 0.97, true);
-  }
-  pb.add("hull", lathe(prof(pts), seg, 1));
-  const thr = rf * 0.95 * R, faceZ = Z(0.915);
-  pb.add("steel", lathe(prof([[split2 ? rf * 0.97 * R : thr, split2 ? Z(bodyEnd) : Z(1)], [rf * 0.885 * R, split2 ? Z(bodyEnd - 0.01) : Z(0.992)], [rf * 0.86 * R, split2 ? Z(bodyEnd - 0.03) : Z(0.97)], [rf * 0.86 * R, faceZ, 1], [rf * 0.6 * R, faceZ]]), seg, 0));
-  pb.add("dark", lathe(prof([[rf * 0.6 * R, faceZ], [0.2 * R, faceZ]]), seg, 0));
-  if (spec2.spike) pb.add("chrome", lathe(prof([[0.22 * R, faceZ, 1], [0.2 * R, faceZ + L * 0.03], [0.12 * R, Z(1)], [0.015 * R, Z(1) + L * 0.26]]), segS, 0));
-  else pb.add("chrome", lathe(prof([[0.22 * R, faceZ, 1], [0.21 * R, faceZ + L * 0.035], [0.14 * R, faceZ + L * 0.07], [0, faceZ + L * 0.085]]), segS, 0));
-  const detailHi = seg >= 24;
-  if (!split2 && detailHi) pb.add("chrome", boltRing(rf * 0.985 * R, Math.round(seg * 0.5), 0.02 * R, Z(1) - 0.01));
-  if (style === "heavy" || style === "turbine") pb.add("hazard", torus(rf * 1.005 * R, 0.022 * R, 5, seg), M4.t(0, 0, Z(0.965)));
-  const nb = detailHi ? spec2.blades : Math.max(8, Math.round(spec2.blades * 0.65));
-  const rMid = 0.52 * R;
-  const fan = radial(() => blade(0.21 * R, 0.83 * rf * R, Math.PI * 2 * rMid / nb * 1.25, 0.03 * R, 1, 0.38, 3), nb);
-  fan.computeBoundingSphere();
-  pb.add("dark", lathe(prof([[0, Z(0.07)], [0.58 * R, Z(0.07), 1], [0.6 * R, Z(0.06)], [0.66 * R, Z(0), 1], [0.74 * R, Z(0)]]), seg, 0));
-  pb.add("glow", new CircleGeometry(0.5 * R, seg).rotateY(Math.PI).translate(0, 0, Z(0.07) - 0.01));
-  pb.add("glow", torus(0.6 * R, 0.018 * R, 6, seg), M4.t(0, 0, Z(0.035)));
-  const np = Math.max(10, Math.round(seg * 0.35));
-  const petals = (() => {
-    const pos = [], pet = [], idx = [];
-    const zH = Z(0) + 0.012 * L, zT = Z(0) - 0.085 * L, rH = 0.745 * R, rT = 0.6 * R;
-    for (let q = 0; q < np; q++) {
-      const a0 = (q + 0.05) / np * Math.PI * 2, a1 = (q + 0.95) / np * Math.PI * 2, am = (a0 + a1) / 2, b = pos.length / 3;
-      for (const [a, z, r, d] of [[a0, zH, rH, 0], [a1, zH, rH, 0], [a0, zT, rT, 0.42 * R], [a1, zT, rT, 0.42 * R]]) {
-        pos.push(Math.cos(a) * r, Math.sin(a) * r, z);
-        pet.push(Math.cos(am), Math.sin(am), d);
-      }
-      idx.push(b, b + 2, b + 1, b + 1, b + 2, b + 3);
-    }
-    const g2 = new BufferGeometry();
-    g2.setAttribute("position", new Float32BufferAttribute(pos, 3));
-    g2.setAttribute("aPet", new Float32BufferAttribute(pet, 3));
-    g2.setIndex(idx);
-    g2.computeVertexNormals();
-    const out2 = g2.toNonIndexed();
-    g2.dispose();
-    return out2;
-  })();
-  pb.add("steel", torus(0.75 * R, 0.03 * R, 6, seg), M4.t(0, 0, Z(5e-3)));
-  if (detailHi) {
-    pb.add("glow", torus(rf * 0.895 * R, 0.012 * R, 5, seg), M4.t(0, 0, Z(split2 ? bodyEnd - 0.02 : 0.975)));
-    pb.add("copper", torus(0.77 * R, 0.022 * R, 6, seg), M4.t(0, 0, Z(0.055)));
-    for (let k = 0; k < 4; k++) {
-      const a = k * Math.PI * 0.5 + 0.38, rm = rf * 0.53 * R;
-      pb.add("chrome", rbox(0.024 * R, rf * 0.62 * R, 0.045 * R, 5e-3), M4.trs(Math.sin(a) * rm, Math.cos(a) * rm, faceZ + 0.03 * L, 0, 0, -a));
+    pb.add("skin", sphere(0.112, 18, 14), at(M4.trs(head.x, head.y - 0.015, head.z + 0.02, 0, 0, 0, 0.95, 1.05, 1)));
+    pb.add("leather", sphere(0.13, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.64), at(M4.trs(head.x, head.y + 0.012, head.z - 0.015, -0.25, 0, 0, 1, 1.05, 1.1)));
+    pb.add("chrome", rbox(0.032, 0.04, 0.22, 8e-3), at(M4.trs(head.x, head.y + 0.135, head.z - 0.02, -0.18, 0, 0)));
+    pb.add("rubber", torus(0.122, 0.013, 6, 24), at(M4.trs(head.x, head.y + 0.035, head.z, Math.PI / 2 - 0.2, 0, 0)));
+    for (const sd of [-1, 1]) {
+      pb.add("chrome", cyl(0.046, 0.05, 0.046, 14), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.105, Math.PI / 2, 0, 0)));
+      pb.add("visor", sphere(0.041, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.128, Math.PI / 2, 0, 0, 1, 0.45, 1)));
     }
   }
-  bandTs.forEach((tb, i) => {
-    if (tb > bodyEnd - 0.04) return;
-    const rb = bodyR(tb) * 0.955 * R;
-    pb.add(style === "heavy" ? "dark" : "steel", torus(rb + 0.012 * R, (style === "heavy" ? 0.045 : 0.032) * R, 6, seg), M4.t(0, 0, Z(tb)));
-    if (detailHi && i % 2 === 0) pb.add("chrome", boltRing(rb + 0.035 * R, Math.round(seg * 0.45), 0.018 * R, Z(tb), true));
-  });
-  {
-    const a0 = 0.3, a1 = split2 ? 0.62 : 0.7;
-    let rmax = 0;
-    for (let s = a0; s <= a1; s += 0.02) rmax = Math.max(rmax, bodyR(s));
-    const r0 = rmax * R + 0.01, r1 = r0 + (style === "heavy" ? 0.06 : 0.035) * R;
-    const plate = prof([[r1, Z(a0), 1], [r1, Z(a1), 1], [r0, Z(a1), 1], [r0, Z(a0), 1], [r1, Z(a0), 1]]);
-    const span = style === "heavy" ? 1.1 : 0.8;
-    for (const c of [Math.PI / 2, Math.PI * 1.5]) pb.add("hull", lathe(plate, Math.max(6, Math.round(seg * 0.2)), 3, c - span / 2, span));
-    if (detailHi) for (const sd of [-1, 1]) for (let s = a0 + 0.04; s < a1 - 0.01; s += 0.08) for (const dy of [-0.3, 0.3]) {
-      pb.add("chrome", cyl(0.018 * R, 0.018 * R, 0.02 * R, 6), M4.trs(sd * (r1 + 5e-3) * Math.cos(dy), r1 * Math.sin(dy), Z(s), 0, 0, Math.PI / 2));
-    }
-  }
-  const pipeSides = style === "needle" ? [1] : [-1, 1];
-  const pipeSeg = Math.max(12, Math.round(seg * 0.55));
-  for (const sd of pipeSides) for (const [ang, mat, rad] of [[0.62, "copper", 0.036], [0.85, "steel", 0.028]]) {
-    const pp = [];
-    const tA = 0.16, tB = split2 ? 0.74 : 0.86;
-    for (let k = 0; k <= 8; k++) {
-      const tt = tA + (tB - tA) * (k / 8);
-      const lift = Math.sin(k / 8 * Math.PI);
-      const rr = bodyR(tt) * R * (0.985 + 0.1 * lift) + rad * R * 1.2;
-      const a = sd * ang;
-      pp.push(new Vector3(Math.sin(a) * rr, Math.cos(a) * rr, Z(tt)));
-    }
-    pb.add(mat, tube(pp, rad * R, pipeSeg, 6));
-    if (detailHi) for (let k = 1; k < 8; k += 2) {
-      const p = pp[k];
-      pb.add("dark", torus(rad * R * 1.5, rad * R * 0.45, 5, 10), M4.t(p.x, p.y, p.z));
-    }
-  }
-  for (const sd of [-1, 1]) for (let i = 0; i < 6; i++) {
-    const tt = 0.17 + i * 0.022;
-    const r = bodyR(tt) * R;
-    pb.add("dark", rbox(0.03 * R, 0.34 * R, 0.016 * L, 6e-3), M4.trs(sd * (r + 0.01 * R), -0.05 * R, Z(tt), 0, sd * 0.5, 0));
-  }
-  if (style === "long" || style === "heavy" || spec2.fins > 0) {
-    const nf = Math.max(12, spec2.fins * 3);
-    const rr = bodyR(0.22) * R;
-    pb.add("dark", radial(() => rbox(0.022 * R, 0.2 * R, 0.13 * L, 6e-3).translate(0, rr + 0.09 * R, Z(0.22)), nf, 0.13));
-  }
-  const bellyR = bodyR(0.5) * R;
-  pb.add("dark", rbox(0.34 * R, 0.08 * R, 0.5 * L, 0.03), M4.t(0, -bellyR - 0.02 * R, Z(0.5)));
-  pb.add("glow", rbox(0.2 * R, 0.03 * R, 0.44 * L, 0.01), M4.t(0, -bellyR - 0.07 * R, Z(0.5)));
-  const topR = bodyR(0.58) * R;
-  const py2 = topR + 0.42;
-  pb.add("steel", rbox(0.16, 0.46, 0.34, 0.04), M4.t(0, topR + 0.2, Z(0.58)));
-  pb.add("chrome", torus(0.1, 0.03, 8, 16), M4.trs(0, py2 + 0.06, Z(0.58), 0, Math.PI / 2, 0));
-  pb.add("dark", cyl(0.025, 0.025, 0.5, 6), M4.trs(0.18 * R, bodyR(0.85) * R + 0.22, Z(0.85), 0.25, 0, 0));
-  pb.add("glow", sphere(0.045, 8, 6), M4.t(0.18 * R, bodyR(0.85) * R + 0.47, Z(0.85) + 0.06));
-  const cR = bodyR(0.62) * R;
+  pb.add("leather", torus(0.075, 0.03, 8, 18), at(M4.trs(0, 0.56, 0.12, Math.PI / 2 - 0.25, 0, 0)));
+  const hands = [];
   for (const sd of [-1, 1]) {
-    pb.add("dark", cyl(0.15 * R, 0.19 * R, 0.1 * R, 10), M4.trs(sd * (cR + 0.02 * R), 0.2 * R, Z(0.62), 0, 0, sd * -Math.PI / 2));
-    pb.add("copper", torus(0.13 * R, 0.024 * R, 5, 12), M4.trs(sd * (cR + 0.06 * R), 0.2 * R, Z(0.62), 0, Math.PI / 2, 0));
-    pb.add("glow", sphere(0.075 * R, 8, 6), M4.t(sd * (cR + 0.075 * R), 0.2 * R, Z(0.62)));
+    const sh = V2(sd * 0.22, 0.46, 0.09), el = V2(sd * 0.3, 0.27, 0.3), hd = V2(sd * 0.21, 0.31, 0.5);
+    pb.add("suit", sphere(0.085, 12, 10), at(M4.t(sh.x, sh.y, sh.z)));
+    pb.add("suit", tube([sh, el, hd], 0.055, 14, 10), base2);
+    pb.add("leather", sphere(0.062, 12, 10), at(M4.trs(hd.x, hd.y, hd.z + 0.02, 0, 0, 0, 1, 0.9, 1.2)));
+    hands.push(hd.clone().multiplyScalar(s).add(hip));
   }
-  if (split2) {
-    const petal = prof([[rf * 1.02 * R, Z(bodyEnd), 1], [rf * 1.06 * R, Z(0.9)], [rf * 1.05 * R, Z(0.98)], [rf * 0.98 * R, Z(1), 1], [rf * 0.93 * R, Z(1), 1], [rf * 0.95 * R, Z(bodyEnd), 1], [rf * 1.02 * R, Z(bodyEnd)]]);
-    for (let q = 0; q < 4; q++) {
-      const c = Math.PI / 4 + q * Math.PI / 2;
-      const gap = 0.12;
-      const g2 = lathe(petal, Math.max(8, Math.round(seg / 4)), 3, c - Math.PI / 4 + gap / 2, Math.PI / 2 - gap);
-      const hinge = new Vector3(Math.sin(c) * rf * R, Math.cos(c) * rf * R, Z(bodyEnd));
-      const axis = new Vector3(Math.cos(c), -Math.sin(c), 0);
-      const m = new Matrix4().makeTranslation(hinge.x, hinge.y, hinge.z).multiply(new Matrix4().makeRotationAxis(axis, -0.22)).multiply(new Matrix4().makeTranslation(-hinge.x, -hinge.y, -hinge.z));
-      pb.add("hull", g2, m);
-      pb.add("steel", rbox(0.12 * R, 0.12 * R, 0.08 * L, 0.02), new Matrix4().makeTranslation(hinge.x * 1.02, hinge.y * 1.02, hinge.z));
-    }
-    for (let i = 0; i < 9; i++) pb.add("steel", rbox(0.035 * R, 0.32 * R, 0.4 * L, 0.01), M4.t((i - 4) * 0.11 * R, R * 1.08, Z(0.45)));
+  return { head: head.clone().multiplyScalar(s).add(hip), hands };
+}
+var cockpitCache = /* @__PURE__ */ new Map();
+function cockpitGeo(L, seg, head = "goggles") {
+  const c = L.cockpit;
+  const key = `${c.style}|${c.hw}|${c.len}|${c.pilot}|${head}|${seg}`;
+  const hit = cockpitCache.get(key);
+  if (hit) return hit;
+  const pb = new PartBuilder();
+  const hw = c.hw, len = c.len;
+  const secs = sections(c.style, hw, len, seg >= 40 ? 6 : seg >= 28 ? 4 : 3);
+  const segC = Math.max(24, seg);
+  pb.add("hull", loft(secs, segC, 2));
+  let iA = secs.findIndex((s) => (s.open ?? 0) > 1e-3) - 1;
+  let iB = secs.length - 1;
+  for (let j = secs.length - 1; j >= 0; j--) if ((secs[j].open ?? 0) > 1e-3) {
+    iB = j + 1;
+    break;
   }
-  if (style === "ring") {
-    const rr = 1.24 * R;
-    pb.add("hull", torus(rr, 0.11 * R, 12, seg), M4.t(0, 0, Z(0.95)), [0, 0, 3]);
-    pb.add("chrome", torus(rr - 0.11 * R, 0.025 * R, 6, seg), M4.t(0, 0, Z(0.95) + 0.06 * R));
-    for (let q = 0; q < 4; q++) {
-      const a = Math.PI / 4 + q * Math.PI / 2;
-      const mid = (rr + rf * R) / 2;
-      pb.add("steel", rbox(0.08 * R, rr - rf * R + 0.1 * R, 0.1 * R, 0.02), M4.trs(Math.sin(a) * mid, Math.cos(a) * mid, Z(0.95), 0, 0, -a));
-    }
+  iA = Math.max(0, iA);
+  iB = Math.min(secs.length - 1, iB);
+  const th = 0.05 * hw + 0.02;
+  const outerSub = secs.slice(iA, iB + 1);
+  const inner = outerSub.map((s) => ({ ...s, w: s.w - th, hT: s.hT - th, hB: s.hB - th }));
+  pb.add("interior", loft(inner, segC, 0, [true, true], true));
+  pb.add("chrome", loftRim(outerSub, inner, segC));
+  const zA = secs[iA].z, zB = secs[iB].z;
+  let wMax = 0, hBm = 0;
+  for (const s of outerSub) {
+    wMax = Math.max(wMax, s.w);
+    hBm = Math.max(hBm, s.hB);
   }
-  if (style === "blade") {
-    for (const sd of [-1, 1]) {
-      const g2 = extrude([[0, 0], [1.25 * R, -0.25 * L], [1.3 * R, -0.42 * L], [0, -0.6 * L]], 0.05 * R, 0.015);
-      g2.rotateX(-Math.PI / 2);
-      if (sd < 0) g2.scale(-1, 1, 1);
-      pb.add("hull", g2, M4.t(sd * bodyR(0.6) * R * 0.9, 0, Z(0.8)), [0, 0, 3]);
-    }
+  const mid = outerSub[Math.floor(outerSub.length / 2)];
+  const rimY = mid.hT * Math.pow(Math.cos((mid.open ?? 0.5) * Math.PI / 2), 2 / (mid.n ?? 2.4));
+  const floorY = -(mid.hB - th);
+  const hipZ = zA + (zB - zA) * 0.4, hipY = floorY * 0.5;
+  pb.add("leather", rbox(0.56, 0.12, 0.5, 0.05), M4.t(0, hipY - 0.06, hipZ + 0.08));
+  pb.add("leather", rbox(0.56, 0.7, 0.12, 0.06), M4.trs(0, hipY + 0.3, hipZ - 0.2, -0.15, 0, 0));
+  pb.add("leather", rbox(0.3, 0.2, 0.12, 0.05), M4.trs(0, hipY + 0.78, hipZ - 0.27, -0.15, 0, 0));
+  const pil = pilotParts(pb, c.pilot, V2(0, hipY, hipZ), head);
+  pb.add("chrome", torus(0.24 * c.pilot, 0.022, 7, 18, Math.PI), M4.t(0, hipY + 0.78 * c.pilot, hipZ - 0.34));
+  pb.add("glow", torus(0.055, 6e-3, 5, 16), M4.t(0, rimY + 0.11, zB - 0.34 * (zB - zA)));
+  for (const hd of pil.hands) {
+    const base2 = V2(hd.x, floorY + 0.05, hd.z + 0.1);
+    pb.add("steel", tube([base2, V2(hd.x, (base2.y + hd.y) / 2, hd.z + 0.08), V2(hd.x, hd.y - 0.07, hd.z)], 0.022, 8, 6));
+    pb.add("rubber", cyl(0.032, 0.032, 0.12, 10), M4.t(hd.x, hd.y - 0.06, hd.z));
+    pb.add("glow", sphere(0.018, 8, 6), M4.t(hd.x, hd.y + 0.01, hd.z + 0.03));
   }
-  if (style === "needle") pb.add("chrome", torus(rf * 0.75 * R, 0.02 * R, 6, seg), M4.t(0, 0, Z(0.97)));
-  const flaps = [];
-  {
-    const fr = bodyR(0.5) * R;
-    const len = 0.22 * L;
-    for (const sd of [-1, 1]) {
-      const g2 = rbox(0.045 * R, 0.62 * R, len, 0.015).translate(0, 0, -len / 2);
-      const gg = new PartBuilder().add("hull", g2, void 0, [0, 0, 3]).build().get("hull");
-      flaps.push({ geo: gg, pivot: new Vector3(sd * (fr + 0.06 * R), 0.05 * R, Z(0.62)), sign: -sd });
-    }
+  const D = new Matrix4().compose(V2(0, rimY - 0.06, zB - 0.16 * len * 0.3 - 0.12), new Quaternion().setFromEuler(new Euler(-0.65, 0, 0)), V2(1, 1, 1));
+  const dw = Math.min(wMax * 1.3, 1.5);
+  pb.add("interior", rbox(dw, 0.06, 0.34, 0.03), D);
+  for (let i = 0; i < 5; i++) {
+    const gx = (i - 2) * dw * 0.18;
+    const m = D.clone().multiply(M4.trs(gx, 0.032, 0.02 * (i % 2), -Math.PI / 2, 0, 0));
+    pb.add("glow", new CircleGeometry(0.04, 16), m);
+    pb.add("chrome", torus(0.045, 8e-3, 6, 18), m);
   }
-  const rn = 0.5 * R;
-  const out = {
-    parts: pb.build(),
-    fan,
-    fanZ: faceZ + 0.06 * L * 0.5,
-    flaps,
-    petals,
-    flameOuter: flameGeo(rn, L * 0.75, Math.max(12, Math.round(seg * 0.5))),
-    flameCore: flameGeo(rn * 0.42, L * 0.38, 12),
-    flameZ: Z(0.07) - 0.02,
-    exhaustZ: Z(0) - 0.12 * L,
-    pylon: new Vector3(0, py2 + 0.06, Z(0.58)),
-    frontZ: Z(1),
-    top: py2,
-    R,
-    L
-  };
-  cache3.set(key, out);
+  const ws = c.style === "wedge" ? [0.85, 0.2, 0.42] : c.style === "saucer" ? [1, 0.45, 0.7] : c.style === "long" ? [0.72, 0.34, 0.58] : [0.9, 0.32, 0.48];
+  const wsM = M4.trs(0, rimY - 0.02, zB - 0.42 * (zB - zA), 0, 0, 0, wMax * ws[0], ws[1], ws[2]);
+  pb.add("glass", sphere(1, 28, 10, 0, Math.PI, 0, Math.PI / 2), wsM);
+  pb.add("chrome", torus(1, 0.022, 6, 28, Math.PI), wsM.clone().multiply(new Matrix4().makeRotationX(Math.PI / 2)));
+  const spZ = zA + (zB - zA) * 0.25;
+  for (const sd of [-1, 1]) {
+    pb.add("hull", rbox(0.3 * hw, 0.34 * hw, 0.42 * len, 0.06), M4.t(sd * wMax * 0.97, -0.08 * hw, spZ), [0, 0, 3]);
+    for (let i = 0; i < 5; i++) pb.add("dark", rbox(0.02, 0.22 * hw, 0.03, 6e-3), M4.trs(sd * (wMax * 0.97 + 0.15 * hw + 0.01), -0.08 * hw, spZ - 0.12 * len + i * 0.06 * len, 0, sd * 0.6, 0));
+    pb.add("dark", lathe(prof([[0.11 * hw, -0.1, 1], [0.11 * hw, 0.05, 1], [0.08 * hw, 0.05, 1], [0, -0.05]]), 16, 0), M4.t(sd * wMax * 0.97, -0.08 * hw, spZ + 0.21 * len + 0.02));
+  }
+  pb.add("dark", rbox(wMax * 1.1, 0.07, len * 0.5, 0.03), M4.t(0, -hBm - 0.03, zA + (zB - zA) * 0.5));
+  pb.add("glow", rbox(wMax * 0.7, 0.025, len * 0.42, 0.01), M4.t(0, -hBm - 0.075, zA + (zB - zA) * 0.5));
+  const rear = secs[1];
+  for (const sd of [-1, 1]) {
+    const fin = extrude([[0, 0], [0.55, 0], [0.75, 0.55 * hw], [0.45, 0.55 * hw]], 0.04, 0.012);
+    fin.rotateY(Math.PI / 2);
+    pb.add("hull", fin, M4.trs(sd * rear.w * 0.45, rear.hT * 0.6, secs[2].z, 0, 0, sd * -0.35), [0, 0, 3]);
+    pb.add("glow", sphere(0.045, 10, 8), M4.t(sd * rear.w * 0.62, 0, secs[0].z + 0.06));
+  }
+  pb.add("dark", cyl(0.012, 0.016, 0.9, 6), M4.t(-rear.w * 0.3, rear.hT + 0.45, rear.z + 0.15));
+  pb.add("glow", sphere(0.03, 8, 6), M4.t(-rear.w * 0.3, rear.hT + 0.92, rear.z + 0.15));
+  pb.add("chrome", lathe(prof([[0.07 * hw, 0], [0.05 * hw, 0.12], [0, 0.3]]), 16, 0), M4.t(0, 0, len * 0.5 - 0.02));
+  const fr = secs[Math.min(secs.length - 1, iB + 2)];
+  const anchors = [V2(-fr.w * 0.45, fr.hT * 0.75 + 0.06, fr.z), V2(fr.w * 0.45, fr.hT * 0.75 + 0.06, fr.z)];
+  for (const a of anchors) {
+    pb.add("chrome", torus(0.06, 0.02, 6, 14), M4.trs(a.x, a.y, a.z, 0, Math.PI / 2, 0));
+    pb.add("steel", rbox(0.1, 0.1, 0.16, 0.02), M4.t(a.x, a.y - 0.07, a.z));
+  }
+  const out = { parts: pb.build(), info: { head: pil.head, anchors } };
+  cockpitCache.set(key, out);
   return out;
 }
 
@@ -99705,7 +99660,7 @@ function buildFlexCables(L, seg, anchors) {
     const isR = em.x >= 0 ? 1 : 0;
     const a = eg.pylon.clone().add(new Vector3(em.x, em.y, em.z));
     const b = anchors[isR].clone().add(cp);
-    const rearZ = eg.exhaustZ + 0.12 * eg.L, topY = Math.max(eg.top, eg.R) + 0.14;
+    const rearZ = eg.exhaustZ + 0.12 * eg.L, topY = Math.max(eg.top, engineExtent(em.spec).top) + 0.14;
     const v1 = new Vector3(em.x, em.y + topY + 0.1, em.z + rearZ - 0.3);
     const v2 = new Vector3(em.x, em.y + topY, em.z + rearZ + (eg.pylon.z - rearZ) * 0.5);
     const dist = v1.distanceTo(b);
@@ -99847,8 +99802,9 @@ function buildOpponentFarGeo(def, L) {
   const c = L.cockpit;
   pb.add("hull", rbox(c.hw * 1.7, c.hw * 0.82, c.len, 0.14, 1), M4.t(0, c.y, c.z), [0, 0.5, 2]);
   pb.add("dark", rbox(c.hw * 0.9, c.hw * 0.45, c.len * 0.42, 0.05, 1), M4.t(0, c.y + c.hw * 0.42, c.z));
-  if (L.binder) {
-    const A = L.engines[L.binder[0]], B2 = L.engines[L.binder[1]];
+  const b0 = L.binders[0];
+  if (b0) {
+    const A = L.engines[b0.a], B2 = L.engines[b0.b];
     pb.add("glow", rbox(Math.abs(B2.x - A.x), 0.18, 0.18, 0.02), M4.t((A.x + B2.x) * 0.5, (A.y + B2.y) * 0.5 + 0.2, (A.z + B2.z) * 0.5));
   }
   const built = pb.build();
@@ -99856,7 +99812,7 @@ function buildOpponentFarGeo(def, L) {
   oppFarCache.set(def.id, out);
   return out;
 }
-function base(def, seg, species) {
+function base(def, seg, head) {
   const L = podLayout(def);
   const exhaustLocal = [];
   let frontZ = -Infinity, topY = 0, sumY = 0;
@@ -99867,22 +99823,32 @@ function base(def, seg, species) {
     topY = Math.max(topY, em.y + eg.R);
     sumY += em.y;
   }
-  const ck = cockpitGeo(L, seg, species);
+  const ck = cockpitGeo(L, seg, head);
   const eye = new Vector3(0, L.cockpit.y, L.cockpit.z).add(ck.info.head).add(new Vector3(0, 0.24, 0.32));
   const hood = new Vector3(0, sumY / Math.max(1, L.engines.length) + topY * 0.35 + 0.35, frontZ - 1.2);
-  const extraPB = new PartBuilder();
-  L.extras?.(extraPB, L);
-  const extraParts = extraPB.build();
+  const build = (fn) => {
+    const pb = new PartBuilder();
+    fn?.(pb, L);
+    return pb.build();
+  };
   const b = { layout: L, bodyZ: -L.cockpit.z * 0.25, exhaustLocal, eye, hood };
-  return { b, ck, extraParts };
+  return { b, ck, engineExtras: build(L.engineExtras), cockpitExtras: build(L.cockpitExtras) };
 }
 var sideOf = (x) => x < 0 ? -1 : 1;
-var binderList = (L) => L.binders ?? (L.binder ? [L.binder] : []);
-function assembleHero(def, seg, species) {
-  const { b, ck, extraParts } = base(def, seg, species);
+function binderEnds(L, seg, link) {
+  let A = L.engines[link.a], B2 = L.engines[link.b];
+  if (A.x > B2.x) {
+    const t = A;
+    A = B2;
+    B2 = t;
+  }
+  const ea = engineGeo(A.spec, seg), eb = engineGeo(B2.spec, seg), z = link.zOff ?? 0;
+  return { A, B: B2, ea, eb, ax: A.x + ea.binder.x, ay: A.y + ea.binder.y, az: A.z + ea.binder.z + z, bx: B2.x - eb.binder.x, by: B2.y + eb.binder.y, bz: B2.z + eb.binder.z + z };
+}
+function assembleHero(def, seg, head) {
+  const { b, ck, engineExtras, cockpitExtras } = base(def, seg, head);
   const L = b.layout;
   const owned = [];
-  const attachExtraToEngines = def.id === "aurora" || def.id === "brute" || def.id === "gasvaro" || def.id === "bomquad" || def.id === "teemo";
   const banks = [];
   for (const side of [-1, 1]) {
     const mounts = L.engines.map((em, index) => ({ em, index })).filter((m) => sideOf(m.em.x) === side);
@@ -99907,9 +99873,9 @@ function assembleHero(def, seg, species) {
       }
       engines.push({ index, off, geo: eg });
     }
-    if (attachExtraToEngines) {
+    {
       const shift = M4.t(-piv.x, -piv.y, -piv.z);
-      for (const [k, eg] of extraParts) {
+      for (const [k, eg] of engineExtras) {
         const idx = eg.index.array;
         const pos = eg.attributes.position;
         const keep = [];
@@ -99927,6 +99893,7 @@ function assembleHero(def, seg, species) {
     }
     banks.push({ side, pivot: piv, engines, buckets: mergeAll(lists2, owned, `${def.id} engine bank ${side}`) });
   }
+  for (const g2 of engineExtras.values()) g2.dispose();
   const lists = /* @__PURE__ */ new Map();
   const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
   for (const [k, g2] of ck.parts) {
@@ -99934,30 +99901,21 @@ function assembleHero(def, seg, species) {
     gc.applyMatrix4(ckM);
     push(lists, k, gc);
   }
-  for (const [k, g2] of extraParts) {
-    if (!attachExtraToEngines) push(lists, k, g2);
-    else g2.dispose();
-  }
+  for (const [k, g2] of cockpitExtras) push(lists, k, g2);
   const cockpit = mergeAll(lists, owned, `${def.id} cockpit`);
   const cables = buildFlexCables(L, seg, ck.info.anchors);
   owned.push(cables);
   const binders = [];
-  for (const [ia, ib] of binderList(L)) {
-    let A = L.engines[ia], B2 = L.engines[ib];
-    if (A.x > B2.x) {
-      const t = A;
-      A = B2;
-      B2 = t;
-    }
-    const ea = engineGeo(A.spec, seg), eb = engineGeo(B2.spec, seg);
-    const g2 = makeBinderGeo(new Vector3(A.x + ea.R * 0.97, A.y + ea.R * 0.2, A.z + ea.L * 0.12), new Vector3(B2.x - eb.R * 0.97, B2.y + eb.R * 0.2, B2.z + eb.L * 0.12));
+  for (const link of L.binders) {
+    const e = binderEnds(L, seg, link);
+    const g2 = makeBinderGeo(new Vector3(e.ax, e.ay, e.az), new Vector3(e.bx, e.by, e.bz));
     binders.push(g2);
     owned.push(g2);
   }
   return { ...b, banks, cockpit, cables, binders, owned };
 }
-function assembleRival(def, seg, species, colors, pattern) {
-  const { b, ck, extraParts } = base(def, seg, species);
+function assembleRival(def, seg, head, colors, pattern) {
+  const { b, ck, engineExtras, cockpitExtras } = base(def, seg, head);
   const L = b.layout;
   const owned = [];
   const liv = pattern !== void 0 && pattern >= 0 ? pattern : L.livery;
@@ -100015,7 +99973,7 @@ function assembleRival(def, seg, species, colors, pattern) {
   const lists = /* @__PURE__ */ new Map();
   const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
   for (const [k, g2] of ck.parts) pushC(lists, k, g2, ckM);
-  for (const [k, g2] of extraParts) {
+  for (const extras of [engineExtras, cockpitExtras]) for (const [k, g2] of extras) {
     pushC(lists, k, g2);
     g2.dispose();
   }
@@ -100036,19 +99994,13 @@ function assembleRival(def, seg, species, colors, pattern) {
   const cockpit = mergeAll(lists, owned, `${def.id} rival cockpit`, bake);
   const binders = [];
   let spanX = 4.6;
-  for (const [ia, ib] of binderList(L)) {
-    let A = L.engines[ia], B2 = L.engines[ib];
-    if (A.x > B2.x) {
-      const t = A;
-      A = B2;
-      B2 = t;
-    }
-    const ea = engineGeo(A.spec, seg), eb = engineGeo(B2.spec, seg);
-    const dyh = (B2.y + eb.R * 0.2 - (A.y + ea.R * 0.2)) * 0.5;
-    const pa = new Vector3(A.x + ea.R * 0.97, -dyh, A.z + ea.L * 0.12);
-    const pb = new Vector3(B2.x - eb.R * 0.97, dyh, B2.z + eb.L * 0.12);
+  for (const link of L.binders) {
+    const e = binderEnds(L, seg, link);
+    const dyh = (e.by - e.ay) * 0.5;
+    const pa = new Vector3(e.ax, -dyh, e.az);
+    const pb = new Vector3(e.bx, dyh, e.bz);
     spanX = Math.max(1.5, Math.abs(pb.x - pa.x));
-    const baseY = (A.y + ea.R * 0.2 + B2.y + eb.R * 0.2) * 0.5;
+    const baseY = (e.A.y + e.ea.binder.y + e.B.y + e.eb.binder.y) * 0.5;
     const bg = makeBinderGeo(pa, pb, glowCol);
     owned.push(bg);
     binders.push({ geo: bg, baseY });
@@ -101011,7 +100963,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
   const body = new Group();
   group.add(body);
   if (isOpponent) {
-    const A2 = assembleRival(def, seg, pilot.species, colors, opts?.pattern);
+    const A2 = assembleRival(def, seg, pilot.head, colors, opts?.pattern);
     body.position.z = A2.bodyZ;
     const oppHull = sharedOpponentHullMaterial(1024);
     const oppFlame = sharedOpponentFlameMaterial();
@@ -101114,7 +101066,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     };
     return { group, body, engines: engines2, exhaustLocal: A2.exhaustLocal, eye: A2.eye, hood: A2.hood, update: update2, setEngineMotion: setEngineMotion2, setDistance, dispose: dispose2 };
   }
-  const A = assembleHero(def, seg, pilot.species);
+  const A = assembleHero(def, seg, pilot.head);
   body.position.z = A.bodyZ;
   const liv = opts?.pattern !== void 0 && opts.pattern >= 0 ? opts.pattern : A.layout.livery;
   const hullL = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
@@ -101349,15 +101301,15 @@ var Pool = class {
     this.head = (this.head + 1) % this.max;
     if (this.dirty === 0) this.dirtyStart = i4 / 4;
     if (this.dirty < this.max) this.dirty++;
-    const P = this.aPos.array, V2 = this.aVel.array, A0 = this.aC0.array, A1 = this.aC1.array, M3 = this.aMisc.array;
+    const P = this.aPos.array, V4 = this.aVel.array, A0 = this.aC0.array, A1 = this.aC1.array, M3 = this.aMisc.array;
     P[i4] = p.x;
     P[i4 + 1] = p.y;
     P[i4 + 2] = p.z;
     P[i4 + 3] = this.time;
-    V2[i4] = v.x;
-    V2[i4 + 1] = v.y;
-    V2[i4 + 2] = v.z;
-    V2[i4 + 3] = life;
+    V4[i4] = v.x;
+    V4[i4 + 1] = v.y;
+    V4[i4 + 2] = v.z;
+    V4[i4 + 3] = life;
     A0[i4] = c0.r;
     A0[i4 + 1] = c0.g;
     A0[i4 + 2] = c0.b;
@@ -101956,13 +101908,13 @@ function bindAnalyticNoise(resolution, seed = 0) {
 
 // node_modules/three/examples/jsm/tsl/utils/SpecularHelpers.js
 var ENV_RAY_LENGTH = 1e4;
-var SampleGGXVNDF = Fn(([V2, ax, ay, r1, r2]) => {
-  const wiStd = normalize2(vec3(ax.mul(V2.x), ay.mul(V2.y), V2.z)).toVar();
+var SampleGGXVNDF = Fn(([V4, ax, ay, r1, r2]) => {
+  const wiStd = normalize2(vec3(ax.mul(V4.x), ay.mul(V4.y), V4.z)).toVar();
   const a = ax.min(ay).toVar();
-  const s = float(1).add(V2.xy.length()).toVar();
+  const s = float(1).add(V4.xy.length()).toVar();
   const a2 = a.mul(a).toVar();
   const s2 = s.mul(s).toVar();
-  const k = a2.oneMinus().mul(s2).div(s2.add(a2.mul(V2.z).mul(V2.z))).toVar();
+  const k = a2.oneMinus().mul(s2).div(s2.add(a2.mul(V4.z).mul(V4.z))).toVar();
   const b = wiStd.z.mul(k).toVar();
   const phi = float(6.283185307179586).mul(r1).toVar();
   const z = r2.oneMinus().mul(float(1).add(b)).sub(b).toVar();
@@ -102040,26 +101992,26 @@ var ggxReflectionStruct = struct({
   f0: "vec3"
   // Fresnel reflectance at normal incidence
 });
-var ggxReflectionSampleWithReflectance = Fn(([N3, V2, roughness3, f0, f90, Xi]) => {
+var ggxReflectionSampleWithReflectance = Fn(([N3, V4, roughness3, f0, f90, Xi]) => {
   const a = roughness3.mul(roughness3).max(1e-3).toVar();
   const ax = a.toVar();
   const ay = a.toVar();
   const up = N3.z.abs().lessThan(0.999).select(vec3(0, 0, 1), vec3(1, 0, 0));
   const T2 = cross(up, N3).normalize().toVar();
   const B2 = cross(N3, T2).normalize().toVar();
-  const Vlocal = vec3(dot(T2, V2), dot(B2, V2), dot(N3, V2)).toVar();
+  const Vlocal = vec3(dot(T2, V4), dot(B2, V4), dot(N3, V4)).toVar();
   const Hlocal = SampleGGXVNDF(Vlocal, ax, ay, Xi.x, Xi.y).toVar();
   If(Hlocal.z.lessThan(0), () => {
     Hlocal.assign(Hlocal.negate());
   });
   const h = normalize2(T2.mul(Hlocal.x).add(B2.mul(Hlocal.y)).add(N3.mul(Hlocal.z))).toVar();
-  const viewReflectDir = reflect(V2.negate(), h).normalize().toVar();
+  const viewReflectDir = reflect(V4.negate(), h).normalize().toVar();
   const L = viewReflectDir.toVar();
-  const H = normalize2(V2.add(L)).toVar();
-  const NdotV = max(float(0), dot(N3, V2)).toVar();
+  const H = normalize2(V4.add(L)).toVar();
+  const NdotV = max(float(0), dot(N3, V4)).toVar();
   const NdotL = max(float(0), dot(N3, L)).toVar();
   const NdotH = max(float(0), dot(N3, H)).toVar();
-  const VdotH = max(float(0), dot(V2, H)).toVar();
+  const VdotH = max(float(0), dot(V4, H)).toVar();
   const fresnelWeight = F_Schlick2(f0, VdotH, f90).toVar();
   const pdf = GGXVNDFPdf(NdotH, NdotV, ax).toVar();
   const a2 = ax.mul(ax).toVar();
@@ -102071,7 +102023,7 @@ var ggxReflectionSampleWithReflectance = Fn(([N3, V2, roughness3, f0, f90, Xi]) 
   const glossyWeight = fresnelWeight.mul(GeometryTerm(NdotL, NdotV, ax)).mul(kB.mul(NdotV).add(tB)).div(float(2).mul(NdotV).max(1e-4)).toVar();
   return ggxReflectionStruct(viewReflectDir, glossyWeight, pdf, NdotV, ax, f90, f0);
 });
-var ggxReflectionSample = (N3, V2, roughness3, metalness3, albedo, Xi, f0 = null, f90 = 1) => ggxReflectionSampleWithReflectance(N3, V2, roughness3, f0 ?? mix(vec3(0.04), albedo, metalness3), float(f90), Xi);
+var ggxReflectionSample = (N3, V4, roughness3, metalness3, albedo, Xi, f0 = null, f90 = 1) => ggxReflectionSampleWithReflectance(N3, V4, roughness3, f0 ?? mix(vec3(0.04), albedo, metalness3), float(f90), Xi);
 var equirectUvToDir = Fn(([uvIn]) => {
   const phi = uvIn.x.mul(Math.PI * 2).sub(Math.PI);
   const lat = uvIn.y.sub(0.5).mul(Math.PI);
@@ -102374,13 +102326,13 @@ var ImportanceSampledEnvironment = class {
     cameraWorldMatrix: cameraWorldMatrix2,
     viewReflectDir,
     N: N3,
-    V: V2,
+    V: V4,
     alpha,
     f0,
     f90 = float(1)
   }) {
     const worldNormal = cameraWorldMatrix2.mul(vec4(N3, 0)).xyz.normalize().toVar();
-    const worldV = cameraWorldMatrix2.mul(vec4(V2, 0)).xyz.normalize().toVar();
+    const worldV = cameraWorldMatrix2.mul(vec4(V4, 0)).xyz.normalize().toVar();
     const NdotV = max(float(0), dot(worldNormal, worldV)).toVar();
     const L1 = cameraWorldMatrix2.mul(vec4(viewReflectDir, float(0))).xyz.normalize().toVar();
     const brdfEnvColor = texture(this._mapNode, equirectUV(L1)).level(0).rgb;
@@ -102413,7 +102365,7 @@ var ImportanceSampledEnvironment = class {
     cameraWorldMatrix: cameraWorldMatrix2,
     viewReflectDir,
     N: N3,
-    V: V2,
+    V: V4,
     alpha,
     f0,
     f90 = float(1),
@@ -102427,7 +102379,7 @@ var ImportanceSampledEnvironment = class {
     const envH = this._size.y;
     const envMapIntensity = this.intensity;
     const worldNormal = cameraWorldMatrix2.mul(vec4(N3, 0)).xyz.normalize().toVar();
-    const worldV = cameraWorldMatrix2.mul(vec4(V2, 0)).xyz.normalize().toVar();
+    const worldV = cameraWorldMatrix2.mul(vec4(V4, 0)).xyz.normalize().toVar();
     const NdotV = max(float(0), dot(worldNormal, worldV)).toVar();
     const L1 = cameraWorldMatrix2.mul(vec4(viewReflectDir, float(0))).xyz.normalize().toVar();
     const brdfEnvColor = texture(mapNode, equirectUV(L1)).level(0).rgb;
@@ -102833,7 +102785,7 @@ var SSRNode = class extends Node {
       const glossiness = min(roughness3.div(0.25), 1).oneMinus();
       const surfaceBorderFactor = this.screenEdgeFadeBlack ? computeScreenBorderFactor(uvPos, this.screenEdgeFade) : null;
       const hitBorderWidth = this.screenEdgeFade.mul(glossiness);
-      const V2 = viewIncidentDir.negate().normalize().toVar();
+      const V4 = viewIncidentDir.negate().normalize().toVar();
       let viewReflectDir, finalSampleWeight, specDominantFactor;
       let sampleEnvReflection = null;
       if (this.stochastic === false) {
@@ -102844,9 +102796,9 @@ var SSRNode = class extends Node {
         const Xi = noise.toVar();
         Xi.y.assign(mix(Xi.y, 0, this.mirrorBias.mul(Xi.w.sqrt())));
         const albedo = (this.specularNode === null && this.diffuseNode !== null ? this.diffuseNode.sample(uvPos).rgb : vec3(1)).toVar();
-        const ggxSample = ggxReflectionSample(viewNormal, V2, roughness3, metalness3, albedo, Xi, this.specularNode, this.specularF90Node ?? 1).toVar();
+        const ggxSample = ggxReflectionSample(viewNormal, V4, roughness3, metalness3, albedo, Xi, this.specularNode, this.specularF90Node ?? 1).toVar();
         If(ggxSample.get("reflectDir").dot(viewNormal).lessThan(0), () => {
-          ggxSample.assign(ggxReflectionSample(viewNormal, V2, roughness3, metalness3, albedo, Xi.add(Xi.mul(7)).fract(), this.specularNode, this.specularF90Node ?? 1));
+          ggxSample.assign(ggxReflectionSample(viewNormal, V4, roughness3, metalness3, albedo, Xi.add(Xi.mul(7)).fract(), this.specularNode, this.specularF90Node ?? 1));
         });
         viewReflectDir = ggxSample.get("reflectDir").toVar();
         finalSampleWeight = ggxSample.get("sampleWeight").toVar();
@@ -102860,7 +102812,7 @@ var SSRNode = class extends Node {
               cameraWorldMatrix: this._cameraWorldMatrix,
               viewReflectDir,
               N: viewNormal,
-              V: V2,
+              V: V4,
               alpha: ggxSample.get("alpha"),
               f0: ggxSample.get("f0"),
               f90: ggxSample.get("f90"),
@@ -102871,7 +102823,7 @@ var SSRNode = class extends Node {
               cameraWorldMatrix: this._cameraWorldMatrix,
               viewReflectDir,
               N: viewNormal,
-              V: V2,
+              V: V4,
               alpha: ggxSample.get("alpha"),
               f0: ggxSample.get("f0"),
               f90: ggxSample.get("f90")
@@ -104317,7 +104269,7 @@ var Game = class _Game {
     const diff = DIFFICULTIES[prof2.race.difficulty];
     const playerDef = PODS.find((p) => p.id === prof2.podId) ?? PODS[0];
     const others = PODS.filter((p) => p.id !== playerDef.id);
-    const n = Math.min(10, prof2.race.opponents);
+    const n = Math.min(MAX_OPPONENTS, prof2.race.opponents);
     const list = [{ def: playerDef, isPlayer: true }];
     for (let i = 0; i < n; i++) list.push({ def: others[i % others.length], isPlayer: false });
     const playerGrid = Math.min(n, Math.floor(n * 0.6));
@@ -104559,10 +104511,7 @@ var Game = class _Game {
         const dx = p.pos.x - hz.x, dz = p.pos.z - hz.z;
         if (dx * dx + dz * dz > hz.r ** 2 || p.pos.y > hz.y + 18) continue;
         const P = podParams(p);
-        if (p.invuln <= 0) {
-          p.hpL -= 12 * dt * P.sturdy;
-          p.hpR -= 12 * dt * P.sturdy;
-        }
+        if (p.invuln <= 0) applyDamage(p, "both", 12 * dt * P.sturdy, "heat");
         p.heat = Math.min(1, p.heat + 0.55 * dt);
         p.vel.y += 28 * dt;
         p.shake = Math.min(1, p.shake + dt * 1.5);
@@ -105051,12 +105000,12 @@ var Game = class _Game {
           bm.mesh.setMatrixAt(nb++, m);
         }
       };
-      const eL = env.engL, eR = env.engR, yL = (p.engYL ?? 0) + eL.minY + p.def.engineRad, yR = (p.engYR ?? 0) + eR.minY + p.def.engineRad;
+      const eL = env.engL, eR = env.engR, yL = (p.engYL ?? 0) + eL.axisY, yR = (p.engYR ?? 0) + eR.axisY;
       put(eL.x, yL, eL.frontZ + 0.15, 0.24, true);
       put(eR.x, yR, eR.frontZ + 0.15, 0.24, true);
       put(eL.outerX, yL, (eL.frontZ + eL.backZ) * 0.5, 0.18);
       put(eR.outerX, yR, (eR.frontZ + eR.backZ) * 0.5, 0.18);
-      put(0, env.cockpit.minY + 1.75, env.cockpit.z, (this.clock * 1.3 + p.id * 0.37) % 1 < 0.16 ? 0.22 : 0);
+      put(0, env.cockpit.topY, env.cockpit.z, (this.clock * 1.3 + p.id * 0.37) % 1 < 0.16 ? 0.22 : 0);
     }
     im.instanceMatrix.needsUpdate = true;
     if (bm) bm.mesh.instanceMatrix.needsUpdate = true;

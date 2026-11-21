@@ -13,6 +13,31 @@ export interface EngineGeo {
   petals: THREE.BufferGeometry;
   flameOuter: THREE.BufferGeometry; flameCore: THREE.BufferGeometry; flameZ: number;
   exhaustZ: number; pylon: THREE.Vector3; frontZ: number; top: number; R: number; L: number;
+  /** where the energy binder couples, relative to the engine axis: x = sideways towards the partner engine, y up, z along the engine */
+  binder: THREE.Vector3;
+  /** parts that can break off (Bruchteile): own geometry sets, never merged into `parts` */
+  breakParts: BreakPart[];
+}
+export interface BreakPart { id: string; parts: Map<MatKey, THREE.BufferGeometry>; center: THREE.Vector3 }
+
+/** Size of an engine as physics and cable routing see it – pure numbers, the single source for collision, ground clamp and wake.
+ *  The pod audit (tools/ci/pods.ts) compares them with the real geometry. */
+export interface EngineExtent {
+  /** radius of the collision circles */ coll: number;
+  /** lowest point below the engine axis (ground clamp) */ bottom: number;
+  /** outermost point sideways from the axis (ground clamp, dust wake) */ side: number;
+  /** highest solid point above the axis besides the cable pylon (cable routing) */ top: number;
+  /** half length */ halfL: number;
+}
+export function engineExtent(spec: EngineSpec): EngineExtent {
+  const { R, L, style } = spec;
+  return {
+    coll: R * 1.05 + (style === 'blade' ? 0.45 : 0) + (style === 'ring' ? 0.3 : 0),
+    bottom: R * (style === 'ring' ? 1.36 : 1.12) + 0.1,
+    side: R * (style === 'blade' ? 2.1 : 1.1),
+    top: R,
+    halfL: L * 0.5,
+  };
 }
 
 const cache = new Map<string, EngineGeo>();
@@ -217,6 +242,7 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
     parts: pb.build(), fan, fanZ: faceZ + 0.06 * L * 0.5,
     flaps, petals, flameOuter: flameGeo(rn, L * 0.75, Math.max(12, Math.round(seg * 0.5))), flameCore: flameGeo(rn * 0.42, L * 0.38, 12), flameZ: Z(0.07) - 0.02,
     exhaustZ: Z(0) - 0.12 * L, pylon: new THREE.Vector3(0, py + 0.06, Z(0.58)), frontZ: Z(1.0), top: py, R, L,
+    binder: new THREE.Vector3(R * 0.97, R * 0.2, L * 0.12), breakParts: [],
   };
   cache.set(key, out);
   return out;

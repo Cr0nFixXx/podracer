@@ -10,7 +10,7 @@ import { podEnvelope } from './podDesigns';
 import { WeatherFx } from './weather';
 import { CSMShadowNode } from 'three/examples/jsm/csm/CSMShadowNode.js';
 import { DIFFICULTIES, PILOTS, PODS, THEMES, TRACKS } from './data';
-import { effectiveStats, type Profile, type GfxSettings } from './settings';
+import { effectiveStats, MAX_OPPONENTS, type Profile, type GfxSettings } from './settings';
 import { buildTrack, type TrackData } from './trackBuilder';
 import { buildWorld, type World, worldTextureSpecs } from './world';
 import { makeSky, sunDirection } from './sky';
@@ -18,7 +18,7 @@ import { buildPodModel, setPodLodScale } from './podModel';
 import { Particles } from './particles';
 import { PostFX } from './post';
 import { AudioFX, type WorldAudioState } from './audio';
-import { HOVER, aiInputs, podParams, respawn, stepPod, type PodState, collidePods } from './physics';
+import { HOVER, aiInputs, applyDamage, podParams, respawn, stepPod, type PodState, collidePods } from './physics';
 import { applyAtmosphere } from './atmosphere';
 import type { LifeAudio } from './wildlife';
 
@@ -240,7 +240,7 @@ export class Game {
     const prof = this.profile; const diff = DIFFICULTIES[prof.race.difficulty];
     const playerDef = PODS.find(p => p.id === prof.podId) ?? PODS[0];
     const others = PODS.filter(p => p.id !== playerDef.id);
-    const n = Math.min(10, prof.race.opponents);
+    const n = Math.min(MAX_OPPONENTS, prof.race.opponents);
     const list = [{ def: playerDef, isPlayer: true }];
     for (let i = 0; i < n; i++) list.push({ def: others[i % others.length], isPlayer: false });
     const playerGrid = Math.min(n, Math.floor(n * 0.6));
@@ -387,7 +387,7 @@ export class Game {
         const dx = p.pos.x - hz.x, dz = p.pos.z - hz.z;
         if (dx * dx + dz * dz > hz.r ** 2 || p.pos.y > hz.y + 18) continue;
         const P = podParams(p);
-        if (p.invuln <= 0) { p.hpL -= 12 * dt * P.sturdy; p.hpR -= 12 * dt * P.sturdy; }
+        if (p.invuln <= 0) applyDamage(p, 'both', 12 * dt * P.sturdy, 'heat');
         p.heat = Math.min(1, p.heat + 0.55 * dt); p.vel.y += 28 * dt; p.shake = Math.min(1, p.shake + dt * 1.5);
         if (p.isPlayer && this.messageT <= 0) this.showMsg(this.td.def.theme === 'lava' ? 'LAVA-SCHLOT!' : 'GEYSIR!', 0.8);
       }
@@ -735,10 +735,10 @@ export class Game {
         m.compose(pos, q0, sc.setScalar(dead ? 0 : s * lv)); im.setMatrixAt(n++, m);
         if (beam && bm) { const hpS = lx < 0 ? p.hpL : p.hpR; m.compose(pos, qb, sc.setScalar(dead || hpS < 12 ? 0 : 1)); bm.mesh.setMatrixAt(nb++, m); }
       };
-      const eL = env.engL, eR = env.engR, yL = (p.engYL ?? 0) + eL.minY + p.def.engineRad, yR = (p.engYR ?? 0) + eR.minY + p.def.engineRad;
+      const eL = env.engL, eR = env.engR, yL = (p.engYL ?? 0) + eL.axisY, yR = (p.engYR ?? 0) + eR.axisY; // nav lights sit on the (lowest) engine axis
       put(eL.x, yL, eL.frontZ + 0.15, 0.24, true); put(eR.x, yR, eR.frontZ + 0.15, 0.24, true);
       put(eL.outerX, yL, (eL.frontZ + eL.backZ) * 0.5, 0.18); put(eR.outerX, yR, (eR.frontZ + eR.backZ) * 0.5, 0.18);
-      put(0, env.cockpit.minY + 1.75, env.cockpit.z, ((this.clock * 1.3 + p.id * 0.37) % 1) < 0.16 ? 0.22 : 0);
+      put(0, env.cockpit.topY, env.cockpit.z, ((this.clock * 1.3 + p.id * 0.37) % 1) < 0.16 ? 0.22 : 0);
     }
     im.instanceMatrix.needsUpdate = true; if (bm) bm.mesh.instanceMatrix.needsUpdate = true;
     const pl = this.player;

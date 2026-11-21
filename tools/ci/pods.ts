@@ -3,12 +3,14 @@
 //   1. mesh + triangle counts against the golden numbers in pods-baseline.json (measured on the real models in the browser)
 //   2. every geometry: required attributes, no NaN, index range – a bucket with mismatching attributes would vanish in the merge
 //   3. the visible pod against the physics shapes (podCollision / podEnvelope): how far it sticks out sideways or hangs below the ground clamp
+//   4. the physics shapes themselves against pods-shapes.json: the handling of an existing pod must not move by accident
 // Env: POD=<id> only that pod · UPDATE=1 prints fresh baseline rows instead of comparing.
 import * as THREE from 'three';
 import { PILOTS, PODS, type PodDef } from '../../src/game/data';
 import { podCollision, podEnvelope } from '../../src/game/podDesigns';
 import { assembleHero, assembleRival, segFor } from '../../src/game/podAssembly';
 import BASE from './pods-baseline.json';
+import SHAPES from './pods-shapes.json';
 
 /** How far the visible model may exceed the physics shapes (metres). Calibrated on the Session 19 pods: worst case + 5 cm
  *  (wide: Tyr Vespa's blade wings 0.50 · engines: Splitter-X 0.02 · no cockpit hangs below its ground clamp). */
@@ -51,7 +53,7 @@ const V = (a: THREE.Vector3, b?: THREE.Vector3, z = 0) => { const v = a.clone();
 
 function hero(def: PodDef, quality: number) {
   const pilot = PILOTS.find(p => p.id === def.pilotId) ?? PILOTS[0];
-  const a = assembleHero(def, segFor(quality, false), pilot.species);
+  const a = assembleHero(def, segFor(quality, false), pilot.head);
   const all = new Tally(), bank: Record<string, Tally> = { L: new Tally(), R: new Tally() }, ck = new Tally();
   const w = `${def.id} hero q${quality}`;
   for (const b of a.banks) {
@@ -76,7 +78,7 @@ function hero(def: PodDef, quality: number) {
 
 function rival(def: PodDef, quality: number) {
   const pilot = PILOTS.find(p => p.id === def.pilotId) ?? PILOTS[0];
-  const a = assembleRival(def, segFor(quality, true), pilot.species, def.colors, 1);
+  const a = assembleRival(def, segFor(quality, true), pilot.head, def.colors, 1);
   const near = new Tally(), far = new Tally(); const w = `${def.id} rival q${quality}`;
   for (const b of a.banks) {
     for (const [k, g] of b.buckets) near.add(g, `${w} bank ${b.side} ${k}`, k === 'hull' || k === 'glow' ? [...BUCKET, 'color'] : BUCKET, b.pivot);
@@ -90,8 +92,16 @@ function rival(def: PodDef, quality: number) {
   return { near: { meshes: near.meshes, tris: Math.round(near.tris) }, far: { meshes: far.meshes, tris: Math.round(far.tris) } };
 }
 
+const r6 = (v: number) => Math.round(v * 1e6) / 1e6;
+/** The numbers physics works with (collision circles: x, z, r, side · envelope sides: x, outerX, frontZ, backZ, minY · cockpit: z, minY). */
+function shapeOf(def: PodDef) {
+  const c = podCollision(def), e = podEnvelope(def);
+  const side = (s: typeof e.engL) => [r6(s.x), r6(s.outerX), r6(s.frontZ), r6(s.backZ), r6(s.minY)];
+  return { halfW: r6(c.halfW), circles: c.circles.map(q => [r6(q.x), r6(q.z), r6(q.r), q.side]), engL: side(e.engL), engR: side(e.engR), cockpit: [r6(e.cockpit.z), r6(e.cockpit.minY)] };
+}
+
 console.log('pod        hero q1        hero q2        hero q3      rival q2      rival q3     far     wide   lowL   lowR   lowCk  result');
-const fresh: (string | number)[][] = [];
+const fresh: (string | number)[][] = [], shapes: string[] = [];
 for (const def of PODS) {
   if (ONLY && def.id !== ONLY) continue;
   const before = failed;
@@ -103,6 +113,10 @@ for (const def of PODS) {
     if (!gold) fail(`${def.id}: no baseline row (run with UPDATE=1 and add it on purpose)`);
     else for (let i = 1; i < row.length; i++) if (row[i] !== gold[i]) fail(`${def.id}: ${BASE.columns[i]} = ${row[i]}, baseline ${gold[i]}`);
   }
+  // physics shapes vs their golden numbers
+  const shape = shapeOf(def); shapes.push(`    ${JSON.stringify(def.id)}: ${JSON.stringify(shape)}`);
+  if (!UPDATE && JSON.stringify(shape) !== JSON.stringify((SHAPES as Record<string, unknown>)[def.id]))
+    fail(`${def.id}: collision circles / ground-clamp envelope differ from tools/ci/pods-shapes.json (an existing pod must keep its physics size)`);
   // visible model vs physics shapes (hero, quality 3 = the most detailed build)
   const hq = h[2], env = podEnvelope(def), halfW = podCollision(def).halfW;
   const wide = Math.max(-hq.L.min.x, hq.R.max.x, -hq.ck.min.x, hq.ck.max.x) - halfW;              // > 0: wider than the collision shape
@@ -114,6 +128,6 @@ for (const def of PODS) {
   const f = (v: number) => v.toFixed(2).padStart(6);
   console.log(`${def.id.padEnd(9)} ${c(h[0].meshes, h[0].tris)}     ${c(h[1].meshes, h[1].tris)}     ${c(h[2].meshes, h[2].tris)}    ${c(n2.near.meshes, n2.near.tris)}    ${c(n3.near.meshes, n3.near.tris)}  ${c(n2.far.meshes, n2.far.tris).trim().padStart(6)} ${f(wide)} ${f(lowL)} ${f(lowR)} ${f(lowCk)}  ${failed > before ? 'FAIL' : 'ok'}`);
 }
-if (UPDATE) console.log('\nbaseline rows:\n' + fresh.map(r => '    ' + JSON.stringify(r)).join(',\n'));
+if (UPDATE) console.log('\npods-baseline.json rows:\n' + fresh.map(r => '    ' + JSON.stringify(r)).join(',\n') + '\n\npods-shapes.json:\n{\n' + shapes.join(',\n') + '\n  }');
 console.log(failed ? `\n${failed} pod audit failure(s).` : '\nAll pods passed the audit (meshes/triangles per build; wide/low = metres outside the physics shape).');
 process.exit(failed ? 1 : 0);

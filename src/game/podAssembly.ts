@@ -3,10 +3,11 @@
 // Keep this file free of three/webgpu, TSL and DOM imports (it is bundled into the node CI).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { PodDef } from './data';
+import type { PilotHead, PodDef } from './data';
 import { M4, PartBuilder, cyl, lathe, prof, rbox, tube, torus } from './podKit';
-import { engineGeo, type EngineGeo } from './podParts';
-import { cockpitGeo, podLayout, type PodLayout } from './podDesigns';
+import { engineExtent, engineGeo, type EngineGeo } from './podParts';
+import { cockpitGeo } from './podCockpits';
+import { podLayout, type PodLayout } from './podLayouts';
 
 const BINDER_PTS = 18;
 
@@ -53,7 +54,7 @@ function buildFlexCables(L: PodLayout, seg: number, anchors: [THREE.Vector3, THR
     // Session 14: the old cable ran in a straight sagging line from the cockpit to the pylon at 58 % of the engine length – straight
     // THROUGH the rear half of the nacelle. It is now routed around it: free-hanging span to a saddle just above/behind the rear rim,
     // then clipped along the top of the nacelle to the pylon (that part moves rigidly with the engine).
-    const rearZ = eg.exhaustZ + 0.12 * eg.L, topY = Math.max(eg.top, eg.R) + 0.14;
+    const rearZ = eg.exhaustZ + 0.12 * eg.L, topY = Math.max(eg.top, engineExtent(em.spec).top) + 0.14;
     const v1 = new THREE.Vector3(em.x, em.y + topY + 0.1, em.z + rearZ - 0.3);
     const v2 = new THREE.Vector3(em.x, em.y + topY, em.z + rearZ + (eg.pylon.z - rearZ) * 0.5);
     const dist = v1.distanceTo(b); const sag = 0.3 + dist * 0.03;
@@ -161,8 +162,9 @@ function buildOpponentFarGeo(def: PodDef, L: PodLayout) {
   const c = L.cockpit;
   pb.add('hull', rbox(c.hw * 1.7, c.hw * 0.82, c.len, 0.14, 1), M4.t(0, c.y, c.z), [0, 0.5, 2]);
   pb.add('dark', rbox(c.hw * 0.9, c.hw * 0.45, c.len * 0.42, 0.05, 1), M4.t(0, c.y + c.hw * 0.42, c.z));
-  if (L.binder) {
-    const A = L.engines[L.binder[0]], B = L.engines[L.binder[1]];
+  const b0 = L.binders[0];
+  if (b0) {
+    const A = L.engines[b0.a], B = L.engines[b0.b];
     pb.add('glow', rbox(Math.abs(B.x - A.x), 0.18, 0.18, 0.02), M4.t((A.x + B.x) * 0.5, (A.y + B.y) * 0.5 + 0.2, (A.z + B.z) * 0.5));
   }
   const built = pb.build();
@@ -180,7 +182,7 @@ interface Base {
   exhaustLocal: THREE.Vector3[];
   eye: THREE.Vector3; hood: THREE.Vector3;
 }
-function base(def: PodDef, seg: number, species: string) {
+function base(def: PodDef, seg: number, head: PilotHead) {
   const L = podLayout(def);
   const exhaustLocal: THREE.Vector3[] = [];
   let frontZ = -Infinity, topY = 0, sumY = 0;
@@ -189,16 +191,21 @@ function base(def: PodDef, seg: number, species: string) {
     exhaustLocal.push(new THREE.Vector3(em.x, em.y, em.z + eg.exhaustZ));
     frontZ = Math.max(frontZ, em.z + eg.frontZ); topY = Math.max(topY, em.y + eg.R); sumY += em.y;
   }
-  const ck = cockpitGeo(L, seg, species);
+  const ck = cockpitGeo(L, seg, head);
   const eye = new THREE.Vector3(0, L.cockpit.y, L.cockpit.z).add(ck.info.head).add(new THREE.Vector3(0, 0.24, 0.32));
   const hood = new THREE.Vector3(0, sumY / Math.max(1, L.engines.length) + topY * 0.35 + 0.35, frontZ - 1.2);
   // pod extras: built fresh per model (the callers merge or dispose them)
-  const extraPB = new PartBuilder(); L.extras?.(extraPB, L); const extraParts = extraPB.build() as Map<string, THREE.BufferGeometry>;
+  const build = (fn?: (pb: PartBuilder, L: PodLayout) => void) => { const pb = new PartBuilder(); fn?.(pb, L); return pb.build() as Map<string, THREE.BufferGeometry>; };
   const b: Base = { layout: L, bodyZ: -L.cockpit.z * 0.25, exhaustLocal, eye, hood };
-  return { b, ck, extraParts };
+  return { b, ck, engineExtras: build(L.engineExtras), cockpitExtras: build(L.cockpitExtras) };
 }
 const sideOf = (x: number): -1 | 1 => (x < 0 ? -1 : 1);
-const binderList = (L: PodLayout): [number, number][] => L.binders ?? (L.binder ? [L.binder] : []);
+/** Both ends of an energy binder in body space, left-hand engine first (the player binder material lifts end A with uLift.x). */
+function binderEnds(L: PodLayout, seg: number, link: { a: number; b: number; zOff?: number }) {
+  let A = L.engines[link.a], B = L.engines[link.b]; if (A.x > B.x) { const t = A; A = B; B = t; }
+  const ea = engineGeo(A.spec, seg), eb = engineGeo(B.spec, seg), z = link.zOff ?? 0;
+  return { A, B, ea, eb, ax: A.x + ea.binder.x, ay: A.y + ea.binder.y, az: A.z + ea.binder.z + z, bx: B.x - eb.binder.x, by: B.y + eb.binder.y, bz: B.z + eb.binder.z + z };
+}
 
 // ------------------------------------------------------------------ player / hangar pod
 export interface EnginePart { /** index into layout.engines */ index: number; /** position relative to the bank pivot */ off: THREE.Vector3; geo: EngineGeo }
@@ -216,10 +223,8 @@ export interface HeroAssembly extends Base {
   owned: THREE.BufferGeometry[];
 }
 
-export function assembleHero(def: PodDef, seg: number, species: string): HeroAssembly {
-  const { b, ck, extraParts } = base(def, seg, species); const L = b.layout; const owned: THREE.BufferGeometry[] = [];
-  // Split Aurora/Brute/Gasvaro/Teemo engine-mounted extras onto their matching L/R articulated engine group!
-  const attachExtraToEngines = def.id === 'aurora' || def.id === 'brute' || def.id === 'gasvaro' || def.id === 'bomquad' || def.id === 'teemo';
+export function assembleHero(def: PodDef, seg: number, head: PilotHead): HeroAssembly {
+  const { b, ck, engineExtras, cockpitExtras } = base(def, seg, head); const L = b.layout; const owned: THREE.BufferGeometry[] = [];
   const banks: HeroBank[] = [];
   for (const side of [-1, 1] as const) {
     const mounts = L.engines.map((em, index) => ({ em, index })).filter(m => sideOf(m.em.x) === side);
@@ -235,9 +240,9 @@ export function assembleHero(def: PodDef, seg: number, species: string): HeroAss
       for (const [k, g] of eg.parts) { const gc = g.clone(); gc.applyMatrix4(emM); push(lists, k, gc); }
       engines.push({ index, off, geo: eg });
     }
-    if (attachExtraToEngines) {
+    { // engine-mounted extras (wings, struts …) ride with the engine bank of their side: split by triangle centroid
       const shift = M4.t(-piv.x, -piv.y, -piv.z);
-      for (const [k, eg] of extraParts) {
+      for (const [k, eg] of engineExtras) {
         const idx = eg.index!.array; const pos = eg.attributes.position;
         const keep: number[] = [];
         for (let t = 0; t < idx.length; t += 3) {
@@ -249,17 +254,17 @@ export function assembleHero(def: PodDef, seg: number, species: string): HeroAss
     }
     banks.push({ side, pivot: piv, engines, buckets: mergeAll(lists, owned, `${def.id} engine bank ${side}`) });
   }
+  for (const g of engineExtras.values()) g.dispose();
   // Cockpit + cockpit-mounted extras
   const lists: Lists = new Map(); const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
   for (const [k, g] of ck.parts) { const gc = g.clone(); gc.applyMatrix4(ckM); push(lists, k, gc); }
-  for (const [k, g] of extraParts) { if (!attachExtraToEngines) push(lists, k, g); else g.dispose(); }
+  for (const [k, g] of cockpitExtras) push(lists, k, g);
   const cockpit = mergeAll(lists, owned, `${def.id} cockpit`);
   const cables = buildFlexCables(L, seg, ck.info.anchors); owned.push(cables);
   const binders: THREE.BufferGeometry[] = [];
-  for (const [ia, ib] of binderList(L)) { // one mesh per binder (X on the Quadra Lumber)
-    let A = L.engines[ia], B = L.engines[ib]; if (A.x > B.x) { const t = A; A = B; B = t; } // A = left-hand engine (uLift.x)
-    const ea = engineGeo(A.spec, seg), eb = engineGeo(B.spec, seg);
-    const g = makeBinderGeo(new THREE.Vector3(A.x + ea.R * 0.97, A.y + ea.R * 0.2, A.z + ea.L * 0.12), new THREE.Vector3(B.x - eb.R * 0.97, B.y + eb.R * 0.2, B.z + eb.L * 0.12));
+  for (const link of L.binders) { // one mesh per binder (X on the Quadra Lumber)
+    const e = binderEnds(L, seg, link);
+    const g = makeBinderGeo(new THREE.Vector3(e.ax, e.ay, e.az), new THREE.Vector3(e.bx, e.by, e.bz));
     binders.push(g); owned.push(g);
   }
   return { ...b, banks, cockpit, cables, binders, owned };
@@ -281,8 +286,8 @@ export interface RivalAssembly extends Base {
 }
 
 /** `pattern`: livery pattern 0..5; undefined / negative = the pod's factory pattern. */
-export function assembleRival(def: PodDef, seg: number, species: string, colors: [string, string, string], pattern?: number): RivalAssembly {
-  const { b, ck, extraParts } = base(def, seg, species); const L = b.layout; const owned: THREE.BufferGeometry[] = [];
+export function assembleRival(def: PodDef, seg: number, head: PilotHead, colors: [string, string, string], pattern?: number): RivalAssembly {
+  const { b, ck, engineExtras, cockpitExtras } = base(def, seg, head); const L = b.layout; const owned: THREE.BufferGeometry[] = [];
   const liv = pattern !== undefined && pattern >= 0 ? pattern : L.livery;
   const glowCol = new THREE.Color(colors[2]), glowBoost = glowCol.clone().multiplyScalar(1.2);
   const bake = (k: string, mg: THREE.BufferGeometry) => { if (k === 'hull') bakeHullVertexColors(mg, colors[0], colors[1], liv); else if (k === 'glow') bakeSolidColor(mg, glowBoost); };
@@ -315,7 +320,7 @@ export function assembleRival(def: PodDef, seg: number, species: string, colors:
   const lists: Lists = new Map();
   const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
   for (const [k, g] of ck.parts) pushC(lists, k, g, ckM);
-  for (const [k, g] of extraParts) { pushC(lists, k, g); g.dispose(); }
+  for (const extras of [engineExtras, cockpitExtras]) for (const [k, g] of extras) { pushC(lists, k, g); g.dispose(); } // rivals: all extras are static (merged with the cockpit)
   const cp = new THREE.Vector3(0, L.cockpit.y, L.cockpit.z);
   const cabPB = new PartBuilder();
   for (const em of L.engines) {
@@ -329,14 +334,13 @@ export function assembleRival(def: PodDef, seg: number, species: string, colors:
   const cockpit = mergeAll(lists, owned, `${def.id} rival cockpit`, bake);
 
   const binders: { geo: THREE.BufferGeometry; baseY: number }[] = []; let spanX = 4.6;
-  for (const [ia, ib] of binderList(L)) {
-    let A = L.engines[ia], B = L.engines[ib]; if (A.x > B.x) { const t = A; A = B; B = t; }
-    const ea = engineGeo(A.spec, seg), eb = engineGeo(B.spec, seg);
-    const dyh = ((B.y + eb.R * 0.2) - (A.y + ea.R * 0.2)) * 0.5; // diagonal binders: the two ends sit at different heights around the mesh origin
-    const pa = new THREE.Vector3(A.x + ea.R * 0.97, -dyh, A.z + ea.L * 0.12);
-    const pb = new THREE.Vector3(B.x - eb.R * 0.97, dyh, B.z + eb.L * 0.12);
+  for (const link of L.binders) {
+    const e = binderEnds(L, seg, link);
+    const dyh = (e.by - e.ay) * 0.5; // diagonal binders: the two ends sit at different heights around the mesh origin
+    const pa = new THREE.Vector3(e.ax, -dyh, e.az);
+    const pb = new THREE.Vector3(e.bx, dyh, e.bz);
     spanX = Math.max(1.5, Math.abs(pb.x - pa.x));
-    const baseY = (A.y + ea.R * 0.2 + B.y + eb.R * 0.2) * 0.5;
+    const baseY = (e.A.y + e.ea.binder.y + e.B.y + e.eb.binder.y) * 0.5;
     const bg = makeBinderGeo(pa, pb, glowCol); owned.push(bg);
     binders.push({ geo: bg, baseY });
   }

@@ -82,7 +82,25 @@ export interface Profile {
   pad?: PadMap;  // rebindable gamepad controls
 }
 
-const KEY = 'podracer-profile-v1';
+const KEY = 'podracer-profile-v2';
+/** Saves of builds before the pod overhaul (10 pods). Imported when no v2 save exists and never written again – an older build that
+ *  still reads this key keeps working (it would crash on pod ids it does not know). */
+const KEY_V1 = 'podracer-profile-v1';
+/** Largest rival field a race can have (slider in the race setup, clamp in Game.createPods). */
+export const MAX_OPPONENTS = 10;
+
+const clampInt = (v: unknown, lo: number, hi: number, d: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : d);
+const hexColor = (v: unknown, d: string) => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v : d);
+
+/** One pod's saved look + tuning, forced into the valid range (old, damaged or foreign saves). `base` = that pod's defaults. */
+export function sanitizeCustom(c: Partial<PodCustom> | undefined | null, base: PodCustom): PodCustom {
+  const colors = [0, 1, 2].map(i => hexColor(c?.colors?.[i], base.colors[i])) as [string, string, string];
+  const tuning = Object.fromEntries(STAT_KEYS.map(k => [k, clampInt(c?.tuning?.[k], 0, 5, 0)])) as Record<StatKey, number>;
+  const out: PodCustom = { colors, tuning };
+  if (c?.pattern !== undefined && c.pattern !== null) out.pattern = clampInt(c.pattern, 0, LIVERY_PATTERNS.length - 1, 0); // absent = the pod's factory pattern
+  if (c?.finish !== undefined && c.finish !== null) out.finish = clampInt(c.finish, 0, PAINT_FINISHES.length - 1, 0) as PaintFinish;
+  return out;
+}
 
 export function defaultProfile(): Profile {
   const custom: Record<string, PodCustom> = {};
@@ -93,12 +111,17 @@ export function defaultProfile(): Profile {
 export function loadProfile(): Profile {
   const d = defaultProfile();
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(KEY) ?? localStorage.getItem(KEY_V1);
     if (!raw) return d;
     const p = JSON.parse(raw) as Partial<Profile>;
     const race = { ...d.race, ...(p.race || {}) };
     if (!TRACKS.some(t => t.id === race.trackId)) race.trackId = TRACKS[0].id; // safe fallback if saved track (e.g. deleted neon) no longer exists
-    return { ...d, ...p, custom: { ...d.custom, ...(p.custom || {}) }, race, gfx: { ...d.gfx, ...(p.gfx || {}) }, best: { ...(p.best || {}) }, keys: normalizeKeys(p.keys), pad: normalizePad(p.pad) };
+    race.opponents = clampInt(race.opponents, 0, MAX_OPPONENTS, d.race.opponents);
+    // every pod of THIS build gets a valid entry; entries of pods this build does not know are dropped
+    const custom: Record<string, PodCustom> = {};
+    for (const pod of PODS) custom[pod.id] = sanitizeCustom(p.custom?.[pod.id], d.custom[pod.id]);
+    const podId = PODS.some(x => x.id === p.podId) ? p.podId! : d.podId; // the menus look the pod up without a fallback
+    return { ...d, ...p, podId, custom, race, gfx: { ...d.gfx, ...(p.gfx || {}) }, best: { ...(p.best || {}) }, keys: normalizeKeys(p.keys), pad: normalizePad(p.pad) };
   } catch { return d; }
 }
 export function saveProfile(p: Profile) { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* ignore */ } }

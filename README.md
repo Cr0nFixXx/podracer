@@ -155,7 +155,7 @@ Neue Änderungen sichern: `npm run save -- "Beschreibung"` (committet und erneue
 
 ## Für Entwickler: Prüfbefehle
 
-1. `npm run check` – Typecheck + Pod-Audit + Physik-Simulation aller 13 Strecken (11 Pods, 45 s, ca. 25 s Laufzeit, kein Browser nötig).
+1. `npm run check` – Typecheck + Unit-Prüfungen (`tools/ci/unit.ts`) + Pod-Audit + Physik-Simulation aller 13 Strecken (11 Pods, 45 s, ca. 30 s Laufzeit, kein Browser nötig).
 2. `npm run check:pods` – nur das Pod-Audit (1 s): baut jeden Pod ohne Browser, vergleicht Mesh- und Dreieckszahlen mit `tools/ci/pods-baseline.json` und prüft das Sichtmodell gegen die Kollisionsform.
 3. `npm run check:gpu` – lädt Strecken im Headless-Chrome mit WebGPU und meldet jeden Shader-/Konsolenfehler (braucht Puppeteer, siehe `HANDOFF.md`).
 4. `npm run build` – erzeugt `dist/index.html`.

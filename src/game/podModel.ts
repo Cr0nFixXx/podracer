@@ -52,7 +52,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
 
   // ==================== SHARED-PIPELINE, ARTICULATED 2-LOD OPPONENT POD ====================
   if (isOpponent) {
-    const A = assembleRival(def, seg, pilot.species, colors, opts?.pattern);
+    const A = assembleRival(def, seg, pilot.head, colors, opts?.pattern);
     body.position.z = A.bodyZ;
     const oppHull = sharedOpponentHullMaterial(1024);
     const oppFlame = sharedOpponentFlameMaterial();
@@ -122,7 +122,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
   }
 
   // ==================== FULL HERO PLAYER / HANGAR POD ====================
-  const A = assembleHero(def, seg, pilot.species);
+  const A = assembleHero(def, seg, pilot.head);
   body.position.z = A.bodyZ;
   const liv = opts?.pattern !== undefined && opts.pattern >= 0 ? opts.pattern : A.layout.livery;
   const hullL = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);

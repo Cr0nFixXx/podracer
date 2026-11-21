@@ -4,7 +4,7 @@ import { KeyBindings, PadBindings } from './KeyBindings';
 import { sanitizeEnv, timeOptionsFor, weatherOptionsFor, type TimeOfDay, type WeatherKind } from '../game/environment';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, STAT_LABELS, THEMES, TRACKS, type StatKey } from '../game/data';
-import { effectiveStats, LIVERY_PATTERNS, PAINT_FINISHES, type PaintFinish, type Profile } from '../game/settings';
+import { effectiveStats, LIVERY_PATTERNS, MAX_OPPONENTS, PAINT_FINISHES, type PaintFinish, type Profile } from '../game/settings';
 import { buildTrack, type TrackData } from '../game/trackBuilder';
 import { CAMERA_NAMES, fmt } from '../game/Game';
 import { Btn, Panel, Slider, StatBar } from './common';
@@ -150,7 +150,7 @@ export function RaceSetup({ profile, update, go, start }: { profile: Profile; up
           </Panel>
           <Panel title="Renneinstellungen">
             {track.type === 'circuit' ? <Slider label="Runden" value={r.laps} min={1} max={7} step={1} onChange={v => set('laps', v)} /> : <div className="text-[11px] uppercase tracking-widest text-stone-400 mb-3">Sprint – Punkt zu Punkt</div>}
-            <Slider label="Gegner" value={r.opponents} min={0} max={10} step={1} onChange={v => set('opponents', v)} />
+            <Slider label="Gegner" value={r.opponents} min={0} max={MAX_OPPONENTS} step={1} onChange={v => set('opponents', v)} />
             <div className="text-[11px] uppercase tracking-widest text-stone-300 mb-2">Schwierigkeit</div>
             <div className="grid grid-cols-2 gap-2 mb-4">{DIFFICULTIES.map((d, i) => <Btn key={d.id} active={r.difficulty === i} onClick={() => set('difficulty', i)}>{d.name}</Btn>)}</div>
             <div className="grid grid-cols-2 gap-2 mb-4">
