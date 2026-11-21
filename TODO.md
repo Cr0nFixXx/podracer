@@ -6,9 +6,10 @@
 - [x] **Phase 2 – 10 neue Cockpits + Details + Cockpit-Innenansicht** – wartet auf die Sichtung durch den Nutzer („Ultra" am Gaming-PC testen)
 - [x] **Nachbesserung aus der Sichtung: Cockpits weiter oben** (0,6–1,05 m, über der Triebwerkslinie; Fahrverhalten unverändert über `keel`) – Höhe bestätigt der Nutzer anhand `tools/harness/out/p2_hoeher_*.jpg`
 - [ ] Cockpit-Innenansicht in einem Tunnel sichten (Regen und 90°-Rolle sind gesichtet)
-- [x] **Phase 3 – 4 neue Pods:** Cyclone, Halo, Manta, Voltspire, Gegner-Auslosung aus 13, Hangar-Liste für 14, wanderndes CI-Startfeld – **wartet auf die Sichtung durch den Nutzer** (Bilder `tools/harness/out/p3_*.jpg`)
+- [x] **Phase 3 – 4 neue Pods:** Cyclone, Halo, Manta, Voltspire, Gegner-Auslosung aus 13, Hangar-Liste für 14, wanderndes CI-Startfeld – vom Nutzer freigegeben, Quill Voltspire danach geschlossener gebaut
 - [ ] Langlauf `SECS=120`: auf Sprintstrecken zählt die Sim nach dem Zieleinlauf vereinzelt einen „downward teleport" (auch mit dem alten Feld, also schon vor Phase 3) – Ursache klären
-- [ ] **Phase 4 – Tuning-Optik:** Tuning-Teile + Style-Teile, Hangar-Reiter „Lack | Teile"
+- [x] **Phase 4 – Tuning-Optik:** Tuning-Teile (7 Werte × 2 Stufen) + Style-Teile (Finnen, Einlass, Düse, Kanzel), Hangar-Reiter „Lack | Teile", Gegner mit ausgelosten Style-Teilen
+- [ ] Teile-Kombinationen am Gaming-PC durchklicken (gesichtet sind 7; Maße und Dreiecke prüft das Audit an drei Sätzen je Pod)
 - [ ] **Phase 5–7 – Schadensmodelle:** Fahrverhalten, Optik Spieler, Optik Gegner
 - [ ] `tools/harness/pui.mjs:39` prüft noch die gelöschte „Neon-Spirale" → anpassen; `tools/harness/run.sh` läuft nur unter Linux
 

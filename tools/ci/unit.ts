@@ -6,7 +6,8 @@ import { cockpitGeo } from '../../src/game/podCockpits';
 import { engineExtent, engineGeo } from '../../src/game/podParts';
 import { podCollision, podEnvelope } from '../../src/game/podDesigns';
 import { assembleHero, assembleRival } from '../../src/game/podAssembly';
-import { pickRivals } from '../../src/game/roster';
+import { pickRivals, rivalKit } from '../../src/game/roster';
+import { engineKit, tuneTiers, NO_KIT } from '../../src/game/podKitParts';
 import { ciRoster } from './roster';
 import { applyDamage, podParams, FX_NONE, type PodState } from '../../src/game/physics';
 import { loadProfile, saveProfile } from '../../src/game/settings';
@@ -128,6 +129,40 @@ test('Quadra Lumber keeps its X: binders between different engine pairs stay sep
   const p = podById('bomquad'); eq(assembleHero(p, 28, 'dome').binders.length, 2); eq(assembleRival(p, 14, 'dome', p.colors).binders.length, 2);
 });
 
+// ------------------------------------------------------------------ Session 20 / Phase 4: tuning look (Tuning-Teile + Style-Teile)
+const ZERO = Object.fromEntries(STAT_KEYS.map(k => [k, 0])) as Record<StatKey, number>;
+/** size of a kit: triangles of its parts, plus a big number per extra flap and for enlarged flaps (those are meshes, not parts) */
+function kitSize(spec: Parameters<typeof engineKit>[0], kit: Parameters<typeof engineKit>[2]) {
+  const k = engineKit(spec, 28, kit), base = engineGeo(spec, 28).flaps; let n = 0;
+  for (const g of k.parts.values()) n += triCount(g);
+  n += Math.max(0, k.flaps.length - base.length) * 5000;
+  k.flaps.forEach((f, i) => { if (base[i]) { f.geo.computeBoundingBox(); base[i].geo.computeBoundingBox(); if (f.geo.boundingBox!.min.z < base[i].geo.boundingBox!.min.z - 0.01) n += 1000; } });
+  return n;
+}
+const kitPrint = (spec: Parameters<typeof engineKit>[0], kit: Parameters<typeof engineKit>[2]) => [...engineKit(spec, 28, kit).parts].sort(([a], [b]) => a.localeCompare(b)).map(([k, g]) => `${k}:${triCount(g)}`).join(' ');
+test('tuning tiers: step 0–1 shows no part, 2–3 the small one, 4–5 the big one', () => {
+  eq([0, 1, 2, 3, 4, 5].map(s => tuneTiers({ ...ZERO, topSpeed: s }).topSpeed), [0, 0, 1, 1, 2, 2]); eq(tuneTiers(undefined).accel, 0, 'no tuning');
+});
+test('kit: Werk (no Style-Teil, no tuning) adds nothing', () => { for (const p of PODS) eq(kitSize(podLayout(p).engines[0].spec, NO_KIT), 0, p.id); });
+test('kit: every Style-Teil choice adds parts of its own on every engine style', () => {
+  for (const p of PODS) for (const slot of ['fins', 'intake', 'nozzle'] as const) {
+    const s = podLayout(p).engines[0].spec, seen = new Set<string>();
+    for (let c = 1; c <= 3; c++) { ok(kitSize(s, { ...NO_KIT, [slot]: c }) > 0, `${p.id}: ${slot} ${c} adds nothing`); seen.add(kitPrint(s, { ...NO_KIT, [slot]: c })); }
+    eq(seen.size, 3, `${p.id}: different ${slot} choices`);
+  }
+});
+test('kit: every tuning value shows a part at tier 1 and more at tier 2 on every engine style', () => {
+  for (const p of PODS) for (const st of STAT_KEYS) {
+    const s = podLayout(p).engines[0].spec, a = kitSize(s, { ...NO_KIT, tune: { ...ZERO, [st]: 1 } }), b = kitSize(s, { ...NO_KIT, tune: { ...ZERO, [st]: 2 } });
+    ok(a > 0, `${p.id}: ${st} tier 1 shows nothing`); ok(b > a, `${p.id}: ${st} tier 2 (${b}) is not more than tier 1 (${a})`);
+  }
+});
+test('kit: Gegner get their Style-Teile from a seeded draw (same seed = same parts, every value 0..3)', () => {
+  eq(rivalKit(42), rivalKit(42)); const seen = new Set<number>();
+  for (let s = 0; s < 60; s++) { const k = rivalKit(s); for (const v of [k.fins, k.intake, k.nozzle, k.canopy]) { ok(Number.isInteger(v) && v >= 0 && v <= 3, `seed ${s}: ${v}`); seen.add(v); } }
+  eq(seen.size, 4, 'values ever drawn');
+});
+
 // ------------------------------------------------------------------ who races: Gegner draw (game) and the CI grid
 /** deterministic random source for the draw */
 const lcg = (seed: number) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -217,6 +252,10 @@ test('profile: a pod without a saved pattern keeps the factory pattern (undefine
 test('profile: a broken colour falls back to that pod\'s own colour', () => {
   saved(V2, { custom: { aurora: { colors: ['#12', 42, '#ABCDEF'], tuning: {} } } });
   eq(loadProfile().custom.aurora.colors, [PODS[0].colors[0], PODS[0].colors[1], '#ABCDEF']);
+});
+test('profile: Style-Teile are clamped into range; a save without them means Werk', () => {
+  saved(V2, { podId: 'aurora', custom: { aurora: { colors: PODS[0].colors, tuning: {}, kit: { fins: 9, intake: -2, nozzle: 2.4, canopy: 'x' } } } });
+  const p = loadProfile(); eq(p.custom.aurora.kit, { fins: 3, intake: 0, nozzle: 2, canopy: 0 }); eq(p.custom.brute.kit, undefined, 'pod without saved parts');
 });
 test('profile: the rival count is clamped to 0..10', () => {
   saved(V2, { race: { opponents: 99 } }); eq(loadProfile().race.opponents, 10);

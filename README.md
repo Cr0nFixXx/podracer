@@ -101,7 +101,7 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 
 ## Inhalte
 
-**14 Podracer** (alle freigeschaltet, Tuning, 6 Lackiermuster, 3 Lackfinishes, 8 Vorlagen, individuelle Piloten-Spezies) · **13 Strecken: 7 Rundkurse, 6 Sprints** auf Tatooine, Ando Prime, Vulkanwelt, Dschungelmond, Aquilaris, Oovo IV, Kristallschluchten und Malastare · bis zu 10 Gegner (für jedes Rennen neu aus den 13 anderen Pods ausgelost) mit vorausschauender Korridor-KI und Düsen-Hitzeflimmern, 4 Schwierigkeitsstufen · 6 Kameras.
+**14 Podracer** (alle freigeschaltet, Tuning mit sichtbaren Tuning-Teilen, frei wählbare Style-Teile, 6 Lackiermuster, 3 Lackfinishes, 8 Vorlagen, individuelle Piloten-Spezies) · **13 Strecken: 7 Rundkurse, 6 Sprints** auf Tatooine, Ando Prime, Vulkanwelt, Dschungelmond, Aquilaris, Oovo IV, Kristallschluchten und Malastare · bis zu 10 Gegner (für jedes Rennen neu aus den 13 anderen Pods ausgelost) mit vorausschauender Korridor-KI und Düsen-Hitzeflimmern, 4 Schwierigkeitsstufen · 6 Kameras.
 
 ## Landschaft & Atmosphäre
 
@@ -114,6 +114,7 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
   2. **Lyss Halo-9** (Sira Lyss, Nerai) – schlanke Kerntriebwerke in großen Ringflügeln mit Lichtbändern, der Energieblitz springt von Ring zu Ring. Stärke: Wendigkeit und Luftbremse.
   3. **Dorn Manta** (Havo Dorn, Brakkan) – flache Triebwerksplatten mit Briefschlitz-Einlass, Schlitzdüsen und Doppelleitwerk, dessen Ruder als Luftbremse aufspreizen. Stärke: Höchstgeschwindigkeit.
   4. **Quill Voltspire** (Ixo Quill, Synth-Droide) – Reaktor-Triebwerke: vorn und hinten geschlossen verkleidet, dazwischen ein vergittertes Fenster auf die Plasmaspule, in dem ein Käfigläufer dreht; gekoppelt über drei Energiebögen. Cockpit: Glaskugel im Reifenkäfig. Stärke: Beschleunigung und Kühlung, dafür empfindlich.
+- **Tuning, das man sieht:** jede der 7 Tuning-Größen baut ab Stufe 2 ein kleines und ab Stufe 4 ein großes Teil an (Nachbrennerring, Kompressorhutzen, Radiatoren, Steuerflächen, Repulsor-Pads, Doppelklappen, Reparatureinheit). Dazu vier Steckplätze mit **Style-Teilen** im Hangar-Reiter „Teile": Finnen (Haifinne, Doppel-Leitwerk, Pfeilflügel), Einlass (Gitter, Langer Dorn, Irisblende), Düse (Lang, Schubvektor-Paddel, Zackenkrone), Kanzel (klar, Rauch, Bernstein, Spiegel). Style-Teile ändern nur das Aussehen; Gegner tragen ausgeloste.
 - **Hangar & Podracer:** 6 Lackiermuster (Klassik, Streifen, Flammen, Rennringe, Chevron, Rallye), 3 Finishes (Klarlack, Metallic, Matt) und 8 Vorlagen neben freier Farbwahl; individuelle Piloten-Spezies, seitengetrennte lose Schadensklappen und Hitzeflimmern auch hinter Gegner-Pods.
 - **Größere Strecken:** alle 13 Kurse sind 7–16 km lang, mit S-Kurven, zwei weiten offenen Flächen je Strecke (bis über 100 m breit) und hohen Tunneln (19,5–22,5 m).
 - **Verzweigte Höhlensysteme (neu):** auf Vulkanwelt (5 Kammern, 2 Gabelungen), Ando Prime, Kristallschluchten und Dschungelmond – bis 38 m hohe, verbreiterte Kammern mit Höhlenboden, Lichtschächten, Felssäulen, Leuchtadern und wieder zusammenführenden Seitenröhren.

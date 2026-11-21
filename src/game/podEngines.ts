@@ -149,6 +149,12 @@ function rotorEngine(spec: EngineSpec, seg: number): EngineGeo {
   return {
     parts: pb.build(), fan, fanZ: zR, fanMat: 'steel', fanSpin: 0.36, openRotor: true, flaps, ...nz,
     pylon, frontZ: Z(1.0) + 0.045 * L, top: py, R, L, binder: V(R * 0.97, R * 0.2, Z(0.45)), breakParts: [],
+    hard: {
+      nozzle: { z: Z(0), r0: 0.7 * R, r1: bodyR(0.3 / L) * R, open: 0.92 * R, tipZ: Z(0) - 0.085 * L },
+      mouth: { z: zf + 0.07, r: Rh + th * 1.1, ri: Rh - th }, spikeZ: Z(1.0) + 0.045 * L,
+      body: { zA: Z(0.14), zB: Z(0.56), r: R }, spine: { zA: Z(0.42) + 0.28, zB: Z(0.64), y: R * 0.99 }, tail: { z: Z(0.1), y: bodyR(0.12) * R },
+      sideMax: Rh + 0.07, bottomMax: Rh + 0.07,
+    },
   };
 }
 
@@ -220,6 +226,12 @@ function hoopEngine(spec: EngineSpec, seg: number): EngineGeo {
   return {
     parts: pb.build(), fan, fanZ: faceZ + 0.03 * L, flaps, ...nz,
     pylon, frontZ: Z(1.0), top: py, R, L, binder: V(Rw + 0.07, 0, zB), breakParts: [],
+    hard: {
+      nozzle: { z: Z(0), r0: 0.78 * R, r1: bodyR(0.3 / L) * R, open: 1.03 * R, tipZ: Z(0) - 0.085 * L },
+      mouth: { z: Z(1.0), r: rf * 1.035 * R, ri: rf * 0.86 * R }, spikeZ: Z(1.0) + 0.16 * L,
+      body: { zA: Z(0.1), zB: Z(0.42), r: R }, spine: { zA: Z(0.68), zB: Z(0.88), y: R * 0.96 }, tail: { z: Z(0.08), y: bodyR(0.12) * R },
+      sideMax: Rw + 0.12, bottomMax: Rw + 0.09,
+    },
   };
 }
 
@@ -322,6 +334,12 @@ function slabEngine(spec: EngineSpec, seg: number): EngineGeo {
   return {
     parts: pb.build(), fan, fanZ: zF + 0.06, flaps, petals, flameOuter, flameCore, flameZ: z0 - 0.05, exhaustZ: z0 - 0.12 * L,
     pylon, frontZ: zF, top: py, R, L, binder: V(W + 0.05, 0, Z(0.6)), breakParts: [],
+    hard: {
+      nozzle: { z: z0, r0: hs + 0.06, r1: 0.9 * R, open: 1.5 * hs + 0.09, tipZ: z0 - 0.045 * L, slot: [ws, hs] },
+      mouth: { z: zF, r: mh + 0.06, ri: mh, slot: [mw, mh] }, spikeZ: zF + 0.3,
+      body: { zA: Z(0.2), zB: Z(0.72), r: R, slot: [W, R] }, spine: { zA: Z(0.5) + 0.3, zB: Z(0.82), y: R * 0.96 + 0.2 }, tail: { z: Z(0.05), y: R * 0.84 },
+      sideMax: W + 0.56, bottomMax: R + 0.14,
+    },
   };
 }
 
@@ -414,6 +432,12 @@ function cageEngine(spec: EngineSpec, seg: number): EngineGeo {
   return {
     parts: pb.build(), fan, fanZ: Z(0.5), fanMat: 'copper', fanSpin: 0.6, flaps, ...nz,
     pylon, frontZ: Z(1.0) + 0.1 * L, top: py, R, L, binder: V(R + 0.3, 0, zB), breakParts: [],
+    hard: {
+      nozzle: { z: Z(0), r0: 0.64 * R, r1: 0.83 * R, open: 0.83 * R, tipZ: Z(0) - 0.085 * L },
+      mouth: { z: Z(1.0), r: R + 0.07, ri: R - 0.09 }, spikeZ: Z(1.0) + 0.1 * L,
+      body: { zA: Z(0.12), zB: Z(0.31), r: Rc }, spine: { zA: Z(0.7), zB: Z(0.88), y: Rc }, tail: { z: Z(0.1), y: R * 0.98 },
+      sideMax: R + 0.36, bottomMax: R * 1.06 + 0.16,
+    },
   };
 }
 

@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { PILOTS, type PodDef } from './data';
 import { assembleHero, assembleRival, segFor } from './podAssembly';
+import { tuneTiers, type KitSpec } from './podKitParts';
+import type { StatKey } from './data';
 import { LAMP_VERTS } from './podCockpits';
 import {
   binderMaterial, cableFlexMaterial, flameMaterial, hullMaterial, podSharedTime,
   sharedOpponentBinderMaterial, sharedOpponentFlameMaterial, sharedOpponentHullMaterial,
-  sharedPodMaterials, skinMaterial, suitMaterial, type FxU, type HullU, petalMaterial } from './podMaterials';
+  sharedPodMaterials, skinMaterial, suitMaterial, canopyGlass, type FxU, type HullU, petalMaterial } from './podMaterials';
 
 export interface PodVisual {
   group: THREE.Group;
@@ -44,11 +46,15 @@ function getOppGlow() { return sharedOppGlow ?? (sharedOppGlow = new THREE.MeshB
 function getOppFarHull() { return sharedOppFarHull ?? (sharedOppFarHull = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.48, roughness: 0.34 })); }
 
 /** Geometry comes from podAssembly.ts (material-free, audited in CI); this file adds materials, meshes and animation. */
-export function buildPodModel(def: PodDef, colors: [string, string, string], quality = 2, texRes = 1024, isOpponent = false, opts?: { pattern?: number; finish?: number }): PodVisual {
+/** Look options of a pod model: paint pattern / finish, Style-Teile (`kit`, 0 = Werk per slot) and the tuning steps whose parts show (`tune`). */
+export interface PodLook { pattern?: number; finish?: number; kit?: { fins?: number; intake?: number; nozzle?: number; canopy?: number }; tune?: Partial<Record<StatKey, number>> }
+export function buildPodModel(def: PodDef, colors: [string, string, string], quality = 2, texRes = 1024, isOpponent = false, opts?: PodLook): PodVisual {
   const seg = segFor(quality, isOpponent);
   const texSize = texRes >= 2048 && !isOpponent ? 2048 : 1024;
   const fin = opts?.finish ?? 0;
-  const shared = sharedPodMaterials(texSize) as Record<string, THREE.Material>;
+  const kit: KitSpec = { fins: opts?.kit?.fins ?? 0, intake: opts?.kit?.intake ?? 0, nozzle: opts?.kit?.nozzle ?? 0, tune: tuneTiers(opts?.tune) };
+  // the canopy tint is a Style-Teil too: one of four shared glass materials (same shader, no extra pipeline)
+  const shared: Record<string, THREE.Material> = { ...(sharedPodMaterials(texSize) as Record<string, THREE.Material>), glass: canopyGlass(opts?.kit?.canopy ?? 0) };
   const glowCol = new THREE.Color(colors[2]);
   const pilot = PILOTS.find(p => p.id === def.pilotId) ?? PILOTS[0];
   const suit = suitMaterial(pilot.color), skin = skinMaterial(pilot.skin);
@@ -57,7 +63,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
 
   // ==================== SHARED-PIPELINE, ARTICULATED 2-LOD OPPONENT POD ====================
   if (isOpponent) {
-    const A = assembleRival(def, seg, pilot.head, colors, opts?.pattern);
+    const A = assembleRival(def, seg, pilot.head, colors, opts?.pattern, kit);
     body.position.z = A.bodyZ;
     const oppHull = sharedOpponentHullMaterial(1024);
     const oppFlame = sharedOpponentFlameMaterial();
@@ -130,7 +136,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
   }
 
   // ==================== FULL HERO PLAYER / HANGAR POD ====================
-  const A = assembleHero(def, seg, pilot.head);
+  const A = assembleHero(def, seg, pilot.head, kit);
   body.position.z = A.bodyZ;
   const liv = opts?.pattern !== undefined && opts.pattern >= 0 ? opts.pattern : A.layout.livery;
   const hullL = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
@@ -158,7 +164,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
 
   const engines: THREE.Object3D[] = [];
   const fans: THREE.Mesh[] = [];
-  const flaps: { m: THREE.Mesh; sign: number; side: number }[] = []; const petals: THREE.Mesh[] = [];
+  const flaps: { m: THREE.Mesh; sign: number; side: number; gain: number }[] = []; const petals: THREE.Mesh[] = [];
   const flames: { m: THREE.Mesh; side: number }[] = [];
   const hc = new THREE.Color(), hot = new THREE.Color('#ff5a1a');
 
@@ -168,11 +174,11 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     heroPivots.push(bank.pivot);
     const engGrp = new THREE.Group(); engGrp.position.copy(bank.pivot); body.add(engGrp); engines.push(engGrp);
     const hull = side < 0 ? hullL : hullR;
-    for (const { off, geo: eg } of bank.engines) {
+    for (const { off, geo: eg, flaps: egFlaps } of bank.engines) {
       const fan = new THREE.Mesh(eg.fan, shared[eg.fanMat ?? 'dark'] ?? shared.dark); fan.position.set(off.x, off.y, off.z + eg.fanZ);
       fan.castShadow = !!eg.openRotor; fan.receiveShadow = !!eg.openRotor; fan.userData.spin = eg.fanSpin ?? 1; engGrp.add(fan); fans.push(fan); // a big open rotor throws a shadow, an enclosed fan does not
       { const pm = new THREE.Mesh(eg.petals, petalMaterial()); pm.position.copy(off); pm.userData.open = 0; pm.castShadow = false; engGrp.add(pm); petals.push(pm); }
-      for (const f of eg.flaps) { const m = new THREE.Mesh(f.geo, hull); m.position.set(off.x + f.pivot.x, off.y + f.pivot.y, off.z + f.pivot.z); m.castShadow = false; m.receiveShadow = true; engGrp.add(m); flaps.push({ m, sign: f.sign, side }); }
+      for (const f of egFlaps) { const m = new THREE.Mesh(f.geo, hull); m.position.set(off.x + f.pivot.x, off.y + f.pivot.y, off.z + f.pivot.z); m.castShadow = false; m.receiveShadow = true; engGrp.add(m); flaps.push({ m, sign: f.sign, side, gain: f.gain ?? 1 }); }
       for (const core of [false, true]) {
         const m = new THREE.Mesh(core ? eg.flameCore : eg.flameOuter, side < 0 ? (core ? coreL : flameL) : (core ? coreR : flameR));
         m.position.set(off.x, off.y, off.z + eg.flameZ); m.renderOrder = 2; engGrp.add(m); flames.push({ m, side });
@@ -249,7 +255,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     for (let i = 0; i < petals.length; i++) petals[i].userData.open = open;
     for (let i = 0; i < flaps.length; i++) {
       const flp = flaps[i], df = flp.side < 0 ? dmgFL : dmgFR;
-      flp.m.rotation.y = flp.sign * (airbrake * 1.05 + (df > 0 ? (0.18 + 0.14 * Math.sin(t * 39 + i * 2.1)) * df : 0));
+      flp.m.rotation.y = flp.sign * (airbrake * 1.05 * flp.gain + (df > 0 ? (0.18 + 0.14 * Math.sin(t * 39 + i * 2.1)) * df : 0));
       flp.m.rotation.z = df > 0.25 ? flp.sign * (df - 0.25) * 0.34 : 0; // bent hinge droop when badly damaged
     }
     // The hull glow lags the heat value (metal warms up slowly and stays hot for a while) – a readable overheating indicator

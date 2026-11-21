@@ -5,7 +5,25 @@ import { OWN_ENGINES, OWN_EXTENTS } from './podEngines';
 
 /** Parametric podracer engine. Geometry is merged per material and cached per spec. */
 export interface EngineSpec { L: number; R: number; style: EngineStyle; bands: number; blades: number; spike: boolean; fins: number; }
-export interface FlapGeo { geo: THREE.BufferGeometry; pivot: THREE.Vector3; sign: number; }
+/** `gain`: how far this flap opens compared with a normal one (outer leaf of a double flap, default 1). */
+export interface FlapGeo { geo: THREE.BufferGeometry; pivot: THREE.Vector3; sign: number; gain?: number; }
+/** Hard points of an engine: where Tuning-Teile and Style-Teile attach (podKitParts.ts). Engine space, metres.
+ *  `slot` = the part is flat (slab engine): [half width, half height] instead of a radius. */
+export interface HardPoints {
+  /** nozzle: exit plane z, skin radius at the exit (r0) and 0.3 m ahead of it (r1), radius the open petals reach, z of the petal tips */
+  nozzle: { z: number; r0: number; r1: number; open: number; tipZ: number; slot?: [number, number] };
+  /** intake: plane of the front rim, outer radius of the rim (r), radius of the throat (ri) */
+  mouth: { z: number; r: number; ri: number; slot?: [number, number] };
+  /** tip of the nose spike */ spikeZ: number;
+  /** barrel of the body between zA (rear) and zB (front) with radius r */
+  body: { zA: number; zB: number; r: number; slot?: [number, number] };
+  /** free strip on the spine ahead of the cable pylon (a central fin stands there) and its surface height */
+  spine: { zA: number; zB: number; y: number };
+  /** station on the rear spine (twin fins straddle the cable there) and its surface height */
+  tail: { z: number; y: number };
+  /** how far a part may reach sideways / downwards from the axis (the physics shapes cover that much) */
+  sideMax: number; bottomMax: number;
+}
 export interface EngineGeo {
   parts: Map<MatKey, THREE.BufferGeometry>;
   /** the turning part: turbine fan, open rotor or armature (its own mesh on the player pod) */
@@ -23,6 +41,8 @@ export interface EngineGeo {
   binder: THREE.Vector3;
   /** parts that can break off (Bruchteile): own geometry sets, never merged into `parts` */
   breakParts: BreakPart[];
+  /** where Tuning-Teile and Style-Teile attach */
+  hard: HardPoints;
 }
 export interface BreakPart { id: string; parts: Map<MatKey, THREE.BufferGeometry>; center: THREE.Vector3 }
 
@@ -268,6 +288,19 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
     flaps, petals, flameOuter: flameGeo(rn, L * 0.75, Math.max(12, Math.round(seg * 0.5))), flameCore: flameGeo(rn * 0.42, L * 0.38, 12), flameZ: Z(0.07) - 0.02,
     exhaustZ: Z(0) - 0.12 * L, pylon: new THREE.Vector3(0, py + 0.06, Z(0.58)), frontZ: Z(1.0), top: py, R, L,
     binder: new THREE.Vector3(R * 0.97, R * 0.2, L * 0.12), breakParts: [],
+    hard: (() => { // (data only – the geometry above does not depend on it)
+      const ext = engineExtent(spec), t3 = 0.3 / L;
+      const skin3 = (t3 < 0.025 ? 0.74 + 0.06 * (t3 / 0.025) : t3 < 0.08 ? 0.8 + (bodyR(0.08) * 0.94 - 0.8) * ((t3 - 0.025) / 0.055) : bodyR(t3)) * R;
+      return {
+        nozzle: { z: Z(0), r0: 0.75 * R, r1: skin3, open: 1.02 * R, tipZ: Z(0) - 0.085 * L },
+        mouth: { z: Z(1.0), r: rf * (split ? 1.06 : 1.035) * R, ri: rf * (split ? 0.93 : 0.86) * R },
+        spikeZ: spec.spike ? Z(1.0) + L * 0.26 : faceZ + L * 0.085,
+        body: { zA: Z(0.2), zB: Z(bodyEnd - 0.12), r: bodyR(0.45) * R },
+        spine: { zA: Z(0.58) + 0.3, zB: Z(bodyEnd - 0.1), y: bodyR(0.75) * R },
+        tail: { z: Z(0.13), y: bodyR(0.2) * R },
+        sideMax: ext.side, bottomMax: ext.bottom,
+      };
+    })(),
   };
   cache.set(key, out);
   return out;

@@ -211,6 +211,17 @@ export function sharedPodMaterials(texSize: number) {
   return m;
 }
 
+/** Style-Teil "Kanzel": canopy glass tints 0 klar · 1 Rauch · 2 Bernstein · 3 Spiegel. Four shared materials with the same shader
+ *  (only uniform values differ), so a tinted canopy costs no extra pipeline. */
+const CANOPY: [string, number, number, number][] = [['#9fd4ff', 0.28, 0.1, 0.12], ['#20262e', 0.62, 0.2, 0.16], ['#ffab3d', 0.42, 0.15, 0.12], ['#dfe9f2', 0.86, 1.0, 0.05]]; // colour, opacity, metalness, roughness
+const canopyCache: (THREE.MeshStandardMaterial | undefined)[] = [];
+export function canopyGlass(tint: number) {
+  const i = Math.max(0, Math.min(CANOPY.length - 1, Math.round(tint) || 0));
+  let m = canopyCache[i];
+  if (!m) { const [color, opacity, metalness, roughness] = CANOPY[i]; m = new THREE.MeshStandardMaterial({ color, metalness, roughness, transparent: true, opacity, envMapIntensity: i === 3 ? 1.6 : 1.2, side: THREE.DoubleSide, depthWrite: false }); m.userData.shared = true; canopyCache[i] = m; }
+  return m;
+}
+
 export function suitMaterial(color: string) {
   let m = suitCache.get(color);
   if (!m) { m = new THREE.MeshStandardMaterial({ color, roughness: 0.66, metalness: 0.05 }); m.userData.shared = true; suitCache.set(color, m); }

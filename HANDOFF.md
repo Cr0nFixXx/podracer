@@ -1,7 +1,7 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-1. **Pod-Überholung fortsetzen:** Phasentabelle im Abschnitt „Session 20" unten – die erste offene Phase ist dran. **Stand: Phase 3 fertig (4 neue Pods: Tarn Cyclone, Lyss Halo-9, Dorn Manta, Quill Voltspire). Vereinbarter Stopp: der Nutzer sichtet die neuen Pods (Bilder `tools/harness/out/p3_*.jpg`) und testet „Ultra" am Gaming-PC; erst nach seinem „weiter" beginnt Phase 4 (Tuning-Optik).** Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
+1. **Pod-Überholung fortsetzen:** Phasentabelle im Abschnitt „Session 20" unten – die erste offene Phase ist dran. **Stand: Phase 4 fertig (Tuning-Optik: Tuning-Teile + Style-Teile, Hangar-Reiter „Lack | Teile"). Als Nächstes Phase 5 (Schaden – Fahrverhalten); die Phasen 5–7 laufen laut Absprache ohne Stopp durch.** Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
 2. Vor jeder Änderung: `npm run check` (Typecheck + Pod-Audit + Sim) muss grün sein. Pods ansehen: `npm run dev` → `http://localhost:5173/tools/harness/pods.dev.html`.
 3. Weiterhin offen aus Session 19: `npm run dev` → **Aquilaris-Küstenlauf** (19,5-m-Unterwassertunnel, 2 Skyway-Brücken, Flutschleuse) und **Frostspalt-Ring** (22,5-m-Gletschertunnel, verzweigte Eishöhle, Eisschleuse, Viadukt) Probe fahren; im **Hangar** die 6 Lackiermuster & 3 Finishes testen (≈ 6 Min.).
 
@@ -31,8 +31,8 @@
 | 0 | Setup + Sicherheitsnetz | ✅ erledigt |
 | 1 | Refactoring ohne Spieländerung: Layout-Registry (`podLayouts.ts`), `engineExtent`, `podCockpits.ts`, `applyDamage` + Wirkungs-Struct, Profil v2 | ✅ erledigt |
 | 2 | 10 neue Cockpits + Detailpass + Cockpit-Innenansicht → **Stopp: Nutzer sichtet** | ✅ erledigt, Nachbesserung „Cockpits weiter oben" eingearbeitet, vom Nutzer freigegeben („Go Phase 3") |
-| 3 | 4 neue Pods (Cyclone → Halo → Manta → Voltspire), Hangar-Liste für 14, Gegner-Auslosung → **Stopp** | ✅ erledigt – **wartet auf Sichtung durch den Nutzer** |
-| 4 | Tuning-Optik: `PodCustom.kit`, `podKitParts.ts`, Hangar-Reiter „Lack \| Teile" | offen |
+| 3 | 4 neue Pods (Cyclone → Halo → Manta → Voltspire), Hangar-Liste für 14, Gegner-Auslosung → **Stopp** | ✅ erledigt, vom Nutzer freigegeben („Go Phase 4"), Nachbesserung „Quill geschlossener" eingearbeitet |
+| 4 | Tuning-Optik: `PodCustom.kit`, `podKitParts.ts`, Hangar-Reiter „Lack \| Teile" | ✅ erledigt |
 | 5 | Schaden – Fahrverhalten: `podDamage.ts`, Bruchteil-Maske, HUD-Lampen | offen |
 | 6 | Schaden – Optik Spieler: Bruchteile, Treffermarken, Trümmer, Hangar-Schadensvorschau | offen |
 | 7 | Schaden – Optik Gegner: `userData`-Ruß/Flammenleistung in den geteilten Materialien | offen |
@@ -148,6 +148,49 @@ Budgets für neue Pods: Spieler „Hoch" ≤ 70 Tsd., Gegner nah ≤ 26 Tsd., Ul
 - Der im Plan genannte „Schatten-Stellvertreter" für dünne Teile wurde nicht gebaut (es gab ihn auch in Phase 2 nicht): dünne Teile werfen Schatten wie bisher nach Material. Bei flimmernden Käfig-Schatten nachziehen.
 - Langlauf `SECS=120` einzeln mit dem **alten** Feld: Malastare und Crystal melden je einen „downward teleport" nach dem Zieleinlauf – betrifft nur alte Pods und unveränderte Physik, also schon vor Phase 3 vorhanden; im Standardlauf (45 s) tritt es nicht auf.
 
+### Erledigt in Phase 4 (Tuning-Optik)
+1. **Zwei Arten sichtbarer Teile** (`src/game/podKitParts.ts`, neu – nur Geometrie, läuft auch im Node-Audit):
+   - **Tuning-Teile** folgen den 7 Tuning-Werten in drei Stufen (`tuneTiers`): Stufe 0–1 nichts, 2–3 das kleine Teil, 4–5 das große.
+   - **Style-Teile** sind frei wählbar in vier Steckplätzen (`PodCustom.kit`, 0 = Werk): Finnen, Einlass, Düse, Kanzel.
+2. **Anbau über Ankerpunkte:** jeder Triebwerks-Bauer liefert `EngineGeo.hard` (`HardPoints`: Düse, Einlass, Dorn, Rumpf, Rücken, Heck, `sideMax` / `bottomMax`). Die Teile werden nur angesetzt, nie ausgetauscht – Werk-Geometrie, Goldwerte und Physikformen bleiben unverändert. Die flache Manta hat eigene Varianten (`slot`).
+3. **Tuning-Teile:** Höchstgeschw. = Düsenkragen → Nachbrennerring mit Kühlrippen + Glühring · Beschleunigung = 4 Stauhutzen → + 2 Kompressorhutzen mit Kupferleitung · Kühlung = Kühlrippenring → + Radiatorplatten mit Kühlmittelleitung · Wendigkeit = 2 Canards → + 4 Steuerflächen mit Stellstangen · Traktion = langer Bauch-Repulsor mit Kufen → + Ausleger-Pads · Luftbremse = Klappen +25 % → + zweites, weiter öffnendes Klappenblatt (`FlapGeo.gain`) · Reparatur = Panzer-Doppler → + Reparatureinheit am Kabelpylon.
+4. **Style-Teile:** Finnen = Haifinne · Doppel-Leitwerk · Pfeilflügel; Einlass = Gitter · Langer Dorn · Irisblende (acht verdrehte Metall-Lamellen); Düse = Lang · Schubvektor-Paddel · Zackenkrone; Kanzel = klar · Rauch · Bernstein · Spiegel (`canopyGlass(tint)` in `podMaterials.ts`: vier geteilte Glasmaterialien).
+5. **Durchleitung:** `buildPodModel(…, opts: PodLook)` mit `kit` + `tune`; `assembleHero` / `assembleRival(…, kit)`. Spieler: Style-Teile + Tuning-Teile aus dem Profil. **Gegner: nur Style-Teile**, je Startplatz fest ausgelost (`rivalKit(seed)` in `roster.ts`) – reine Optik.
+6. **Hangar:** Tafel „Lackierung & Design" mit den Reitern **Lack | Teile** (keine zusätzliche Höhe); „Teile" zeigt die vier Steckplätze + „Alles Werk". Die Vorschau baut sich bei jedem Klick und jeder Tuning-Stufe neu (`PodPreview` bekommt `kit` + `tune`).
+7. **Spielstand:** `PodCustom.kit` wird in `sanitizeCustom` auf 0–3 begrenzt; ein Stand ohne `kit` = Werk.
+
+### Verifiziert (Phase 4)
+- `npm run check` grün: 41/41 Unit-Prüfungen (neu: Stufen 0–1 / 2–3 / 4–5, „Werk fügt nichts hinzu", jede Style-Wahl und jede Tuning-Stufe auf jedem Triebwerksstil, Gegner-Auslosung der Style-Teile, Profil-Begrenzung), Pod-Audit 14/14 **ohne neue Goldwerte** (Werk-Zahlen und Physikformen unverändert), Sim 13/13.
+- **Sim-Tabelle zeilengleich** zu Phase 3 (neues Feld) und mit `ROSTER_OLD=1` zu Phase 2 → die Teile ändern nichts am Fahren.
+- Audit der Varianten (drei Sätze je Pod: Style-Wahl 1 / 2 / 3 in allen Steckplätzen, Tuning-Stufe 1 bzw. 2): größte Überbreite über die Kollisionsform weiter 0,50 m (Tyr Vespa), einzelne Pods werden mit Teilen bis 0,18 m breiter (Fireflare 0,10 → 0,28 m; Grenze 0,55 m); nichts hängt mehr als 0,02 m unter der Bodenklemme (wie ohne Teile); Gegner mit Style-Teilen bleiben unter den Session-19-Zahlen.
+- Browser (WebGPU): Bilder `tools/harness/out/p4_*.jpg` (Aurora mit allen drei Sätzen, Manta, Cyclone, Halo) gesichtet; Hangar bei 1280 × 720, 1920 × 1080, 1024 × 600, 800 × 1000, 2560 × 1440: `data-fit-shrunk = 0`, kein Scrollbalken, Vorschau ändert sich bei Klick auf Style-Teile und „Alles Max"; echtes Rennen Boonta mit der Voltspire (Pfeilflügel, Irisblende, lange Düse, Bernstein-Kanzel, Tuning 5) und 10 Gegnern 21 Rennsekunden per Hand getaktet: keine Konsolenfehler.
+- `npm run build` → `dist/index.html` (2,89 MB).
+
+### Messwerte Phase 4 (Dreiecke Spieler „Ultra"; „mit Teilen" = größter der drei geprüften Sätze)
+| Pod | Werk | mit Teilen | Gegner nah mit Style-Teilen (unter Ultra) |
+|---|---|---|---|
+| Aurora XR-7 | 57 170 | 68 626 | 16 596 |
+| Vrak Splitter-X | 55 462 | 66 918 | 18 036 |
+| Tenroc 6-Fach | 119 050 | 153 418 | 38 968 |
+| Quadra Lumber | 89 280 | 110 656 | 28 986 |
+| Hollo Needle | 50 754 | 61 442 | 14 928 |
+| Tyr Vespa | 43 710 | 55 166 | 14 408 |
+| Beerak Fireflare | 57 662 | 69 118 | 16 672 |
+| Pagali Ironclad | 80 194 | 103 106 | 27 920 |
+| Mak Starling | 51 878 | 62 566 | 14 924 |
+| Mandrel Ram | 52 638 | 64 094 | 16 644 |
+| Tarn Cyclone | 46 578 | 58 034 | 14 016 |
+| Lyss Halo-9 | 45 062 | 55 750 | 14 708 |
+| Dorn Manta | 27 042 | 34 874 | 8 980 |
+| Quill Voltspire | 58 782 | 70 238 | 20 928 |
+
+Ultra-Grenze 250 Tsd. – der größte Pod (Tenroc, sechs Triebwerke) liegt bei 153 Tsd. Die Teile kommen in die vorhandenen Material-Töpfe; zusätzliche Meshes entstehen nur für das zweite Bremsklappenblatt (Luftbremse Stufe 2): +4 bei zwei Triebwerken, +8 bei vier, +12 beim Tenroc (76 statt 64, Grenze 110). Das Audit druckt die Zahlen je Pod in den Zeilen „kit: …".
+
+### Nicht verifiziert (Phase 4)
+- **Bildrate auf „Ultra"** mit vollem Teilesatz – am Gaming-PC prüfen.
+- Nicht jede Kombination einzeln angesehen: gesichtet sind sechs Bilder (drei Sätze an der Aurora, je einer an Manta, Cyclone, Halo) und die Voltspire in Hangar und Rennen; die übrigen deckt nur das Audit ab (Maße, Dreiecke) – und das Audit prüft drei Sätze je Pod, nicht alle 4 × 4 × 4 Style-Kombinationen mal Tuning-Stufen.
+- Von den vier Kanzel-Tönungen im Rennen nur „Bernstein" gesehen.
+
 ### Messwerte vor der Überholung (Meshes / Dreiecke)
 | Pod | Spieler „Hoch" | Spieler „Ultra" | Gegner nah | Gegner fern |
 |---|---|---|---|---|
@@ -171,7 +214,7 @@ Sichtmodell gegen Physikform: breiter als die Kollisionsform höchstens 0,50 m (
 
 ### Befehle (neu)
 1. `npm run check:pods` – nur das Pod-Audit. `POD=<id>` prüft einen Pod, `UPDATE=1` gibt neue Baseline-Zeilen aus (bewusst übernehmen, wenn Pods absichtlich geändert wurden).
-2. Harness-Konsole: `await sheet('front', { quality: 3, save: 'name' })`, `await show(3, 0.3, 3, { rival: true })`, `statsAll()`. Bogen-Ansichten: `pod`, `front`, `rear`, `side`, `inside`, `chase` (Verfolgerkamera), `profile` (Seitenriss); `{ rival: true, far: true }` zeigt das Fern-Modell. Pod-Indizes der neuen: 10 Cyclone, 11 Halo, 12 Manta, 13 Voltspire.
+2. Harness-Konsole: `await sheet('front', { quality: 3, save: 'name' })`, `await show(3, 0.3, 3, { rival: true })`, `statsAll()`. Bogen-Ansichten: `pod`, `front`, `rear`, `side`, `inside`, `chase` (Verfolgerkamera), `profile` (Seitenriss); `{ rival: true, far: true }` zeigt das Fern-Modell. Pod-Indizes der neuen: 10 Cyclone, 11 Halo, 12 Manta, 13 Voltspire. Teile zeigen: `await show(0, 1, 3, { kit: { fins: 3, intake: 3, nozzle: 1, canopy: 2 }, tune: { topSpeed: 5, cooling: 5 } })` (`kit` 0–3 je Steckplatz, `tune` = Tuning-Stufen 0–5; beides auch in `sheet(…)`).
 3. `ROSTER_OLD=1 node tools/ci/out/sim.mjs` (nach `npm run check`) – Sim mit dem alten Startfeld; die Tabelle muss der von Phase 2 gleichen.
 
 ---

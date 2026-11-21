@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { PilotHead, PodDef } from './data';
 import { M4, PartBuilder, cyl, lathe, prof, rbox, tube, torus, type MatKey } from './podKit';
-import { engineExtent, engineGeo, type EngineGeo } from './podParts';
+import { engineExtent, engineGeo, type EngineGeo, type FlapGeo } from './podParts';
+import { engineKit, NO_KIT, type KitSpec } from './podKitParts';
 import { cockpitGeo, type CockpitDetail } from './podCockpits';
 import { podLayout, type Extras, type PodLayout } from './podLayouts';
 
@@ -256,7 +257,7 @@ function binderEnds(L: PodLayout, seg: number, link: { a: number; b: number; zOf
 }
 
 // ------------------------------------------------------------------ player / hangar pod
-export interface EnginePart { /** index into layout.engines */ index: number; /** position relative to the bank pivot */ off: THREE.Vector3; geo: EngineGeo }
+export interface EnginePart { /** index into layout.engines */ index: number; /** position relative to the bank pivot */ off: THREE.Vector3; geo: EngineGeo; /** air-brake flaps with the kit applied (larger / doubled by the Luftbremse tuning) */ flaps: FlapGeo[] }
 export interface HeroBank { side: -1 | 1; /** 3D centroid of this side's engines (body space) */ pivot: THREE.Vector3; engines: EnginePart[]; /** merged static parts of all engines of this side (+ engine-mounted extras), relative to the pivot */ buckets: Map<string, THREE.BufferGeometry> }
 export interface HeroAssembly extends Base {
   /** left bank first, then right */
@@ -292,7 +293,8 @@ function cockpitViewScale(parts: Iterable<THREE.BufferGeometry>, eye: THREE.Vect
   return Math.max(1.4, Math.min(3.2, 0.86 / near));
 }
 
-export function assembleHero(def: PodDef, seg: number, head: PilotHead): HeroAssembly {
+/** `kit`: Tuning-Teile + Style-Teile (podKitParts.ts); their geometry joins the engine buckets – no extra draws except double flaps. */
+export function assembleHero(def: PodDef, seg: number, head: PilotHead, kit: KitSpec = NO_KIT): HeroAssembly {
   const { b, ck, engineExtras, cockpitExtras } = base(def, seg, head, false); const L = b.layout; const owned: THREE.BufferGeometry[] = [];
   const banks: HeroBank[] = [];
   for (const side of [-1, 1] as const) {
@@ -307,7 +309,9 @@ export function assembleHero(def: PodDef, seg: number, head: PilotHead): HeroAss
       const off = new THREE.Vector3(em.x - piv.x, em.y - piv.y, em.z - piv.z);
       const eg = engineGeo(em.spec, seg); const emM = M4.t(off.x, off.y, off.z);
       for (const [k, g] of eg.parts) { const gc = g.clone(); gc.applyMatrix4(emM); push(lists, k, gc); }
-      engines.push({ index, off, geo: eg });
+      const ek = engineKit(em.spec, seg, kit);
+      for (const [k, g] of ek.parts) { const gc = g.clone(); gc.applyMatrix4(emM); push(lists, k, gc); }
+      engines.push({ index, off, geo: eg, flaps: ek.flaps });
     }
     addSideExtras(lists, engineExtras, side, piv);
     banks.push({ side, pivot: piv, engines, buckets: mergeAll(lists, owned, `${def.id} engine bank ${side}`) });
@@ -357,7 +361,7 @@ export interface RivalAssembly extends Base {
 }
 
 /** `pattern`: livery pattern 0..5; undefined / negative = the pod's factory pattern. */
-export function assembleRival(def: PodDef, seg: number, head: PilotHead, colors: [string, string, string], pattern?: number): RivalAssembly {
+export function assembleRival(def: PodDef, seg: number, head: PilotHead, colors: [string, string, string], pattern?: number, kit: KitSpec = NO_KIT): RivalAssembly {
   const { b, ck, engineExtras, cockpitExtras } = base(def, seg, head, true); const L = b.layout; const owned: THREE.BufferGeometry[] = [];
   const liv = pattern !== undefined && pattern >= 0 ? pattern : L.livery;
   const glowCol = new THREE.Color(colors[2]), glowBoost = glowCol.clone().multiplyScalar(1.2);
@@ -376,9 +380,11 @@ export function assembleRival(def: PodDef, seg: number, head: PilotHead, colors:
       const ox = em.x - piv.x, oy = em.y - piv.y, oz = em.z - piv.z;
       const eg = engineGeo(em.spec, seg); const emM = M4.t(ox, oy, oz);
       for (const [k, g] of eg.parts) pushC(lists, k, g, emM);
+      const ek = engineKit(em.spec, seg, kit);
+      for (const [k, g] of ek.parts) pushC(lists, k, g, emM);
       if (eg.openRotor) rotors.push({ geo: eg.fan, pos: new THREE.Vector3(ox, oy, oz + eg.fanZ), mat: eg.fanMat ?? 'dark', spin: eg.fanSpin ?? 1 });
       else pushC(lists, eg.fanMat ?? 'dark', eg.fan, M4.t(ox, oy, oz + eg.fanZ));
-      for (const f of eg.flaps) pushC(lists, 'hull', f.geo, M4.t(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z));
+      for (const f of ek.flaps) pushC(lists, 'hull', f.geo, M4.t(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z));
       const fo = eg.flameOuter.clone(); fo.applyMatrix4(M4.t(ox, oy, oz + eg.flameZ)); fls.push(fo);
       pts.push(eg.petals.clone().translate(ox, oy, oz));
     }

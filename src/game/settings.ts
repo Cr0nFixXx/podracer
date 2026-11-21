@@ -52,6 +52,15 @@ export type PaintFinish = 0 | 1 | 2; // 0 = Klarlack, 1 = Chrom-Metallic, 2 = Ca
 export const LIVERY_PATTERNS = ['Klassik', 'Streifen', 'Flammen', 'Rennringe', 'Chevron', 'Rallye'] as const;
 export const PAINT_FINISHES = ['Klarlack', 'Metallic', 'Matt'] as const;
 
+/** Style-Teile of a pod: one choice per slot, 0 = Werk (factory look). Look only – they never change how the pod drives. */
+export interface PodKit { fins: number; intake: number; nozzle: number; canopy: number }
+export const KIT_SLOTS: { key: keyof PodKit; label: string; choices: readonly string[] }[] = [
+  { key: 'fins', label: 'Finnen', choices: ['Werk', 'Haifinne', 'Doppel-Leitwerk', 'Pfeilflügel'] },
+  { key: 'intake', label: 'Einlass', choices: ['Werk', 'Gitter', 'Langer Dorn', 'Irisblende'] },
+  { key: 'nozzle', label: 'Düse', choices: ['Werk', 'Lang', 'Schubvektor-Paddel', 'Zackenkrone'] },
+  { key: 'canopy', label: 'Kanzel', choices: ['Klar', 'Rauch', 'Bernstein', 'Spiegel'] },
+];
+
 export interface PodCustom {
   colors: [string, string, string];
   tuning: Record<StatKey, number>; // 0..5
@@ -59,6 +68,8 @@ export interface PodCustom {
   pattern?: number;
   /** Hull clearcoat / metallic / satin-matte finish (0..2) */
   finish?: PaintFinish;
+  /** Style-Teile; undefined = everything Werk */
+  kit?: PodKit;
 }
 
 export interface RaceConfig {
@@ -99,6 +110,7 @@ export function sanitizeCustom(c: Partial<PodCustom> | undefined | null, base: P
   const out: PodCustom = { colors, tuning };
   if (c?.pattern !== undefined && c.pattern !== null) out.pattern = clampInt(c.pattern, 0, LIVERY_PATTERNS.length - 1, 0); // absent = the pod's factory pattern
   if (c?.finish !== undefined && c.finish !== null) out.finish = clampInt(c.finish, 0, PAINT_FINISHES.length - 1, 0) as PaintFinish;
+  if (c?.kit && typeof c.kit === 'object') out.kit = Object.fromEntries(KIT_SLOTS.map(s => [s.key, clampInt((c.kit as Partial<PodKit>)[s.key], 0, s.choices.length - 1, 0)])) as unknown as PodKit;
   return out;
 }
 

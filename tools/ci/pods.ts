@@ -7,7 +7,8 @@
 // Env: POD=<id> only that pod · UPDATE=1 prints fresh baseline rows instead of comparing.
 import * as THREE from 'three';
 import fs from 'node:fs';
-import { PILOTS, PODS, type PodDef } from '../../src/game/data';
+import { PILOTS, PODS, STAT_KEYS, type PodDef } from '../../src/game/data';
+import { tuneTiers, NO_KIT, type KitSpec } from '../../src/game/podKitParts';
 import { podCollision, podEnvelope } from '../../src/game/podDesigns';
 import { assembleHero, assembleRival, segFor } from '../../src/game/podAssembly';
 import BASE from './pods-baseline.json';
@@ -15,7 +16,7 @@ import SHAPES from './pods-shapes.json';
 
 /** How far the visible model may exceed the physics shapes (metres). Calibrated on the Session 19 pods: worst case + 5 cm
  *  (wide: Tyr Vespa's blade wings 0.50 · engines: Splitter-X 0.02 · no cockpit hangs below its ground clamp). */
-const TOL = { wide: 0.55, lowEngine: 0.07, lowCockpit: 0 };
+const TOL = { wide: 0.55, lowEngine: 0.07, lowCockpit: 0, /** how much wider than the factory pod kit parts may make it when that is already past `wide` */ kit: 0.12 };
 /** Triangle / draw budgets. Old pods are measured against their Session 19 numbers (`budgetRef` in pods-baseline.json):
  *  the player pod may grow 20 % below Ultra, a near Gegner must not grow at all. New pods and Ultra have absolute caps. */
 const BUDGET = { playerGrow: 1.2, newPlayerHigh: 70000, newRivalNear: 26000, ultraPlayer: 250000, ultraPlayerDraws: 110, ultraRival: 100000, rivalDraws: 60, far: 1100 };
@@ -55,9 +56,9 @@ class Tally {
 const BUCKET = ['position', 'normal', 'uv', 'aLiv'];
 const V = (a: THREE.Vector3, b?: THREE.Vector3, z = 0) => { const v = a.clone(); if (b) v.add(b); v.z += z; return v; };
 
-function hero(def: PodDef, quality: number) {
+function hero(def: PodDef, quality: number, kit: KitSpec = NO_KIT) {
   const pilot = PILOTS.find(p => p.id === def.pilotId) ?? PILOTS[0];
-  const a = assembleHero(def, segFor(quality, false), pilot.head);
+  const a = assembleHero(def, segFor(quality, false), pilot.head, kit);
   const all = new Tally(), bank: Record<string, Tally> = { L: new Tally(), R: new Tally() }, ck = new Tally();
   const w = `${def.id} hero q${quality}`;
   for (const b of a.banks) {
@@ -68,7 +69,7 @@ function hero(def: PodDef, quality: number) {
       const o = V(b.pivot, e.off);
       both(e.geo.fan, `${w} fan`, ['position', 'normal'], V(o, undefined, e.geo.fanZ));
       both(e.geo.petals, `${w} petals`, ['position', 'normal', 'aPet'], o);
-      for (const f of e.geo.flaps) both(f.geo, `${w} flap`, BUCKET, V(o, f.pivot));
+      for (const f of e.flaps) both(f.geo, `${w} flap`, BUCKET, V(o, f.pivot));
       both(e.geo.flameOuter, `${w} flame`, ['position', 'aLiv'], o, false);
       both(e.geo.flameCore, `${w} flame core`, ['position', 'aLiv'], o, false);
     }
@@ -83,9 +84,9 @@ function hero(def: PodDef, quality: number) {
   return { meshes: all.meshes, tris: Math.round(all.tris), bodyZ: a.bodyZ, L: bank.L.box, R: bank.R.box, ck: ck.box };
 }
 
-function rival(def: PodDef, quality: number) {
+function rival(def: PodDef, quality: number, kit: KitSpec = NO_KIT) {
   const pilot = PILOTS.find(p => p.id === def.pilotId) ?? PILOTS[0];
-  const a = assembleRival(def, segFor(quality, true), pilot.head, def.colors, 1);
+  const a = assembleRival(def, segFor(quality, true), pilot.head, def.colors, 1, kit);
   const near = new Tally(), far = new Tally(); const w = `${def.id} rival q${quality}`;
   for (const b of a.banks) {
     for (const [k, g] of b.buckets) near.add(g, `${w} bank ${b.side} ${k}`, k === 'hull' || k === 'glow' ? [...BUCKET, 'color'] : BUCKET, b.pivot);
@@ -109,7 +110,7 @@ function shapeOf(def: PodDef) {
 }
 
 console.log('pod        hero q1        hero q2        hero q3      rival q2      rival q3     far     wide   lowL   lowR   lowCk  result');
-const fresh: (string | number)[][] = [], shapes: string[] = [];
+const fresh: (string | number)[][] = [], shapes: string[] = [], kitNote: string[] = [];
 for (const def of PODS) {
   if (ONLY && def.id !== ONLY) continue;
   const before = failed;
@@ -140,11 +141,27 @@ for (const def of PODS) {
   if (wide > TOL.wide) fail(`${def.id}: ${wide.toFixed(2)} m wider than its collision shape (limit ${TOL.wide})`);
   if (lowL > TOL.lowEngine || lowR > TOL.lowEngine) fail(`${def.id}: engines hang ${Math.max(lowL, lowR).toFixed(2)} m below the ground clamp (limit ${TOL.lowEngine})`);
   if (lowCk > TOL.lowCockpit) fail(`${def.id}: cockpit hangs ${lowCk.toFixed(2)} m below the ground clamp (limit ${TOL.lowCockpit})`);
+  // Tuning-Teile + Style-Teile (Phase 4): every Style-Teil choice with all tuning at tier 1 / tier 2 must build, stay inside the same
+  // tolerances round the physics shapes and inside the Ultra budget; a Gegner with Style-Teile must not cost more than before the overhaul.
+  let kitTris = 0, kitMeshes = 0, kitWide = -9, kitLow = -9, kitRival = 0;
+  for (const [ci, tier] of [[1, 1], [2, 2], [3, 2]] as const) {
+    const kit: KitSpec = { fins: ci, intake: ci, nozzle: ci, tune: tuneTiers(Object.fromEntries(STAT_KEYS.map(k => [k, tier * 2]))) };
+    const k = hero(def, 3, kit), kr = rival(def, 2, { ...kit, tune: NO_KIT.tune });
+    kitTris = Math.max(kitTris, k.tris); kitMeshes = Math.max(kitMeshes, k.meshes); kitRival = Math.max(kitRival, kr.near.tris);
+    kitWide = Math.max(kitWide, Math.max(-k.L.min.x, k.R.max.x, -k.ck.min.x, k.ck.max.x) - halfW);
+    kitLow = Math.max(kitLow, env.engL.minY - k.L.min.y, env.engR.minY - k.R.min.y);
+    over(`player triangles on Ultra with kit ${ci}`, k.tris, BUDGET.ultraPlayer); over(`player draws on Ultra with kit ${ci}`, k.meshes, BUDGET.ultraPlayerDraws);
+    over(`Gegner (near) triangles below Ultra with Style-Teile ${ci}`, kr.near.tris, ref ? ref[8] : BUDGET.newRivalNear);
+  }
+  if (kitWide > Math.max(TOL.wide, wide + TOL.kit)) fail(`${def.id}: with kit ${kitWide.toFixed(2)} m wider than its collision shape (factory ${wide.toFixed(2)}, kit may add ${TOL.kit})`);
+  if (kitLow > TOL.lowEngine) fail(`${def.id}: kit parts hang ${kitLow.toFixed(2)} m below the ground clamp (limit ${TOL.lowEngine})`);
+  kitNote.push(`${def.id.padEnd(9)} kit: player Ultra up to ${String(kitMeshes).padStart(3)} meshes (+${kitMeshes - hq.meshes}) / ${String(kitTris).padStart(6)} (+${kitTris - hq.tris}) · Gegner with Style-Teile up to ${String(kitRival).padStart(5)} · wide ${kitWide.toFixed(2)} · low ${kitLow.toFixed(2)}`);
   const c = (m: number, t: number) => `${String(m).padStart(3)}/${String(t).padStart(6)}`;
   const f = (v: number) => v.toFixed(2).padStart(6);
   console.log(`${def.id.padEnd(9)} ${c(h[0].meshes, h[0].tris)}     ${c(h[1].meshes, h[1].tris)}     ${c(h[2].meshes, h[2].tris)}    ${c(n2.near.meshes, n2.near.tris)}    ${c(n3.near.meshes, n3.near.tris)}  ${c(n2.far.meshes, n2.far.tris).trim().padStart(6)} ${f(wide)} ${f(lowL)} ${f(lowR)} ${f(lowCk)}  ${failed > before ? 'FAIL' : 'ok'}`);
 }
 if (UPDATE) console.log('\npods-baseline.json rows:\n' + fresh.map(r => '    ' + JSON.stringify(r)).join(',\n') + '\n\npods-shapes.json:\n{\n' + shapes.join(',\n') + '\n  }');
+console.log(''); for (const l of kitNote) console.log(l);
 if (process.env.UPDATE === 'write' && !ONLY) { // take the fresh numbers over (deliberate step: say why in HANDOFF.md)
   const file = 'tools/ci/pods-baseline.json', j = JSON.parse(fs.readFileSync(file, 'utf8'));
   j.rows = fresh; j.measured = process.env.NOTE ?? j.measured;

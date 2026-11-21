@@ -69,6 +69,23 @@ Leitidee: **Jeder Racer ist an seinem Cockpit erkennbar – auch als Silhouette.
 - **Detailstufen:** Spieler-Pod immer voll; Gegner unter „Ultra" mit leichtem Cockpit (Silhouette + einfacher Pilot) und damit leichter als vor der Überholung; auf „Ultra" (Ziel: Gaming-PC) nahe Gegner mit vollen Details. Fern-LOD zeigt die Cockpit-Grundform (Kiste, Scheibe, Finne, Käfig) und jeden Energieblitz.
 - **Piloten:** Hautfarbe je Spezies, Kragenring, Schulterpolster, Brustgerät.
 
+**Tuning, das man sieht (Phase 4)** – Leitidee: **Man liest einem Pod an, was sein Besitzer getunt hat.** Jede Tuning-Größe hat ihren festen Platz am Triebwerk, damit sich die Teile nie in die Quere kommen und ein Blick genügt:
+
+| Tuning-Wert | Platz am Triebwerk | kleines Teil (Stufe 2–3) | großes Teil (Stufe 4–5) |
+|---|---|---|---|
+| Höchstgeschw. | Düse | Düsenkragen mit Kupferring | Nachbrennerring mit Kühlrippen und zweitem Glühring |
+| Beschleunigung | Einlasslippe | vier Stauhutzen | + zwei Kompressorhutzen mit Kupferleitung |
+| Kühlung | Heck des Rumpfs | Kühlrippenring | + Radiatorplatten auf den Schultern mit Kühlmittelleitung |
+| Wendigkeit | hinter dem Einlass / Düse | zwei Canards | + vier Steuerflächen mit Stellstangen |
+| Traktion | Bauch | langer Repulsor-Streifen mit Kufen | + vier Ausleger-Pads |
+| Luftbremse | Bremsklappen | Klappen 25 % größer | + zweites Klappenblatt, das weiter aufgeht |
+| Reparatur | Flanken / Kabelpylon | aufgenietete Panzer-Doppler | + Reparatureinheit mit Gelenkarm und Statuslicht |
+
+- **Farbe sagt, was es ist:** Tuning-Teile sind Technik (Stahl, Kupfer, dunkles Metall, Leuchtbänder). Flächen, die zum Pod gehören sollen – Canards, Steuerflächen, Panzer-Doppler und alle Finnen –, tragen die **Sekundärfarbe** der Lackierung.
+- **Style-Teile** (frei, nur Aussehen) verändern die Silhouette an vier Stellen: **Finnen** (Haifinne · Doppel-Leitwerk · Pfeilflügel), **Einlass** (Gitter · Langer Dorn · Irisblende aus acht verdrehten Lamellen), **Düse** (Lang · Schubvektor-Paddel · Zackenkrone), **Kanzel** (klar · Rauch · Bernstein · Spiegel).
+- **Größe folgt dem Triebwerk:** alle Teile skalieren mit dem Rumpfradius; flache Triebwerke (Manta) bekommen flache Varianten (Leisten statt Ringe, Zahnleiste statt Krone). Nichts ragt tiefer als die Bodenklemme oder weiter als 0,55 m über die Kollisionsform.
+- **Gegner** tragen ausgeloste Style-Teile, aber keine Tuning-Teile – so sieht jedes Startfeld anders aus, und der eigene Pod bleibt der am weitesten ausgebaute.
+
 ## Überführungen, Schleusen, verzweigte Höhlen, Blitze & Pods (Session 19)
 - **Über-/Unterführungen:** Wo sich eine Strecke kreuzt (≥ 35 m Höhenabstand), trägt die obere Piste einen abgeschrägten Stahl-Hohlkasten mit Querträgern, seitlichen Leuchtstreifen, Widerlagern und Zwillingspfeilern; die untere führt durch einen 20-m-Unterführungstunnel oder frei unter dem Viadukt hindurch. Auf Karte und Minimap hebt eine dunkle Kontur die Brücke ab.
 - **Futuristische Schleusen (statt Fallgitter):** 3-spurige Panzerschleuse mit Überkopf-Kammer, hydraulischen Verbund-Schotts, Plasma-Dichtnaht und dezentem Warn-Energiefeld; seitlich wachsen Fels-, Gletscher-, Kristall- oder Stations-Monolithen organisch in die Landschaft.

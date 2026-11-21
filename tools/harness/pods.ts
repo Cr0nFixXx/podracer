@@ -5,8 +5,8 @@
 //   stats(idx, quality = 2, rival = false) / statsAll()           mesh + triangle counts of the real model (golden numbers for tools/ci/pods.ts)
 // `save: 'name'` posts the frame as JPEG to tools/harness/shot-server.mjs → tools/harness/out/name.jpg. Query: ?webgl forces WebGL2.
 import * as THREE from 'three/webgpu';
-import { PODS, THEMES } from '../../src/game/data';
-import { buildPodModel, type PodVisual } from '../../src/game/podModel';
+import { PODS, STAT_KEYS, THEMES } from '../../src/game/data';
+import { buildPodModel, type PodLook, type PodVisual } from '../../src/game/podModel';
 import { podLayout } from '../../src/game/podLayouts';
 import { makeSky } from '../../src/game/sky';
 const W = 1280, H = 720;
@@ -27,7 +27,7 @@ const cam = new THREE.PerspectiveCamera(40, (W / 2) / (H / 2), 0.1, 3000);
 const win = window as unknown as Record<string, unknown>;
 let pod: PodVisual | null = null;
 
-interface ShowOpts { rival?: boolean; save?: string; boost?: boolean; quality?: number; /** rival only: show the far LOD (> 48 m) */ far?: boolean }
+interface ShowOpts { rival?: boolean; save?: string; boost?: boolean; quality?: number; /** rival only: show the far LOD (> 48 m) */ far?: boolean; /** Style-Teile { fins, intake, nozzle, canopy } and tuning steps (number = all values) */ kit?: PodLook['kit']; tune?: number | PodLook['tune'] }
 /** Must run in the same task as the last render call: the canvas keeps its picture only until the frame is presented. */
 async function saveFrame(name?: string) {
   if (!name) return '';
@@ -36,16 +36,17 @@ async function saveFrame(name?: string) {
   try { const rs = await fetch('http://127.0.0.1:5174/save?name=' + encodeURIComponent(name), { method: 'POST', body: blob }); return ' | saved ' + (await rs.text()); }
   catch (e) { return ' | save FAILED (' + (e as Error).message + ' – start tools/harness/shot-server.mjs)'; }
 }
-function build(idx: number, quality: number, rival: boolean, far = false) {
+function build(idx: number, quality: number, rival: boolean, far = false, o: ShowOpts = {}) {
   const def = PODS[idx];
-  const p = buildPodModel(def, def.colors, quality, 1024, rival, rival ? { pattern: (idx + 1) % 6 } : undefined);
+  const tune = typeof o.tune === 'number' ? Object.fromEntries(STAT_KEYS.map(k => [k, o.tune as number])) : o.tune;
+  const p = buildPodModel(def, def.colors, quality, 1024, rival, { ...(rival ? { pattern: (idx + 1) % 6 } : {}), kit: o.kit, tune });
   if (rival) p.setDistance(far ? 100 : 10);
   return p;
 }
 
 win.show = async (idx: number, dmg = 1, quality = 3, o: ShowOpts = {}) => {
   if (pod) { scene.remove(pod.group); pod.dispose(); }
-  const def = PODS[idx]; pod = build(idx, quality, !!o.rival); scene.add(pod.group);
+  const def = PODS[idx]; pod = build(idx, quality, !!o.rival, false, o); scene.add(pod.group);
   pod.update(1.3, 1, o.boost ? 1 : 0, 0.6, dmg, 1, dmg < 1 ? 0.95 : 0.2);
   pod.group.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(pod.group); const size = box.getSize(new THREE.Vector3()); const c = box.getCenter(new THREE.Vector3());
@@ -75,7 +76,7 @@ async function sheet(view: SheetView, o: ShowOpts & { health?: number } = {}) {
   let tris = 0;
   for (let i = 0; i < n; i++) {
     if (pod) { scene.remove(pod.group); pod.dispose(); }
-    pod = build(i, o.quality ?? 2, !!o.rival, !!o.far); scene.add(pod.group); pod.update(2, 1, boost ? 1 : 0, 0, hp, hp, hp < 1 ? 0.9 : 0.2); pod.group.updateMatrixWorld(true);
+    pod = build(i, o.quality ?? 2, !!o.rival, !!o.far, o); scene.add(pod.group); pod.update(2, 1, boost ? 1 : 0, 0, hp, hp, hp < 1 ? 0.9 : 0.2); pod.group.updateMatrixWorld(true);
     const Lc = podLayout(PODS[i]).cockpit; const ck = pod.body.localToWorld(new THREE.Vector3(0, Lc.y + 0.12, Lc.z)); // cockpit centre
     if (view === 'pod') {
       const sph = new THREE.Box3().setFromObject(pod.group).getBoundingSphere(new THREE.Sphere()); const d = sph.radius / Math.sin(half) * 0.92;
