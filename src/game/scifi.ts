@@ -6,6 +6,7 @@ import * as TSLmod from 'three/tsl';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { ThemeDef } from './data';
 import type { Sample, TrackData } from './trackBuilder';
+import { SURF } from './surfaces';
 import { macroTexture } from './textures';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -32,7 +33,7 @@ export function addSciFi(td: TrackData, theme: ThemeDef, group: THREE.Group, dis
         for (let i = 0; i <= nP; i++) {
           if (!pClosed && i >= nP) break;
           const s = P[i % nP], sideOpen = sd > 0 ? s.openR : s.openL;
-          const on = !s.gap && !sideOpen && ((path.id === 0 && (sci || s.bridge)) || s.roof > 0);
+          const on = !s.gap && !sideOpen && !s.lake && ((path.id === 0 && (sci || s.bridge) && (s.surf === 0 || s.surf === SURF.deck)) || s.roof > 0); // Session 20: light strips only on built decks, not on natural ground
           if (!on) { prev = -1; continue; }
           // Step by 1 on ramps/hills for 100% flush seating over every crest, by 2 on flat sections
           if (prev >= 0 && i % 2 === 1 && s.ramp === 0 && i < nP - 1) continue;
@@ -58,7 +59,7 @@ export function addSciFi(td: TrackData, theme: ThemeDef, group: THREE.Group, dis
   if (!sci) return;
 
   // ---------- 2. holographic panels on grounded/cantilevered masts + 3. bracket-mounted beacons + 4. energy conduits ----------
-  const sideFree = (s: Sample, sd: number) => (sd > 0 ? s.hR : s.hL) === 0 && !(sd > 0 ? s.openR : s.openL) && !s.gap && !(s.roof > 0) && !s.zeroG && !s.bridge && !s.underpass;
+  const sideFree = (s: Sample, sd: number) => !s.lake && (sd > 0 ? s.hR : s.hL) === 0 && !(sd > 0 ? s.openR : s.openL) && !s.gap && !(s.roof > 0) && !s.zeroG && !s.bridge && !s.underpass;
   const panels: THREE.BufferGeometry[] = [], solids: THREE.BufferGeometry[] = [], glows: THREE.BufferGeometry[] = [];
   const up = new THREE.Vector3(0, 1, 0), q = new THREE.Quaternion(), qRd = new THREE.Quaternion();
   let n = 0;

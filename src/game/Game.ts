@@ -1,10 +1,11 @@
 import * as THREE from 'three/webgpu';
 import { resolveEnvironment, type EnvBuild, type EnvFx, type EnvTimeline } from './environment';
 import { WEATHER } from './materials';
-import { generateTextures, hasTextureWorkers, setTextureAnisotropy, textureStats } from './textures';
+import { beginTextureEpoch, generateTextures, hasTextureWorkers, setTextureAnisotropy, textureStats } from './textures';
 import { makeBeams } from './lights';
 import { DebrisPool } from './debris';
-import { roadSurfaceAt } from './trackBuilder';
+import { DS, TUNNEL_SHOULDER, roadSurfaceAt, tunnelCeiling } from './trackBuilder';
+import { surfaceOf, surfacePalette, type SurfaceDef } from './surfaces';
 import { normalizeKeys, normalizePad, padValue, type Action, type KeyMap, type PadMap } from './keymap';
 import { podEnvelope } from './podDesigns';
 import { WeatherFx } from './weather';
@@ -35,6 +36,8 @@ export interface HudState {
   finished: boolean;
   /** Session 12: flight attitude (roll -1..1 = ∓90°, pitch -1 dive..+1 lift), slide state/charge, weather label */
   roll: number; pitch: number; sliding: boolean; slideCharge: number; airborne: boolean; env: string;
+  /** Session 20: ground under the player (label + effect hint, e.g. "Eis · wenig Haftung") */
+  surface: string; surfaceFx: string;
   /** 0..1 share of the 3 s boost overdrive that is used up */
   overdrive: number;
 }
@@ -100,13 +103,14 @@ export class Game {
     const res = resolveEnvironment(THEMES[trackDef.theme], this.profile.race.timeOfDay, this.profile.race.weather);
     const { theme, fx, build } = res;
     this.env = fx; this.envBuild = build; this.tl = res.timeline; this.envLabel = res.label; this.keymap = normalizeKeys(this.profile.keys); this.padmap = normalizePad(this.profile.pad);
-    this.baseGrip = theme.id === 'ice' ? 0.55 : theme.id === 'jungle' ? 0.85 : 1;
+    this.baseGrip = theme.id === 'ice' ? 0.8 : theme.id === 'jungle' ? 0.9 : 1; // Session 20: the surfaces carry the rest (ice ×0.75, snow ×0.92, mud ×0.9 …)
     this.gripMul = this.baseGrip * fx.grip;
     this.dustBase.set(theme.palette.ground[1]); this.dustCol.copy(this.dustBase);
     this.dustAmt = theme.terrain === 'prison' || theme.road === 'cityRoad' ? 0.35 : theme.id === 'ice' ? 0.8 : 1; // little loose dust on metal decks
     this.barrierGlow.set(theme.barrierColor).multiplyScalar(1.25);
 
     // Load-time optimisation: texture workers start NOW and run in parallel with renderer init, track build and sky/PMREM setup
+    beginTextureEpoch(); // textures of the world before the previous one are released
     if (hasTextureWorkers()) void generateTextures(worldTextureSpecs(theme, gfx), gfx.anisotropy ?? 8).catch(() => { /* buildWorld retries */ });
     this.cb.onLoading(0.01, 'Initialisiere Renderer …');
     const r = new THREE.WebGPURenderer({ antialias: false, powerPreference: 'high-performance', forceWebGL: gfx.backend === 'webgl' });
@@ -610,12 +614,18 @@ export class Game {
         const envP = podEnvelope(p.def), cyD = Math.cos(p.yaw), syD = Math.sin(p.yaw);
         const near = !p.isPlayer && dist < 24 ? 0.3 : 1, aD = (p.isPlayer ? 0.42 : 0.36) * near * this.dustAmt;
         this.tmpC.copy(this.dustCol).lerp(WHITE_C, 0.3); // a little lighter than the ground, otherwise the wake is invisible on its own surface
+        const sfw = surfaceOf(smp?.surf), wk = sfw.liquid && sfw.liquid !== 'lava' && sfw.liquid !== 'methane' ? 'spray' : sfw.wake === 'spray' ? 'dust' : sfw.wake, wkCol = this.wakeColor(sfw);
         for (const e of [envP.engL, envP.engR]) {
           const lz = p.isPlayer ? (e.frontZ + e.backZ) * 0.5 : e.backZ - 1.2, lx = e.outerX * 1.1, sg = e.x < 0 ? -1 : 1;
           this.tmpV.set(p.pos.x + lx * cyD + lz * syD, p.groundY + 0.25, p.pos.z - lx * syD + lz * cyD);
           this.tmpV2.set(p.vel.x + cyD * sg * 11, 0, p.vel.z - syD * sg * 11); // slight outward drift: the wakes pass left and right of the cockpit
-          if (wet) this.particles.spray(this.tmpV, this.tmpV2, sp, this.wet * (p.isPlayer ? 1 : 0.85) * near);
-          else this.particles.trail(this.tmpV, this.tmpV2, this.tmpC, sp, aD);
+          // Session 20: the wake shows what the pod is flying over – white spray on lakes, coloured dust on sand / snow / ash / mud,
+          // glowing embers over lava, next to nothing on bare ice and metal decks
+          if (wet || wk === 'spray') this.particles.spray(this.tmpV, this.tmpV2, sp, (wet ? this.wet : 0.9) * (p.isPlayer ? 1 : 0.85) * near);
+          else if (wk !== 'none') {
+            this.particles.trail(this.tmpV, this.tmpV2, wkCol ?? this.tmpC, sp, wkCol ? aD / Math.max(0.35, this.dustAmt) : aD);
+            if (wk === 'embers' && this.particles.chance(0.22)) this.particles.sparks(this.tmpV, UP, p.vel, 2);
+          }
         }
       }
       // Slide plume: the rear steps out and throws ground material (or spray) sideways + a few skid sparks
@@ -751,6 +761,21 @@ export class Game {
     }
   }
 
+  /** wake / dust colour of a ground surface (null = the world's default dust colour) */
+  private wakeCols = new Map<string, THREE.Color | null>();
+  private wakeColor(sf: SurfaceDef): THREE.Color | null {
+    let c = this.wakeCols.get(sf.id);
+    if (c === undefined) { const hex = sf.wakeColor ?? (sf.tex ? surfacePalette(this.td.def.theme, sf)[2] : null); c = hex ? new THREE.Color(hex) : null; this.wakeCols.set(sf.id, c); }
+    return c;
+  }
+
+  /** HUD hint for the ground under the player */
+  private surfaceHud(): { surface: string; surfaceFx: string } {
+    const p = this.player, sf = surfaceOf(this.td.paths[p.path]?.samples[p.idx]?.surf);
+    const fx = sf.grip <= 0.8 ? 'wenig Haftung' : sf.heat >= 1.25 ? 'Triebwerke heizen auf' : sf.vmax <= 0.95 ? 'bremst' : sf.grip < 0.95 ? 'rutschig' : '';
+    return { surface: p.zeroG ? 'Schwerelos' : sf.name, surfaceFx: p.zeroG ? '' : fx };
+  }
+
   updateCamera(dt: number) {
     const p = this.player; const cam = this.camera; const gfx = this.profile.gfx;
     p.visual?.setCockpitVisible?.(this.camMode !== 2); // first-person: the near plane (0.8 m) cut the cockpit in half → hidden, engines and cables stay
@@ -773,6 +798,16 @@ export class Game {
       const gy = p.zeroG ? -1e9 : this.world.heightAt(cam.position.x, cam.position.z);
       const S = this.td.paths[p.path].samples[p.idx];
       cam.position.y = Math.max(cam.position.y, Math.max(gy, S.gap ? -1e9 : S.y) + 2.2);
+      if (S.roof > 0 && !p.upper) { // Session 20: the chase camera stays inside the tunnel vault (it used to poke through the ceiling near the walls)
+        const P = this.td.paths[p.path], n = P.samples.length, back = Math.round(dist / DS);
+        const cs = P.samples[P.closed ? ((p.idx - back) % n + n) % n : Math.max(0, p.idx - back)];
+        if (cs.roof > 0) {
+          let lat = (cam.position.x - cs.x) * cs.rx + (cam.position.z - cs.z) * cs.rz;
+          const lim = (cs.hw + TUNNEL_SHOULDER + (cs.caveW ?? 0)) * 0.9;
+          if (Math.abs(lat) > lim) { const k = Math.sign(lat) * lim - lat; cam.position.x += cs.rx * k; cam.position.z += cs.rz * k; lat += k; }
+          cam.position.y = Math.min(cam.position.y, cs.y + cs.ramp - lat * cs.bank + tunnelCeiling(cs, lat) - 1.4);
+        }
+      }
       cam.up.set(0, 1, 0);
       cam.lookAt(p.pos.x + fx * 16, p.pos.y + (mode === 0 ? 1.6 : 2.3), p.pos.z + fz * 16);
       cam.rotateZ(-p.roll * 0.2 + (p.zeroG ? Math.sin(this.clock * 0.6) * 0.25 : 0));
@@ -891,7 +926,7 @@ export class Game {
       wrongWay: p.wrongWay > 1.2, zeroG: p.zeroG, countdown: this.state === 'countdown' ? this.countdown : -1,
       message: this.messageT > 0 ? this.message : '', camName: CAMERA_NAMES[this.camMode], fps: this.fps, backend: this.backend,
       standings: [], dead: p.dead > 0, finished: p.finished,
-      roll: p.rollCtl ?? 0, pitch: p.pitchCtl ?? 0, sliding: !!p.sliding, slideCharge: Math.min(1, (p.slideT ?? 0) / 1.6), airborne: !p.grounded && !p.zeroG, env: this.envLabel, overdrive: Math.min(1, (p.overT ?? 0) / 3),
+      roll: p.rollCtl ?? 0, pitch: p.pitchCtl ?? 0, sliding: !!p.sliding, slideCharge: Math.min(1, (p.slideT ?? 0) / 1.6), airborne: !p.grounded && !p.zeroG, env: this.envLabel, ...this.surfaceHud(), overdrive: Math.min(1, (p.overT ?? 0) / 3),
     };
   }
 

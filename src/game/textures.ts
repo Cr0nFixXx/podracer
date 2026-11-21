@@ -3,6 +3,7 @@ import type { TexKind } from './data';
 import { TileNoise, aeolianWave, blur, clamp01, computeTexture, sstep, type TexBytes } from './texCore';
 import { texGet, texPut } from './texStore';
 import { applyPhotoDetail, hasPhotoFor, photosReady } from './photoTex';
+import { hasPbr, pbrBytes } from './pbrTex';
 
 export interface TexSet {
   map: THREE.Texture;       // RGB = sRGB albedo (with baked multi-scale cavity AO), A = packed height
@@ -21,18 +22,31 @@ function toTex(data: Uint8Array, size: number, srgb: boolean, aniso: number) {
 }
 
 const cache = new Map<string, TexSet>();
+// Session 20: the cache keeps the sets of the current and the previous world only. Photo sets are 1024² × 2 textures each – without
+// eviction every further world added ~100 MB (the software-rendering test sandbox ran out of memory on the third track).
+let epoch = 0; const usedIn = new Map<string, number>();
+const touch = (k: string) => { usedIn.set(k, epoch); };
+/** Call once before the textures of a new world are requested. */
+export function beginTextureEpoch() {
+  epoch++;
+  for (const [k, e] of usedIn) {
+    if (e >= epoch - 1) continue;
+    const s = cache.get(k); if (s) { for (const t of [s.map, s.normalMap, s.rhMap, s.emissiveMap]) t?.dispose(); cache.delete(k); }
+    usedIn.delete(k);
+  }
+}
 const texKey = (kind: TexKind, palette: string[], size: number, seed: number, emissive?: string) => `${kind}|${palette.join(',')}|${size}|${seed}|${emissive ?? ''}`;
 function wrap(b: TexBytes, size: number, aniso: number, kind?: TexKind): TexSet {
   let map = b.map, nrm = b.nrm;
   if (kind && hasPhotoFor(kind)) { map = b.map.slice(); nrm = b.nrm.slice(); applyPhotoDetail(kind, size, map, nrm); } // copies: the originals go to the persistent cache
-  const set: TexSet = { map: toTex(map, size, true, aniso), normalMap: toTex(nrm, size, false, aniso), rhMap: toTex(b.rh, size, false, aniso) };
+  const set: TexSet = { map: toTex(map, size, true, aniso), normalMap: toTex(nrm, size, false, aniso), rhMap: toTex(b.rh, b.rh.length === 4 ? 1 : size, false, aniso) }; // (photo sets carry a 1×1 rh – no material reads it)
   if (b.em) set.emissiveMap = toTex(b.em, size, true, aniso);
   return set;
 }
 
 /** Synchronous synthesis on the calling thread (cached per kind/palette/size/seed). */
 export function generateTexture(kind: TexKind, palette: string[], size: number, seed: number, aniso = 8, emissiveColor?: string): TexSet {
-  const key = texKey(kind, palette, size, seed, emissiveColor);
+  const key = texKey(kind, palette, size, seed, emissiveColor); touch(key);
   const c = cache.get(key); if (c) return c;
   const set = wrap(computeTexture(kind, palette, size, seed, emissiveColor), size, aniso, kind);
   cache.set(key, set);
@@ -40,7 +54,8 @@ export function generateTexture(kind: TexKind, palette: string[], size: number, 
 }
 
 // ---------- Session 13: parallel synthesis in Web Workers (cuts the dominant part of the loading time) ----------
-export interface TexSpec { kind: TexKind; palette: string[]; size: number; seed: number; emissive?: string }
+export interface TexSpec { kind: TexKind; palette: string[]; size: number; seed: number; emissive?: string; /** Session 20: real PBR photo set (pbrTex.ts), graded to `palette`; the procedural `kind` is the fallback (node CI, `?nophoto`) */ photo?: string; grade?: number }
+const specKey = (s: TexSpec) => texKey(s.kind, s.palette, s.size, s.seed, s.emissive) + (hasPbr(s.photo) ? `|photo:${s.photo}:${s.grade ?? 1}` : '');
 let workerFactory: (() => Worker) | null = null;
 /** The app registers an inlined worker (main.tsx); without a factory (test harness, node) everything runs synchronously. */
 export function setTextureWorkerFactory(f: (() => Worker) | null) { workerFactory = f; }
@@ -60,7 +75,7 @@ const inflight = new Map<string, Promise<TexSet[]>>();
 export const hasTextureWorkers = () => !!workerFactory && typeof Worker !== 'undefined';
 /** Same request while it is still running (pre-warm during renderer init → buildWorld) shares one promise instead of starting twice. */
 export function generateTextures(specs: TexSpec[], aniso: number): Promise<TexSet[]> {
-  const id = specs.map(s => texKey(s.kind, s.palette, s.size, s.seed, s.emissive)).join(';') + '@' + aniso;
+  const id = specs.map(specKey).join(';') + '@' + aniso;
   let p = inflight.get(id);
   if (!p) { p = runTextures(specs, aniso).finally(() => inflight.delete(id)); inflight.set(id, p); }
   return p;
@@ -68,9 +83,15 @@ export function generateTextures(specs: TexSpec[], aniso: number): Promise<TexSe
 async function runTextures(specs: TexSpec[], aniso: number): Promise<TexSet[]> {
   await photosReady(); // photo detail is applied when a set is wrapped into GPU textures
   const t0 = performance.now();
-  const keys = specs.map(s => texKey(s.kind, s.palette, s.size, s.seed, s.emissive));
+  const keys = specs.map(specKey); keys.forEach(touch);
   const todo: number[] = []; const seen = new Set<string>();
   specs.forEach((_s, i) => { if (!cache.has(keys[i]) && !seen.has(keys[i])) { seen.add(keys[i]); todo.push(i); } });
+  // 0) photo sets: decoded and packed on the main thread (fast – no synthesis), never stored in IndexedDB
+  for (let q = todo.length - 1; q >= 0; q--) {
+    const i = todo[q], sp = specs[i]; if (!hasPbr(sp.photo)) continue;
+    const sz = Math.min(sp.size, 1024), b = await pbrBytes(sp.photo!, sz, sp.palette, sp.grade ?? 1);
+    if (b) { cache.set(keys[i], wrap(b, sz, aniso)); todo.splice(q, 1); }
+  }
   todo.sort((a, b) => specs[b].size - specs[a].size);
   textureStats.workers = 0; textureStats.jobMs = []; textureStats.cached = 0;
   // 1) persistent cache

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { TrackDef } from './data';
+import { SURF, SURFACES, THEME_SURFACES } from './surfaces';
 
 export const DS = 2; // sample spacing in meters
 /** Session 11: global road width scale (+18 % – more room for slides, knife-edge passes and three-wide racing) */
@@ -8,6 +9,22 @@ export const WIDTH_SCALE = 2.0; // global road width multiplier
 export const SC_HW = 12; // shortcut half width
 export const RAIL_INSET = 0.3; // guard-rail inner face, metres inside the road edge
 export const CANYON_OUTSET = 0.5; // canyon rock face, metres outside the road edge
+/** Session 20: every tunnel / cave cross-section is a superellipse |x/W|^n + |y/H|^n = 1 instead of a half ellipse. The half ellipse
+ *  was only 44 % of its crown height above the road edge – pods (lift, 90° roll) and the chase camera dipped into the vault near the
+ *  walls. With n = 3 the walls are nearly vertical and the vault is broad: 65 % at 0.9 W, 87 % at 0.7 W. Used by the mesh (world.ts),
+ *  the ceiling collision (physics.ts) and the camera (Game.ts) – keep them in sync through these helpers only. */
+export const TUNNEL_N = 3;
+/** lateral shoulder between the road edge and the tunnel wall foot (tunnel half width Wd = hw + TUNNEL_SHOULDER + caveW) */
+export const TUNNEL_SHOULDER = 3.4;
+/** vault height factor 0..1 at the lateral fraction l = |lat| / Wd */
+export function tunnelProfile(l: number) { const a = Math.min(1, Math.abs(l)); return Math.pow(1 - Math.pow(a, TUNNEL_N), 1 / TUNNEL_N); }
+/** cross-section point for the parameter angle 0..π (0 = right wall foot, π/2 = crown, π = left wall foot): [x / W, y / H] */
+export function tunnelArc(ang: number): [number, number] { const c = Math.cos(ang), sn = Math.sin(ang), e = 2 / TUNNEL_N; return [Math.sign(c) * Math.pow(Math.abs(c), e), Math.pow(Math.max(0, sn), e)]; }
+/** Height of the tunnel shell above the road surface point below it (0 outside tunnels) – lat measured from the centreline of `s`. */
+export function tunnelCeiling(s: Sample, lat: number) {
+  if (!(s.roof > 0)) return 0;
+  return 1.5 + (s.roof - 1.5) * tunnelProfile(Math.abs(lat) / (s.hw + TUNNEL_SHOULDER + (s.caveW ?? 0)));
+}
 
 export interface Sample {
   x: number; y: number; z: number;
@@ -27,6 +44,11 @@ export interface Sample {
   roof: number; // tunnel ceiling height above the road (0 = open sky)
   tun?: number; // tunnel kind: 1 = standard (drivable deck), 2 = underwater tube (Aquilaris), 3 = cave, 4 = underpass tunnel beneath bridge
   caveW?: number; // extra lateral cavern width per side inside widened cave chambers (carries cave-floor mesh)
+  /** Session 20: ground surface under this sample (index into SURFACES, 0 = built race deck) – look, grip, top speed, engine heat */
+  surf: number;
+  /** flat open basin (lake, frozen lake, rock plateau): level road at `lakeY`, no camber, no rails/kerbs; the liquid / rock sheet reaches
+   *  `lakeL` / `lakeR` metres beyond the left / right road edge. `lvl` 0..1 = how far profile and camber are levelled (eases in/out). */
+  lake?: boolean; lakeY?: number; lakeL?: number; lakeR?: number; lvl?: number;
   bridge?: boolean; // elevated overpass viaduct crossing over a lower stretch of the track
   underpass?: boolean; // lower stretch passing beneath an elevated track bridge
   vmax: number; // ai reference speed
@@ -184,7 +206,7 @@ function finalizeSamples(S: Sample[], closed: boolean, banked = false) {
     S[i].curv = s / c;
     // Session 10: main circuits get real banked corners (up to ~21° / 6.2 m outer-edge rise); shortcuts keep the gentle camber
     const bl = S[i].bridge ? Math.min(0.16, 2.6 / Math.max(1, S[i].hw)) : banked ? Math.min(0.39, 6.2 / Math.max(1, S[i].hw)) : Math.min(0.2, 2.4 / Math.max(1, S[i].hw));
-    S[i].bank = S[i].gap || S[i].zeroG ? 0 : Math.max(-bl, Math.min(bl, S[i].curv * (banked ? 46 : 14)));
+    S[i].bank = S[i].gap || S[i].zeroG ? 0 : Math.max(-bl, Math.min(bl, S[i].curv * (banked ? 46 : 14))) * (1 - (S[i].lvl ?? 0));
   }
   // AI reference speeds
   for (let i = 0; i < n; i++) {
@@ -202,11 +224,13 @@ function finalizeSamples(S: Sample[], closed: boolean, banked = false) {
 }
 
 function makeSample(p: THREE.Vector3, hw: number, s: number): Sample {
-  return { x: p.x, y: p.y, z: p.z, tx: 0, tz: 1, rx: -1, rz: 0, hw, bank: 0, curv: 0, ramp: 0, gap: false, zeroG: false, canyon: false, openL: false, openR: false, link: -1, wallL: hw, wallR: hw, hL: 0, hR: 0, roof: 0, vmax: 200, s };
+  return { x: p.x, y: p.y, z: p.z, tx: 0, tz: 1, rx: -1, rz: 0, hw, bank: 0, curv: 0, ramp: 0, gap: false, zeroG: false, canyon: false, openL: false, openR: false, link: -1, wallL: hw, wallR: hw, hL: 0, hR: 0, roof: 0, surf: 0, vmax: 200, s };
 }
 
 export function buildTrack(def: TrackDef): TrackData {
   const rng = mulberry32(hashStr(def.id));
+  // Session 20: all ceilings raised once more (+6.5…7.5 m) – see `tunnelProfile` for the new cross-section
+  const ICE = def.theme === 'ice', UNDER_ROOF = ICE ? 28 : 26, STD_ROOF = ICE ? 30 : 27, SC_ROOF = ICE ? 27 : 25, CAVE_ROOF = ICE ? 29 : 27, SEA_ROOF = 26;
   const { pts, map: cpMap } = controlPoints(def);
   const closed = def.type === 'circuit';
   const curve = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(p.x, p.y, p.z)), closed, 'centripetal');
@@ -330,6 +354,44 @@ export function buildTrack(def: TrackDef): TrackData {
     for (let k = 0; k < ng; k++) { const sm = samples[(i0 + nr + k) % N]; sm.gap = true; }
     rampSpans.push([i0, nr + ng]);
   }
+  // ---- Session 20: the wide open flats become surface showpieces – dunes, plateaus, lakes (see surfaces.ts) ----
+  const TS = THEME_SURFACES[def.theme], START_I = closed ? 30 : 45, FINISH_I = closed ? START_I : N - 40;
+  const nearGrid = (i: number, m: number) => idxDist(i, START_I) < m || (!closed && (i > FINISH_I - m || i < START_I + m));
+  const openRuns: { a: number; b: number; surf: number }[] = [];
+  let seaY0: number | undefined; // Aquilaris sea level
+  const LAKE_EASE = def.theme === 'aquilaris' ? 150 : 62; // samples over which the profile eases to the basin level (Aquilaris descends ~24 m to the sea)
+  if (TS && !(globalThis as { NO_SURFACES?: boolean }).NO_SURFACES) {
+    const W = (i: number) => samples[closed ? ((i % N) + N) % N : Math.max(0, Math.min(N - 1, i))];
+    // a sample is usable when it is wide and nothing built is within `m` samples
+    const clean = (i: number, m: number) => {
+      if (samples[i].hw <= wideLim || nearGrid(i, 130)) return false;
+      for (let k = -m; k <= m; k += 5) { const q = W(i + k); if (q.ramp > 0 || q.gap || q.bridge || q.underpass || q.zeroG) return false; }
+      return true;
+    };
+    const runsFor = (m: number) => { const out: [number, number][] = []; let a = -1; for (let i = 0; i <= N; i++) { const ok = i < N && clean(i, m); if (ok && a < 0) a = i; if (!ok && a >= 0) { if (i - a >= 150) out.push([a, i - 1]); a = -1; } } return out.sort((p, q) => (q[1] - q[0]) - (p[1] - p[0])); };
+    const taken: [number, number][] = [];
+    TS.open.forEach((id, oi) => {
+      const sf = SURFACES[SURF[id]], cand = runsFor(sf.flat ? 75 : 30).filter(([a, b]) => taken.every(([ta, tb]) => b < ta - 40 || a > tb + 40));
+      const r = cand[0]; if (!r) return;
+      // (Aquilaris: the long descent to sea level happens inside the wide run)
+      const inset = sf.flat ? (def.theme === 'aquilaris' ? LAKE_EASE - 60 : 6) : 0, a = r[0] + inset, b = r[1] - inset; if (b - a < 120) return; taken.push([a, b]);
+      openRuns.push({ a, b, surf: SURF[id] });
+      for (let i = a; i <= b; i++) samples[i].surf = SURF[id];
+      if (sf.flat) {
+        const E = LAKE_EASE, seed = hashStr(def.id + '|lake' + oi) % 1000;
+        for (let k = a - E; k <= b + E; k++) {
+          if (!closed && (k < 0 || k >= N)) continue;
+          const q = W(k), t = k < a ? (k - (a - E)) / E : k > b ? ((b + E) - k) / E : 1;
+          q.lvl = Math.max(q.lvl ?? 0, t * t * (3 - 2 * t));
+        }
+        for (let i = a; i <= b; i++) {
+          const q = samples[i], e = Math.min(1, Math.min(i - a, b - i) / 48), tp = e * e * (3 - 2 * e); // shoreline closes in towards both ends
+          q.lake = true;
+          q.lakeL = tp * (46 + 62 * fbm1(q.s * 0.0034 + seed)); q.lakeR = tp * (46 + 62 * fbm1(q.s * 0.0034 + seed + 57.3));
+        }
+      }
+    });
+  }
   // Session 10: rolling gradients on every map – faded out at grid, finish, ramps/gaps, zero-G tubes & all bridge/underpass crossings
   {
     const rh = mulberry32(hashStr(def.id + '|hills'));
@@ -363,7 +425,7 @@ export function buildTrack(def: TrackDef): TrackData {
       let minU = 1e9, maxL = -1e9;
       for (let k = c.upperFrom; k <= c.upperTo; k++) if (closed || (k >= 0 && k < N)) minU = Math.min(minU, samples[((k % N) + N) % N].y);
       for (let k = c.lowerFrom; k <= c.lowerTo; k++) if (closed || (k >= 0 && k < N)) maxL = Math.max(maxL, samples[((k % N) + N) % N].y);
-      const wantSep = c.tunnelUnder ? 33.5 : 30.0, cur = minU - maxL;
+      const wantSep = c.tunnelUnder ? UNDER_ROOF + 11 : 30.0, cur = minU - maxL; // underpass roof + 1.2 m hood + 2.8 m box girder + 7 m buffer
       if (cur < wantSep) {
         const need = wantSep - cur;
         bumpSpan(c.upperFrom, c.upperTo, need * 0.56, 135);
@@ -371,8 +433,45 @@ export function buildTrack(def: TrackDef): TrackData {
       }
       c.clearance = samples[((c.upperIdx % N) + N) % N].y - samples[((c.lowerIdx % N) + N) % N].y;
     }
+    // Session 20 (part of the hill logic): dune waves on dune / powder passages, level basins for lakes and plateaus
+    if (def.theme === 'aquilaris') seaY0 = samples.reduce((a, q) => a + q.y, 0) / N - 24;
+    for (const r of openRuns) {
+      const sf = SURFACES[r.surf];
+      if (sf.dune) for (let i = r.a; i <= r.b; i++) {
+        const q = samples[i], env = Math.min(1, Math.min(i - r.a, r.b - i) / 45), p = q.s / 165 + 0.35 * Math.sin(q.s / 410), f = p - Math.floor(p);
+        // asymmetric dune: long windward rise, shorter lee side, both cosine-smooth (pods get light over the crests, never launched)
+        q.y += sf.dune * env * env * (3 - 2 * env) * (f < 0.66 ? 0.5 - 0.5 * Math.cos(Math.PI * f / 0.66) : 0.5 + 0.5 * Math.cos(Math.PI * (f - 0.66) / 0.34));
+      }
+      if (sf.flat) {
+        let sum = 0; for (let i = r.a; i <= r.b; i++) sum += samples[i].y;
+        // Aquilaris: the track comes down to the ocean – the pod skims the open sea (level fixed before the dip so it stays consistent)
+        const yL = seaY0 !== undefined ? seaY0 + 0.4 : sum / (r.b - r.a + 1);
+        for (let k = r.a - LAKE_EASE - 8; k <= r.b + LAKE_EASE + 8; k++) {
+          if (!closed && (k < 0 || k >= N)) continue;
+          const q = samples[closed ? ((k % N) + N) % N : k], w = q.lvl ?? 0;
+          q.y += (yL - q.y) * w; if (q.lake) q.lakeY = yL;
+        }
+      }
+    }
   }
   finalizeSamples(samples, closed, true);
+  // basins: on the inside of a corner the sheet may only reach as far as the cross sections do not fold over each other
+  // Exception: where the road band itself is wider than the corner radius (a kink in a wide flat, e.g. the Mos Espa plateau) the
+  // sheet folds whatever the shore does. There the sheets before and after the kink must OVERLAP at the apex, otherwise a
+  // diamond-shaped notch (a pit in the plateau / a hole in the lake) opens between the two crossing road edges → keep 34 m of shore.
+  // (The basin mesh is double-wound and level, so folded and overlapping parts render as one surface – world.ts → buildBasins.)
+  for (const r of openRuns) if (SURFACES[r.surf].flat) {
+    const lims: number[] = [];
+    for (let i = r.a; i <= r.b; i++) {
+      let lim = 1e9; for (let k = -14; k <= 14; k += 2) { const q = samples[Math.max(0, Math.min(N - 1, i + k))]; lim = Math.min(lim, 1 / Math.max(1e-5, Math.abs(q.curv)) - q.hw); }
+      lims.push(lim < 0 ? 34 : Math.max(0, lim - 12));
+    }
+    for (let i = r.a; i <= r.b; i++) {
+      let sum = 0, n = 0; for (let k = -6; k <= 6; k++) { const v = lims[i - r.a + k]; if (v !== undefined) { sum += v; n++; } }
+      const q = samples[i], lim = sum / n; // short box filter: no step in the shoreline where the exception starts
+      if (q.curv > 0) q.lakeR = Math.min(q.lakeR ?? 0, lim); else q.lakeL = Math.min(q.lakeL ?? 0, lim);
+    }
+  }
   const main: Path = { id: 0, samples, closed, length, mainFrom: 0, mainTo: N - 1, side: 0 };
   const paths: Path[] = [main];
 
@@ -489,21 +588,21 @@ export function buildTrack(def: TrackDef): TrackData {
       if (dL > 2) { const t = Math.min(1, (dL - 2) / 16); s.hL = cliffH(s, -1) * 0.8 * (t * t * (3 - 2 * t)); } else s.hL = 0;
       if (dR > 2) { const t = Math.min(1, (dR - 2) / 16); s.hR = cliffH(s, 1) * 0.8 * (t * t * (3 - 2 * t)); } else s.hR = 0;
       if (pa.isCave) {
-        // Cave branch: full subterranean vaulted cavern from just past fork to just before reunion, swelling into a wide side chamber!
-        if (i >= 14 && i <= n2 - 15) {
-          const u = (i - 14) / Math.max(1, n2 - 29), sn = Math.sin(Math.PI * u);
-          s.roof = roofH + 9.5 * sn * sn; s.tun = 3; s.caveW = 7.5 * Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, (u - 0.15) / 0.7))), 2);
-        }
+        // Cave branch (Session 20): roofed over its FULL length – its tube starts and ends inside the main cavern, the world builder
+        // merges both shells (boolean union), so no daylight shows at the fork. Mid-way the ROAD itself widens into a side chamber
+        // (the old `caveW` shelf was scenery behind an invisible wall). The cave rock is the barrier: no cliffs, no guard rails.
+        const u = i / Math.max(1, n2 - 1), sn = Math.sin(Math.PI * u);
+        s.roof = roofH + 9.5 * sn * sn; s.tun = 3; s.hw += 5 * Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, (u - 0.2) / 0.6))), 2);
+        s.hL = dL > 2 ? 2 : 0; s.hR = dR > 2 ? 2 : 0;
       } else if (i >= Math.floor(n2 * 0.26) && i <= Math.floor(n2 * 0.74) && dL > 10 && dR > 10) {
         s.roof = roofH; s.tun = tunKind;
       }
     }
   };
-  for (let pi = 1; pi < paths.length; pi++) applyShortcutWalls(paths[pi], def.theme === 'ice' ? 20.5 : 18.5, 1);
+  for (let pi = 1; pi < paths.length; pi++) applyShortcutWalls(paths[pi], SC_ROOF, 1);
 
   const obstacles: Obstacle[] = [];
-  const startIdx = closed ? 30 : 45;
-  const finishIdx = closed ? startIdx : N - 40;
+  const startIdx = START_I, finishIdx = FINISH_I;
   const okSpot = (s: Sample, i: number) => !s.gap && s.ramp === 0 && !s.openL && !s.openR && !samples[(i + 22) % N].gap && samples[(i + 18) % N].ramp === 0;
 
   // ---------- Tunnels, Underwater Tubes, Underpass Tunnels & Branching Cave Systems ----------
@@ -525,7 +624,7 @@ export function buildTrack(def: TrackDef): TrackData {
     const roofRun = (i: number, len: number, h: number, kind: number) => { for (let k = 0; k <= len; k++) { const q = W(i + k); q.roof = h; q.tun = kind; } };
 
     // (0) Underpass tunnels where the track dives directly beneath its own elevated viaduct bridge
-    const underRoof = def.theme === 'ice' ? 21.5 : 20.0;
+    const underRoof = UNDER_ROOF;
     for (const c of crossings) {
       const len = c.lowerTo - c.lowerFrom;
       tunTaken.push({ i: c.lowerFrom, len });
@@ -542,12 +641,12 @@ export function buildTrack(def: TrackDef): TrackData {
 
     // (1) Aquilaris high-vaulted panoramic underwater ocean tubes (roof = 19.5 m, was 9 m!)
     if (def.theme === 'aquilaris') {
-      seaY = samples.reduce((a, q) => a + q.y, 0) / N - 24;
-      const SEA_ROOF = 19.5, target = seaY - (SEA_ROOF + 3.2);
+      seaY = seaY0 ?? samples.reduce((a, q) => a + q.y, 0) / N - 24;
+      const target = seaY - (SEA_ROOF + 3.2);
       const cands: { i: number; len: number; depth: number; ease: number; flat: number }[] = [];
       for (const FLAT of [155, 105]) for (let f0 = 90; f0 < N - FLAT - 220; f0 += 8) {
         let top = -1e9; for (let k = 0; k <= FLAT; k += 2) top = Math.max(top, W(f0 + k).y);
-        const depth = top - target; if (depth < 8 || depth > 46) continue;
+        const depth = top - target; if (depth < 8 || depth > 54) continue;
         const ease = Math.ceil(7.6 * depth / DS), i0 = f0 - ease, len = FLAT + 2 * ease;
         if (!clearRun(i0, len, 12) || !awayFromGrid(i0, len) || rampBefore(i0, 260)) continue;
         if (W(i0 + 4).y < seaY + 2.0 || W(i0 + len - 4).y < seaY + 2.0) continue;
@@ -569,7 +668,7 @@ export function buildTrack(def: TrackDef): TrackData {
     //     secondary cave tube (`Path.isCave`) that splits off in the cave and reunites further downstream!
     const CAVES: Record<string, [number, number, number]> = { lava: [520, 12, 5], ice: [300, 9, 3], crystal: [310, 10, 3], jungle: [290, 9, 3] };
     const cv = CAVES[def.theme];
-    const caveBaseRoof = def.theme === 'ice' ? 22.0 : 20.5;
+    const caveBaseRoof = CAVE_ROOF;
     if (cv) {
       for (const shrink of [1, 0.8, 0.62]) {
         const LEN = Math.round(cv[0] * shrink), CH = Math.max(2, Math.round(cv[2] * shrink)), DEPTH = cv[1], EASE = 58;
@@ -586,12 +685,15 @@ export function buildTrack(def: TrackDef): TrackData {
         dip(best, LEN, DEPTH, EASE);
         const gap = 18, part = (LEN - 48 - gap * (CH - 1)) / CH;
         const chSpans: [number, number][] = [];
+        // Session 20: ONE continuous cave. The chambers used to be separate 150 m tunnels with 36 m of open sky in between (and canyon
+        // cliffs standing inside them). Now low necks (base roof) connect the chambers, and the cave rock replaces cliffs and rails.
+        for (let k = 24; k <= LEN - 24; k++) { const q = W(best + k); q.roof = caveBaseRoof; q.tun = 3; q.hL = 2; q.hR = 2; }
         for (let c = 0; c < CH; c++) {
           const a = 24 + Math.round(c * (part + gap)), b = a + Math.round(part), hi = 8.5 + rt() * 7.5, wi = 6.5 + rt() * 5.5;
           chSpans.push([best + a, best + b]);
           for (let k = a; k <= b; k++) {
             const q = W(best + k), t = (k - a) / (b - a), sn = Math.sin(Math.PI * t), s2 = sn * sn;
-            q.roof = caveBaseRoof + hi * s2; q.tun = 3; q.caveW = wi * s2;
+            q.roof = caveBaseRoof + hi * s2; q.tun = 3; q.hw += wi * s2; // the ROAD widens with the chamber (drivable width = visible width)
           }
           cavePillars.push([best + Math.round((a + b) / 2 + (rt() - 0.5) * part * 0.28), (c % 2 ? 1 : -1) * (0.28 + rt() * 0.18)]);
         }
@@ -653,7 +755,7 @@ export function buildTrack(def: TrackDef): TrackData {
     }
 
     // (3) High-clearance standard tunnels with drivable top deck (22.5 m on Ando Prime, 19.5 m on all other worlds; was 13 m!)
-    const stdRoof = def.theme === 'ice' ? 22.5 : 19.5;
+    const stdRoof = STD_ROOF;
     const want = def.theme === 'aquilaris' ? 0 : ({ oovo: 3, ice: 3, malastare: 4 } as Record<string, number>)[def.theme] ?? 2;
     const cands: { i: number; len: number; score: number }[] = [];
     for (let i = 40; i < N - 440; i += 12) {
@@ -665,6 +767,38 @@ export function buildTrack(def: TrackDef): TrackData {
     cands.sort((a, b) => b.score - a.score);
     let placed = 0;
     for (const c of cands) { if (placed >= want) break; if (clash(c.i, c.len, 130)) continue; tunTaken.push(c); roofRun(c.i, c.len, stdRoof, 1); placed++; }
+  }
+
+  // ---- Session 20: surface of every remaining passage (built deck / cave floor / alternating natural ground) ----
+  if (TS && !(globalThis as { NO_SURFACES?: boolean }).NO_SURFACES) {
+    const gen = TS.general.map(id => SURF[id]), caveSurf = SURF[TS.cave ?? TS.general[0]];
+    const built = new Uint8Array(N);
+    const mark = (i: number, back: number, fwd: number) => { for (let k = -back; k <= fwd; k++) { const j = closed ? ((i + k) % N + N) % N : i + k; if (j >= 0 && j < N) built[j] = 1; } };
+    for (let i = 0; i < N; i++) {
+      const q = samples[i];
+      if (nearGrid(i, 95)) built[i] = 1;
+      if (q.bridge || q.zeroG || (q.roof > 0 && q.tun !== 3)) mark(i, 10, 10);
+      if (q.ramp > 0 || q.gap) mark(i, 26, 34);
+    }
+    let cyc = hashStr(def.id + '|surf') % gen.length, a = -1;
+    for (let i = 0; i <= N; i++) {
+      const q = i < N ? samples[i] : null, cave = !!q && q.roof > 0 && q.tun === 3;
+      if (q && cave && !(q.surf > 0)) q.surf = caveSurf;
+      const free = !!q && !built[i] && !cave && !(q.surf > 0);
+      if (free && a < 0) a = i;
+      if (!free && a >= 0) {
+        const L = i - a;
+        if (L >= 50) { const n = Math.max(1, Math.round(L / 250)); for (let k = a; k < i; k++) samples[k].surf = gen[(cyc + Math.min(n - 1, Math.floor((k - a) / (L / n)))) % gen.length]; cyc += n; }
+        a = -1;
+      }
+    }
+    // branch paths: cave tubes carry the cave floor, shortcuts the solid surface of the road they leave
+    for (let pi = 1; pi < paths.length; pi++) {
+      const pa = paths[pi], m = samples[((pa.mainFrom % N) + N) % N].surf, sf = pa.isCave ? caveSurf : SURFACES[m].flat ? gen.find(g => g > 0) ?? 0 : m;
+      for (const q of pa.samples) q.surf = sf;
+    }
+    // rivals brake earlier where the grip is low (ice) – the reference speeds assume full grip
+    for (const pa of paths) for (const q of pa.samples) { const g = SURFACES[q.surf].grip; if (g < 1) q.vmax *= 0.45 + 0.55 * g; }
   }
 
   // Recompute final collision wall offsets after all shortcuts, bridges, underwater tubes & branching caves are placed
@@ -688,7 +822,8 @@ export function buildTrack(def: TrackDef): TrackData {
       const e = Math.min(1, Math.abs(lat) / s.hw);
       const y = s.y - lat * s.bank + (1 - e * e) * 0.2;
       // Favor crisp tall pillars & hazard pods (2/3) plus beacon-marked boulders (1/3)
-      obstacles.push({ path: 0, idx, lat, r, kind: Math.floor(rng() * 3), x: s.x + s.rx * lat, y, z: s.z + s.rz * lat });
+      const kindR = Math.floor(rng() * 3);
+      obstacles.push({ path: 0, idx, lat, r, kind: s.lake ? 1 : kindR, x: s.x + s.rx * lat, y, z: s.z + s.rz * lat }); // lakes: rock pillars only (no crates on a liquid)
       placed++;
     }
   }
@@ -716,7 +851,7 @@ export function buildTrack(def: TrackDef): TrackData {
   const setPieces: SetPiece[] = [];
   const cdist = (a: number, b: number) => { const d = Math.abs(a - b); return closed ? Math.min(d, N - d) : d; };
   const spOk = (i: number, type: string) => {
-    const s = samples[i]; if (!okSpot(s, i) || s.zeroG || s.bridge || s.underpass) return false;
+    const s = samples[i]; if (!okSpot(s, i) || s.zeroG || s.bridge || s.underpass || s.lake) return false;
     if (closed ? cdist(i, startIdx) < 110 : (i < startIdx + 110 || i > finishIdx - 70)) return false;
     for (let k = -68; k <= 42; k += 3) { const q = samples[((i + k) % N + N) % N]; if (q.gap || q.ramp > 0 || q.openL || q.openR || q.zeroG || q.roof > 0 || q.bridge || q.underpass) return false; }
     if (hazards.some(h => cdist(h.idx, i) < 50) || setPieces.some(o => cdist(o.idx, i) < 120)) return false;

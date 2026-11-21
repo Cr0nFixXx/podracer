@@ -10,11 +10,12 @@ let g: Game | null = null; let cur = -1;
   if (cur !== i) {
     g?.dispose(); cur = i;
     const prof = defaultProfile(); prof.race.trackId = TRACKS[i].id; prof.race.opponents = 7; prof.gfx.texRes = 1024; if (location.search.includes('webgl')) prof.gfx.backend = 'webgl'; if (location.search.includes('csm')) prof.gfx.csm = true; if (location.search.includes('ssr')) prof.gfx.ssr = true;
-    { const qs = new URLSearchParams(location.search); if (qs.get('tod')) prof.race.timeOfDay = qs.get('tod') as never; if (qs.get('wx')) prof.race.weather = qs.get('wx') as never; if (qs.has('ultra')) Object.assign(prof.gfx, PRESETS.ultra, { preset: 'ultra', texRes: 1024, renderScale: 0.6 }); } prof.gfx.renderScale = 0.6; prof.gfx.shadows = 1;
+    { const qs = new URLSearchParams(location.search); if (qs.get('tod')) prof.race.timeOfDay = qs.get('tod') as never; if (qs.get('wx')) prof.race.weather = qs.get('wx') as never; if (qs.has('ultra')) Object.assign(prof.gfx, PRESETS.ultra, { preset: 'ultra', texRes: 1024, renderScale: 0.6 }); if (qs.get('tex')) prof.gfx.texRes = +qs.get('tex')!; /* tex=256: small textures for the WebGPU console check on machines with little RAM */ } prof.gfx.renderScale = 0.6; prof.gfx.shadows = 1;
     g = new Game(div, prof, { onHud: () => {}, onLoading: () => {}, onFinish: () => {}, onPause: () => {}, onReady: () => {} });
     const tLoad = performance.now(); await g.start(); (window as unknown as Record<string, unknown>).loadInfo = `load=${Math.round(performance.now() - tLoad)}ms ` + JSON.stringify(g.world.timings) + ' ' + JSON.stringify((g as unknown as { loadMs?: unknown }).loadMs ?? {}); g.paused = true; await new Promise(r => setTimeout(r, 400));
   }
   const G = g!; G.paused = true;
+  (window as unknown as Record<string, unknown>).coverInfo = ''; // per-view info line (probe / decor views fill it) – reset so it never leaks into the next view
   if (view === 'b') {
     const S = G.td.main.samples, N = S.length; let best = 0, bc = 0;
     for (let k = 0; k < N; k += 3) { const c = Math.abs(S[k].curv); if (c > bc && !S[k].gap && S[k].ramp === 0 && !S[k].canyon) { bc = c; best = k; } }
@@ -66,6 +67,17 @@ let g: Game | null = null; let cur = -1;
     let found: THREE.InstancedMesh | null = null;
     G.scene.traverse(o => { const im = o as THREE.InstancedMesh; if (!found && im.isInstancedMesh && im.visible && (im.material as THREE.MeshStandardMaterial).alphaMap && im.count > 0) found = im; });
     if (found) { const m = new THREE.Matrix4(); (found as THREE.InstancedMesh).getMatrixAt(0, m); const p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3(); m.decompose(p, q, sc); (found as THREE.InstancedMesh).visible = true; G.camera.position.set(p.x + 21 * sc.x, p.y + 9 * sc.y, p.z + 17 * sc.x); G.camera.lookAt(p.x, p.y + 11.5 * sc.y, p.z); }
+  } else if (view.startsWith('g_')) { // Session 20: close-up of a named decor geometry – g_<geometry.name>[_<instance>[_<distance factor ×10>]], e.g. g_boulder, g_cactus_3
+    const [, name, kStr, dStr] = view.split('_'); let found: THREE.InstancedMesh | null = null;
+    G.scene.traverse(o => { const im = o as THREE.InstancedMesh; if (!found && im.isInstancedMesh && im.geometry.name === name && im.count > 0) found = im; });
+    if (found) {
+      const im = found as THREE.InstancedMesh, m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+      im.getMatrixAt(Math.min(im.count - 1, +(kStr ?? 0) || 0), m); m.decompose(p, q, sc); im.visible = true;
+      const bs = im.geometry.boundingSphere!, R = bs.radius * sc.x * (dStr ? +dStr / 10 : 1.7), sun = G.sunDir ?? new THREE.Vector3(0.5, 0.6, 0.4);
+      const side = new THREE.Vector3(sun.x, 0, sun.z).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.7); // from the lit side, 40° off the sun
+      G.camera.position.set(p.x + side.x * R, p.y + bs.center.y * sc.y + R * 0.38, p.z + side.z * R); G.camera.lookAt(p.x, p.y + bs.center.y * sc.y, p.z);
+      (window as unknown as Record<string, unknown>).coverInfo = `decor ${name} tris=${(im.geometry.index ? im.geometry.index.count : im.geometry.attributes.position.count) / 3} scale=${sc.x.toFixed(1)} instances=${im.count}`;
+    } else (window as unknown as Record<string, unknown>).coverInfo = `decor ${name}: not found`;
   } else if (view === 'j' && G.td.crossings.length) { // crossing: from the lower approach looking at the overpass bridge + underpass
     const cx = G.td.crossings[0], S = G.td.main.samples, N = S.length;
     const a = S[((cx.lowerFrom - 26) % N + N) % N], b = S[((cx.lowerIdx) % N + N) % N];
@@ -79,6 +91,15 @@ let g: Game | null = null; let cur = -1;
   } else if (view === 's') { // look from above the road towards the sun (lens flare / god-ray / glare check)
     const S = G.td.main.samples, a = S[Math.floor(S.length * 0.2)];
     G.camera.position.set(a.x, a.y + 6, a.z); G.camera.lookAt(a.x + G.sunDir.x * 100, a.y + 6 + G.sunDir.y * 60, a.z + G.sunDir.z * 100);
+  } else if (/^p\d/.test(view)) { // generic probe: p<idx>_<lat>_<height>_<ahead>_<path>_<lookLat>_<lookHeight> – camera on sample idx looking `ahead` samples forward
+    const [i0, lat = 0, hh = 5, ahead = 40, pi = 0, lLat = 0, lH = 3] = view.slice(1).split('_').map(Number);
+    const P = G.td.paths[pi] ?? G.td.main, S = P.samples, N = S.length, W = (k: number) => P.closed ? S[((k % N) + N) % N] : S[Math.max(0, Math.min(N - 1, k))];
+    const a = W(i0), b = W(i0 + ahead);
+    G.camera.position.set(a.x + a.rx * lat, a.y + a.ramp - lat * a.bank + hh, a.z + a.rz * lat); G.camera.lookAt(b.x + b.rx * lLat, b.y + b.ramp - lLat * b.bank + lH, b.z + b.rz * lLat);
+    (window as unknown as Record<string, unknown>).coverInfo = `probe idx=${i0} roof=${a.roof} tun=${a.tun ?? 0} hw=${a.hw.toFixed(1)} bank=${a.bank.toFixed(3)} surf=${(a as unknown as { surf?: number }).surf ?? '-'}`;
+  } else if (view === 'n') { // towards the gas giant in the sky of Oovo IV (Session 20)
+    const a = G.td.main.samples[300]; let dir: THREE.Vector3 | null = null; G.scene.traverse(o => { if (o.userData.dir) dir = o.userData.dir as THREE.Vector3; });
+    G.camera.position.set(a.x, a.y + 5, a.z); if (dir) G.camera.lookAt(a.x + (dir as THREE.Vector3).x, a.y + 5 + (dir as THREE.Vector3).y * 0.6, a.z + (dir as THREE.Vector3).z);
   } else if (view === 'r') { // 3.4 s of real racing (AI + player idle) so exhaust/dust particles, banking and engine heave are live
     G.state = 'race'; (G as unknown as { keys: Set<string> }).keys.add('KeyW'); for (let k = 0; k < 170; k++) { G.update(1 / 60); if (k % 3 === 0) G.updateVisuals(); } G.updateCamera(0.5);
   } else { G.updateCamera(0.5); }
@@ -87,6 +108,7 @@ let g: Game | null = null; let cur = -1;
   G.sun.target.position.copy(t); G.sun.position.copy(t).addScaledVector(G.sunDir, 400);
   { const rt = new URLSearchParams(location.search).get('rt'); if (rt) { G.raceTime = +rt; G.applyEnv(0, true); } }
   G.updateVisuals(); G.updateLights(); G.world.update(G.clock + 5, G.camera.position);
+  if (location.search.includes('bright') && !G.scene.getObjectByName('dbgAmb')) { const al = new THREE.AmbientLight(0xffffff, 2.5); al.name = 'dbgAmb'; G.scene.add(al); } // diagnostic fill light (caves)
   if (location.search.includes('flash')) { G.sky.uniforms.flash.value = 0.9; G.hemi.intensity = 1.75; }
   if (location.search.includes('live')) { // live graphics switching: toggle everything that is switchable at runtime, render, toggle back
     const g0 = G.profile.gfx; G.render(0.016); await new Promise(r => setTimeout(r, 300));
@@ -109,6 +131,17 @@ let g: Game | null = null; let cur = -1;
   (G.particles.alpha as unknown as { fullUpload: () => void }).fullUpload(); (G.particles.add as unknown as { fullUpload: () => void }).fullUpload(); // the harness runs many updates without rendering
   for (let k = 0; k < 3; k++) { G.render(0.016); await new Promise(r => setTimeout(r, 900)); }
   return `${(window as unknown as Record<string, unknown>).loadInfo ?? ''} ${(window as unknown as Record<string, unknown>).coverInfo ?? ''} ${G.backend} ${TRACKS[i].id}/${view} calls=${G.renderer.info.render.calls} tris=${G.renderer.info.render.triangles}`;
+};
+/** Session 20 – frame-time benchmark of one view: positions the camera like `track(i, view)`, then times `n` full frames (synchronised with readPixels).
+ *  Software rendering (SwiftShader) → only useful to COMPARE views / builds, not as an absolute FPS figure. */
+(window as unknown as Record<string, unknown>).bench = async (i: number, view: string, n = 6) => {
+  const info = String(await (window as unknown as { track: (i: number, v: string) => Promise<string> }).track(i, view)); const G = g!;
+  const gl = (G.renderer as unknown as { backend?: { gl?: WebGL2RenderingContext } }).backend?.gl;
+  const t0 = performance.now();
+  const px = new Uint8Array(4); // readPixels blocks until the frame is really rendered (gl.finish() does not in Chrome)
+  for (let k = 0; k < n; k++) { G.render(0.016); if (gl) gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); else await new Promise(r => setTimeout(r, 50)); }
+  const ms = (performance.now() - t0) / n;
+  return `${info.trim().split(' ').slice(-3, -2).join(' ')} bench ${ms.toFixed(0)} ms/frame = ${(1000 / ms).toFixed(1)} fps (${gl ? 'readPixels sync' : 'no gl'})`;
 };
 /** Physics/collision stress test without rendering: AI opponents race `secs` seconds. */
 (window as unknown as Record<string, unknown>).sim = async (i: number, secs: number) => {

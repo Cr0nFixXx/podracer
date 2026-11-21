@@ -1,9 +1,22 @@
 # TODO
 
-## 0. Direkt aus Session 19
-- [ ] **Probefahrt + FPS-Messung:** Brücken-/Tunnel-Kreuzungen, futuristische Schleusen, verzweigte Höhlen, hohe Tunnel (Aquilaris/Ando Prime), feine Blitze
-- [ ] **Mehr HQ-Assets:** Schneekiefern mit Nadel-Karten, Kakteen/Farne mit Fototextur, Felsbrocken mit Displacement
-- [ ] **Weitere Foto-Texturen:** Schnee/Eis, Metallplatten, Lava-Kruste; Fotos optional in 1024 px
+## 0. Direkt aus Session 20
+- [ ] **Probefahrt + FPS-Messung auf echter GPU** (weiter offen – die Sandbox rendert nur in Software): durchgehende Höhlen und Gabelungen, neue Tunnelhöhen (27–30 m), See-Passagen, Untergrund-Physik (ist Eis mit −25 % Haftung fair?), Oovo-Mond
+- [ ] **HQ-Farne:** Wedel als Alpha-Karten mit Textur in `groundCover.ts` (Schneekiefern, Felsbrocken, Kakteen sind erledigt)
+- [ ] **Höhlen-Optik prüfen:** Felsschichtung läuft am Gewölbe stark gebogen (Textur folgt dem Bogen); Vulkan-Höhle ist ohne Zusatzlicht fast schwarz – ggf. mehr Glutadern/Lampen
+- [ ] **Schnee-Fotoset:** zeigt auf Ando Prime fußspurartige Flecken – ggf. anderes CC0-Set (`tools/photos/pbr.py`)
+- [ ] **Fahrbahn faltet sich in sehr engen Knicken weiter offener Flächen** (halbe Breite > Kurvenradius; besteht seit Session 18): Boonta 3462–3487 (Breite/Radius 2,8) und 2159–2178, Mos Espa 4671–4692, Aquilaris 4521–4534. Anzeige: `tools/ci/info.ts`, Zeile `fold`. Lösung in `trackBuilder.ts → controlPoints` (Breite an den Radius koppeln oder Knick entschärfen)
+- [ ] **Build-Größe 17,5 MB** (Fotosets): optional WebP/AVIF oder 512-px-Sets für die Voreinstellung „Niedrig"
+- [ ] **Aufräumen:** `tools/harness/out/game.js` (19,6 MB Build-Artefakt) ist getrackt – aus dem Repo nehmen; `world.ts → place()`: der Früh-Ausstieg `if (count <= 0)` steht versehentlich hinter einem Kommentar
+
+## Erledigt (Session 20 – Höhlen, „Balken", Tunneldecken, Untergründe, Seen, Oovo-Mond, PBR-Fotosets, HQ-Assets)
+- [x] **Bugs behoben:** „Balken" in Schrägkurven (Pfeilerkappen folgen der Überhöhung), Tunneldecken +6,5–7,5 m mit breitem Gewölbe (Superellipse) und Kamera im Gewölbe, Höhlen durchgehend und an Gabelungen verschmolzen
+- [x] **25 Untergründe mit eigener Fahrphysik** auf allen 13 Strecken (Eis, Pulverschnee, Dünen, Schlamm, Lava …), HUD-Zeile, Staubfahne in Untergrundfarbe
+- [x] **Seen und Plateaus als offene Passage:** Eissee, Lavasee, Methansee, Sumpf, Spiegelsee, Meer (Aquilaris), Felsplateau
+- [x] **Oovo IV:** Mondoberfläche mit Kratern, Stationsdecks, Gasriese am Himmel
+- [x] **15 PBR-Fotosets (CC0, 1024 px)** mit echten Normal-Maps: Fels, Klippe, Sand, Schnee, Pulverschnee, Eis, Lava, Asche, Waldboden, Schlamm, Kies, Riff, Regolith, Metallplatten, rissiger Lehm
+- [x] **HQ-Assets:** Schneekiefern mit Nadel-Karten, Felsbrocken mit Displacement aus der Textur-Höhe, Kakteen mit Rippen-/Dornen-Haut
+- [x] **Textur-Cache gibt alte Welten frei**, Strecken-Dump `tools/ci/info.ts`, Harness-Ansichten (Sonde, Dekor-Nahaufnahme, Bench)
 
 ## Erledigt (Session 19 – Bugfixes, Brücken/Kreuzungen, Schleusen, verzweigte Höhlen, Pod-Aufwertung)
 - [x] **Bugs behoben:** hohe Tunneldecken (Ando Prime 22,5 m, Aquilaris 19,5 m, Höhlen bis 38 m), C¹-stetiger Talnebel ohne schwebende Schicht am Hang, straßenkonforme Bodenplatten/Ladepads/Vents, tief verankerte Bögen & Strecken-Assets, saubere Abkürzungs-Einmündung auf Dschungelfluss-Sprint
@@ -23,7 +36,7 @@
 ## 3. Performance & Tooling
 - [ ] **`npm run check` in GitHub Actions** (Push auf `B`), `check:gpu` als optionaler Job
 - [ ] **Harness:** WebGPU-Screenshots im headless Chrome reparieren (weiß; nur Konsolencheck möglich)
-- [ ] **Fern-LOD auch für Kiefern/Tafelberge**, falls die Messung es rechtfertigt
+- [ ] **Fern-LOD auch für Tafelberge**, falls die Messung es rechtfertigt (Kiefern und Felsbrocken haben seit Session 20 einen Zwilling)
 
 ## Erledigt (Session 18 – Erweiterung, Höhlen, HQ-Bäume, Foto-Texturen)
 - [x] **Alle Strecken länger** (7,0–13,9 km), **mehr Kurven** (eingefügte S-Kurven), **offene Flächen** (bis ~108 m breit)

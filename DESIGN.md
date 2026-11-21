@@ -35,16 +35,38 @@ Schwarz/Dunkelbraun, Glas-Panels, Amber-Akzent (`#ffb040`), Orbitron + Rajdhani,
 | Vulkanwelt | `lava` (Pahoehoe-Stricke + Schlackeporen) | Basaltsäulen, Lavakrusten, treibendes Magmameer, glühende Schlucht-Lavafälle |
 | Kristall / Aquilaris | `crystal` / `beach` | Kristall-Spaltstufen / Atoll-Inseln, Felsnadeln, Uferschaum, Küsten-Wasserfälle |
 
+## Untergründe, Seen, Gewölbe, Mondoberfläche (Session 20)
+Leitidee: **Der Boden erzählt den Planeten.** Eine Strecke ist kein einheitliches Band mehr: alle paar hundert Meter wechselt, worüber der Pod schwebt – und man sieht und spürt es.
+
+| Thema | Gestaltung |
+|---|---|
+| Passagen-Rhythmus | allgemeine Passagen wechseln etwa alle 500 m zwischen zwei bis drei Böden der Welt; gebautes Renndeck nur an Start/Ziel, Brücken, Tunneln, Rampen und Zero-G-Röhren |
+| Übergang | Naturboden löst sich über 30 m fleckig in den nächsten auf, nie mit hartem Schnitt; wo das Renndeck an einen See stößt, franst es über 26 m aus |
+| See-Passage | die offene Fläche **ist** die Oberfläche: eben, bis über 100 m breit, kein Geländer. Rand = schlanke Baken mit Leuchtkopf in `barrierColor`; das Ufer ragt immer über die Flüssigkeit |
+| Flüssigkeiten | Eissee: blankes dunkles Eis, spiegelt den Himmel · Lavasee: dunkle Kruste mit Glutadern · Methansee: gelbgrün, milchig · Sumpf: dunkles Wasser mit Algenflecken · Spiegelsee: fast schwarzviolett, glatt · Meer: der Ozean von Aquilaris selbst |
+| Plateau | heller, rissiger Lehmboden; am Rand fällt eine Felskante 17 m ab |
+| Fahrgefühl | spürbar, aber fair: höchstens 25 % weniger Haftung (Eis) oder 8 % weniger Tempo (Sumpf); gilt für alle Pods; das HUD nennt Boden und Wirkung in zwei Wörtern |
+| Staubfahne | trägt die Farbe des Bodens (Schnee weiß, Asche dunkelgrau, Mondstaub grau); über Wasser, Sumpf und Spiegelsee Gischt; über Lava zusätzlich Glutfunken; auf blankem Eis, Stationsdeck und Kristall keine |
+| Tunnel-Gewölbe | Superellipse: fast senkrechte Wände, breite flache Decke – auch am Rand bleibt Luft. 27 m hoch (Ando Prime 30 m). Die Kamera bleibt immer im Gewölbe |
+| Höhle | ein durchgehender Raum ohne Lücken. Kammern öffnen sich nach oben (bis 45 m) und zur Seite (die Piste wird breiter). An Gabelungen verschmelzen beide Röhren zu einer Halle mit Felspfeiler |
+| Oovo IV | Mond statt Leere: grauer Regolith, Krater, flache Kraterränder am Horizont; Stationsdecks aus hellen Metallplatten; Gasriese mit Ring tief am Himmel; flache Sonne (19°) für lange Schatten |
+| Foto-Sets | echte Materialien (Farbe, Normal-Map, Rauheit, Höhe). Die Struktur kommt vom Foto, die Farbe wird auf die Palette der Welt gezogen |
+| Schneekiefer (HQ) | hängende Nadelzweige in Quirlen, Schnee auf den Oberseiten, dunkler Stamm mit Rinde; aus der Ferne Kegel-Etagen gleicher Silhouette |
+| Felsbrocken (HQ) | kantiger Bruchkörper; das Relief folgt der Textur (Riss im Bild = Kerbe im Stein); große Bruchkanten hart, verwitterte Flächen weich schattiert |
+| Kaktus (HQ) | Rippen dunkeln ins Tal ab; auf jedem Rippenkamm helle Areolen mit Dornenfächer |
+
+- **Alles unter einer überhöhten Fahrbahn folgt der Überhöhung** (Pfeilerkappen, Träger). Ein waagerechter Balken sticht in der Kurve durch die Fahrbahn.
+
 ## Überführungen, Schleusen, verzweigte Höhlen, Blitze & Pods (Session 19)
 - **Über-/Unterführungen:** Wo sich eine Strecke kreuzt (≥ 35 m Höhenabstand), trägt die obere Piste einen abgeschrägten Stahl-Hohlkasten mit Querträgern, seitlichen Leuchtstreifen, Widerlagern und Zwillingspfeilern; die untere führt durch einen 20-m-Unterführungstunnel oder frei unter dem Viadukt hindurch. Auf Karte und Minimap hebt eine dunkle Kontur die Brücke ab.
 - **Futuristische Schleusen (statt Fallgitter):** 3-spurige Panzerschleuse mit Überkopf-Kammer, hydraulischen Verbund-Schotts, Plasma-Dichtnaht und dezentem Warn-Energiefeld; seitlich wachsen Fels-, Gletscher-, Kristall- oder Stations-Monolithen organisch in die Landschaft.
-- **Hohe Tunnel & verzweigte Höhlen:** Luftige Querschnitte (19,5 m Standard/Unterwasser, 22,5 m Ando Prime, 20,5–38 m Höhlen). Höhlenkammern weiten sich mit modelliertem Felsboden, Leuchtadern und Stalagmiten; an Gabelungen teilt ein Felspfeiler mit Doppel-Leuchtpfeil den Weg in zwei vollwertige Röhren, die sich wieder vereinen.
+- **Hohe Tunnel & verzweigte Höhlen:** Luftige Querschnitte (Maße und Profil seit Session 20: siehe oben). Höhlenkammern weiten sich mit modelliertem Felsboden, Leuchtadern und Stalagmiten; an Gabelungen teilt ein Felspfeiler mit Doppel-Leuchtpfeil den Weg in zwei vollwertige Röhren, die sich wieder vereinen.
 - **Atmosphäre & Blitze:** Höhennebel bleibt unterhalb des Talbodens C¹-stetig dicht (keine schwebende Nebelkante am Hang). Gewitterblitze sind fein fraktal verästelt (64-Segment-Hauptkanal, 5 Hauptäste, 7 Haarzweige).
 - **Podracer-Aufwertung:** 6 Lackiermuster × 3 Finishes (Klarlack, Metallic, Matt), Spezies-spezifische Pilotenköpfe/-Helme, Überrollbügel, Einlass-Statoren, Plasma-Koppler, seitengetrennt flatternde Schadensklappen und dezentes Hitzeflimmern auch hinter nahen Gegner-Düsen (weiterhin ohne aufgesetzte Nummernschilder).
 
 ## Streckenrhythmus, Vegetation, Foto-Detail (Session 18)
 - **Rhythmus einer Strecke:** enge Passagen (Schlucht, Tunnel, Höhle) wechseln mit S-Kurven und zwei **weiten offenen Flächen**, auf denen das Feld auffächern kann. Tunnel sind lang genug, um als eigener Abschnitt zu wirken (≥ 260 m).
-- **Höhle:** Folge von Kammern statt gleichförmiger Röhre – Decke wölbt sich in jeder Kammer hoch, dazwischen Tageslicht durch Lichtschächte; Felssäulen stehen frei in den Kammern, Stalagmiten säumen den Rand.
+- **Höhle:** Folge von Kammern statt gleichförmiger Röhre – Decke wölbt sich in jeder Kammer hoch; Felssäulen stehen frei in den Kammern, Stalagmiten säumen den Rand. (Die offenen Lichtschächte zwischen den Kammern sind seit Session 20 entfallen: die Höhle ist durchgehend.)
 - **Baum (HQ):** Silhouette aus Schirmkronen bleibt; die Oberfläche besteht aus erkennbaren Zweigen mit Einzelblättern (hell- bis dunkelgrün gemischt), der Kern dahinter ist dunkel, der Stamm trägt fotografierte, leicht bemooste Rinde. Aus der Ferne wechselt der Baum auf glatte Kronenlappen gleicher Form.
 - **Foto-Detail:** echte Fotos liefern Feinstruktur (Risse, Körnung, Rippel), nie die Farbe – Farbe, Schichtung und Stimmung kommen weiter aus der Palette der Welt. So bleibt roter Fels rot und Dschungelfels grün, bekommt aber echte Oberfläche.
 - **Dichte:** mit der Streckenlänge wachsen Felsen, Bäume, Landmarken mit; nahe der Fahrbahn bleibt die Sicht frei.
@@ -170,7 +192,7 @@ Leitidee: **Silhouette vor Textur** – jede Form muss aus 300 m als Gestein, Ba
 | Felsnadel (Hoodoo) | 8–11 Schichten, harte Lagen kragen aus, weiche weichen zurück; Erosionsrillen; Schuttfuß; Deckstein; leichte Neigung | 3 |
 | Tafelberg | Schutthalde → Klippe mit Rinnen → Bank → Klippe → Plateau; gelappter Grundriss | 2 |
 | Urwaldriese | 5–6 Brettwurzeln, gebogener Stamm, 4 Astgabeln, 6–10 flache Kronenlappen + Büschel, Lianen; unten dunkel, oben sonnig gelbgrün | 2 |
-| Schneekiefer | 4–6 sternförmige, hängende Astetagen; Schnee nur auf Oberseiten | 1 (Höhe variiert) |
+| Schneekiefer | 4–6 sternförmige, hängende Astetagen; Schnee nur auf Oberseiten (seit Session 20 durch die HQ-Kiefer ersetzt; diese Form bleibt nur für Umgebungen ohne Canvas, z. B. Node-Audits) | 1 (Höhe variiert) |
 | Eis / Kristall | 5–8 sechseckige Prismen mit exzentrischer Spitze, Bruchstücke am Fuß, flat-shaded, leicht emissiv | 2 |
 | Saguaro | 8 Rippen, runde Kuppe, 2–3 aufgebogene Arme | 2 |
 

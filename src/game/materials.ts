@@ -6,7 +6,7 @@ const TSL = TSLmod as any;
  *  compiled with `wet > 0` (dynamic rain → the road gets wet and dries again). Keep it at 1 on worlds without dynamic rain. */
 export const WEATHER: { wet: { value: number } } = { wet: TSL.uniform(1) };
 const {
-  Break, Fn, If, Loop, abs, clamp, color, cross, dFdx, dFdy, dot, float, inverseSqrt, length, materialColor, materialRoughness, max, mix,
+  Break, Fn, If, Loop, abs, attribute, clamp, color, cross, dFdx, dFdy, dot, float, inverseSqrt, length, materialColor, materialRoughness, max, mix,
   normalLocal, normalView, normalViewGeometry, normalWorldGeometry, normalize, positionLocal, positionView, positionWorld, pow,
   oneMinus, smoothstep, texture, uniform, uv, vec2, vec3, vertexColor, floor, fract, min, sin, time,
 } = TSL;
@@ -50,6 +50,10 @@ export interface SurfaceOpts {
   snow?: number;
   strata?: StrataDef | null;
   cloud?: number;
+  /** Session 20: noise dissolve driven by the vertex attribute `aFade` (0 = gone … 1 = solid) – ragged transitions between ground surfaces */
+  fade?: boolean;
+  /** UVs are world-space (x / tile, z / tile): no edge-based effects (edge snow, edge-locked displacement) */
+  worldUV?: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -150,7 +154,7 @@ export function surfaceMaterial(set: TexSet, o: SurfaceOpts = {}) {
     }
   }
   if (snowAmt > 0) {
-    const e = min(uv().x, oneMinus(uv().x));
+    const e = o.worldUV ? float(1) : min(uv().x, oneMinus(uv().x));
     snowM = oneMinus(smoothstep(0.012, 0.075, e.add(texture(macro, wpos.mul(1 / 9)).g.sub(0.5).mul(0.065)))).mul(snowAmt);
     snowM = max(snowM, smoothstep(0.63, 0.74, texture(macro, wpos.mul(1 / 23).add(0.1)).r).mul(0.45 * snowAmt));
   }
@@ -223,7 +227,13 @@ export function surfaceMaterial(set: TexSet, o: SurfaceOpts = {}) {
   if (set.emissiveMap) mat.emissiveNode = texture(set.emissiveMap, pUV).rgb.mul(color(o.emissive ?? '#ffffff')).mul(o.emissiveIntensity ?? 1.6);
 
   // ---- edge-tapered road micro-relief (0 at uv.x=0/1 so road-to-skirt & kerb seams never crack open) ----
-  if ((o.displace ?? 0) > 0) {
+  if (o.fade) {
+    // visible where the noise lies below the fade value: grains / hollows of the surface appear first, a ragged front follows
+    const fz = texture(macro, wpos.mul(1 / 7.3)).r.mul(0.5).add(texture(macro, wpos.mul(1 / 2.1).add(0.21)).g.mul(0.32)).add(baseSample.a.mul(0.18));
+    mat.opacityNode = smoothstep(-0.04, 0.04, attribute('aFade', 'float').mul(1.24).sub(0.12).sub(fz));
+    mat.alphaTest = 0.5;
+  }
+  if ((o.displace ?? 0) > 0 && !o.worldUV) {
     const amp = Math.min(0.08, o.displace! * 0.22);
     const edgeLock = smoothstep(0.0, 0.14, min(uv().x, oneMinus(uv().x)));
     mat.positionNode = positionLocal.add(normalLocal.mul(texture(set.map, baseUV).level(2).a.mul(amp).mul(edgeLock)));

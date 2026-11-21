@@ -93,6 +93,68 @@ export function rockGeometry(detail: number, seed: number, stretch = 1): THREE.B
   return g;
 }
 
+/** HQ boulder (Session 20): the fractured body of `rockGeometry` at a finer tessellation with REAL displacement – every vertex moves
+ *  along its smoothed normal by the height channel of the rock texture (cracks and bedding of the picture become relief in the
+ *  silhouette) plus ridged 3D noise for crags. Texture coordinates are box-projected per face: no pinched pole on top of the rock and
+ *  the same texel density everywhere. Welded by position → watertight. Creased normals keep the big cleavage edges crisp while the
+ *  weathered faces shade smoothly.
+ *  `height(u, v)` → 0..1 at the box-projected texture coordinates (undefined → noise only); `tile` = rock units per uv unit.
+ *  The far LOD twin is the same call with a low `detail` (same displacement field, same texture mapping → no pop in the picture). */
+export function boulderGeometry(detail: number, seed: number, stretch = 1, height?: (u: number, v: number) => number, tile = 4.8, amp = 0.1): THREE.BufferGeometry {
+  const g = rockGeometry(detail, seed, stretch); // non-indexed: three own corners per triangle
+  const pos = g.attributes.position as THREE.BufferAttribute, n = pos.count;
+  // --- weld the corners by position
+  const ids = new Int32Array(n), look = new Map<number, number>(); let m = 0;
+  for (let i = 0; i < n; i++) {
+    const k = (Math.round((pos.getX(i) + 4) * 1024) * 8192 + Math.round((pos.getY(i) + 4) * 1024)) * 8192 + Math.round((pos.getZ(i) + 4) * 1024);
+    let id = look.get(k); if (id === undefined) { id = m++; look.set(k, id); } ids[i] = id;
+  }
+  const P = new Float32Array(m * 3), N = new Float32Array(m * 3);
+  for (let i = 0; i < n; i++) { const o = ids[i] * 3; P[o] = pos.getX(i); P[o + 1] = pos.getY(i); P[o + 2] = pos.getZ(i); }
+  const faceN = (t: number): V3 => {
+    const a = ids[t] * 3, b = ids[t + 1] * 3, c = ids[t + 2] * 3;
+    const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2], vx = P[c] - P[a], vy = P[c + 1] - P[a + 1], vz = P[c + 2] - P[a + 2];
+    return [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+  };
+  for (let t = 0; t < n; t += 3) { const f = faceN(t); for (let k = 0; k < 3; k++) { const o = ids[t + k] * 3; N[o] += f[0]; N[o + 1] += f[1]; N[o + 2] += f[2]; } } // area-weighted
+  // --- displacement along the smoothed normal
+  const baseY = -0.42 * stretch;
+  for (let v = 0; v < m; v++) {
+    const o = v * 3, x = P[o], y = P[o + 1], z = P[o + 2], l = Math.hypot(N[o], N[o + 1], N[o + 2]) || 1, nx = N[o] / l, ny = N[o + 1] / l, nz = N[o + 2] / l;
+    let h = 0.5;
+    if (height) { // the three box projections, blended by the normal → one value per welded vertex
+      const wx = nx * nx * nx * nx, wy = ny * ny * ny * ny, wz = nz * nz * nz * nz;
+      h = (wx * height(z / tile, y / tile) + wy * height(x / tile, z / tile) + wz * height(x / tile, y / tile)) / (wx + wy + wz + 1e-9);
+    }
+    const ridge = Math.max(0, 1 - Math.abs(2 * n3(x * 2.6 + seed * 1.7, y * 2.6, z * 2.6) - 1) * 2.2); // crests where the noise crosses its mean
+    const fine = n3(x * 6.1, y * 6.1 + seed, z * 6.1) - 0.5;
+    const d = ((h - 0.5) * 2.2 + (ridge - 0.65) * 0.9 + fine * 1.6) * amp * sstep(baseY, baseY + 0.25, y); // the settled base stays flat
+    P[o] += nx * d; P[o + 1] += ny * d; P[o + 2] += nz * d;
+  }
+  // --- write back: positions, box-projected uv, creased normals (smooth below 52°, crisp above)
+  const uv = new Float32Array(n * 2), nr = new Float32Array(n * 3), fn = new Float32Array(n), CREASE = Math.cos(52 * Math.PI / 180);
+  const fans: number[][] = Array.from({ length: m }, () => []);
+  for (let t = 0; t < n; t += 3) {
+    const f = faceN(t), l = Math.hypot(f[0], f[1], f[2]) || 1; fn[t] = f[0] / l; fn[t + 1] = f[1] / l; fn[t + 2] = f[2] / l;
+    const ax = Math.abs(f[0]), ay = Math.abs(f[1]), az = Math.abs(f[2]);
+    for (let k = 0; k < 3; k++) {
+      const o = ids[t + k] * 3, x = P[o], y = P[o + 1], z = P[o + 2]; pos.setXYZ(t + k, x, y, z); fans[ids[t + k]].push(t);
+      if (ay >= ax && ay >= az) { uv[(t + k) * 2] = x / tile; uv[(t + k) * 2 + 1] = z / tile; } // top / underside
+      else if (ax >= az) { uv[(t + k) * 2] = z / tile; uv[(t + k) * 2 + 1] = y / tile; } // sides: v runs up → bedding stays horizontal
+      else { uv[(t + k) * 2] = x / tile; uv[(t + k) * 2 + 1] = y / tile; }
+    }
+  }
+  for (let t = 0; t < n; t += 3) for (let k = 0; k < 3; k++) {
+    let sx = 0, sy = 0, sz = 0;
+    for (const q of fans[ids[t + k]]) if (fn[q] * fn[t] + fn[q + 1] * fn[t + 1] + fn[q + 2] * fn[t + 2] > CREASE) { sx += fn[q]; sy += fn[q + 1]; sz += fn[q + 2]; }
+    const l = Math.hypot(sx, sy, sz) || 1, o = (t + k) * 3; nr[o] = sx / l; nr[o + 1] = sy / l; nr[o + 2] = sz / l;
+  }
+  pos.needsUpdate = true;
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setAttribute('normal', new THREE.BufferAttribute(nr, 3));
+  g.computeBoundingSphere(); g.name = 'boulder'; // name = handle for the harness close-up view `g_<name>`
+  return g;
+}
+
 /** Hoodoo / rock needle: alternating hard & soft strata (overhanging ledges), fluted erosion, talus skirt, weathered caprock, slight lean. Height 0..1. */
 export function spireGeometry(seed: number, radial = 20, strata = 11): THREE.BufferGeometry {
   const r = rng(seed * 53 + 3); const hard: number[] = []; for (let s = 0; s <= strata; s++) hard.push(r());
@@ -186,6 +248,60 @@ function plainUV(g: THREE.BufferGeometry) { const uv = g.attributes.uv as THREE.
 /** Emergent rainforest tree (Session 18, HQ): buttress roots, bent trunk and forked boughs with a real bark texture, a dark canopy core
  *  and a shell of alpha-tested LEAF-SPRIG CARDS around every canopy lobe (16 per lobe at high quality), hanging lianas.
  *  `lod = true` → far model: same silhouette from plain lobes only (no cards), ~1/3 of the triangles. Material: foliage.ts → treeMaterial. */
+/** Session 20 – HQ snow pine (Ando Prime): bark-photo trunk, 10 whorls of drooping needle-branch cards (alpha, pine atlas of
+ *  foliage.pineMaterial), a hanging side card per branch for depth, and snow sheets lying on the branches. ~700 triangles.
+ *  `lod` = far twin for the same material: four plain cone tiers, green below / snow on top. Height 11 (like pineGeometry). */
+export function snowPineGeometry(seed: number, quality: number, lod = false): THREE.BufferGeometry {
+  const r = rng(seed * 131 + 5), parts: THREE.BufferGeometry[] = [], H = 11;
+  parts.push(paint(barkUV(smooth(ringSurface(lod ? 5 : 8, 5, (a, j) => { const t = j / 4, rad = lerp(0.36, 0.06, t) * (j === 0 ? 1.5 : 1); return [Math.cos(a) * rad, t * H, Math.sin(a) * rad]; })), 3), (_x, y) => { const m = 0.72 + h2(y * 3.1, 2) * 0.3; return [0.66 * m, 0.56 * m, 0.5 * m]; }));
+  if (lod) {
+    for (let k = 0; k < 4; k++) {
+      const f = k / 3, y0 = 1.9 + f * 6.3, rad = lerp(2.7, 0.8, f), h = lerp(3.4, 2.5, f);
+      parts.push(paint(plainUV(flat(new THREE.ConeGeometry(rad, h, 7, 1, true).translate(0, y0 + h / 2, 0))), (x, _y, z, ny) => { const d = Math.hypot(x, z) / rad; return d < 0.74 && ny > 0.1 ? [0.84, 0.89, 0.95] : [0.06 + d * 0.04, 0.17 + d * 0.07, 0.11 + d * 0.02]; }));
+    }
+    return merge(parts);
+  }
+  const P: number[] = [], Nn: number[] = [], U: number[] = [], C: number[] = [];
+  /** textured quad a→b (inner edge) … d→c (outer edge); u runs inner → outer over [f0, f1] of the tile, normals biased upwards (soft light) */
+  const quad = (a: V3, b: V3, c: V3, d: V3, tile: number, f0: number, f1: number, col: V3) => {
+    const [u0, v0, u1] = LEAF_TILE(tile), v1 = v0 + 230 / 512, ua = u0 + (u1 - u0) * f0, ub = u0 + (u1 - u0) * f1;
+    const ex = d[0] - a[0], ey = d[1] - a[1], ez = d[2] - a[2], fx = b[0] - a[0], fy = b[1] - a[1], fz = b[2] - a[2];
+    let nx = fy * ez - fz * ey, ny = fz * ex - fx * ez, nz = fx * ey - fy * ex; if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; }
+    const l0 = Math.hypot(nx, ny, nz) || 1; nx = nx / l0 * 0.55; ny = ny / l0 * 0.55 + 0.7; nz = nz / l0 * 0.55; const l1 = Math.hypot(nx, ny, nz);
+    for (const [p, u, v] of [[a, ua, v0], [b, ua, v1], [c, ub, v1], [a, ua, v0], [c, ub, v1], [d, ub, v0]] as [V3, number, number][]) { P.push(p[0], p[1], p[2]); Nn.push(nx / l1, ny / l1, nz / l1); U.push(u, v); C.push(col[0], col[1], col[2]); }
+  };
+  const whorls = quality >= 2 ? 10 : 7;
+  for (let k = 0; k < whorls; k++) {
+    const f = k / (whorls - 1), y = lerp(1.7, 9.5, f), L = lerp(3.3, 0.9, Math.pow(f, 0.85)), nb = Math.round(lerp(7, 4, f)), rot = r() * TAU, shade = lerp(0.72, 1.05, f);
+    for (let i = 0; i < nb; i++) {
+      const a = rot + (i + (r() - 0.5) * 0.5) / nb * TAU, ca = Math.cos(a), sa = Math.sin(a), len = L * (0.82 + r() * 0.36), droop = len * (0.3 + r() * 0.16), w = len * (0.42 + r() * 0.1), tile = Math.floor(r() * 3);
+      // branch spine: out of the trunk, slightly up, then drooping; card edges ± half width across
+      const sp = (t: number): V3 => [ca * (0.1 + len * t), y + len * 0.1 * Math.sin(t * Math.PI) - droop * t * t, sa * (0.1 + len * t)];
+      const edge = (t: number, hw: number, lift: number): [V3, V3] => { const c0 = sp(t); return [[c0[0] - sa * hw, c0[1] + lift - hw * 0.12, c0[2] + ca * hw], [c0[0] + sa * hw, c0[1] + lift - hw * 0.12, c0[2] - ca * hw]]; };
+      const col: V3 = [shade * (0.9 + r() * 0.2), shade * (0.92 + r() * 0.16), shade * (0.88 + r() * 0.2)];
+      const [a0, b0] = edge(0, w * 0.34, 0), [a1, b1] = edge(0.5, w * 0.5, 0), [a2, b2] = edge(1, w * 0.3, 0);
+      quad(a0, b0, b1, a1, tile, 0, 0.5, col); quad(a1, b1, b2, a2, tile, 0.5, 1, col);
+      if (quality >= 2) { // hanging side card: needles seen from the side
+        const c0 = sp(0.08), c1 = sp(0.95), hh = w * 0.42;
+        quad([c0[0], c0[1] + 0.05, c0[2]], [c0[0], c0[1] - hh, c0[2]], [c1[0], c1[1] - hh * 0.5, c1[2]], [c1[0], c1[1] + 0.05, c1[2]], (tile + 1) % 3, 0, 1, [col[0] * 0.78, col[1] * 0.8, col[2] * 0.8]);
+      }
+      if (r() < 0.86) { // snow lying on the branch (not on every one)
+        const [s0, t0] = edge(0.04, w * 0.3, 0.07), [s1, t1] = edge(0.5, w * 0.42, 0.08), [s2, t2] = edge(0.9, w * 0.22, 0.07), sc: V3 = [1.0, 1.02, 1.05];
+        quad(s0, t0, t1, s1, 3, 0, 0.5, sc); quad(s1, t1, t2, s2, 3, 0.5, 1, sc);
+      }
+    }
+  }
+  for (let i = 0; i < 3; i++) { // top spike: three crossed needle cards + snow cap
+    const a = i / 3 * Math.PI, ca = Math.cos(a) * 0.55, sa = Math.sin(a) * 0.55;
+    quad([-ca, 9.3, -sa], [ca, 9.3, sa], [ca * 0.2, H + 0.6, sa * 0.2], [-ca * 0.2, H + 0.6, -sa * 0.2], i, 0.1, 0.95, [1, 1, 1]);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(Nn, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+  parts.push(g, paint(plainUV(flat(new THREE.ConeGeometry(0.22, 0.9, 5).translate(0, H + 0.7, 0))), () => [0.88, 0.93, 0.98]));
+  return merge(parts);
+}
+
 export function jungleTreeGeometry(seed: number, quality: number, lod = false): THREE.BufferGeometry {
   const r = rng(seed * 211 + 9); const parts: THREE.BufferGeometry[] = [];
   const bend = (t: number): V3 => [Math.sin(t * 2.4 + 0.4) * 0.55 * t, t * 12.4, Math.cos(t * 1.9) * 0.35 * t - 0.35 * t];
@@ -270,7 +386,16 @@ export function cactusGeometry(seed: number): THREE.BufferGeometry {
     for (let j = 0; j < n; j++) for (let i = 0; i < cols; i++) if (i % 2 === 1) { // pinch every other column inward → ribs
       const k = j * cols + i, c = pts[j]; p.setXYZ(k, lerp(c[0], p.getX(k), 0.8), lerp(c[1], p.getY(k), 0.8), lerp(c[2], p.getZ(k), 0.8));
     }
-    core.computeVertexNormals(); return smooth(core);
+    core.computeVertexNormals();
+    // Session 20 – skin texture coordinates (foliage.ts → cactusMaterial): u = rib phase (integer on a rib crest, .5 in the valley),
+    // v = length along the column / 0.42 → the areoles sit on the crests at a fixed spacing whatever the size of the column
+    const uv = core.attributes.uv as THREE.BufferAttribute; let len = 0;
+    for (let j = 0; j < n; j++) {
+      if (j > 0) len += Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1], pts[j][2] - pts[j - 1][2]);
+      for (let i = 0; i < cols; i++) uv.setXY(j * cols + i, i / 2, len / 0.42);
+    }
+    uv.setXY(n * cols, ribs / 2, (len + rad * 0.8) / 0.42); // tip cap
+    return smooth(core);
   };
   const H = 4.3 + r() * 0.5; const trunk: V3[] = []; for (let j = 0; j <= 8; j++) trunk.push([Math.sin(j * 0.5) * 0.04, j / 8 * H, 0]);
   parts.push(column(trunk, 0.4, 8));
@@ -280,7 +405,8 @@ export function cactusGeometry(seed: number): THREE.BufferGeometry {
     const pts: V3[] = [[cx * 0.2, y0, cz * 0.2], [cx * out * 0.75, y0 + 0.08, cz * out * 0.75], [cx * out, y0 + 0.38, cz * out], [cx * out, y0 + 0.38 + up * 0.5, cz * out], [cx * out * 0.98, y0 + 0.38 + up, cz * out * 0.98]];
     parts.push(column(pts, 0.24, 6));
   }
-  return merge(parts);
+  const out = merge(parts); out.name = 'cactus';
+  return out;
 }
 
 /** Racing-blimp: gored teardrop hull, swept cruciform tail fins, gondola on struts, twin engine nacelles. Length ≈ 4.6 (z), radius ≈ 1. */

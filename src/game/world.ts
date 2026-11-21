@@ -3,20 +3,22 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { ThemeDef } from './data';
 import type { GfxSettings } from './settings';
 import { detailKindForTheme, generateTexture, generateTextures, type TexSpec } from './textures';
-import { surfaceMaterial } from './materials';
-import { mulberry32, type Path, type Sample, type TrackData, type Obstacle } from './trackBuilder';
+import { surfaceMaterial, type SurfaceOpts } from './materials';
+import { SURFACES, surfacePalette } from './surfaces';
+import { TUNNEL_SHOULDER, mulberry32, tunnelArc, tunnelProfile, type Path, type Sample, type TrackData, type Obstacle } from './trackBuilder';
 import { addProps, type Emitter } from './props';
 import { addMechProps } from './mechProps';
 import { addSciFi, oceanWindowMaterial } from './scifi';
-import { treeMaterial } from './foliage';
+import { cactusMaterial, pineMaterial, treeMaterial } from './foliage';
 import { TUNNEL_DECK } from './physics';
 import { addTrackDetail } from './trackDetail';
 import { StaticBatcher } from './trackMesh';
-import { airshipGeometry, pylonGeometry, cactusGeometry, crystalClusterGeometry, jungleTreeGeometry, mesaGeometry, pineGeometry, rockGeometry, spireGeometry } from './decorGeo';
+import { airshipGeometry, boulderGeometry, pylonGeometry, cactusGeometry, crystalClusterGeometry, jungleTreeGeometry, mesaGeometry, pineGeometry, rockGeometry, snowPineGeometry, spireGeometry } from './decorGeo';
 import { addSkyline, buildTerrain, makeTerrainField } from './terrain';
 import { buildSetPieces, type SetPieceFx } from './setPieces';
 import { addLandmarks } from './landmarks';
-import { lavaSeaMaterial, layersFor, STRATA, terrainMaterial, waterMaterial } from './terrainMaterial';
+import { lavaSeaMaterial, layersFor, LIQUIDS, STRATA, terrainMaterial, waterMaterial } from './terrainMaterial';
+import { hasPbr } from './pbrTex';
 import { buildGroundCover } from './groundCover';
 import { buildSmoke, type SmokeSrc } from './smoke';
 import { buildLife, type LifeAudio, type PodPos } from './wildlife';
@@ -56,14 +58,20 @@ export interface World {
 const yield_ = () => new Promise(r => setTimeout(r, 0));
 
 /** The large texture sets a world needs – exported so Game can start synthesising them before the renderer is even initialised. */
+/** Session 20: which real photo set (pbrTex.ts) replaces a procedural texture – graded to the palette of the world. */
+const PHOTO_WALL: Record<string, string> = { rock: 'cliff', basalt: 'cliff', snow: 'cliff' };
+const PHOTO_GROUND: Record<string, string> = { desert: 'sand', mesa: 'sand', ice: 'snow', jungle: 'soil', malastare: 'soil', aquilaris: 'sand', oovo: 'regolith', crystal: 'rock' };
+const PHOTO_BASIN: Record<string, string> = { desert: 'cracked', mesa: 'cracked', ice: 'ice', jungle: 'mud', malastare: 'mud', aquilaris: 'sand', oovo: 'regolith' };
+const OOVO_GROUND = ['#4a4c52', '#6e7078', '#96989e'];
 export function worldTextureSpecs(theme: ThemeDef, gfx: GfxSettings): TexSpec[] {
   const P = theme.palette, texRes = gfx.texRes, TL = layersFor(theme.id), lres = Math.min(1024, texRes);
   const specs: TexSpec[] = [
-    { kind: theme.road, palette: P.road, size: texRes, seed: 11 }, { kind: theme.wall, palette: P.wall, size: texRes, seed: 22 },
-    { kind: theme.ground, palette: P.ground, size: texRes, seed: 33, emissive: theme.emissiveGround },
-    { kind: 'gravel', palette: TL.gravel, size: lres, seed: 57 }, { kind: 'cracked', palette: TL.basin, size: lres, seed: 68, emissive: TL.basinEmissive },
+    { kind: theme.road, palette: P.road, size: texRes, seed: 11 }, { kind: theme.wall, palette: P.wall, size: texRes, seed: 22, photo: PHOTO_WALL[theme.wall] },
+    { kind: theme.ground, palette: theme.id === 'oovo' ? OOVO_GROUND : P.ground, size: texRes, seed: 33, emissive: theme.emissiveGround, photo: theme.emissiveGround ? undefined : PHOTO_GROUND[theme.id] },
+    { kind: 'gravel', palette: TL.gravel, size: lres, seed: 57, photo: 'gravel' },
+    { kind: 'cracked', palette: TL.basin, size: lres, seed: 68, emissive: TL.basinEmissive, photo: TL.basinEmissive ? undefined : PHOTO_BASIN[theme.id] },
   ];
-  if (TL.cliff) specs.push({ kind: 'rock', palette: TL.cliff, size: texRes, seed: 79 });
+  if (TL.cliff) specs.push({ kind: 'rock', palette: TL.cliff, size: texRes, seed: 79, photo: 'cliff' });
   return specs;
 }
 
@@ -95,13 +103,29 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   const roadDispOff = Math.min(0.08, disp * 0.22); // exact max offset of edge-locked road micro-relief
   const hwAvg = td.main.samples.reduce((acc, q) => acc + q.hw, 0) / td.N;
   const wallLedge = TL.ledgeColor && TL.ledgeAmt ? { color: TL.ledgeColor, amount: TL.ledgeAmt, rough: theme.id === 'ice' ? 0.66 : 0.86 } : undefined;
-  const roadMat = surfaceMaterial(roadTex, {
+  const roadOpts: SurfaceOpts = {
     cloud: theme.clouds * 0.4, parallax: plx * 0.026, layers,
     wet: theme.ambient === 'rain' ? 0.85 : theme.road === 'mud' ? 0.14 : 0,
     puddles: theme.ambient === 'rain' ? 0.38 : 0.24, rain: theme.ambient === 'rain',
     snow: theme.id === 'ice' ? 1 : theme.ambient === 'snow' ? 0.7 : 0, macro: 0.14, detail: 0.42, bump, displace: disp,
     micro: 0.92, microScale: [(2 * hwAvg) / 1.7, Math.max(24, hwAvg * 1.4) / 1.7],
     envMapIntensity: theme.road === 'ice' ? 1.6 : 0.65, emissive: theme.barrierColor, emissiveIntensity: 1.2,
+  };
+  const roadMat = surfaceMaterial(roadTex, roadOpts);
+  let roadFade: THREE.Material | null = null; // the built deck with a noise dissolve: 26 m aprons where it meets a lake / plateau
+  const roadFadeMat = () => { if (!roadFade) { roadFade = surfaceMaterial(roadTex, { ...roadOpts, displace: 0, fade: true }); if (theme.road === 'ice') (roadFade as THREE.MeshStandardMaterial).roughness = 0.6; disposables.push(roadFade); } return roadFade; };
+  // ---- Session 20: one material per ground surface used on this track (photo sets graded to the world palette, world-space UVs) ----
+  const usedSurf = [...new Set(td.paths.flatMap(pa => pa.samples.map(q => q.surf)))].filter(i => i > 0 && !!SURFACES[i].tex);
+  const surfSets = await generateTextures(usedSurf.map(i => { const t = SURFACES[i].tex!; return { kind: t.kind, palette: surfacePalette(theme.id, SURFACES[i]), size: Math.min(gfx.texRes, 1024), seed: 200 + i, emissive: t.emissive, photo: t.set || undefined }; }), aniso);
+  const surfMat = new Map<number, THREE.Material>();
+  usedSurf.forEach((i, k) => {
+    const t = SURFACES[i].tex!;
+    const m = surfaceMaterial(surfSets[k], {
+      worldUV: true, fade: true, cloud: theme.clouds * 0.4, parallax: plx * 0.02, layers, macro: 0.2, detail: 0.3, detailScale: 3.7, bump,
+      normalScale: t.normal ?? 1, roughness: t.rough ?? 1, metalness: t.metal ?? 0, micro: 0.5, microScale: [5, 5], detailKind: detailKindForTheme(theme.id),
+      envMapIntensity: t.env ?? 0.7, wet: t.wet ?? 0, puddles: 0.34, emissive: t.emissive, emissiveIntensity: 1.5,
+    });
+    surfMat.set(i, m); disposables.push(m);
   });
   // Note: displace=0 on wallMat keeps road-to-skirt joints, cliffs, tunnels, arches & pillars 100% seam-free!
   const wallMat = surfaceMaterial(wallTex, {
@@ -113,6 +137,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   });
   const groundMat = terrainMaterial({
     themeId: theme.id, ground: groundTex, gravel: gravelTex, basin: basinTex, rock: cliffTex,
+    groundScale: !theme.emissiveGround && hasPbr(PHOTO_GROUND[theme.id]) ? 2.7 : 1, // photo ground: ~11 m tiles instead of 30 m
     layers: TL, strata: STRATA[theme.id], cloud: theme.clouds * 0.45, bump, waterY,
     emissive: theme.emissiveGround ?? '#ff4a10', emissiveIntensity: 1.1,
   });
@@ -139,43 +164,87 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     for (let i = 1; i < n; i++) {
       const a = S[last], b = S[i], pv = S[i - 1];
       const turn = Math.abs(Math.atan2(a.tx * b.tz - a.tz * b.tx, a.tx * b.tx + a.tz * b.tz));
-      const flag = pv.gap !== b.gap || pv.canyon !== b.canyon || pv.openL !== b.openL || pv.openR !== b.openR || pv.bridge !== b.bridge || b.ramp > 0 || pv.ramp > 0;
+      const flag = pv.gap !== b.gap || pv.canyon !== b.canyon || pv.openL !== b.openL || pv.openR !== b.openR || pv.bridge !== b.bridge || b.ramp > 0 || pv.ramp > 0 || pv.surf !== b.surf;
       const dy = Math.abs((b.y + b.ramp) - (a.y + a.ramp)) + Math.abs(b.bank - a.bank) * b.hw;
       if (flag && i - 1 > last) { idxs.push(i - 1); last = i - 1; }
       if (flag || i - last >= maxStep || turn > 0.02 || dy > 0.36) { idxs.push(i); last = i; }
     }
     if (path.closed) idxs.push(0); else if (idxs[idxs.length - 1] !== n - 1) idxs.push(n - 1);
 
-    // ---- road deck (smooth camber + beveled outer curb shoulder) ----
+    // ---- road deck (smooth camber + beveled outer curb shoulder) – Session 20: one strip per ground surface ----
     {
-      const pos: number[] = [], uv: number[] = [], ind: number[] = [];
-      // Session 15 fix: v used to be `distance / tileLength(width)`. Wherever the road width changes, that divides the WHOLE distance
-      // travelled so far by a changing number → the texture smeared/compressed more and more the further along the track (very visible
-      // after the shortcut of the jungle sprint). v is now integrated segment by segment.
-      let vbase = 0; let vAcc = 0;
-      for (let k = 0; k < idxs.length; k++) {
-        const s = S[idxs[k]];
-        if (k > 0) { const pr = S[idxs[k - 1]]; vAcc += Math.hypot(s.x - pr.x, s.z - pr.z) / Math.max(24, (s.hw + pr.hw) * 0.7); }
+      const K = idxs.length, cls = (sf: number) => sf === 0 ? 0 : SURFACES[sf].flat ? 2 : 1; // 0 built deck · 1 natural ground · 2 basin (sheet: buildBasins)
+      const runs: { a: number; b: number; sf: number }[] = [];
+      for (let k = 1, a = 0; k <= K; k++) if (k === K || S[idxs[k]].surf !== S[idxs[a]].surf) { runs.push({ a, b: k - 1, sf: S[idxs[a]].surf }); a = k; }
+      // Session 15: the deck's v is integrated segment by segment (dividing the whole distance by a changing width smeared the texture)
+      const dAcc = new Float32Array(K), vAccs = new Float32Array(K);
+      for (let k = 1; k < K; k++) { const s = S[idxs[k]], pr = S[idxs[k - 1]], d = Math.hypot(s.x - pr.x, s.z - pr.z); dAcc[k] = dAcc[k - 1] + d; vAccs[k] = vAccs[k - 1] + d / Math.max(24, (s.hw + pr.hw) * 0.7); }
+      // branch roads (shortcuts, cave tubes) start and end INSIDE the main road: there they are tucked 12 cm under its surface instead of
+      // lying on top of it (their crown and edge used to show as ridges across the main road)
+      const M = td.main.samples, nm = M.length;
+      const tuck = (k: number, x: number, z: number, y: number) => {
+        if (path.id === 0) return y;
+        const i = idxs[k], c = i < 70 ? path.mainFrom : i > n - 71 ? path.mainTo : NaN; if (c !== c) return y;
+        let bq = M[0], bd = 1e12; for (let j = c - 60; j <= c + 60; j += 2) { const q = M[((j % nm) + nm) % nm], d = (q.x - x) ** 2 + (q.z - z) ** 2; if (d < bd) { bd = d; bq = q; } }
+        const lat = (x - bq.x) * bq.rx + (z - bq.z) * bq.rz; if (Math.abs(lat) > bq.hw - 0.3 || bq.gap) return y;
+        return Math.min(y, bq.y + bq.ramp - lat * bq.bank - 0.12);
+      };
+      /** one cross row of vertices; `tile` > 0 = natural ground (world-space UVs, no kerb lip), 0 = built deck (u across, v along) */
+      const row = (k: number, lift: number, tile: number, pos: number[], uv: number[]) => {
+        const s = S[idxs[k]], lipStart = 1 - 2 / across;
         for (let a = 0; a <= across; a++) {
-          const f = a / across; const lat = -s.hw + f * 2 * s.hw;
-          const e = Math.abs(f * 2 - 1);
-          const lipStart = 1 - 2 / across;
-          const lip = e > lipStart ? 0.18 * (e - lipStart) / (1 - lipStart) : 0;
-          const crown = (1 - e * e) * 0.2 + lip;
-          pos.push(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + crown, s.z + s.rz * lat);
-          uv.push(f, vAcc);
+          const f = a / across, lat = -s.hw + f * 2 * s.hw, e = Math.abs(f * 2 - 1);
+          const lip = !tile && e > lipStart ? 0.18 * (e - lipStart) / (1 - lipStart) : 0;
+          const x = s.x + s.rx * lat, z = s.z + s.rz * lat;
+          pos.push(x, tuck(k, x, z, s.y + s.ramp - lat * s.bank + (1 - e * e) * 0.2 + lip + lift), z);
+          if (tile) uv.push(x / tile, z / tile); else uv.push(f, vAccs[k]);
         }
-        if (k > 0 && !S[idxs[k]].gap && !S[idxs[k - 1]].gap) {
-          const r0 = vbase - (across + 1), r1 = vbase;
+      };
+      const emit = (k0: number, k1: number, pos: number[], uv: number[], mat: THREE.Material, fade?: number[]) => {
+        const ind: number[] = [];
+        for (let k = k0 + 1; k <= k1; k++) {
+          if (S[idxs[k]].gap || S[idxs[k - 1]].gap) continue;
+          const r0 = (k - 1 - k0) * (across + 1), r1 = r0 + across + 1;
           for (let a = 0; a < across; a++) ind.push(r0 + a, r0 + a + 1, r1 + a, r0 + a + 1, r1 + a + 1, r1 + a);
         }
-        vbase += across + 1;
-      }
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-      g.setIndex(ind); g.computeVertexNormals();
-      batcher.addStrip(g, roadMat, 5400, false);
+        if (!ind.length) return;
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+        if (fade) g.setAttribute('aFade', new THREE.Float32BufferAttribute(fade, 1));
+        g.setIndex(ind); g.computeVertexNormals();
+        batcher.addStrip(g, mat, 5400, false);
+      };
+      /** walks from row k0 in direction dir until `dist` metres are covered or `lim` is reached */
+      const span = (k0: number, dir: number, lim: number, dist: number) => { let k = k0; while (k !== lim && Math.abs(dAcc[k] - dAcc[k0]) < dist) k += dir; return k; };
+      runs.forEach((r, ri) => {
+        const c = cls(r.sf), prev = runs[ri - 1], next = runs[ri + 1], last = Math.min(K - 1, r.b + 1);
+        if (c === 2) return;
+        if (c === 0) {
+          const pos: number[] = [], uv: number[] = [];
+          for (let k = r.a; k <= last; k++) row(k, 0, 0, pos, uv);
+          emit(r.a, last, pos, uv, roadMat);
+          // apron: next to a lake / plateau the deck dissolves over 26 m instead of ending in a straight edge
+          for (const [nb, dir] of [[prev, -1], [next, 1]] as const) {
+            if (!nb || cls(nb.sf) !== 2) continue;
+            const k0 = dir > 0 ? last : r.a, k1 = span(k0, dir, dir > 0 ? Math.min(K - 1, nb.b) : nb.a, 26); if (k1 === k0) continue;
+            const ap: number[] = [], au: number[] = [], af: number[] = [], lo = Math.min(k0, k1), hi = Math.max(k0, k1), len = Math.max(1, Math.abs(dAcc[k1] - dAcc[k0]));
+            for (let k = lo; k <= hi; k++) { row(k, 0.05, 0, ap, au); const f = 1 - Math.abs(dAcc[k] - dAcc[k0]) / len; for (let a = 0; a <= across; a++) af.push(f); }
+            emit(lo, hi, ap, au, roadFadeMat(), af);
+          }
+          return;
+        }
+        // natural ground: fades in over the end of the previous passage and – above built decks and basins – out over the start of the next
+        const kA = prev ? span(r.a, -1, prev.a, 30) : r.a, kB = next && cls(next.sf) !== 1 ? span(last, 1, Math.min(K - 1, next.b), 30) : last;
+        const tile = SURFACES[r.sf].tex!.tile, lift0 = 0.05 + roadDispOff, pos: number[] = [], uv: number[] = [], fade: number[] = [];
+        const lenIn = Math.max(1, dAcc[r.a] - dAcc[kA]), lenOut = Math.max(1, dAcc[kB] - dAcc[last]);
+        for (let k = kA; k <= kB; k++) {
+          const f = Math.min(k < r.a ? (dAcc[k] - dAcc[kA]) / lenIn : 1, k > last ? 1 - (dAcc[k] - dAcc[last]) / lenOut : 1);
+          row(k, f < 1 || k === r.a || k === last ? lift0 + 0.05 : lift0, tile, pos, uv);
+          for (let a = 0; a <= across; a++) fade.push(f);
+        }
+        emit(kA, kB, pos, uv, surfMat.get(r.sf) ?? roadMat, fade);
+      });
     }
 
     // ---- sculpted 3-tier road embankment skirts & stratified canyon walls ----
@@ -190,7 +259,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
         const open = side > 0 ? s.openR : s.openL;
         const ex = s.x + s.rx * side * s.hw, ez = s.z + s.rz * side * s.hw, ey = s.y + s.ramp - side * s.hw * s.bank + 0.16;
         // 3-point sculpted embankment skirt (omitted on open shortcut/cave forks so zero skirt slices across a merge, and on bridges which carry a box girder)
-        const okS = !s.gap && !open && !s.bridge;
+        const okS = !s.gap && !open && !s.bridge && !s.lake; // (basins: the sheet reaches beyond the road edge)
         const bx = ex + s.rx * side * 3.8, bz = ez + s.rz * side * 3.8;
         const depth = okS ? Math.max(6.2, ey - heightAt(bx, bz) + 4.2) : 16;
         const mx = ex + s.rx * side * 0.75, mz = ez + s.rz * side * 0.75;
@@ -206,7 +275,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
 
         // Multi-ledge canyon cliff with vertical rock-buttress ribs & fracture fissures
         const H = side > 0 ? s.hR : s.hL;
-        const okW = H > 0 && !open && !s.gap;
+        const okW = H > 0 && !open && !s.gap && s.tun !== 3; // caves: the cave shell is the wall (hL/hR only flag the rock barrier)
         const buttress = Math.pow(ridged(sAcc * 0.022 + side * 3.7, 1.3, 3), 2.0) * 2.2;
         for (let j = 0; j < K; j++) {
           const f = j / (K - 1); const pf = f * (cliffProf.length - 1);
@@ -262,13 +331,15 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     }
 
     // ---- high-clearance tunnels, underwater tubes, underpasses & widened/branching caverns ----
-    buildTunnel(path, group, wallMat, roadMat, abutmentMetal, disposables, theme, waterY, heightAt);
+    buildTunnel(td, path, group, wallMat, roadMat, abutmentMetal, disposables, theme, waterY, heightAt);
     if (td.def.theme === 'oovo') buildZeroGTubes(path, group, wallMat, abutmentMetal, disposables, theme);
   }
   // ---- sculpted rock bifurcation wedges with glowing direction chevrons at every branching cave split & reunion ----
   buildCaveForkPylons(td, group, wallMat, abutmentMetal, theme, disposables);
   // ---- elevated overpass viaduct bridges where the track crosses over itself ----
   buildBridges(td, group, abutmentMetal, wallMat, theme, disposables, heightAt, roadClear, waterY);
+  // ---- Session 20: lakes, frozen lakes and plateaus of the open passages ----
+  buildBasins(td, group, theme, surfMat, wallMat, abutmentMetal, disposables, glossy);
 
   // ---- flush ramp-conforming warning chevrons (sit directly on curved ramp slope + bank, never float!) ----
   {
@@ -328,14 +399,17 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     if (T === 'ocean') addViaductPiers(td, group, abutmentMetal, disposables, 44, s => s.bridge || s.tun === 2 ? null : ({ bot: waterY - 8, top: s.y - 1.2, w: s.hw * 1.65, r: 1.9 }), roadClear);
   } else if (T === 'prison') {
     addAsteroidBelt(td, group, wallMat, disposables, rng);
-    addViaductPiers(td, group, abutmentMetal, disposables, 56, s => s.zeroG || s.bridge ? null : ({ bot: s.y - 380, top: s.y - 1.5, w: s.hw * 1.7, r: 2.5 }), roadClear);
+    // Session 20: the decks of the prison station stand on piers on the moon surface (no more stilts into the void)
+    addViaductPiers(td, group, abutmentMetal, disposables, 56, s => s.zeroG || s.bridge || s.surf > 0 ? null : ({ bot: heightAt(s.x, s.z) - 3, top: s.y - 1.5, w: s.hw * 1.7, r: 2.5 }), roadClear);
   }
 
   progress(0.82, 'Platziere Landschaftsdetails …'); await yield_();
   const distToTrack = (x: number, z: number) => nearest(x, z);
   const decorCells = scatterDecor(theme, group, td, heightAt, distToTrack, gfx, disposables, rng, wallTex, roadClear, waterY);
   addArches(td, group, wallMat, disposables, rng, roadClear, heightAt, waterY, T === 'prison');
-  const obstFx = addObstacles(td, group, theme, wallMat, disposables);
+  // obstacle rocks on the track are the closest rocks of all → HQ boulder (wallMat has no uv repeat: 2.4 rock units per tile)
+  const obstRockH = gfx.geometry >= 2 ? heightSampler(wallTex) : undefined;
+  const obstFx = addObstacles(td, group, theme, wallMat, disposables, gfx.geometry >= 2 ? boulderGeometry(gfx.geometry >= 3 ? 6 : 5, 9, 1.05, obstRockH, 2.4) : undefined);
   progress(0.9, 'Platziere Streckendetails …'); await yield_();
   // Session 15: objects are seated on the LOWEST ground point under their footprint (sampling only the centre left them floating on slopes)
   const groundMin = (x: number, z: number, r: number) => Math.min(heightAt(x, z), heightAt(x + r, z), heightAt(x - r, z), heightAt(x, z + r), heightAt(x, z - r));
@@ -358,6 +432,24 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   const cover = buildGroundCover(td, theme, gfx, field, waterY, rng, group, disposables);
   const life = buildLife(td, theme, field, waterY, rng, group, disposables, gfx.detail, landmarks);
 
+  // ---- Session 20: Oovo IV orbits a banded gas giant – lit by the real sun (phase), always at the same place in the sky ----
+  let planet: THREE.Group | null = null;
+  if (theme.id === 'oovo') {
+    const W2 = 256, H2 = 128, px = new Uint8Array(W2 * H2 * 4);
+    for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) {
+      const lat = y / H2, band = Math.sin(lat * 34 + Math.sin(x / W2 * Math.PI * 4 + lat * 9) * 0.6 + vnoise(x * 0.05, y * 0.3) * 1.6) * 0.5 + 0.5, k = (y * W2 + x) * 4, v = 0.82 + 0.18 * vnoise(x * 0.11, y * 0.5);
+      px[k] = (150 + 78 * band) * v; px[k + 1] = (104 + 92 * band) * v; px[k + 2] = (78 + 88 * band) * v; px[k + 3] = 255; // rust ↔ cream cloud belts
+    }
+    const pt = new THREE.DataTexture(px, W2, H2, THREE.RGBAFormat); pt.colorSpace = THREE.SRGBColorSpace; pt.wrapS = THREE.RepeatWrapping; pt.magFilter = THREE.LinearFilter; pt.minFilter = THREE.LinearFilter; pt.needsUpdate = true;
+    const pg = new THREE.SphereGeometry(1150, 48, 32), pm = new THREE.MeshStandardMaterial({ map: pt, roughness: 1, metalness: 0, fog: false, emissive: new THREE.Color('#2a1c14'), emissiveIntensity: 0.25 });
+    const rg = mergeGeometries([[1480, 1640], [1700, 1960], [2010, 2090]].map(([a, b]) => new THREE.RingGeometry(a, b, 96, 1)))!, rm = new THREE.MeshBasicMaterial({ color: '#8a7864', transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false, fog: false });
+    planet = new THREE.Group(); const ball = new THREE.Mesh(pg, pm), ring = new THREE.Mesh(rg, rm);
+    ball.rotation.z = 0.35; ring.rotation.x = Math.PI / 2 - 0.3; ring.rotation.y = 0.35;
+    planet.add(ball, ring); planet.userData.dir = new THREE.Vector3(Math.cos(0.42) * Math.sin(5.5), Math.sin(0.42), Math.cos(0.42) * Math.cos(5.5)).multiplyScalar(5600);
+    planet.traverse(o => { o.frustumCulled = false; (o as THREE.Mesh).castShadow = false; (o as THREE.Mesh).receiveShadow = false; });
+    group.add(planet); disposables.push(pt, pg, pm, rg, rm);
+  }
+
   // tv cams
   const tvCams: THREE.Vector3[] = [];
   const S = td.main.samples;
@@ -378,6 +470,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   const update = (t: number, cam?: THREE.Vector3, pods?: PodPos[]) => {
     smoke.update(t); life.update(t, pods);
     if (cam) {
+      if (planet) planet.position.copy(cam).add(planet.userData.dir as THREE.Vector3);
       cover.update(cam);
       for (let i = 0; i < decorCells.length; i++) {
         const dc = decorCells[i]; const dx = dc.x - cam.x, dz = dc.z - cam.z, d2 = dx * dx + dz * dz;
@@ -425,10 +518,14 @@ function addViaductPiers(
     if (!legs.every(([lx, lz]) => clearBelow(i, lx, lz, s.y, sp.r))) continue;
     const yaw = Math.atan2(s.tx, s.tz); const q = new THREE.Quaternion().setFromAxisAngle(up, yaw);
     const h = sp.top - sp.bot;
-    caps.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x, sp.top - 0.9, s.z), q, new THREE.Vector3(sp.w, 2.2, sp.r * 2.2)));
-    for (const [lx, lz] of legs) {
-      cols.push(new THREE.Matrix4().compose(new THREE.Vector3(lx, sp.bot + h / 2, lz), q, new THREE.Vector3(sp.r, h, sp.r)));
-    }
+    // Session 20 fix: the hammerhead capital used to be level. In banked corners (up to 21°) its low-side end stuck up to 4 m out of
+    // the road surface ("beams lying on the road" on Aquilaris / Oovo IV). It now tilts with the camber and each leg ends under its own side.
+    const qCap = q.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.atan(s.bank)));
+    caps.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x, sp.top - 0.9, s.z), qCap, new THREE.Vector3(sp.w, 2.2, sp.r * 2.2)));
+    [-0.36, 0.36].forEach((sd, li) => {
+      const [lx, lz] = legs[li], hl = h - sd * sp.w * s.bank; // the road surface at lateral `lat` lies at y - lat * bank
+      cols.push(new THREE.Matrix4().compose(new THREE.Vector3(lx, sp.bot + hl / 2, lz), q, new THREE.Vector3(sp.r, hl, sp.r)));
+    });
   }
   if (cols.length) {
     const cg = new THREE.CylinderGeometry(0.78, 1.15, 1, 10); const im = new THREE.InstancedMesh(cg, mat, cols.length);
@@ -573,6 +670,75 @@ function buildBridges(
 }
 
 /** Sculpted floor-to-ceiling cavern septum column + glowing split-arrow beacons marking every branching cave Y-junction. */
+/** Session 20: level basins of the open passages – lakes (the pod hovers directly over the liquid), frozen lakes, rock plateaus.
+ *  One sheet per basin: road width plus `lakeL` / `lakeR` beyond the edges (the terrain banks rise through it → natural shoreline).
+ *  Instead of rails and kerbs, floating beacons mark the course (the energy field between them is built in trackDetail). */
+function buildBasins(
+  td: TrackData, group: THREE.Group, theme: ThemeDef, surfMat: Map<number, THREE.Material>, rockMat: THREE.Material, metalMat: THREE.Material,
+  disp: { dispose: () => void }[], glossy: THREE.Mesh[],
+) {
+  const S = td.main.samples, N = S.length;
+  const runs: [number, number][] = []; let a0 = -1;
+  for (let i = 0; i <= N; i++) { const on = i < N && !!S[i].lake; if (on && a0 < 0) a0 = i; if (!on && a0 >= 0) { runs.push([a0, i - 1]); a0 = -1; } }
+  if (!runs.length) return;
+  const beacons: THREE.Matrix4[] = [], upQ = new THREE.Quaternion();
+  for (const [ra, rb] of runs) {
+    const sf = SURFACES[S[ra].surf], yL = S[ra].lakeY ?? S[ra].y, liquid = sf.liquid, plateau = sf.id === 'plateau';
+    const y = yL + (liquid ? -0.22 : 0.04);
+    for (let i = ra + 6; i <= rb - 6; i += 10) for (const sd of [-1, 1]) {
+      const s = S[i], n = S[Math.min(rb, i + 3)], lat = sd * (s.hw - 0.35);
+      // inner side of a kink that is tighter than the half width: the edge runs backwards there and the beacons would bunch up
+      // in the middle of the basin (Mos Espa plateau) → none where the edge advances at less than a quarter of the centre line
+      const ex = n.x + n.rx * sd * (n.hw - 0.35) - (s.x + s.rx * lat), ez = n.z + n.rz * sd * (n.hw - 0.35) - (s.z + s.rz * lat);
+      if (ex * s.tx + ez * s.tz < 0.25 * Math.hypot(n.x - s.x, n.z - s.z)) continue;
+      beacons.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x + s.rx * lat, y + (liquid ? 0.1 : 0), s.z + s.rz * lat), upQ, new THREE.Vector3(1, 1, 1)));
+    }
+    if (theme.terrain === 'ocean' && liquid === 'water') continue; // Aquilaris: the track comes down to sea level – the ocean itself is the lake
+    const pos: number[] = [], uv: number[] = [], ind: number[] = [], fade: number[] = [], rim: number[] = [], rimUv: number[] = [], rimInd: number[] = [];
+    const tile = sf.tex?.tile ?? 20, COLS = 9; let rows = 0, acc = 0;
+    for (let i = ra; i <= rb; i = i === rb ? rb + 1 : Math.min(rb, i + 2)) {
+      const s = S[i], L = s.lakeL ?? 0, R = s.lakeR ?? 0, mrg = plateau ? 0 : 9;
+      const lats = [-(s.hw + L + mrg), -(s.hw + L * 0.5), -s.hw, -s.hw * 0.5, 0, s.hw * 0.5, s.hw, s.hw + R * 0.5, s.hw + R + mrg];
+      for (const lat of lats) { const x = s.x + s.rx * lat, z = s.z + s.rz * lat; pos.push(x, y, z); uv.push(x / tile, z / tile); fade.push(1); }
+      // Every cell is emitted with BOTH windings: where the shore lies beyond the curve radius (hw + shore > R – common on lakes) the
+      // strip folds over itself and its triangles face down; single-sided they were culled and left a hole in the lake / plateau.
+      // The basin is level and textured in world space, so the overlapping copies are identical – normals are set to +Y below.
+      if (rows > 0) { const r0 = (rows - 1) * COLS, r1 = rows * COLS; for (let c = 0; c < COLS - 1; c++) ind.push(r0 + c, r0 + c + 1, r1 + c, r0 + c + 1, r1 + c + 1, r1 + c, r0 + c, r1 + c, r0 + c + 1, r0 + c + 1, r1 + c, r1 + c + 1); }
+      if (plateau) { // the mesa edge: a rock face dropping 17 m below the plateau rim on both sides
+        acc += 4;
+        for (const lat of [lats[0], lats[COLS - 1]]) { const x = s.x + s.rx * lat, z = s.z + s.rz * lat; rim.push(x, y - 0.04, z, x + s.rx * Math.sign(lat) * 2.5, y - 17, z + s.rz * Math.sign(lat) * 2.5); rimUv.push(acc / 18, 0, acc / 18, 17 / 18); }
+        if (rows > 0) { const r0 = (rows - 1) * 4, r1 = rows * 4; rimInd.push(r0, r1, r0 + 1, r0 + 1, r1, r1 + 1, r0 + 2, r0 + 3, r1 + 2, r0 + 3, r1 + 3, r1 + 2); }
+      }
+      rows++;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    { const nr = new Float32Array(pos.length); for (let k = 1; k < nr.length; k += 3) nr[k] = 1; g.setAttribute('normal', new THREE.Float32BufferAttribute(nr, 3)); }
+    g.setAttribute('aFade', new THREE.Float32BufferAttribute(fade, 1)); g.setIndex(ind); disp.push(g);
+    let mat: THREE.Material;
+    if (liquid === 'lava') { const lm = lavaSeaMaterial(generateTexture('basalt', ['#0b0605', '#1c0e08', '#2e160b'], 512, 99, 8, '#ff7a20')); disp.push(lm); mat = lm; }
+    else if (liquid) { const wm = waterMaterial(theme.id, generateTexture('snow', ['#8899aa', '#99aabb', '#aabbcc'], 512, 55, 8).normalMap, theme.clouds * 0.35, undefined, LIQUIDS[liquid]); disp.push(wm); mat = wm; }
+    else mat = surfMat.get(S[ra].surf) ?? rockMat;
+    const mesh = new THREE.Mesh(g, mat); mesh.receiveShadow = true; group.add(mesh);
+    if (liquid && liquid !== 'lava') glossy.push(mesh);
+    if (rimInd.length) {
+      const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(rim, 3)); rg.setAttribute('uv', new THREE.Float32BufferAttribute(rimUv, 2));
+      rg.setIndex(rimInd); rg.computeVertexNormals(); disp.push(rg);
+      const rm = new THREE.Mesh(rg, rockMat); rm.receiveShadow = true; rm.castShadow = true; group.add(rm);
+    }
+  }
+  if (beacons.length) {
+    const body = mergeGeometries([
+      new THREE.CylinderGeometry(0.75, 0.95, 0.6, 10).translate(0, 0.25, 0), new THREE.CylinderGeometry(0.09, 0.11, 3.1, 6).translate(0, 2.05, 0),
+      new THREE.TorusGeometry(0.52, 0.07, 6, 14).rotateX(Math.PI / 2).translate(0, 0.62, 0), new THREE.CylinderGeometry(0.22, 0.22, 0.16, 8).translate(0, 3.3, 0),
+    ].map(x => x.toNonIndexed()))!;
+    const lamp = new THREE.SphereGeometry(0.3, 10, 8).translate(0, 3.66, 0);
+    const lampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.7) });
+    disp.push(body, lamp, lampMat);
+    for (const [geo, m] of [[body, metalMat], [lamp, lampMat]] as const) { const im = new THREE.InstancedMesh(geo, m, beacons.length); beacons.forEach((mm, i) => im.setMatrixAt(i, mm)); im.castShadow = false; group.add(im); }
+  }
+}
+
 function buildCaveForkPylons(td: TrackData, group: THREE.Group, rockMat: THREE.Material, metalMat: THREE.Material, theme: ThemeDef, disp: { dispose: () => void }[]) {
   const caveBranches = td.paths.filter(p => p.isCave);
   if (!caveBranches.length) return;
@@ -620,110 +786,150 @@ function buildCaveForkPylons(td: TrackData, group: THREE.Group, rockMat: THREE.M
   if (glows.length) { const gm = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.65) }); disp.push(gm); addM(glows, gm, false); }
 }
 
+/** Session 20: vault profile points at equal arc length (wall and crown quads get a similar size – needed for the cave union below) */
+const TUN_SEG = 28;
+const TUN_ARC: [number, number][] = (() => {
+  const M = 480, pts: [number, number][] = [], len: number[] = [0];
+  for (let k = 0; k <= M; k++) pts.push(tunnelArc(Math.PI * k / M));
+  for (let k = 1; k <= M; k++) len.push(len[k - 1] + Math.hypot((pts[k][0] - pts[k - 1][0]) * 33, (pts[k][1] - pts[k - 1][1]) * 27));
+  const out: [number, number][] = []; let j = 0;
+  for (let a = 0; a <= TUN_SEG; a++) { const t = len[M] * a / TUN_SEG; while (j < M - 1 && len[j + 1] < t) j++; const f = (t - len[j]) / Math.max(1e-6, len[j + 1] - len[j]); out.push([pts[j][0] + (pts[j + 1][0] - pts[j][0]) * f, pts[j][1] + (pts[j + 1][1] - pts[j][1]) * f]); }
+  out[0] = [1, 0]; out[TUN_SEG] = [-1, 0];
+  return out;
+})();
+/** Is the world point inside the cave tube described by the roofed samples `L`? `m` shrinks (> 0) or grows (< 0) the tested volume. */
+function insideCave(L: Sample[], x: number, y: number, z: number, m: number) {
+  let bd = 1e12, bq: Sample | null = null;
+  for (const q of L) { const d = (q.x - x) ** 2 + (q.z - z) ** 2; if (d < bd) { bd = d; bq = q; } }
+  if (!bq) return false;
+  const Wd = bq.hw + TUNNEL_SHOULDER; if (bd > (Wd + 4) ** 2) return false;
+  const dx = x - bq.x, dz = z - bq.z, lat = dx * bq.rx + dz * bq.rz;
+  if (Math.abs(dx * bq.tx + dz * bq.tz) > 3.2) return false; // beyond the end of the tube
+  const al = Math.abs(lat) + m; if (al >= Wd) return false;
+  const base = bq.y + bq.ramp - lat * bq.bank;
+  return y > base - 7 && y < base + 1.5 + (bq.roof - 1.5) * tunnelProfile(Math.max(0, al) / Wd) - m;
+}
+
 function buildTunnel(
-  path: Path, group: THREE.Group, mat: THREE.Material, roadMat: THREE.Material, ribMat: THREE.Material,
+  td: TrackData, path: Path, group: THREE.Group, mat: THREE.Material, roadMat: THREE.Material, ribMat: THREE.Material,
   disp: { dispose: () => void }[], theme: ThemeDef, seaY: number, heightAt: (x: number, z: number) => number,
 ) {
-  // Four tunnel kinds (Sample.tun), all with tall generous headroom (19.5–38 m) & wide shoulders (Wd = hw + 3.4 + caveW):
+  // Four tunnel kinds (Sample.tun). Cross-section = superellipse (`tunnelArc`, nearly vertical walls), half width Wd = hw + 3.4 m:
   //  1 standard  – vaulted shell + terrain-seated earth berm + DRIVABLE DECK on top (PodState.upper) with glowing edge lines,
-  //  2 sea tube  – tall 19.5 m Aquilaris caisson with panoramic underwater ocean windows (caustics, light shafts, fish schools),
-  //  3 cave      – widened multi-chamber & branching caverns (up to 38 m dome) + sculpted CAVE-FLOOR MESH, stalactites, stalagmites & glowing veins,
+  //  2 sea tube  – Aquilaris caisson with panoramic underwater ocean windows (caustics, light shafts, fish schools),
+  //  3 cave      – ONE continuous cavern: chambers (road widens, vault rises) joined by low necks; branch tubes are merged with the
+  //                main cavern by a boolean union of the shells (Session 20) – rock shelf floors, stalagmites, stalactites, glow veins,
   //  4 underpass – cut-and-cover underpass tunnel beneath an elevated crossing viaduct bridge (portal frames, ribs, lamps, grounded side berms).
-  const S = path.samples; const n = S.length, floatWorld = theme.terrain === 'prison' || theme.terrain === 'ocean';
+  const S = path.samples; const n = S.length, floatWorld = theme.terrain === 'ocean';
   const runs: [number, number][] = []; let a0 = -1;
   for (let i = 0; i < n; i++) { const on = S[i].roof > 0; if (on && a0 < 0) a0 = i; if ((!on || i === n - 1) && a0 >= 0) { const b0 = on ? i : i - 1; if (b0 - a0 >= 5) runs.push([a0, b0]); a0 = -1; } }
   if (!runs.length) return;
   type Buf = { pos: number[]; uv: number[]; ind: number[] };
   const mk = (): Buf => ({ pos: [], uv: [], ind: [] });
-  const shell = mk(), deck = mk(), berm = mk(), steel = mk(), glowB = mk(), caveFloor = mk(), veinB = mk(); const winInd: number[] = [];
-  const segA = 20, DECK = TUNNEL_DECK; const lamps: THREE.Matrix4[] = [], ribs: THREE.BufferGeometry[] = [], tites: THREE.Matrix4[] = [];
+  const shell = mk(), caveShell = mk(), deck = mk(), berm = mk(), caveBerm = mk(), steel = mk(), glowB = mk(), caveFloor = mk(), veinB = mk(); const winInd: number[] = [];
+  const segA = TUN_SEG, DECK = TUNNEL_DECK; const lamps: THREE.Matrix4[] = [], ribs: THREE.BufferGeometry[] = [], tites: THREE.Matrix4[] = [];
+  const winSeg: boolean[] = []; for (let a = 0; a < segA; a++) { const my = (TUN_ARC[a][1] + TUN_ARC[a + 1][1]) / 2, mx = Math.abs(TUN_ARC[a][0] + TUN_ARC[a + 1][0]) / 2; winSeg.push(my > 0.2 && my < 0.95 && mx > 0.36); }
   const upV = new THREE.Vector3(0, 1, 0), flipQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
   const put = (b: Buf, s: Sample, lat: number, up: number, u: number, v: number) => { b.pos.push(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + up, s.z + s.rz * lat); b.uv.push(u, v); };
   const strip = (b: Buf, r0: number, r1: number, cols: number) => { for (let a = 0; a < cols; a++) b.ind.push(r0 + a, r0 + a + 1, r1 + a, r0 + a + 1, r1 + a + 1, r1 + a); };
+  // ribs / portal frames are tubes swept along the superellipse vault profile, with legs reaching below the road edge
   const arch = (s: Sample, R: number, tube: number, H: number) => {
-    const rg = new THREE.TorusGeometry(R, tube, 8, 32, Math.PI); rg.scale(1, H / R, 1);
-    const p = rg.attributes.position as THREE.BufferAttribute; for (let k = 0; k < p.count; k++) p.setY(k, p.getY(k) + p.getX(k) * s.bank);
+    const SEG = 40, RAD = 7, pos: number[] = [], uv: number[] = [], ind: number[] = [];
+    const ring = (cx: number, cy: number, nx: number, ny: number) => { for (let j = 0; j <= RAD; j++) { const th = Math.PI * 2 * j / RAD, c = Math.cos(th) * tube; pos.push(cx + nx * c, cy + ny * c, Math.sin(th) * tube); uv.push(j / RAD, pos.length / 90); } };
+    ring(R, -3.8, 1, 0);
+    for (let k = 0; k <= SEG; k++) {
+      const ang = Math.PI * k / SEG, [ax, ay] = tunnelArc(ang), [bx, by] = tunnelArc(Math.min(Math.PI, ang + 0.012)), [zx, zy] = tunnelArc(Math.max(0, ang - 0.012));
+      let tx2 = (bx - zx) * R, ty2 = (by - zy) * H; const tl = Math.hypot(tx2, ty2) || 1; tx2 /= tl; ty2 /= tl;
+      ring(ax * R, ay * H, ty2, -tx2);
+    }
+    ring(-R, -3.8, -1, 0);
+    const W1 = RAD + 1; for (let k = 0; k < SEG + 2; k++) for (let j = 0; j < RAD; j++) { const a = k * W1 + j, b = a + W1; ind.push(a, b, a + 1, b, b + 1, a + 1); }
+    for (let k = 1; k < pos.length; k += 3) pos[k] += pos[k - 1] * s.bank;
+    const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); rg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); rg.setIndex(ind); rg.computeVertexNormals();
     rg.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + s.ramp + 1.5, s.z), new THREE.Quaternion().setFromAxisAngle(upV, Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, 1, 1)));
     const out = rg.toNonIndexed(); rg.dispose(); return out;
   };
   const bermFootUp = (s: Sample, lat: number) => {
     if (floatWorld) return -6;
     const wx = s.x + s.rx * lat, wz = s.z + s.rz * lat, roadAtLat = s.y + s.ramp - lat * s.bank;
-    return Math.max(-28, Math.min(-5, heightAt(wx, wz) - roadAtLat - 4.5));
+    return Math.max(-34, Math.min(-5, heightAt(wx, wz) - roadAtLat - 4.5));
   };
+  const BERM_N = 8; // cave berms are tessellated across so the union below can cut them cleanly around a branch tube
 
   for (const [ra, rb] of runs) {
     const kind = S[ra].tun ?? 1, sea = kind === 2, cave = kind === 3, underP = kind === 4;
     const hasDeck = !sea && !underP && !path.isCave;
-    const amp = cave ? 3.2 : (sea || underP) ? 0 : 1.3;
-    let pRing = -1, pDeck = -1, pBerm = -1, pSteel = -1, pGlow = -1, pUnder = false, pOpenL = false, pOpenR = false;
-    let pFloorL = -1, pFloorR = -1, pVein = -1, vAcc = 0, last = ra;
-    for (let i = ra; i <= rb; i = i === rb ? rb + 1 : Math.min(rb, i + 2)) {
-      const s = S[i], cw = cave ? (s.caveW ?? 0) : 0;
-      const H = s.roof - 1.5, Wd = s.hw + 3.4 + cw, D = s.roof + DECK;
+    const amp = cave ? 2.6 : (sea || underP) ? 0 : 1.3;
+    const sh = cave ? caveShell : shell, bm = cave ? caveBerm : berm, step = cave ? 1 : 2;
+    let pRing = -1, pDeck = -1, pBerm = -1, pSteel = -1, pGlow = -1, pUnder = false;
+    let pFloorL = -1, pFloorR = -1, pVeinL = -1, pVeinR = -1, vAcc = 0, last = ra;
+    for (let i = ra; i <= rb; i = i === rb ? rb + 1 : Math.min(rb, i + step)) {
+      const s = S[i];
+      const H = s.roof - 1.5, Wd = s.hw + TUNNEL_SHOULDER, D = s.roof + DECK;
       // Underwater windows open wherever the window crown lies safely beneath the ocean surface!
       const under = sea && s.y + s.roof * 0.88 < seaY - 0.4;
       vAcc += (i - last) * 2 / Math.max(24, s.hw * 1.4); last = i;
       // Positive-biased noise near the crown so rock roughness adds grandeur upward and never lowers headroom!
       const noise = (a: number) => {
         if (!amp) return 0;
-        const raw = (vnoise(i * 0.2, a * 0.7) - 0.5) * amp;
-        const top = Math.sin(Math.PI * a / segA);
+        const raw = (vnoise(i * 0.2, a * 0.5) - 0.5) * amp, top = TUN_ARC[a][1];
         return top > 0.5 ? Math.max(-0.35, raw + 0.35 * amp * top) : raw;
       };
-      // Inner vaulted shell (leave open wall aperture where a branching cave tube forks off or reunites!)
-      const ring = shell.pos.length / 3;
+      const ring = sh.pos.length / 3, vPer = (2 * H + 1.6 * Wd) / 15;
       for (let a = 0; a <= segA; a++) {
-        const ang = Math.PI * a / segA, nz = noise(a);
+        const [ax, ay] = TUN_ARC[a], nz = noise(a);
         const yBase = a === 0 || a === segA ? -2.2 : 1.5; // tuck shell base 2.2 m below road edge so walls never gap on hills!
-        put(shell, s, Math.cos(ang) * (Wd + nz), Math.sin(ang) * (H + nz) + yBase, s.s / 15, a / segA * 2.4);
+        put(sh, s, ax * (Wd + nz), ay * (H + nz) + yBase, s.s / 15, a / segA * vPer);
       }
-      if (pRing >= 0) {
-        const cutR = cave && (s.openR || pOpenR), cutL = cave && (s.openL || pOpenL);
-        for (let a = 0; a < segA; a++) {
-          if ((cutR && a <= 4) || (cutL && a >= segA - 5)) continue; // open archway into branching cave tunnel!
-          const p0 = pRing + a, p1 = ring + a;
-          const isWin = pUnder && under && ((a >= 1 && a <= 7) || (a >= 12 && a <= 18));
-          (isWin ? winInd : shell.ind).push(p0, p0 + 1, p1, p1, p0 + 1, p1 + 1);
+      if (pRing >= 0) for (let a = 0; a < segA; a++) {
+        const p0 = pRing + a, p1 = ring + a;
+        (pUnder && under && winSeg[a] ? winInd : sh.ind).push(p0, p0 + 1, p1, p1, p0 + 1, p1 + 1);
+      }
+      if (path.isCave && cave && (i === ra || i === rb)) { // end wall of a branch tube – the part inside the main cavern is removed by the union
+        // Own vertices with planar texture coordinates (lateral, height). The fan used to reuse the ring's (distance, arc) coordinates:
+        // `u` was the same on every vertex, so the rock texture collapsed into thin parallel stripes on the wall stub at the fork.
+        const c = sh.pos.length / 3; put(sh, s, 0, H * 0.45, 0, H * 0.45 / 15);
+        for (let a = 0; a <= segA; a++) {
+          const [ax, ay] = TUN_ARC[a], nz = noise(a), lat = ax * (Wd + nz), hh = ay * (H + nz) + (a === 0 || a === segA ? -2.2 : 1.5);
+          put(sh, s, lat, hh, lat / 15, hh / 15);
         }
+        for (let a = 0; a < segA; a++) sh.ind.push(c, c + 1 + a, c + 2 + a);
+        sh.ind.push(c, c + 1 + segA, c + 1);
       }
-      pRing = ring; pUnder = under; pOpenL = s.openL; pOpenR = s.openR;
+      pRing = ring; pUnder = under;
 
-      // Sculpted lateral CAVE-FLOOR MESH + glowing mineral/lava fissures inside widened cave chambers!
       if (cave) {
+        // rock shelf between the road edge and the cave wall (rises 1.4 m, hides the embankment), stalagmites and a glowing vein per side
         const addSideFloor = (sd: number, open: boolean, prev: number) => {
-          if (open || cw < 0.2) return -1;
+          if (open) return -1;
           const r0 = caveFloor.pos.length / 3, COLS = 4;
           const lIn = sd * (s.hw - 0.15), lOut = sd * (Wd + 1.8);
           for (let c = 0; c < COLS; c++) {
             const f = c / (COLS - 1), lat = lIn + (lOut - lIn) * f;
-            const shelf = f === 0 ? 0.1 : f === COLS - 1 ? 1.4 : 0.35 * f + (vnoise(i * 0.22 + sd * 5, c * 1.3) - 0.42) * 1.35 * Math.sin(f * Math.PI);
-            put(caveFloor, s, lat, shelf, f * 1.4, s.s / 14);
+            const shelf = f === 0 ? 0.1 : f === COLS - 1 ? 1.4 : 0.35 * f + (vnoise(i * 0.22 + sd * 5, c * 1.3) - 0.42) * 1.1 * Math.sin(f * Math.PI);
+            put(caveFloor, s, lat, shelf, f * 0.5, s.s / 14);
           }
           if (prev >= 0) for (let c = 0; c < COLS - 1; c++) {
             const a = prev + c, b = r0 + c;
             if (sd > 0) caveFloor.ind.push(a, a + 1, b, a + 1, b + 1, b); else caveFloor.ind.push(a, b, a + 1, a + 1, b, b + 1);
           }
-          // Stalagmite clusters rooted into the widened cave-floor terrace (well outside the collision barrier!)
-          if (cw > 2.2 && i > ra + 4 && i < rb - 4 && h2(i, sd > 0 ? 31 : 37) > 0.32) {
-            const fSt = 0.32 + h2(i, sd > 0 ? 41 : 43) * 0.52, lat = lIn + (lOut - lIn) * fSt;
-            const len = 1.8 + h2(i, 27) * (2.6 + cw * 0.28), rr = 0.55 + h2(i, 29) * 0.85;
-            tites.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + len * 0.45 - 0.3, s.z + s.rz * lat), new THREE.Quaternion(), new THREE.Vector3(rr, len, rr)));
+          if (i > ra + 4 && i < rb - 4 && h2(i, sd > 0 ? 31 : 37) > 0.62) {
+            const lat = sd * (s.hw + 1.5 + h2(i, sd > 0 ? 41 : 43) * 1.2);
+            const len = 1.4 + h2(i, 27) * 2.6, rr = 0.4 + h2(i, 29) * 0.5;
+            tites.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + len * 0.45 - 0.1, s.z + s.rz * lat), new THREE.Quaternion(), new THREE.Vector3(rr, len, rr)));
           }
           return r0;
         };
         pFloorL = addSideFloor(-1, s.openL, pFloorL);
         pFloorR = addSideFloor(1, s.openR, pFloorR);
-        // Glowing magma / ice / bioluminescent crystal veins running along widened cave chamber shoulders
-        if (cw > 1.8 && !s.openL && !s.openR) {
-          const rv = veinB.pos.length / 3;
-          for (const sd of [-1, 1]) {
-            const vl = sd * (s.hw + cw * 0.55 + 1.4 + Math.sin(i * 0.17 + sd) * 0.8);
-            put(veinB, s, vl - 0.22, 0.52, 0, 0); put(veinB, s, vl + 0.22, 0.52, 1, 0);
-          }
-          if (pVein >= 0) for (const a of [0, 2]) veinB.ind.push(pVein + a, pVein + a + 1, rv + a, pVein + a + 1, rv + a + 1, rv + a);
-          pVein = rv;
-        } else pVein = -1;
+        const addVein = (sd: number, open: boolean, prev: number) => {
+          if (open) return -1;
+          const rv = veinB.pos.length / 3, vl = sd * (s.hw + 0.75 + Math.sin(i * 0.17 + sd) * 0.3);
+          put(veinB, s, vl - 0.2, 0.5, 0, 0); put(veinB, s, vl + 0.2, 0.5, 1, 0);
+          if (prev >= 0) veinB.ind.push(prev, prev + 1, rv, prev + 1, rv + 1, rv);
+          return rv;
+        };
+        pVeinL = addVein(-1, s.openL, pVeinL); pVeinR = addVein(1, s.openR, pVeinR);
       }
 
       if (sea) { // heavy marine steel caisson around underwater tunnel
@@ -731,22 +937,24 @@ function buildTunnel(
         put(steel, s, -dw, -9, 0, s.s / 12); put(steel, s, -dw, D, 0.3, s.s / 12); put(steel, s, dw, D, 0.7, s.s / 12); put(steel, s, dw, -9, 1, s.s / 12);
         if (pSteel >= 0) strip(steel, pSteel, r, 3); pSteel = r;
       } else if (hasDeck) { // drivable top deck + deep terrain-grounded earth berm + glowing deck guidelines
-        const dw = Math.max(s.hw + 1.5, Wd - 1.5), fw = dw + 20, r = deck.pos.length / 3;
+        const dw = Math.max(s.hw + 1.5, Wd - 1.5), fw = dw + 12 + D * 0.5, r = deck.pos.length / 3;
         put(deck, s, -dw, D, 0, vAcc); put(deck, s, dw, D, 1, vAcc);
         if (pDeck >= 0) strip(deck, pDeck, r, 1); pDeck = r;
-        const rb2 = berm.pos.length / 3;
-        const yFL = bermFootUp(s, -fw), yFR = bermFootUp(s, fw);
-        put(berm, s, -fw, yFL, s.s / 18, 0); put(berm, s, -dw, D, s.s / 18, 1.4); put(berm, s, dw, D, s.s / 18, 1.4); put(berm, s, fw, yFR, s.s / 18, 0);
-        if (pBerm >= 0) {
-          if (!s.openL) berm.ind.push(pBerm, pBerm + 1, rb2, pBerm + 1, rb2 + 1, rb2);
-          if (!s.openR) berm.ind.push(pBerm + 2, pBerm + 3, rb2 + 2, pBerm + 3, rb2 + 3, rb2 + 2);
+        const rb2 = bm.pos.length / 3, NB = cave ? BERM_N : 1;
+        for (const sd of [-1, 1]) {
+          const yF = bermFootUp(s, sd * fw);
+          for (let c = 0; c <= NB; c++) { const f = c / NB; put(bm, s, sd * (dw + (fw - dw) * f), D + (yF - D) * f, s.s / 18, 1.4 * (1 - f)); }
+        }
+        if (pBerm >= 0) for (let side = 0; side < 2; side++) for (let c = 0; c < NB; c++) {
+          const a = pBerm + side * (NB + 1) + c, b = rb2 + side * (NB + 1) + c;
+          if (side === 0) bm.ind.push(a, b, a + 1, a + 1, b, b + 1); else bm.ind.push(a, a + 1, b, a + 1, b + 1, b);
         }
         pBerm = rb2;
         const rg2 = glowB.pos.length / 3;
         for (const sd of [-1, 1]) { put(glowB, s, sd * (s.hw - 0.9), D + 0.08, 0, 0); put(glowB, s, sd * (s.hw - 0.5), D + 0.08, 1, 0); }
         if (pGlow >= 0) for (const a of [0, 2]) glowB.ind.push(pGlow + a, pGlow + a + 1, rg2 + a, pGlow + a + 1, rg2 + a + 1, rg2 + a); pGlow = rg2;
       } else if (underP) { // sleek protective rock/concrete hood over bridge-underpass tunnel (stays well below bridge soffit!)
-        const dw = Wd + 1.2, fw = dw + 18, r = berm.pos.length / 3;
+        const dw = Wd + 1.2, fw = dw + 10 + D * 0.4, r = berm.pos.length / 3;
         const yFL = bermFootUp(s, -fw), yFR = bermFootUp(s, fw);
         put(berm, s, -fw, yFL, s.s / 18, 0); put(berm, s, -dw, D, s.s / 18, 1.2); put(berm, s, dw, D, s.s / 18, 2.4); put(berm, s, fw, yFR, s.s / 18, 3.6);
         if (pBerm >= 0) strip(berm, pBerm, r, 3); pBerm = r;
@@ -757,41 +965,81 @@ function buildTunnel(
         if ((i - ra) % 12 === 0) lamps.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + s.ramp + s.roof - (cave ? 0.9 : 0.45), s.z), new THREE.Quaternion().setFromAxisAngle(upV, Math.atan2(s.tx, s.tz)), new THREE.Vector3(1, 1, 1)));
         if (!cave) ribs.push(arch(s, Wd - 0.15, sea ? 0.32 : 0.38, H - 0.15));
       }
-      if (cave && !s.openL && !s.openR && cw <= 0.25 && i > ra + 2 && i < rb - 2 && h2(i, 21) > 0.38) {
-        const sd = h2(i, 23) > 0.5 ? 1 : -1, len = 1.3 + h2(i, 27) * 2.5, rr = 0.45 + h2(i, 29) * 0.6, lat = sd * (s.hw + 1.4);
-        tites.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + len / 2 - 0.25, s.z + s.rz * lat), new THREE.Quaternion(), new THREE.Vector3(rr, len, rr)));
-      }
-      if (cave && s.roof > 21.5 && i > ra + 2 && i < rb - 2) { // ceiling stalactites strictly in high vaults (tips always >= 17.5 m!)
-        const ang = (0.26 + h2(i, 5) * 0.48) * Math.PI, len = 1.1 + h2(i, 9) * 2.2, rr = 0.38 + h2(i, 3) * 0.58, nz = noise(Math.round(ang / Math.PI * segA));
-        const lat = Math.cos(ang) * (Wd + nz), up = Math.sin(ang) * (H + nz) + 1.6;
-        if (up - len > 17.5) tites.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + up - len / 2, s.z + s.rz * lat), flipQ, new THREE.Vector3(rr, len, rr)));
+      if (cave && i > ra + 2 && i < rb - 2 && i % 2 === 0) { // ceiling stalactites (tips always >= 22 m above the road)
+        const a = Math.round((0.24 + h2(i, 5) * 0.52) * segA), len = 1.3 + h2(i, 9) * 3.0, rr = 0.38 + h2(i, 3) * 0.58, nz = noise(a);
+        const lat = TUN_ARC[a][0] * (Wd + nz), up = TUN_ARC[a][1] * (H + nz) + 1.6;
+        if (up - len > 22) tites.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + up - len / 2, s.z + s.rz * lat), flipQ, new THREE.Vector3(rr, len, rr)));
       }
     }
     // Portal arch frames + grounded headwalls (skipped on underground cave-branch junctions which open directly into the main cave!)
     if (!path.isCave) for (const e of [ra, rb]) {
-      const s = S[e], cw = cave ? (s.caveW ?? 0) : 0, H = s.roof - 1.5, Wd = s.hw + 3.4 + cw, D = s.roof + DECK;
-      const dw = sea ? Wd + 11 : Math.max(s.hw + 1.5, Wd - 1.2), fw = sea ? dw : dw + 20;
+      const s = S[e], H = s.roof - 1.5, Wd = s.hw + TUNNEL_SHOULDER, D = s.roof + DECK;
+      const dw = sea ? Wd + 11 : Math.max(s.hw + 1.5, Wd - 1.2), fw = sea ? dw : dw + (underP ? 10 + D * 0.4 : 12 + D * 0.5);
       ribs.push(arch(s, Wd + 0.9, 1.25, H + 1.1));
       const b = sea ? steel : berm, r0 = b.pos.length / 3;
       for (let a = 0; a <= segA; a++) {
-        const ang = Math.PI * a / segA, c = Math.cos(ang), sn = Math.sin(ang);
-        const raw = amp ? (vnoise(e * 0.2, a * 0.7) - 0.5) * amp : 0, nz = sn > 0.5 ? Math.max(-0.35, raw + 0.35 * amp * sn) : raw;
-        put(b, s, c * (Wd + nz), sn * (H + nz) + (a === 0 || a === segA ? -2.2 : 1.5), c * 0.4 + 0.5, sn * 0.5);
-        const t = Math.min(1, sn / 0.62), ox = sn < 0.62 ? Math.sign(c) * (fw + (dw - fw) * t) : dw * c / 0.785;
+        const [ax, ay] = TUN_ARC[a];
+        const raw = amp ? (vnoise(e * 0.2, a * 0.5) - 0.5) * amp : 0, nz = ay > 0.5 ? Math.max(-0.35, raw + 0.35 * amp * ay) : raw;
+        const ix = ax * (Wd + nz);
+        put(b, s, ix, ay * (H + nz) + (a === 0 || a === segA ? -2.2 : 1.5), ax * 0.4 + 0.5, ay * 0.5);
+        const t = Math.min(1, ay / 0.62), ox = ay < 0.62 ? Math.sign(ax) * (fw + (dw - fw) * t) : Math.max(-dw, Math.min(dw, ix));
         const fy = sea ? -9 : bermFootUp(s, ox), oy = fy + (D - fy) * t;
         put(b, s, ox, oy, ox / 40 + 0.5, oy / 30 + 0.3);
       }
       for (let a = 0; a < segA; a++) { const k = r0 + a * 2; b.ind.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
     }
   }
+
+  // ---- Session 20: boolean union of the cave tubes of all paths (main cavern + branch tubes) ----
+  // A triangle of this path's cave shell is dropped when ALL its corners lie inside another path's cave tube → the walls open exactly
+  // where two tubes meet, with no hole to the outside (everything on the union's surface is kept). The earth berm above the main
+  // cavern is cut more generously (ANY corner inside the slightly enlarged branch tube), otherwise it would slice through the branch.
+  const others = td.paths.filter(p2 => p2 !== path).map(p2 => p2.samples.filter(q => q.roof > 0 && q.tun === 3)).filter(l => l.length);
+  const cull = (b: Buf, m: number, all: boolean) => {
+    if (!others.length || !b.ind.length) return;
+    const st = new Uint8Array(b.pos.length / 3), keep: number[] = [];
+    const ins = (v: number) => { if (!st[v]) { const x = b.pos[v * 3], y = b.pos[v * 3 + 1], z = b.pos[v * 3 + 2]; st[v] = others.some(L => insideCave(L, x, y, z, m)) ? 2 : 1; } return st[v] === 2; };
+    for (let t = 0; t < b.ind.length; t += 3) {
+      const a = ins(b.ind[t]), c = ins(b.ind[t + 1]), d = ins(b.ind[t + 2]);
+      if (all ? (a && c && d) : (a || c || d)) continue;
+      keep.push(b.ind[t], b.ind[t + 1], b.ind[t + 2]);
+    }
+    b.ind = keep;
+  };
+  cull(caveShell, 1.5, true); cull(caveBerm, -2.5, false); cull(caveFloor, 0.4, true);
+
+  // ---- wedge floor between the main road edge and the inner edge of a branch road (the area both paths leave open at a fork / reunion) ----
+  if (path.isCave) {
+    const M = td.main.samples, nm = M.length, sd = path.side;
+    for (const dir of [1, -1]) {
+      let prev = -1;
+      for (let k = 0; k < Math.min(70, n >> 1); k++) {
+        const s = S[dir > 0 ? k : n - 1 - k];
+        const ex = s.x - s.rx * sd * s.hw, ez = s.z - s.rz * sd * s.hw, ey = s.y + s.ramp + sd * s.hw * s.bank; // inner edge of the branch road
+        let bq = M[0], bd = 1e12;
+        for (let j = (dir > 0 ? path.mainFrom : path.mainTo) - 70; j <= (dir > 0 ? path.mainFrom : path.mainTo) + 70; j++) { const q = M[((j % nm) + nm) % nm]; const d = (q.x - ex) ** 2 + (q.z - ez) ** 2; if (d < bd) { bd = d; bq = q; } }
+        const gapW = ((ex - bq.x) * bq.rx + (ez - bq.z) * bq.rz) * sd - bq.hw;
+        if (gapW < 0.2) { prev = -1; continue; }
+        if (gapW > 12) break;
+        const mx = bq.x + bq.rx * sd * (bq.hw - 0.4), mz = bq.z + bq.rz * sd * (bq.hw - 0.4), my = bq.y + bq.ramp - sd * (bq.hw - 0.4) * bq.bank;
+        const bx = ex + s.rx * sd * 0.4, bz = ez + s.rz * sd * 0.4, r0 = caveFloor.pos.length / 3;
+        for (let c = 0; c < 4; c++) { const f = c / 3; caveFloor.pos.push(mx + (bx - mx) * f, my + (ey - my) * f - 0.12 - Math.sin(f * Math.PI) * 0.35, mz + (bz - mz) * f); caveFloor.uv.push(f * 0.5, s.s / 14); }
+        if (prev >= 0) for (let c = 0; c < 3; c++) { const a = prev + c, b = r0 + c; caveFloor.ind.push(a, a + 1, b, a + 1, b + 1, b, a, b, a + 1, a + 1, b, b + 1); }
+        prev = r0;
+      }
+    }
+  }
+
   const geo = (b: Buf, ind = b.ind) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2)); g.setIndex(ind); g.computeVertexNormals(); disp.push(g); return g; };
   const add = (g: THREE.BufferGeometry, m: THREE.Material, cast = false) => { const o = new THREE.Mesh(g, m); o.castShadow = cast; o.receiveShadow = true; group.add(o); return o; };
   const m2 = (mat as THREE.MeshStandardMaterial).clone(); m2.side = THREE.DoubleSide; disp.push(m2);
-  const sg = geo(shell); add(sg, m2, true);
+  const sg = geo(shell); if (shell.ind.length || winInd.length) add(sg, m2, true);
+  if (caveShell.ind.length) add(geo(caveShell), m2, true);
   if (caveFloor.ind.length) add(geo(caveFloor), m2, false);
   if (winInd.length) { const wg = new THREE.BufferGeometry(); wg.setAttribute('position', sg.attributes.position); wg.setAttribute('uv', sg.attributes.uv); wg.setIndex(winInd); const wm = oceanWindowMaterial(seaY); add(wg, wm as unknown as THREE.Material); disp.push(wg, wm as unknown as { dispose: () => void }); }
   if (deck.ind.length) add(geo(deck), roadMat);
   if (berm.ind.length) add(geo(berm), m2, true);
+  if (caveBerm.ind.length) add(geo(caveBerm), m2, true);
   if (steel.ind.length) { const sm = (ribMat as THREE.MeshStandardMaterial).clone(); sm.side = THREE.DoubleSide; disp.push(sm); add(geo(steel), sm, true); }
   const lm = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.barrierColor).multiplyScalar(1.5), side: THREE.DoubleSide }); disp.push(lm);
   if (glowB.ind.length) add(geo(glowB), lm);
@@ -940,6 +1188,23 @@ function addStartArea(td: TrackData, group: THREE.Group, theme: ThemeDef, disp: 
 }
 
 function rockGeo(detail: number, seed: number, stretch = 1) { return rockGeometry(detail, seed, stretch); }
+/** Session 20: blurred height lookup (0..1, wraps) from the height channel (`map.a`) of a texture set – drives the CPU displacement of
+ *  the HQ boulders, so the relief of a rock matches the picture on it. `res`² cells ≈ two vertices per cell on a boulder. */
+function heightSampler(set: { map: THREE.Texture }, res = 16): ((u: number, v: number) => number) | undefined {
+  const img = set.map.image as { data?: ArrayLike<number>; width?: number } | undefined, d = img?.data, W = img?.width ?? 0;
+  if (!d || W < res || d.length < W * W * 4) return undefined;
+  const cell = W / res, st = Math.max(1, Math.floor(cell / 8)), out = new Float32Array(res * res); let mn = 1e9, mx = -1e9;
+  for (let y = 0; y < res; y++) for (let x = 0; x < res; x++) {
+    let sum = 0, c = 0; for (let j = 0; j < cell; j += st) for (let i = 0; i < cell; i += st) { sum += d[(Math.floor(y * cell + j) * W + Math.floor(x * cell + i)) * 4 + 3]; c++; }
+    const h = sum / c; out[y * res + x] = h; mn = Math.min(mn, h); mx = Math.max(mx, h);
+  }
+  const k = mx - mn > 1 ? 1 / (mx - mn) : 0; for (let i = 0; i < out.length; i++) out[i] = k ? (out[i] - mn) * k : 0.5;
+  return (u, v) => {
+    const fx = (u - Math.floor(u)) * res - 0.5, fy = (v - Math.floor(v)) * res - 0.5, x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0;
+    const at = (x: number, y: number) => out[((y % res + res) % res) * res + ((x % res + res) % res)];
+    return (at(x0, y0) * (1 - tx) + at(x0 + 1, y0) * tx) * (1 - ty) + (at(x0, y0 + 1) * (1 - tx) + at(x0 + 1, y0 + 1) * tx) * ty;
+  };
+}
 
 function scatterDecor(
   theme: ThemeDef, group: THREE.Group, td: TrackData, heightAt: (x: number, z: number) => number,
@@ -1004,10 +1269,22 @@ function scatterDecor(
     disp.push(geo); if (opts.lod) disp.push(opts.lod.geo);
   };
   const d1 = gq >= 2 ? 2 : 1; // detail=2 = 320 crisp faceted tris/rock (4× leaner than detail=3, identical with normal map)
+  const rockH = gq >= 2 ? heightSampler(wallTex) : undefined;
+  const boulder = (detail: number, seed: number, stretch: number) => boulderGeometry(detail, seed, stretch, rockH ? (u, v) => rockH(u * 2, v * 2) : undefined); // ×2 = `repeat` of rockMat
   for (const kind of theme.decor) {
     switch (kind) {
-      case 'rocks': for (let v = 0; v < 3; v++) place(rockGeo(d1, 1 + v * 5, 0.66 + v * 0.1), rockMat, 160, 8, 320, 1.5, 7.2, { foot: 1.5, yOff: -0.06, tilt: 0.38 }); break;
-      case 'lavaRocks': for (let v = 0; v < 3; v++) place(rockGeo(d1, 4 + v * 3, 0.74 + v * 0.1), rockMat, 160, 8, 420, 2, 12.5, { foot: 1.5, yOff: -0.08, tilt: 0.38 }); break;
+      // Session 20: HQ boulders from geometry level 2 – displaced by the rock texture's own height channel, box-mapped, creased
+      // normals (720 / 980 triangles within 120 m, the 180-triangle twin of the same shape beyond). Level 1 keeps the old rocks.
+      case 'rocks': for (let v = 0; v < 3; v++) {
+        const sd = 1 + v * 5, st = 0.66 + v * 0.1;
+        if (gq >= 2) place(boulder(gq >= 3 ? 6 : 5, sd, st), rockMat, 160, 8, 320, 1.5, 7.2, { foot: 1.5, yOff: -0.06, tilt: 0.38, lod: { geo: boulder(2, sd, st), dist: 120 } });
+        else place(rockGeo(d1, sd, st), rockMat, 160, 8, 320, 1.5, 7.2, { foot: 1.5, yOff: -0.06, tilt: 0.38 });
+      } break;
+      case 'lavaRocks': for (let v = 0; v < 3; v++) {
+        const sd = 4 + v * 3, st = 0.74 + v * 0.1;
+        if (gq >= 2) place(boulder(gq >= 3 ? 6 : 5, sd, st), rockMat, 160, 8, 420, 2, 12.5, { foot: 1.5, yOff: -0.08, tilt: 0.38, lod: { geo: boulder(2, sd, st), dist: 150 } });
+        else place(rockGeo(d1, sd, st), rockMat, 160, 8, 420, 2, 12.5, { foot: 1.5, yOff: -0.08, tilt: 0.38 });
+      } break;
       case 'spires': {
         // Stratified hoodoos (hard/soft ledges, flutes, talus skirt, caprock) – 3 seeded variants
         const per = [64, 52, 44];
@@ -1019,7 +1296,9 @@ function scatterDecor(
         break;
       }
       case 'cacti': {
-        const cm = new THREE.MeshStandardMaterial({ color: '#4d7034', roughness: 0.8 }); disp.push(cm);
+        // Session 20: HQ skin (ribs shaded into the valleys, areoles with spines) wherever a canvas exists; node audits keep the plain green
+        let cm: THREE.Material;
+        if (typeof document !== 'undefined') cm = cactusMaterial(disp); else { cm = new THREE.MeshStandardMaterial({ color: '#4d7034', roughness: 0.8 }); disp.push(cm); }
         for (let v = 0; v < 2; v++) place(cactusGeometry(2 + v * 3), cm, 140, 10, 300, 0.8, 1.65, { foot: 1.5, keepDry: true, colors: ['#ffffff', '#dfe8c8', '#c8dcb0'] });
         break;
       }
@@ -1030,6 +1309,12 @@ function scatterDecor(
         break;
       }
       case 'pines': {
+        if (gq >= 1 && typeof document !== 'undefined') {
+          // Session 20 – HQ snow pines: needle-branch cards (alpha) + snow sheets near the camera, plain cone twins beyond 230 m
+          const pmHQ = pineMaterial(disp);
+          for (let v = 0; v < 2; v++) place(snowPineGeometry(3 + v * 5, gq), pmHQ, 430, 15, 720, 1.4, 3.1, { foot: 2.6, keepDry: true, scaleY: [0.85, 1.25], colors: ['#ffffff', '#eef3f0', '#e2ece6'], lod: { geo: snowPineGeometry(3 + v * 5, gq, true), dist: 230 } });
+          break;
+        }
         const pm = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.86 }); disp.push(pm);
         place(pineGeometry(gq >= 2 ? 6 : 4, gq >= 2 ? 9 : 7, true), pm, 860, 15, 720, 1.4, 3.1, { foot: 2.6, keepDry: true, scaleY: [0.85, 1.25] }); break;
       }
@@ -1131,7 +1416,7 @@ function addArches(
   const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh); disp.push(merged);
 }
 
-function addObstacles(td: TrackData, group: THREE.Group, theme: ThemeDef, rockMat: THREE.Material, disp: { dispose: () => void }[]) {
+function addObstacles(td: TrackData, group: THREE.Group, theme: ThemeDef, rockMat: THREE.Material, disp: { dispose: () => void }[], hqRock?: THREE.BufferGeometry) {
   // High-contrast yellow/black hazard texture + luminous amber/red beacons so EVERY obstacle pops at 750 km/h!
   const hzCv = document.createElement('canvas'); hzCv.width = hzCv.height = 128; const hc = hzCv.getContext('2d')!;
   hc.fillStyle = '#f0b418'; hc.fillRect(0, 0, 128, 128); hc.fillStyle = '#141518';
@@ -1192,7 +1477,8 @@ function addObstacles(td: TrackData, group: THREE.Group, theme: ThemeDef, rockMa
     const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((m, i) => im.setMatrixAt(i, m));
     im.castShadow = false; im.receiveShadow = true; im.computeBoundingSphere(); group.add(im); disp.push(geo); meshOf.set(list, im);
   };
-  inst(rockGeo(2, 9, 1.05), rockMat, rocks);
+  if (hqRock && !rocks.length) hqRock.dispose();
+  inst(hqRock && rocks.length ? hqRock : rockGeo(2, 9, 1.05), rockMat, rocks);
   const colGeo = mergeGeometries([
     new THREE.CylinderGeometry(1.18, 1.32, 2.2, 12).translate(0, -1.05, 0), // buried plinth prevents slope under-gap
     new THREE.CylinderGeometry(1.02, 1.18, 1.4, 12).translate(0, 0.7, 0),
