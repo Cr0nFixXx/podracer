@@ -7,10 +7,13 @@
 - [x] **Nachbesserung aus der Sichtung: Cockpits weiter oben** (0,6–1,05 m, über der Triebwerkslinie; Fahrverhalten unverändert über `keel`) – Höhe bestätigt der Nutzer anhand `tools/harness/out/p2_hoeher_*.jpg`
 - [ ] Cockpit-Innenansicht in einem Tunnel sichten (Regen und 90°-Rolle sind gesichtet)
 - [x] **Phase 3 – 4 neue Pods:** Cyclone, Halo, Manta, Voltspire, Gegner-Auslosung aus 13, Hangar-Liste für 14, wanderndes CI-Startfeld – vom Nutzer freigegeben, Quill Voltspire danach geschlossener gebaut
-- [ ] Langlauf `SECS=120`: auf Sprintstrecken zählt die Sim nach dem Zieleinlauf vereinzelt einen „downward teleport" (auch mit dem alten Feld, also schon vor Phase 3) – Ursache klären
+- [ ] Langlauf `SECS=120`: vereinzelt „downward teleport" (schon vor Phase 3). Seit Phase 5 genauer: ein Respawn wird nicht mehr mitgezählt; übrig bleibt der Tunnel-Fall unten
 - [x] **Phase 4 – Tuning-Optik:** Tuning-Teile (7 Werte × 2 Stufen) + Style-Teile (Finnen, Einlass, Düse, Kanzel), Hangar-Reiter „Lack | Teile", Gegner mit ausgelosten Style-Teilen
 - [ ] Teile-Kombinationen am Gaming-PC durchklicken (gesichtet sind 7; Maße und Dreiecke prüft das Audit an drei Sätzen je Pod)
-- [ ] **Phase 5–7 – Schadensmodelle:** Fahrverhalten, Optik Spieler, Optik Gegner
+- [x] **Phase 5 – Schadensmodelle, Fahrverhalten:** Panzerzonen + je drei Bruchteile pro Seite für alle 14 Racer, HUD-Lampen, Meldungen, CI-Schalter `ARMOR=0 PARTS=0`
+- [ ] **Phase 6–7 – Schadensmodelle, Optik:** Spieler-Pod (Bruchteile fallen ab, Treffermarken), Gegner
+- [ ] Schadens-Balance von Hand fahren (bisher nur KI-Sim): sind 5–10 % je Bruchteil richtig?
+- [ ] Tunnel-Logik: Pod gilt als „im Tunnel", ist aber über der Decke und wird heruntergesetzt (Malastare, Sample 964; `DEBUG=1 SECS=120 node tools/ci/out/sim.mjs`)
 - [ ] `tools/harness/pui.mjs:39` prüft noch die gelöschte „Neon-Spirale" → anpassen; `tools/harness/run.sh` läuft nur unter Linux
 
 ## 1. Direkt aus Session 19

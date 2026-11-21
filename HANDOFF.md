@@ -1,7 +1,7 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-1. **Pod-Überholung fortsetzen:** Phasentabelle im Abschnitt „Session 20" unten – die erste offene Phase ist dran. **Stand: Phase 4 fertig (Tuning-Optik: Tuning-Teile + Style-Teile, Hangar-Reiter „Lack | Teile"). Als Nächstes Phase 5 (Schaden – Fahrverhalten); die Phasen 5–7 laufen laut Absprache ohne Stopp durch.** Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
+1. **Pod-Überholung fortsetzen:** Phasentabelle im Abschnitt „Session 20" unten – die erste offene Phase ist dran. **Stand: Phase 5 fertig (Schadensmodelle – Fahrverhalten: Panzerzonen + Bruchteile je Racer, HUD-Lampen). Als Nächstes Phase 6 (Schaden – Optik am Spieler-Pod), danach Phase 7 (Gegner); beide laufen laut Absprache ohne Stopp durch.** Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
 2. Vor jeder Änderung: `npm run check` (Typecheck + Pod-Audit + Sim) muss grün sein. Pods ansehen: `npm run dev` → `http://localhost:5173/tools/harness/pods.dev.html`.
 3. Weiterhin offen aus Session 19: `npm run dev` → **Aquilaris-Küstenlauf** (19,5-m-Unterwassertunnel, 2 Skyway-Brücken, Flutschleuse) und **Frostspalt-Ring** (22,5-m-Gletschertunnel, verzweigte Eishöhle, Eisschleuse, Viadukt) Probe fahren; im **Hangar** die 6 Lackiermuster & 3 Finishes testen (≈ 6 Min.).
 
@@ -33,7 +33,7 @@
 | 2 | 10 neue Cockpits + Detailpass + Cockpit-Innenansicht → **Stopp: Nutzer sichtet** | ✅ erledigt, Nachbesserung „Cockpits weiter oben" eingearbeitet, vom Nutzer freigegeben („Go Phase 3") |
 | 3 | 4 neue Pods (Cyclone → Halo → Manta → Voltspire), Hangar-Liste für 14, Gegner-Auslosung → **Stopp** | ✅ erledigt, vom Nutzer freigegeben („Go Phase 4"), Nachbesserung „Quill geschlossener" eingearbeitet |
 | 4 | Tuning-Optik: `PodCustom.kit`, `podKitParts.ts`, Hangar-Reiter „Lack \| Teile" | ✅ erledigt |
-| 5 | Schaden – Fahrverhalten: `podDamage.ts`, Bruchteil-Maske, HUD-Lampen | offen |
+| 5 | Schaden – Fahrverhalten: `podDamage.ts`, Bruchteil-Maske, HUD-Lampen | ✅ erledigt |
 | 6 | Schaden – Optik Spieler: Bruchteile, Treffermarken, Trümmer, Hangar-Schadensvorschau | offen |
 | 7 | Schaden – Optik Gegner: `userData`-Ruß/Flammenleistung in den geteilten Materialien | offen |
 
@@ -191,6 +191,46 @@ Ultra-Grenze 250 Tsd. – der größte Pod (Tenroc, sechs Triebwerke) liegt bei 
 - Nicht jede Kombination einzeln angesehen: gesichtet sind sechs Bilder (drei Sätze an der Aurora, je einer an Manta, Cyclone, Halo) und die Voltspire in Hangar und Rennen; die übrigen deckt nur das Audit ab (Maße, Dreiecke) – und das Audit prüft drei Sätze je Pod, nicht alle 4 × 4 × 4 Style-Kombinationen mal Tuning-Stufen.
 - Von den vier Kanzel-Tönungen im Rennen nur „Bernstein" gesehen.
 
+### Erledigt in Phase 5 (Schadensmodelle – Fahrverhalten)
+1. **`src/game/podDamage.ts` (neu, ohne three – läuft im Node-CI):** ein **Schadensmodell je Racer** (`MODELS`, unbekannte Pod-ID wirft einen Fehler) aus
+   - **Panzerzonen** `front | side | top | belly | heat`: Faktor auf den Schaden aus dieser Richtung (< 1 gepanzert, > 1 weich; im Mittel etwa 1),
+   - **Bruchteilen**: je Schadensanzeige genau drei (Stufen 50 / 35 / 20 % Triebwerkszustand), paarig links/rechts oder als Mittelteil (bricht, sobald eine der beiden Seiten die Stufe unterschreitet). Jedes Bruchteil kostet 5–10 % eines Fahrwerts (`fx`) oder war ein **Schutz** (`guard`), der Treffer aus einer Zone abgefangen hat, solange er dran war.
+2. **Regeln (`physics.ts`):** `applyDamage` gewichtet jeden Treffer mit `zoneFactor` (Panzerung × noch vorhandene Schutzteile dieser Seite) und bricht danach fällige Bruchteile ab (`PodState.parts` = Bitmaske, Ereignis `part`). Wirkungen multiplizieren sich, **höchstens −15 % je Fahrwert** (`FX_CAP`), **Gegner spüren die Hälfte**. Reparatur heilt nur den Zustand; **Teile kommen erst beim Respawn zurück** (`respawn` setzt Maske und `fx` zurück). Explosionsregel unverändert (eine Seite ≤ 0 %); ein explodierender Pod meldet keine Einzelteile.
+3. **HUD:** die drei Zellen je Schadensanzeige sind jetzt Bruchteil-Lampen (oben 50 %, Mitte 35 %, unten 20 %; verloren = rot mit Kreuz, `data-lamp`). Seitentausch wie bisher nur in `Game.hud()` (`partsL` / `partsR`). Je Verlust eine Meldung („FLÜGELPLATTE ABGERISSEN!", „OBERES TRIEBWERK AUSGEFALLEN!" …), ein harter Schlag + Warnton, Funken.
+4. **Kamera:** das Sichtfeld folgt der unbeschädigten Höchstgeschwindigkeit (`podParams().vmax0`) – verlorene Teile weiten das Bild nicht.
+5. **CI:** je Strecke eine Zeile `parts lost: n (…)`; Schalter `ARMOR=0` (Panzerzonen aus) und `PARTS=0` (Bruchteile aus). Die Meldung „downward teleports" zählt einen Respawn (z. B. die KI-Selbstbefreiung) nicht mehr mit; `DEBUG=1` druckt zu jedem Teleport Ort und Tunnelzustand.
+
+| Racer | weich / hart | Bruchteile (50 % · 35 % · 20 %) |
+|---|---|---|
+| Aurora XR-7 | Flanken weich | Flügelplatte (Haftung) · Kreisel-Stabilisator (Wendigkeit) · Innenflügel (Haftung) |
+| Hollo Needle | Nase weich | Nasensonde (Wendigkeit) · Canards (Haftung) · Heckfinne (Wendigkeit) |
+| Tyr Vespa | Flanken weich | Klingenflügel (Haftung) · Fühler (Wendigkeit) · Stachel (Haftung) |
+| Mak Starling | Flanken + Oberseite weich | Schwinge (Haftung) · Bremsfeder (Luftbremse) · Rückenfinne (Wendigkeit) |
+| Lyss Halo-9 | Flanken weich, Nase hart | Ringflügel-Segment (Wendigkeit) · Kuppelbogen (Wendigkeit) · Ringflügel-Segment (Haftung) |
+| Vrak Splitter-X | Nase hart, Oberseite + Hitze weich | Kühllamellen (Kühlung) · Ansaugklappen (Beschleunigung) · Haifinne / Stummelfinne (Wendigkeit) |
+| Beerak Fireflare | hitzefest | Radiator (Kühlung, mehr Hitze) · Kühlschleife (Kühlung, mehr Hitze) · Radiatorflügel (Haftung) |
+| Mandrel Ram | Front erst durch Schutzteile sehr hart, danach weich | Rammring (Schutz Front) · Rammbug (Schutz Front) · Kufenplatte (Schutz Bauch) |
+| Dorn Manta | Bauch weich | Flügelspitze (Haftung) · Seitenleitwerk (Wendigkeit) · Deltafläche (Haftung) |
+| Tarn Cyclone | Front weich (offene Rotoren) | Rotorblatt (Tempo, Beschleunigung) · Ringfinne (Wendigkeit) · Leitwerksträger (Haftung) |
+| Tenroc 6-Fach | dünne Haut überall | Oberes Triebwerk fällt aus · Äußeres Triebwerk fällt aus (je Tempo, Beschleunigung) · Verteilerrohr (Beschleunigung) |
+| Quadra Lumber | Front weich, Oberseite hart | Ringschürze (Wendigkeit) · Energieblitz erlischt (Beschleunigung) · Ausleger (Haftung) |
+| Pagali Ironclad | Flanken erst gepanzert, danach weich | Panzerschürze (Schutz Flanke) · Panzerplatte (Schutz Flanke + Front) · Oberes Triebwerk fällt aus |
+| Quill Voltspire | schwache Hülle, Hitze prallt ab | Energiebogen erlischt · zweiter Energiebogen erlischt (je Beschleunigung) · Entladungsmast (Kühlung) |
+
+### Verifiziert (Phase 5)
+- `npm run check` grün: 57/57 Unit-Prüfungen (16 neue: jedes Modell eigenständig, Zonen-Mittel 0,9–1,1, genau ein Bruchteil je Stufe und Anzeige, Wirkung 5–10 %, Deckel 15 %, Gegner halb, Bruch genau einmal mit Ereignis, Mittelteile, Reparatur bringt nichts zurück / Respawn alles, Rammbug, seitengetrennter Schutz, Explosion ohne Einzelteile, Schalter, HUD-Lampen, `vmax0`), Pod-Audit 14/14 unverändert, Sim 13/13 mit **0 Ausfällen auf allen Strecken** (wie vorher).
+- **`ARMOR=0 PARTS=0`: Sim-Tabelle zeilengleich zu Phase 4** → die Umstellung selbst ändert nichts; alle Unterschiede kommen aus den Modellen.
+- Mit Schadensmodellen: 5–29 verlorene Bruchteile je Strecke (11 Pods, 45 s); Durchschnittstempo je Strecke −4 … +3 m/s gegenüber vorher, langsamster Pod auf Crystal 83 statt 96 m/s (Grenze 18).
+- `GRIP=0.88` (Sturm): 13/13 „ok", höchstens 1 Ausfall je Strecke.
+- Echte App (WebGPU, Boonta, Aurora): 55 Schaden links → Meldung „KREISEL-STABILISATOR AUSGEFALLEN!", Lampen der richtigen Anzeige rot (Seitentausch stimmt), 85 Schaden rechts → drei Lampen rot; keine neuen Konsolenfehler.
+- `npm run build` → `dist/index.html` (2,89 MB).
+
+### Nicht verifiziert / aufgefallen (Phase 5)
+- **Balance von Hand nicht gefahren** – nur KI-Sim. Ob 5–10 % je Teil spürbar genug oder zu viel sind, muss der Nutzer fahren.
+- **Langlauf `SECS=120` mit Schadensmodellen: Malastare meldet 1 echten „downward teleport"** (Gegner-Pod Splitter-X, t = 14,7 s, Sample 964, Standard-Tunnel: der Pod gilt als „im Tunnel" (`upper = false`, `inRoof = true`), ist aber 23 m über der Straße und wird unter die Decke gesetzt). Das ist Tunnel-Logik aus Session 17, kein Pod-Thema; im Standardlauf (45 s) und im Langlauf ohne Schadensmodelle tritt es nicht auf – andere Flugbahnen. Nachstellen: `DEBUG=1 SECS=120 node tools/ci/out/sim.mjs` (ganzer Lauf nötig, wegen des Zufallsstroms).
+- Die Lampen stehen in gleichen Abständen, nicht auf Höhe der Stufen 50 / 35 / 20 % der Füllung.
+- Verlorene Teile sind am Pod **noch nicht zu sehen** (Phase 6) – bisher nur Lampe, Meldung, Ton, Funken und Fahrwirkung.
+
 ### Messwerte vor der Überholung (Meshes / Dreiecke)
 | Pod | Spieler „Hoch" | Spieler „Ultra" | Gegner nah | Gegner fern |
 |---|---|---|---|---|
@@ -216,6 +256,7 @@ Sichtmodell gegen Physikform: breiter als die Kollisionsform höchstens 0,50 m (
 1. `npm run check:pods` – nur das Pod-Audit. `POD=<id>` prüft einen Pod, `UPDATE=1` gibt neue Baseline-Zeilen aus (bewusst übernehmen, wenn Pods absichtlich geändert wurden).
 2. Harness-Konsole: `await sheet('front', { quality: 3, save: 'name' })`, `await show(3, 0.3, 3, { rival: true })`, `statsAll()`. Bogen-Ansichten: `pod`, `front`, `rear`, `side`, `inside`, `chase` (Verfolgerkamera), `profile` (Seitenriss); `{ rival: true, far: true }` zeigt das Fern-Modell. Pod-Indizes der neuen: 10 Cyclone, 11 Halo, 12 Manta, 13 Voltspire. Teile zeigen: `await show(0, 1, 3, { kit: { fins: 3, intake: 3, nozzle: 1, canopy: 2 }, tune: { topSpeed: 5, cooling: 5 } })` (`kit` 0–3 je Steckplatz, `tune` = Tuning-Stufen 0–5; beides auch in `sheet(…)`).
 3. `ROSTER_OLD=1 node tools/ci/out/sim.mjs` (nach `npm run check`) – Sim mit dem alten Startfeld; die Tabelle muss der von Phase 2 gleichen.
+4. `ARMOR=0 PARTS=0 node tools/ci/out/sim.mjs` – Sim ohne Schadensmodelle (Tabelle = Stand Phase 4); einzeln: `ARMOR=0` nur Bruchteile, `PARTS=0` nur Panzerzonen.
 
 ---
 

@@ -3,6 +3,8 @@ import type { PilotDef, PodDef, StatKey } from './data';
 import { DS, boulderState, bridgeSwing, frameAt, gateDrop, nearestGlobal, nearestOnPath, roadSurfaceAt, rotorAngle, type Obstacle, type SetPiece, type TrackData } from './trackBuilder';
 import type { PodVisual } from './podModel';
 import { podCollision, podEnvelope } from './podDesigns';
+import { DAMAGE_RULES, FX_NONE, damageModel, partsDue, partsFx, zoneFactor, type DamageZone, type PodFx } from './podDamage';
+export { FX_NONE, type DamageZone, type PodFx };
 
 /** `airbrake` = air brake, and a handbrake slide while steering. `pitch`: +1 lift (nose up), -1 dive (nose down). `roll`: -1 left / +1 right knife-edge (90°). */
 export interface Inputs { throttle: number; brake: number; steer: number; boost: boolean; airbrake: boolean; repair: boolean; pitch?: number; roll?: number; }
@@ -24,9 +26,11 @@ export interface PodState {
   /** Session 17: on the drivable deck above a tunnel / inside a roofed section; boost overdrive seconds used (max 3); cockpit pendulum (visual) */
   upper?: boolean; inRoof?: boolean; overT?: number;
   ckX?: number; ckY?: number; ckZ?: number; ckVX?: number; ckVY?: number; ckVZ?: number; ckPv?: number;
-  /** Session 20: handling multipliers from lost Bruchteile (undefined = intact); set only when a part breaks or returns */
-  fx?: PodFx;
-  events: { type: 'wall' | 'obstacle' | 'land' | 'explode' | 'pod' | 'fall' | 'field' | 'break'; strength: number; x: number; y: number; z: number; nx: number; nz: number; ref?: Obstacle }[];
+  /** Session 20: lost Bruchteile (bit i = part i of the racer's Schadensmodell is gone) and the handling multipliers that follow
+   *  from them (undefined = intact). Both change only in `applyDamage` (a part breaks) and `respawn` (all parts return). */
+  parts?: number; fx?: PodFx;
+  /** `part`: a Bruchteil broke off (`part` = its index in the Schadensmodell) */
+  events: { type: 'wall' | 'obstacle' | 'land' | 'explode' | 'pod' | 'fall' | 'field' | 'break' | 'part'; strength: number; x: number; y: number; z: number; nx: number; nz: number; ref?: Obstacle; part?: number }[];
   visual: PodVisual | null;
   ai: AIState | null;
   place: number;
@@ -41,19 +45,23 @@ export const HOVER = 2.85;
 export const TUNNEL_DECK = 1.2;
 const MIN_ROAD_CLEAR = 0.68;
 
-/** Where a hit comes from (Panzerzone, see CONTEXT.md). A racer's Schadensmodell weighs each zone. */
-export type DamageZone = 'front' | 'side' | 'top' | 'belly' | 'heat';
-/** Handling multipliers from lost Bruchteile (1 = intact). */
-export interface PodFx { vmax: number; accel: number; turn: number; grip: number; abDecel: number; cool: number; heatRate: number }
-export const FX_NONE: Readonly<PodFx> = { vmax: 1, accel: 1, turn: 1, grip: 1, abDecel: 1, cool: 1, heatRate: 1 };
-
 /** The one place where a pod loses engine health.
  *  `side`: < 0 left engine side, > 0 right, 0 = no side (split half and half), 'both' = the full amount on each side.
+ *  `zone`: where the hit comes from – the racer's Schadensmodell (podDamage.ts) weighs it: armour of that Panzerzone times the guards
+ *  still attached on that side. Afterwards every Bruchteil whose side fell through its step breaks off (event `part`).
  *  Stat factors (`sturdy`), AI factors, cooldowns and invulnerability stay with the caller. */
-export function applyDamage(p: PodState, side: number | 'both', amount: number, _zone: DamageZone) {
-  if (side === 'both') { p.hpL -= amount; p.hpR -= amount; }
-  else if (side < 0) p.hpL -= amount; else if (side > 0) p.hpR -= amount;
-  else { p.hpL -= amount * 0.5; p.hpR -= amount * 0.5; }
+export function applyDamage(p: PodState, side: number | 'both', amount: number, zone: DamageZone) {
+  const m = DAMAGE_RULES.armor || DAMAGE_RULES.parts ? damageModel(p.def.id) : null;
+  let aL = side === 'both' || side < 0 ? amount : side > 0 ? 0 : amount * 0.5;
+  let aR = side === 'both' || side > 0 ? amount : side < 0 ? 0 : amount * 0.5;
+  if (m && DAMAGE_RULES.armor) { const mask = p.parts ?? 0; aL *= zoneFactor(m, mask, -1, zone); aR *= zoneFactor(m, mask, 1, zone); }
+  p.hpL -= aL; p.hpR -= aR;
+  if (!m || !DAMAGE_RULES.parts || p.hpL <= 0 || p.hpR <= 0) return; // (a pod about to explode loses everything at once: no single parts)
+  const due = partsDue(m, p.hpL, p.hpR) & ~(p.parts ?? 0);
+  if (!due) return;
+  p.parts = (p.parts ?? 0) | due;
+  p.fx = partsFx(m, p.parts, !p.isPlayer); // a Gegner feels half of it
+  for (let i = 0; i < m.parts.length; i++) if ((due >> i) & 1) p.events.push({ type: 'part', strength: 1, part: i, x: p.pos.x, y: p.pos.y, z: p.pos.z, nx: 0, nz: 0 });
 }
 /** Zone of a hit whose contact normal (nx, nz) points from the obstacle to the pod: head-on = front, anything else = side. */
 function hitZone(p: PodState, nx: number, nz: number): DamageZone { return nx * Math.sin(p.yaw) + nz * Math.cos(p.yaw) < -0.5 ? 'front' : 'side'; }
@@ -62,6 +70,7 @@ export function podParams(p: PodState) {
   const s = p.stats, f = p.fx ?? FX_NONE;
   return {
     vmax: (108 + 50 * s.topSpeed) * f.vmax,
+    /** top speed without lost Bruchteile (sense of speed: camera FOV) */ vmax0: 108 + 50 * s.topSpeed,
     accel: (24 + 30 * s.accel) * f.accel,
     turn: (1.05 + 0.75 * s.turn) * f.turn,
     grip: (2.6 + 5.2 * s.traction) * f.grip,
@@ -657,6 +666,7 @@ export function respawn(p: PodState, td: TrackData) {
   p.upper = false; p.inRoof = false; p.overT = 0; p.ckX = 0; p.ckY = 0; p.ckZ = 0; p.ckVX = 0; p.ckVY = 0; p.ckVZ = 0;
   p.vel.set(s.tx * 35, 0, s.tz * 35);
   p.hpL = Math.max(p.hpL, 55); p.hpR = Math.max(p.hpR, 55); p.heat = 0; p.overheat = false;
+  p.parts = 0; p.fx = undefined; // every Bruchteil is back (ADR 0001: parts return only here)
   p.dead = 0; p.invuln = 2.2; p.grounded = false; p.groundY = s.y; p.prevGroundY = s.y;
 }
 

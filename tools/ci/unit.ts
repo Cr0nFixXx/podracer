@@ -1,6 +1,7 @@
 // Headless unit checks for pure game logic (part of `npm run check`). No framework: tiny test / expect helpers.
 // Env: ONLY=<substring> runs only the tests whose name contains it.
-import { PILOTS, PODS, STAT_KEYS, type StatKey } from '../../src/game/data';
+import * as THREE from 'three';
+import { PILOTS, PODS, STAT_KEYS, TRACKS, type StatKey } from '../../src/game/data';
 import { podLayout } from '../../src/game/podLayouts';
 import { cockpitGeo } from '../../src/game/podCockpits';
 import { engineExtent, engineGeo } from '../../src/game/podParts';
@@ -9,7 +10,9 @@ import { assembleHero, assembleRival } from '../../src/game/podAssembly';
 import { pickRivals, rivalKit } from '../../src/game/roster';
 import { engineKit, tuneTiers, NO_KIT } from '../../src/game/podKitParts';
 import { ciRoster } from './roster';
-import { applyDamage, podParams, FX_NONE, type PodState } from '../../src/game/physics';
+import { applyDamage, podParams, respawn, FX_NONE, type PodState } from '../../src/game/physics';
+import { DAMAGE_RULES, damageModel, partLamps, partsFx, zoneFactor, type DamageZone } from '../../src/game/podDamage';
+import { buildTrack } from '../../src/game/trackBuilder';
 import { loadProfile, saveProfile } from '../../src/game/settings';
 
 let failed = 0, passed = 0;
@@ -192,15 +195,123 @@ function eq(a: unknown, b: unknown, msg = '') {
   const A = JSON.stringify(a), B = JSON.stringify(b), cut = (s: string) => (s && s.length > 160 ? s.slice(0, 160) + ' …' : s);
   if (A !== B) throw new Error(`${msg} expected ${cut(B)}, got ${cut(A)}`);
 }
-/** Just enough of a pod for the pure damage / parameter functions. */
+/** Just enough of a pod for the pure damage / parameter functions (the player's Aurora XR-7 unless told otherwise). */
 function pod(over: Partial<PodState> = {}): PodState {
   const stats = Object.fromEntries(STAT_KEYS.map(k => [k, 0.5])) as Record<StatKey, number>;
-  return { def: PODS[0], stats, hpL: 100, hpR: 100, ...over } as unknown as PodState;
+  return { def: PODS[0], isPlayer: true, stats, hpL: 100, hpR: 100, events: [], pos: new THREE.Vector3(), vel: new THREE.Vector3(), ...over } as unknown as PodState;
 }
-test('applyDamage: a hit on the left side costs only the left engine', () => { const p = pod(); applyDamage(p, -1, 10, 'side'); eq([p.hpL, p.hpR], [90, 100]); });
-test('applyDamage: a hit on the right side costs only the right engine', () => { const p = pod(); applyDamage(p, 1, 10, 'side'); eq([p.hpL, p.hpR], [100, 90]); });
-test('applyDamage: a hit without a side (cockpit, landing, ceiling) is split half and half', () => { const p = pod(); applyDamage(p, 0, 10, 'top'); eq([p.hpL, p.hpR], [95, 95]); });
-test("applyDamage: 'both' costs each engine the full amount (overdrive, geyser, portal lip)", () => { const p = pod(); applyDamage(p, 'both', 10, 'heat'); eq([p.hpL, p.hpR], [90, 90]); });
+const near = (a: number, b: number, msg = '') => { if (!(Math.abs(a - b) < 1e-9)) throw new Error(`${msg} expected ${b}, got ${a}`); };
+/** the plain rule (no Panzerzonen, no Bruchteile): for the checks of which engine side pays */
+function plain(fn: () => void) { const was = { ...DAMAGE_RULES }; DAMAGE_RULES.armor = false; DAMAGE_RULES.parts = false; try { fn(); } finally { Object.assign(DAMAGE_RULES, was); } }
+test('applyDamage: a hit on the left side costs only the left engine', () => plain(() => { const p = pod(); applyDamage(p, -1, 10, 'side'); eq([p.hpL, p.hpR], [90, 100]); }));
+test('applyDamage: a hit on the right side costs only the right engine', () => plain(() => { const p = pod(); applyDamage(p, 1, 10, 'side'); eq([p.hpL, p.hpR], [100, 90]); }));
+test('applyDamage: a hit without a side (cockpit, landing, ceiling) is split half and half', () => plain(() => { const p = pod(); applyDamage(p, 0, 10, 'top'); eq([p.hpL, p.hpR], [95, 95]); }));
+test("applyDamage: 'both' costs each engine the full amount (overdrive, geyser, portal lip)", () => plain(() => { const p = pod(); applyDamage(p, 'both', 10, 'heat'); eq([p.hpL, p.hpR], [90, 90]); }));
+
+// ------------------------------------------------------------------ Schadensmodell: Panzerzonen + Bruchteile (Phase 5)
+const ZONES: DamageZone[] = ['front', 'side', 'top', 'belly', 'heat'];
+const FX_KEYS = Object.keys(FX_NONE) as (keyof typeof FX_NONE)[];
+const byId = (id: string) => PODS.find(p => p.id === id)!;
+/** ids of the Bruchteile a pod has lost */
+const lost = (p: PodState) => damageModel(p.def.id).parts.filter((_, i) => ((p.parts ?? 0) >> i) & 1).map(b => b.id);
+const bitOf = (podId: string, partId: string) => { const i = damageModel(podId).parts.findIndex(b => b.id === partId); if (i < 0) throw new Error(`${podId} has no Bruchteil "${partId}"`); return 1 << i; };
+
+test('Schadensmodell: every racer has one of its own (an unknown pod id throws)', () => {
+  const seen = new Map<string, string>();
+  for (const p of PODS) {
+    const m = damageModel(p.id), key = JSON.stringify([m.armor, m.parts.map(b => [b.step, b.side, b.fx, b.guard])]);
+    ok(m.parts.length >= 3, `${p.id}: ${m.parts.length} Bruchteile`); ok(!seen.has(key), `${p.id} breaks exactly like ${seen.get(key)}`); seen.set(key, p.id);
+    eq(new Set(m.parts.map(b => b.id)).size, m.parts.length, `${p.id}: Bruchteil ids must differ`);
+  }
+  throws(() => damageModel('no-such-pod'), /no Schadensmodell.*no-such-pod/i);
+});
+test('Schadensmodell: the Panzerzonen of an intact racer average about 1 (0.9–1.1), each between 0.4 and 1.3', () => {
+  for (const p of PODS) {
+    const m = damageModel(p.id); let sum = 0;
+    for (const z of ZONES) { const f = (zoneFactor(m, 0, -1, z) + zoneFactor(m, 0, 1, z)) / 2; ok(f >= 0.4 && f <= 1.3, `${p.id} ${z} × ${f}`); sum += f; }
+    ok(sum / 5 >= 0.9 && sum / 5 <= 1.1, `${p.id}: mean × ${(sum / 5).toFixed(3)}`);
+  }
+});
+test('Schadensmodell: steps are 50 / 35 / 20 % and every HUD box has exactly one Bruchteil per step', () => {
+  for (const p of PODS) {
+    const m = damageModel(p.id);
+    for (const b of m.parts) ok([50, 35, 20].includes(b.step) && [-1, 0, 1].includes(b.side), `${p.id} ${b.id}: step ${b.step}, side ${b.side}`);
+    for (const sd of [-1, 1]) for (const step of [50, 35, 20]) eq(m.parts.filter(b => b.step === step && (b.side === sd || b.side === 0)).length, 1, `${p.id}: Bruchteile at ${step} % in box ${sd}:`);
+  }
+});
+test('Schadensmodell: every Bruchteil has a name and a mild effect (5–10 % per number) or guards a Panzerzone', () => {
+  for (const p of PODS) for (const b of damageModel(p.id).parts) {
+    ok(b.label.length > 2, `${p.id} ${b.id}: label`); ok(b.fx || b.guard, `${p.id} ${b.id}: no effect`);
+    for (const [k, v] of Object.entries(b.fx ?? {})) ok(k === 'heatRate' ? v >= 1.05 && v <= 1.1 : v >= 0.9 && v <= 0.95, `${p.id} ${b.id}: ${k} × ${v}`);
+    for (const [z, v] of Object.entries(b.guard ?? {})) ok(v >= 0.5 && v <= 0.9, `${p.id} ${b.id}: guard ${z} × ${v}`);
+  }
+});
+test('Bruchteile: lost parts multiply up, but no number loses more than 15 %', () => {
+  const m = damageModel('aurora');
+  eq(partsFx(m, 0, false), FX_NONE);
+  const one = partsFx(m, bitOf('aurora', 'wingL'), false); near(one.grip, 0.93); eq(one.turn, 1);
+  near(partsFx(m, (1 << m.parts.length) - 1, false).grip, 0.85, 'Aurora without its four wing plates (would be -24 % grip):');
+  for (const p of PODS) {
+    const mm = damageModel(p.id), f = partsFx(mm, (1 << mm.parts.length) - 1, false);
+    for (const k of FX_KEYS) ok(k === 'heatRate' ? f[k] >= 1 && f[k] <= 1.15 + 1e-9 : f[k] <= 1 && f[k] >= 0.85 - 1e-9, `${p.id} with every part lost: ${k} × ${f[k]}`);
+  }
+});
+test('Bruchteile: a Gegner feels only half of each effect', () => {
+  const m = damageModel('aurora');
+  near(partsFx(m, bitOf('aurora', 'gyro'), false).turn, 0.92); near(partsFx(m, bitOf('aurora', 'gyro'), true).turn, 0.96);
+  const p = pod({ isPlayer: false }); applyDamage(p, -1, 55, 'top'); eq(lost(p), ['wingL']); near(p.fx!.grip, 0.965);
+});
+test('applyDamage: the Panzerzone scales the hit (Vrak Splitter-X: hard nose, soft top)', () => {
+  const a = pod({ def: byId('brute') }); applyDamage(a, -1, 10, 'front'); near(a.hpL, 92.5); eq(a.hpR, 100);
+  const b = pod({ def: byId('brute') }); applyDamage(b, 0, 10, 'top'); near(b.hpL, 94.25); near(b.hpR, 94.25);
+});
+test('applyDamage: a Bruchteil breaks when its side falls through its step – once, with one event, and the handling follows', () => {
+  const p = pod(); // Aurora XR-7: the outer wing plates go at 50 % (its top armour is 1)
+  applyDamage(p, -1, 40, 'top'); eq(lost(p), []); eq(p.events.length, 0); eq(p.fx, undefined);
+  applyDamage(p, -1, 15, 'top'); eq(lost(p), ['wingL']); eq(p.events.map(e => [e.type, e.part]), [['part', damageModel('aurora').parts.findIndex(b => b.id === 'wingL')]]);
+  near(p.fx!.grip, 0.93); near(podParams(p).grip, 5.2 * 0.93);
+  applyDamage(p, -1, 1, 'top'); eq(p.events.length, 1, 'no second event:'); eq(p.hpR, 100);
+});
+test('applyDamage: a centre Bruchteil breaks as soon as either side falls through its step', () => {
+  const m = damageModel('volt'), p = pod({ def: byId('volt') }); // Quill Voltspire: its arcs die at 50 and 35 %
+  applyDamage(p, 1, 60 / m.armor.top, 'top'); eq(lost(p), ['arcA']);          // right side at 40 %
+  applyDamage(p, -1, 70 / m.armor.top, 'top'); eq(lost(p), ['arcA', 'arcB']);  // left side at 30 %
+});
+test('Bruchteile: repairing above the step does not bring a part back – a respawn does', () => {
+  const td = buildTrack(TRACKS[0]), p = pod({ lastSafePath: 0, lastSafeIdx: td.startIdx });
+  applyDamage(p, -1, 55, 'top'); eq(lost(p), ['wingL']);
+  p.hpL = 100; applyDamage(p, 1, 1, 'top'); eq(lost(p), ['wingL'], 'after a full repair:'); near(p.fx!.grip, 0.93);
+  respawn(p, td); eq(lost(p), [], 'after the respawn:'); eq(p.fx, undefined);
+});
+test("applyDamage: the Mandrel Ram's bar eats front hits until it drops", () => {
+  const m = damageModel('odo'), p = pod({ def: byId('odo') });
+  const before = zoneFactor(m, 0, -1, 'front'); ok(before < 0.6, `front factor with bar and ring: ${before}`);
+  applyDamage(p, 'both', 70 / m.armor.top, 'top'); // 30 % left on both sides
+  ok(lost(p).includes('ram') && lost(p).includes('hoopL') && lost(p).includes('hoopR'), `lost: ${lost(p)}`);
+  near(zoneFactor(m, p.parts!, -1, 'front'), m.armor.front); ok(m.armor.front > before * 2, 'without the bar a front hit costs more than twice as much');
+});
+test('applyDamage: a guard covers only its own side (Pagali Ironclad: left skirt gone, right skirt still holds)', () => {
+  const m = damageModel('teemo'), p = pod({ def: byId('teemo') });
+  applyDamage(p, -1, 52 / zoneFactor(m, 0, -1, 'top'), 'top'); eq(lost(p), ['skirtL']); // left side at 48 %
+  const l0 = p.hpL, r0 = p.hpR; applyDamage(p, -1, 10, 'side'); applyDamage(p, 1, 10, 'side');
+  ok(l0 - p.hpL > r0 - p.hpR + 2, `the same side hit cost the left ${(l0 - p.hpL).toFixed(1)}, the right ${(r0 - p.hpR).toFixed(1)}`);
+});
+test('applyDamage: a pod that is about to explode does not report single parts', () => {
+  const p = pod(); applyDamage(p, 'both', 150, 'top'); ok(p.hpL <= 0 && p.hpR <= 0); eq(p.events.length, 0); eq(p.parts ?? 0, 0);
+});
+test('applyDamage: with Panzerzonen and Bruchteile switched off it is the plain rule again (CI: ARMOR=0 PARTS=0)', () => plain(() => {
+  const p = pod({ def: byId('brute') }); applyDamage(p, -1, 60, 'front'); eq([p.hpL, p.hpR], [40, 100]); eq(p.parts ?? 0, 0); eq(p.fx, undefined); eq(p.events.length, 0);
+}));
+test('HUD lamps: three rows per box (50 / 35 / 20 %) – 1 attached, 2 lost; a centre part shows in both boxes', () => {
+  const m = damageModel('aurora'); eq(partLamps(m, 0, -1), [1, 1, 1]); eq(partLamps(m, 0, 1), [1, 1, 1]);
+  eq(partLamps(m, bitOf('aurora', 'wingL'), -1), [2, 1, 1]); eq(partLamps(m, bitOf('aurora', 'wingL'), 1), [1, 1, 1]);
+  eq(partLamps(m, bitOf('aurora', 'gyro'), -1), [1, 2, 1]); eq(partLamps(m, bitOf('aurora', 'gyro'), 1), [1, 2, 1]);
+  eq(partLamps(m, bitOf('aurora', 'innerR'), 1), [1, 1, 2]);
+});
+test('podParams: vmax0 is the top speed without lost parts (the camera FOV follows it)', () => {
+  const a = podParams(pod()), b = podParams(pod({ fx: { ...FX_NONE, vmax: 0.9 } }));
+  eq(a.vmax0, a.vmax); eq(b.vmax0, a.vmax); ok(b.vmax < a.vmax);
+});
 test('podParams: without lost parts every handling number is the plain stat formula', () => {
   const a = podParams(pod()), b = podParams(pod({ fx: { ...FX_NONE } }));
   eq([a.vmax, a.accel, a.turn, a.grip, a.abDecel, a.cool, a.heatRate], [133, 39, 1.425, 5.2, 41, 0.31, 0.3]);

@@ -20,6 +20,7 @@ import { Particles } from './particles';
 import { PostFX } from './post';
 import { AudioFX, type WorldAudioState } from './audio';
 import { HOVER, aiInputs, applyDamage, podParams, respawn, stepPod, type PodState, collidePods } from './physics';
+import { damageModel, lostMessage, partLamps } from './podDamage';
 import { applyAtmosphere } from './atmosphere';
 import type { LifeAudio } from './wildlife';
 
@@ -38,6 +39,8 @@ export interface HudState {
   roll: number; pitch: number; sliding: boolean; slideCharge: number; airborne: boolean; env: string;
   /** 0..1 share of the 3 s boost overdrive that is used up */
   overdrive: number;
+  /** Bruchteil lamps of the two damage boxes (screen-left / screen-right), rows 50 / 35 / 20 %: 0 no part · 1 attached · 2 lost */
+  partsL: number[]; partsR: number[];
 }
 export interface RaceResult { place: number; name: string; pod: string; color: string; isPlayer: boolean; time: number | null; bestLap: number | null; }
 
@@ -566,6 +569,11 @@ export class Game {
           }
           if (p.isPlayer) this.audio.fieldZap(e.strength);
         } else if (e.type === 'fall' && p.isPlayer) this.showMsg('ABSTURZ!', 2);
+        else if (e.type === 'part') { // a Bruchteil broke off: sparks, a hard knock, and the player is told which part
+          if (near) this.particles.sparks(this.tmpV, UP, p.vel, 14);
+          if (p.isPlayer) { this.audio.hit(48); this.audio.beep(196, 0.22, 'sawtooth', 0.16); p.shake = Math.min(1, p.shake + 0.35); this.showMsg(lostMessage(damageModel(p.def.id).parts[e.part ?? 0]), 2.2); }
+          else if (dist < 120) this.audio.hit(18);
+        }
       }
       p.events.length = 0;
 
@@ -755,7 +763,7 @@ export class Game {
   updateCamera(dt: number) {
     const p = this.player; const cam = this.camera; const gfx = this.profile.gfx;
     p.visual?.setCockpitView?.(this.camMode === 2); // Session 20: the cockpit camera sits in the pilot's head and shows the cockpit from inside (see PodVisual.setCockpitView)
-    const sp = Math.hypot(p.vel.x, p.vel.z); const vmax = podParams(p).vmax;
+    const sp = Math.hypot(p.vel.x, p.vel.z); const vmax = podParams(p).vmax0; // (undamaged top speed: lost parts must not widen the view)
     let fov = gfx.fov + Math.min(1.3, sp / vmax) * 16 + (p.boosting ? 8 : 0) + (p.zeroG ? 8 : 0); // zero-G: wider view = more sense of speed
     const velYaw = sp > 8 ? Math.atan2(p.vel.x, p.vel.z) : p.yaw;
     let dy = velYaw - p.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
@@ -882,13 +890,14 @@ export class Game {
     const p = this.player; const closed = this.td.main.closed;
     const best = p.lapTimes.length ? Math.min(...p.lapTimes) : null;
     const total = closed ? this.profile.race.laps : 1;
+    const dm = damageModel(p.def.id), lostParts = p.parts ?? 0;
     return {
       speed: Math.round(Math.hypot(p.vel.x, p.vel.z) * 3.6), place: p.place, total: this.pods.length,
       lap: Math.max(1, Math.min(total, p.lap + 1)), laps: total, sprint: !closed,
       progress: closed ? 0 : Math.max(0, Math.min(1, p.rel / (this.td.finishIdx - this.td.startIdx))),
       time: this.raceTime, lastLap: p.lapTimes.length ? p.lapTimes[p.lapTimes.length - 1] : null, bestLap: closed ? best : null,
       // HUD boxes mean screen-left / screen-right. Internal "L" is local x < 0 = the RIGHT engine in the chase view → swapped here.
-      hpL: Math.max(0, p.hpR), hpR: Math.max(0, p.hpL), heat: p.heat, boosting: p.boosting, overheat: p.overheat, repairing: p.repairing, airbrake: p.airbraking,
+      hpL: Math.max(0, p.hpR), hpR: Math.max(0, p.hpL), partsL: partLamps(dm, lostParts, 1), partsR: partLamps(dm, lostParts, -1), heat: p.heat, boosting: p.boosting, overheat: p.overheat, repairing: p.repairing, airbrake: p.airbraking,
       wrongWay: p.wrongWay > 1.2, zeroG: p.zeroG, countdown: this.state === 'countdown' ? this.countdown : -1,
       message: this.messageT > 0 ? this.message : '', camName: CAMERA_NAMES[this.camMode], fps: this.fps, backend: this.backend,
       standings: [], dead: p.dead > 0, finished: p.finished,

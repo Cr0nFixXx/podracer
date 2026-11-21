@@ -86,6 +86,12 @@ Leitidee: **Jeder Racer ist an seinem Cockpit erkennbar – auch als Silhouette.
 - **Größe folgt dem Triebwerk:** alle Teile skalieren mit dem Rumpfradius; flache Triebwerke (Manta) bekommen flache Varianten (Leisten statt Ringe, Zahnleiste statt Krone). Nichts ragt tiefer als die Bodenklemme oder weiter als 0,55 m über die Kollisionsform.
 - **Gegner** tragen ausgeloste Style-Teile, aber keine Tuning-Teile – so sieht jedes Startfeld anders aus, und der eigene Pod bleibt der am weitesten ausgebaute.
 
+**Schaden, der zum Racer passt (Phase 5)** – Leitidee: **Ein Racer geht so kaputt, wie er gebaut ist.** Leichte Renner verlieren Flügel und Finnen (Haftung, Wendigkeit), schwere verlieren Panzerung oder Kühlung, Mehrmotorige verlieren einzelne Triebwerke, die Voltspire ihre Energiebögen.
+- **Lesbar in drei Stufen:** jede Schadensanzeige hat drei Lampen (50 / 35 / 20 %). Fällt die Füllung unter eine Stufe, bricht genau ein Teil – mit Meldung, Schlag und Funken. Kein Teil hat eigene Lebenspunkte.
+- **Mild:** ein Teil kostet 5–10 %, zusammen nie mehr als 15 % je Fahrwert. Der Pod bleibt fahrbar; man merkt den Schaden in schnellen Kurven und beim Beschleunigen, nicht auf der Geraden.
+- **Schutzteile:** Rammbug (Mandrel Ram) und Panzerschürzen (Pagali Ironclad) kosten nichts, wenn sie fehlen – sie haben vorher Treffer abgefangen. Wer sie verliert, steckt danach mehr ein.
+- **Reparatur ist kein Zurückspulen:** `R` heilt die Triebwerke, verlorene Teile bleiben bis zum Respawn weg.
+
 ## Überführungen, Schleusen, verzweigte Höhlen, Blitze & Pods (Session 19)
 - **Über-/Unterführungen:** Wo sich eine Strecke kreuzt (≥ 35 m Höhenabstand), trägt die obere Piste einen abgeschrägten Stahl-Hohlkasten mit Querträgern, seitlichen Leuchtstreifen, Widerlagern und Zwillingspfeilern; die untere führt durch einen 20-m-Unterführungstunnel oder frei unter dem Viadukt hindurch. Auf Karte und Minimap hebt eine dunkle Kontur die Brücke ab.
 - **Futuristische Schleusen (statt Fallgitter):** 3-spurige Panzerschleuse mit Überkopf-Kammer, hydraulischen Verbund-Schotts, Plasma-Dichtnaht und dezentem Warn-Energiefeld; seitlich wachsen Fels-, Gletscher-, Kristall- oder Stations-Monolithen organisch in die Landschaft.

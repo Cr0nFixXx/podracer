@@ -93380,22 +93380,168 @@ function treeMaterial(disp) {
   return m;
 }
 
+// ../../src/game/podDamage.ts
+var FX_NONE = { vmax: 1, accel: 1, turn: 1, grip: 1, abDecel: 1, cool: 1, heatRate: 1 };
+var FX_KEYS = Object.keys(FX_NONE);
+var DAMAGE_RULES = { armor: true, parts: true };
+var FX_CAP = 0.15;
+var armor = (front, side, top, belly2, heat) => ({ front, side, top, belly: belly2, heat });
+var pair2 = (step9, id, label2, fx, x = {}) => [-1, 1].map((side) => ({ id: id + (side < 0 ? "L" : "R"), label: label2, side, step: step9, ...fx ? { fx } : {}, ...x }));
+var one = (side, step9, id, label2, fx, x = {}) => ({ id, label: label2, side, step: step9, ...fx ? { fx } : {}, ...x });
+var OUT = "ausgefallen";
+var DEAD = "erloschen";
+var MODELS = {
+  // ---- light twin-engine racers: thin skin on the flanks, wings and fins go first
+  aurora: { armor: armor(1, 1.15, 1, 0.9, 0.95), parts: [
+    // wing plates tear off (grip), the tail gyro fails (turn)
+    ...pair2(50, "wing", "Fl\xFCgelplatte", { grip: 0.93 }),
+    one(0, 35, "gyro", "Kreisel-Stabilisator", { turn: 0.92 }, { lost: OUT }),
+    ...pair2(20, "inner", "Innenfl\xFCgel", { grip: 0.94 })
+  ] },
+  mavik: { armor: armor(1.2, 1, 1, 0.9, 0.9), parts: [
+    // Hollo Needle: the nose probe bends (turn), canards and fin snap
+    one(0, 50, "probe", "Nasensonde", { turn: 0.94 }),
+    ...pair2(35, "canard", "Canards", { grip: 0.94 }),
+    one(0, 20, "fin", "Heckfinne", { turn: 0.92 })
+  ] },
+  rattis: { armor: armor(0.95, 1.2, 1, 0.95, 0.9), parts: [
+    // Tyr Vespa: a blade wing shears off (grip)
+    ...pair2(50, "blade", "Klingenfl\xFCgel", { grip: 0.92 }),
+    ...pair2(35, "feeler", "F\xFChler", { turn: 0.95 }),
+    one(0, 20, "stinger", "Stachel", { grip: 0.95 })
+  ] },
+  elana: { armor: armor(1, 1.1, 1.1, 0.9, 0.9), parts: [
+    // Mak Starling: wings, an air-brake feather (braking), the dorsal fin (turn)
+    ...pair2(50, "wing", "Schwinge", { grip: 0.94 }),
+    ...pair2(35, "petal", "Bremsfeder", { abDecel: 0.9 }),
+    one(0, 20, "fin", "R\xFCckenfinne", { turn: 0.92 })
+  ] },
+  halo: { armor: armor(0.9, 1.2, 1, 1, 0.9), parts: [
+    // Lyss Halo-9: the ring wings crack, then a segment goes (turn, grip)
+    ...pair2(50, "ringA", "Ringfl\xFCgel-Segment", { turn: 0.94 }),
+    one(0, 35, "arch", "Kuppelbogen", { turn: 0.95 }),
+    ...pair2(20, "ringB", "Ringfl\xFCgel-Segment", { grip: 0.93 })
+  ] },
+  // ---- heavy twin-engine racers
+  brute: { armor: armor(0.75, 0.95, 1.15, 1, 1.15), parts: [
+    // Vrak Splitter-X: hard nose; top slats rip (cooling), intake petals jam (accel)
+    ...pair2(50, "slats", "K\xFChllamellen", { cool: 0.92 }),
+    ...pair2(35, "petals", "Ansaugklappen", { accel: 0.93 }, { lost: "verklemmt" }),
+    one(-1, 20, "fin", "Haifinne", { turn: 0.93 }),
+    one(1, 20, "stub", "Stummelfinne", { turn: 0.95 })
+  ] },
+  aldo: { armor: armor(1, 1.1, 1.05, 1.05, 0.8), parts: [
+    // Beerak Fireflare: built for heat; radiators leak (cooling, more heat)
+    ...pair2(50, "rad", "Radiator", { cool: 0.92, heatRate: 1.06 }, { lost: "leck" }),
+    ...pair2(35, "loop", "K\xFChlschleife", { cool: 0.93, heatRate: 1.05 }, { lost: "geplatzt" }),
+    ...pair2(20, "vane", "Radiatorfl\xFCgel", { grip: 0.95 })
+  ] },
+  odo: { armor: armor(1.15, 1.05, 1.2, 1, 1.2), parts: [
+    // Mandrel Ram: ram rings and ram bar eat front hits until they drop
+    ...pair2(50, "hoop", "Rammring", void 0, { guard: { front: 0.85 } }),
+    one(0, 35, "ram", "Rammbug", void 0, { guard: { front: 0.55 } }),
+    ...pair2(20, "skid", "Kufenplatte", void 0, { guard: { belly: 0.8 } })
+  ] },
+  manta: { armor: armor(0.9, 1.1, 0.9, 1.2, 0.9), parts: [
+    // Dorn Manta: flat and low – soft belly; wing tips (grip), fins (turn)
+    ...pair2(50, "winglet", "Fl\xFCgelspitze", { grip: 0.93 }),
+    ...pair2(35, "fin", "Seitenleitwerk", { turn: 0.94 }),
+    ...pair2(20, "delta", "Deltafl\xE4che", { grip: 0.94 })
+  ] },
+  cyclone: { armor: armor(1.2, 0.9, 0.95, 0.95, 1), parts: [
+    // Tarn Cyclone: open rotors up front; a rotor blade goes (speed), the ring fin (turn)
+    ...pair2(50, "blade", "Rotorblatt", { vmax: 0.95, accel: 0.95 }),
+    ...pair2(35, "fin", "Ringfinne", { turn: 0.94 }),
+    one(0, 20, "tail", "Leitwerkstr\xE4ger", { grip: 0.92 })
+  ] },
+  // ---- multi-engine racers and the special one
+  gasvaro: { armor: armor(1.1, 1.1, 1.05, 1.05, 1.1), parts: [
+    // Tenroc 6-Fach: thin skin; single engines flame out one by one (speed, accel)
+    ...pair2(50, "engC", "Oberes Triebwerk", { vmax: 0.95, accel: 0.95 }, { lost: OUT }),
+    ...pair2(35, "engB", "\xC4u\xDFeres Triebwerk", { vmax: 0.95, accel: 0.95 }, { lost: OUT }),
+    ...pair2(20, "manifold", "Verteilerrohr", { accel: 0.95 }, { lost: "geplatzt" })
+  ] },
+  bomquad: { armor: armor(1.1, 1, 0.9, 1, 1), parts: [
+    // Quadra Lumber: a ring shroud cracks (turn), one arc of the X dies (accel)
+    ...pair2(50, "shroud", "Ringsch\xFCrze", { turn: 0.94 }),
+    ...pair2(35, "arc", "Energieblitz", { accel: 0.93 }, { lost: DEAD }),
+    ...pair2(20, "arm", "Ausleger", { grip: 0.95 })
+  ] },
+  teemo: { armor: armor(1, 1.25, 1, 1, 1.1), parts: [
+    // Pagali Ironclad: skirts and plates take the first hits, then fall; an upper engine goes late
+    ...pair2(50, "skirt", "Panzersch\xFCrze", void 0, { guard: { side: 0.7 } }),
+    ...pair2(35, "plate", "Panzerplatte", void 0, { guard: { side: 0.85, front: 0.9 } }),
+    ...pair2(20, "engU", "Oberes Triebwerk", { vmax: 0.95, accel: 0.93 }, { lost: OUT })
+  ] },
+  volt: { armor: armor(1.15, 1.2, 1.05, 1.05, 0.55), parts: [
+    // Quill Voltspire: weak hull that shrugs off heat; its arcs die 3 → 2 → 1 (accel)
+    one(0, 50, "arcA", "Energiebogen", { accel: 0.95 }, { lost: DEAD }),
+    one(0, 35, "arcB", "Energiebogen", { accel: 0.95 }, { lost: DEAD }),
+    one(0, 20, "mast", "Entladungsmast", { cool: 0.9 })
+  ] }
+};
+function damageModel(podId) {
+  const m = MODELS[podId];
+  if (!m) throw new Error(`No Schadensmodell for pod "${podId}" \u2013 add it to MODELS in src/game/podDamage.ts`);
+  return m;
+}
+function partsFx(m, mask, ai) {
+  const f = { ...FX_NONE };
+  m.parts.forEach((b, i) => {
+    if (b.fx && mask >> i & 1) for (const k of FX_KEYS) f[k] *= b.fx[k] ?? 1;
+  });
+  for (const k of FX_KEYS) {
+    let d = k === "heatRate" ? Math.min(FX_CAP, f[k] - 1) : -Math.min(FX_CAP, 1 - f[k]);
+    if (ai) d *= 0.5;
+    f[k] = 1 + d;
+  }
+  return f;
+}
+function zoneFactor(m, mask, side, zone) {
+  let f = m.armor[zone];
+  m.parts.forEach((b, i) => {
+    const g2 = b.guard?.[zone];
+    if (g2 !== void 0 && !(mask >> i & 1) && (b.side === side || b.side === 0)) f *= g2;
+  });
+  return f;
+}
+function partsDue(m, hpL, hpR) {
+  let mask = 0;
+  m.parts.forEach((b, i) => {
+    if ((b.side < 0 ? hpL : b.side > 0 ? hpR : Math.min(hpL, hpR)) < b.step) mask |= 1 << i;
+  });
+  return mask;
+}
+function partLamps(m, mask, side) {
+  return [50, 35, 20].map((step9) => {
+    const i = m.parts.findIndex((b) => b.step === step9 && (b.side === side || b.side === 0));
+    return i < 0 ? 0 : mask >> i & 1 ? 2 : 1;
+  });
+}
+var lostMessage = (b) => `${b.label} ${b.lost ?? "abgerissen"}!`.toUpperCase();
+
 // ../../src/game/physics.ts
 var GRAVITY = 34;
 var HOVER = 2.85;
 var TUNNEL_DECK = 1.2;
 var MIN_ROAD_CLEAR = 0.68;
-var FX_NONE = { vmax: 1, accel: 1, turn: 1, grip: 1, abDecel: 1, cool: 1, heatRate: 1 };
-function applyDamage(p, side, amount, _zone) {
-  if (side === "both") {
-    p.hpL -= amount;
-    p.hpR -= amount;
-  } else if (side < 0) p.hpL -= amount;
-  else if (side > 0) p.hpR -= amount;
-  else {
-    p.hpL -= amount * 0.5;
-    p.hpR -= amount * 0.5;
+function applyDamage(p, side, amount, zone) {
+  const m = DAMAGE_RULES.armor || DAMAGE_RULES.parts ? damageModel(p.def.id) : null;
+  let aL = side === "both" || side < 0 ? amount : side > 0 ? 0 : amount * 0.5;
+  let aR = side === "both" || side > 0 ? amount : side < 0 ? 0 : amount * 0.5;
+  if (m && DAMAGE_RULES.armor) {
+    const mask = p.parts ?? 0;
+    aL *= zoneFactor(m, mask, -1, zone);
+    aR *= zoneFactor(m, mask, 1, zone);
   }
+  p.hpL -= aL;
+  p.hpR -= aR;
+  if (!m || !DAMAGE_RULES.parts || p.hpL <= 0 || p.hpR <= 0) return;
+  const due = partsDue(m, p.hpL, p.hpR) & ~(p.parts ?? 0);
+  if (!due) return;
+  p.parts = (p.parts ?? 0) | due;
+  p.fx = partsFx(m, p.parts, !p.isPlayer);
+  for (let i = 0; i < m.parts.length; i++) if (due >> i & 1) p.events.push({ type: "part", strength: 1, part: i, x: p.pos.x, y: p.pos.y, z: p.pos.z, nx: 0, nz: 0 });
 }
 function hitZone(p, nx, nz) {
   return nx * Math.sin(p.yaw) + nz * Math.cos(p.yaw) < -0.5 ? "front" : "side";
@@ -93404,6 +93550,8 @@ function podParams(p) {
   const s = p.stats, f = p.fx ?? FX_NONE;
   return {
     vmax: (108 + 50 * s.topSpeed) * f.vmax,
+    /** top speed without lost Bruchteile (sense of speed: camera FOV) */
+    vmax0: 108 + 50 * s.topSpeed,
     accel: (24 + 30 * s.accel) * f.accel,
     turn: (1.05 + 0.75 * s.turn) * f.turn,
     grip: (2.6 + 5.2 * s.traction) * f.grip,
@@ -94205,6 +94353,8 @@ function respawn(p, td) {
   p.hpR = Math.max(p.hpR, 55);
   p.heat = 0;
   p.overheat = false;
+  p.parts = 0;
+  p.fx = void 0;
   p.dead = 0;
   p.invuln = 2.2;
   p.grounded = false;
@@ -106534,6 +106684,15 @@ var Game = class _Game {
           }
           if (p.isPlayer) this.audio.fieldZap(e.strength);
         } else if (e.type === "fall" && p.isPlayer) this.showMsg("ABSTURZ!", 2);
+        else if (e.type === "part") {
+          if (near) this.particles.sparks(this.tmpV, UP4, p.vel, 14);
+          if (p.isPlayer) {
+            this.audio.hit(48);
+            this.audio.beep(196, 0.22, "sawtooth", 0.16);
+            p.shake = Math.min(1, p.shake + 0.35);
+            this.showMsg(lostMessage(damageModel(p.def.id).parts[e.part ?? 0]), 2.2);
+          } else if (dist < 120) this.audio.hit(18);
+        }
       }
       p.events.length = 0;
       const alive = p.dead <= 0 && !(p.invuln > 0 && Math.floor(this.clock * 12) % 2 === 0);
@@ -106801,7 +106960,7 @@ var Game = class _Game {
     const gfx = this.profile.gfx;
     p.visual?.setCockpitView?.(this.camMode === 2);
     const sp = Math.hypot(p.vel.x, p.vel.z);
-    const vmax = podParams(p).vmax;
+    const vmax = podParams(p).vmax0;
     let fov2 = gfx.fov + Math.min(1.3, sp / vmax) * 16 + (p.boosting ? 8 : 0) + (p.zeroG ? 8 : 0);
     const velYaw = sp > 8 ? Math.atan2(p.vel.x, p.vel.z) : p.yaw;
     let dy = velYaw - p.yaw;
@@ -106974,6 +107133,7 @@ var Game = class _Game {
     const closed = this.td.main.closed;
     const best = p.lapTimes.length ? Math.min(...p.lapTimes) : null;
     const total = closed ? this.profile.race.laps : 1;
+    const dm = damageModel(p.def.id), lostParts = p.parts ?? 0;
     return {
       speed: Math.round(Math.hypot(p.vel.x, p.vel.z) * 3.6),
       place: p.place,
@@ -106988,6 +107148,8 @@ var Game = class _Game {
       // HUD boxes mean screen-left / screen-right. Internal "L" is local x < 0 = the RIGHT engine in the chase view → swapped here.
       hpL: Math.max(0, p.hpR),
       hpR: Math.max(0, p.hpL),
+      partsL: partLamps(dm, lostParts, 1),
+      partsR: partLamps(dm, lostParts, -1),
       heat: p.heat,
       boosting: p.boosting,
       overheat: p.overheat,

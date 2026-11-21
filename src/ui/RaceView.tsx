@@ -93,11 +93,14 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
 
           {/* ===== engine damage (bottom left, original style) ===== */}
           <div className="absolute bottom-6 left-5 flex gap-3">
-            {[{ v: h.hpL, label: 'L' }, { v: h.hpR, label: 'R' }].map((e, i) => (
+            {[{ v: h.hpL, lamps: h.partsL }, { v: h.hpR, lamps: h.partsR }].map((e, i) => (
               <div key={i} className="w-16 h-24 rounded-md border-2 border-cyan-300/70 bg-black/30 relative overflow-hidden">
                 <div className="absolute inset-x-0 bottom-0" style={{ height: `${e.v}%`, background: e.v > 60 ? 'linear-gradient(#d9ff6a,#7fbf2a)' : e.v > 30 ? 'linear-gradient(#ffe27a,#d9a13a)' : 'linear-gradient(#ffb0a0,#d94a3a)' }} />
                 <div className="absolute inset-0 flex flex-col justify-between py-1 items-center">
-                  {[0, 1, 2].map(r => <div key={r} className="w-10 h-5 border border-black/40 rounded-sm" />)}
+                  {/* Bruchteil lamps, rows 50 / 35 / 20 %: attached = plain cell, lost = red cell with a cross */}
+                  {e.lamps.map((s, r) => (
+                    <div key={r} data-lamp={s} className={`w-10 h-5 rounded-sm flex items-center justify-center text-[11px] leading-none font-black ${s === 2 ? 'border-2 border-red-400 bg-red-950/90 text-red-300' : s === 1 ? 'border border-black/40' : 'border border-black/15'}`}>{s === 2 ? '✕' : ''}</div>
+                  ))}
                 </div>
               </div>
             ))}
