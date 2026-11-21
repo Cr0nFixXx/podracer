@@ -2,11 +2,12 @@ import * as THREE from 'three/webgpu';
 import * as TSLmod from 'three/tsl';
 import type { ThemeDef } from './data';
 import type { TerrainField } from './terrain';
+import { macroTexture } from './textures';
 import type { TrackData } from './trackBuilder';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
-const { abs, attribute, cameraPosition, clamp, color, cos, length, mix, mx_noise_float, normalize, oneMinus, positionLocal, pow, sin, smoothstep, time, uniform, vec3 } = TSL;
+const { abs, attribute, cameraPosition, clamp, color, cos, length, mix, normalize, oneMinus, positionLocal, pow, sin, smoothstep, texture, time, uniform, vec2, vec3 } = TSL;
 
 /**
  * Particle-free smoke columns: camera-facing (cylindrical) strips with scrolling noise, wind bend and haze (scene fog).
@@ -79,14 +80,14 @@ export function buildSmoke(srcs: SmokeSrc[], theme: ThemeDef, td: TrackData, fie
   const swirl = vec3(sin(tw), 0, cos(tw)).mul(v.mul(p.z).mul(0.35)).mul(devil);
   const bend = wind.mul(pow(v, 1.6).mul(H).mul(0.35)).mul(oneMinus(devil));
   const center = positionLocal.add(vec3(0, v.mul(H), 0)).add(bend).add(swirl);
-  const toCam = cameraPosition.sub(center); const right = normalize(vec3(toCam.z, 0, toCam.x.negate()));
+  const toCam = cameraPosition.sub(center); const right = normalize(vec3(toCam.z, 0, toCam.x.negate()).add(vec3(1e-4, 0, 0)));
   const w = p.y.add(p.z.sub(p.y).mul(pow(v, 0.75)));
-  // own (weaker) aerial perspective: scene fog would erase distant columns completely against the horizon haze
+  // own (weaker) aerial perspective + fast macroTexture billow (zero 3D Perlin ALU, zero overhead-camera NaN)
   const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false });
   mat.positionNode = center.add(right.mul(c.x).mul(w));
-  const u = c.x;
-  const n1 = mx_noise_float(vec3(u.mul(1.4).add(p.w), v.mul(H.div(38)).sub(time.mul(0.35)), p.w.mul(0.37))).mul(0.5).add(0.5);
-  const n2 = mx_noise_float(vec3(u.mul(3.1), v.mul(H.div(14)).sub(time.mul(0.6)), p.w)).mul(0.5).add(0.5);
+  const u = c.x; const mTex = macroTexture();
+  const n1 = texture(mTex, vec2(u.mul(0.28).add(p.w.mul(0.13)), v.mul(H.div(150)).sub(time.mul(0.045)))).r;
+  const n2 = texture(mTex, vec2(u.mul(0.62).sub(p.w.mul(0.07)), v.mul(H.div(58)).sub(time.mul(0.085)))).g;
   const n = n1.mul(0.65).add(n2.mul(0.35));
   const edge = oneMinus(pow(abs(u), 1.6)); const vert = smoothstep(0.0, 0.05, v).mul(pow(oneMinus(v), 1.2));
   const camD = length(center.sub(cameraPosition)); const haze = smoothstep(300.0, 5000.0, camD).mul(0.55);

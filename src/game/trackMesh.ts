@@ -1,16 +1,18 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 /**
- * Static track geometry pipeline.
- *  chunkGeometries(): splits long strips (road, walls, rails, kerbs …) into compact chunks (own vertices, seamless
- *                     normals computed on the full strip first) → per-chunk frustum culling.
- *  StaticBatcher:     collects chunks/tiles per (material, castShadow) and builds ONE BatchedMesh per group
- *                     (per-object frustum culling for camera + shadow camera, multi-draw on WebGL2, one pipeline on
- *                     WebGPU). Falls back to plain meshes when batching is off or attribute layouts differ.
+ * Static track & terrain geometry pipeline:
+ *  chunkGeometries(): splits long strips (road, walls, rails, kerbs …) into compact chunks with seamless normals.
+ *  StaticBatcher:     groups world-space chunks into ~560 m spatial cells per (material, castShadow) and merges
+ *                     each cell into a plain indexed THREE.Mesh (16-bit indices where possible).
+ *                     Compared to BatchedMesh on WebGPU, this cuts real drawIndexed calls by ~10×, removes
+ *                     per-frame indirect-texture uploads, avoids shadow/camera indirect-buffer races, and lets
+ *                     Three.js frustum-cull every 560 m tile independently in both camera and shadow passes.
  */
 type Disp = { dispose: () => void }[];
 
-export function chunkGeometries(g: THREE.BufferGeometry, trisPerChunk = 2400): THREE.BufferGeometry[] {
+export function chunkGeometries(g: THREE.BufferGeometry, trisPerChunk = 3200): THREE.BufferGeometry[] {
   if (!g.attributes.normal) g.computeVertexNormals();
   const index = g.index; if (!index) return [g];
   const arr = index.array as ArrayLike<number>; const tris = arr.length / 3;
@@ -39,6 +41,9 @@ export function chunkGeometries(g: THREE.BufferGeometry, trisPerChunk = 2400): T
 interface Item { g: THREE.BufferGeometry; m?: THREE.Matrix4 }
 interface Group { mat: THREE.Material; cast: boolean; items: Item[] }
 
+const CELL = 580;
+const MAX_VERTS = 60000;
+
 export class StaticBatcher {
   batched: boolean; meshes = 0; batches = 0;
   private groups = new Map<string, Group>();
@@ -52,22 +57,50 @@ export class StaticBatcher {
     for (const c of chunkGeometries(g, trisPerChunk)) this.add(c, mat, cast);
   }
   build(parent: THREE.Object3D, disp: Disp) {
+    const sig = (g: THREE.BufferGeometry) => Object.keys(g.attributes).sort().join(',') + (g.index ? '|i' : '|n');
+    const cTmp = new THREE.Vector3();
     for (const grp of this.groups.values()) {
-      const sig = (g: THREE.BufferGeometry) => Object.keys(g.attributes).sort().join(',') + (g.index ? '|i' : '|n');
-      const s0 = sig(grp.items[0].g);
-      const ok = this.batched && grp.items.length > 1 && grp.items.every(it => sig(it.g) === s0 && !!it.g.index);
-      if (ok) {
-        let nv = 0, ni = 0; for (const it of grp.items) { nv += it.g.attributes.position.count; ni += it.g.index!.count; }
-        const bm = new THREE.BatchedMesh(grp.items.length, nv, ni, grp.mat);
-        for (const it of grp.items) { const gid = bm.addGeometry(it.g); const iid = bm.addInstance(gid); if (it.m) bm.setMatrixAt(iid, it.m); it.g.dispose(); }
-        bm.castShadow = grp.cast; bm.receiveShadow = true; bm.perObjectFrustumCulled = true; bm.sortObjects = false;
-        bm.computeBoundingBox(); bm.computeBoundingSphere();
-        parent.add(bm); disp.push(bm); this.batches++;
-      } else {
-        for (const it of grp.items) {
-          const mesh = new THREE.Mesh(it.g, grp.mat); if (it.m) mesh.applyMatrix4(it.m);
-          mesh.castShadow = grp.cast; mesh.receiveShadow = true; parent.add(mesh); disp.push(it.g); this.meshes++;
+      const isTrans = grp.mat.transparent;
+      const addMesh = (geo: THREE.BufferGeometry) => {
+        geo.computeBoundingBox(); geo.computeBoundingSphere();
+        const mesh = new THREE.Mesh(geo, grp.mat);
+        mesh.castShadow = grp.cast && !isTrans;
+        mesh.receiveShadow = !isTrans;
+        if (isTrans) mesh.renderOrder = 4;
+        mesh.matrixAutoUpdate = false;
+        mesh.updateMatrix();
+        parent.add(mesh); disp.push(geo);
+      };
+      if (!this.batched || grp.items.length <= 1) {
+        for (const it of grp.items) { if (it.m) it.g.applyMatrix4(it.m); addMesh(it.g); this.meshes++; }
+        continue;
+      }
+      // Group compatible geometries into ~580 m spatial cells (larger 1700 m far-terrain cells grouped into 1740 m supercells)
+      const cells = new Map<string, THREE.BufferGeometry[]>();
+      for (const it of grp.items) {
+        if (it.m) it.g.applyMatrix4(it.m);
+        if (!it.g.boundingSphere) it.g.computeBoundingSphere();
+        const sp = it.g.boundingSphere!;
+        cTmp.copy(sp.center);
+        const step = sp.radius > 450 ? CELL * 3 : CELL;
+        const k = `${sig(it.g)}|${step}|${Math.floor(cTmp.x / step)},${Math.floor(cTmp.z / step)}`;
+        let list = cells.get(k); if (!list) { list = []; cells.set(k, list); }
+        list.push(it.g);
+      }
+      const flush = (batch: THREE.BufferGeometry[]) => {
+        if (batch.length === 1) { addMesh(batch[0]); this.meshes++; return; }
+        const mg = mergeGeometries(batch, false);
+        if (mg) { batch.forEach(x => x.dispose()); addMesh(mg); this.batches++; }
+        else for (const x of batch) { addMesh(x); this.meshes++; }
+      };
+      for (const list of cells.values()) {
+        let cur: THREE.BufferGeometry[] = [], vSum = 0;
+        for (const g of list) {
+          const vc = g.attributes.position.count;
+          if (cur.length > 0 && vSum + vc > MAX_VERTS) { flush(cur); cur = []; vSum = 0; }
+          cur.push(g); vSum += vc;
         }
+        if (cur.length) flush(cur);
       }
     }
     this.groups.clear();

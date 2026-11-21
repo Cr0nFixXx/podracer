@@ -6,11 +6,16 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check": "tsc --noEmit -p . && esbuild tools/ci/sim.ts --bundle --platform=node --format=esm --outfile=tools/ci/out/sim.mjs --log-level=error && node tools/ci/out/sim.mjs",
+    "check:gpu": "node tools/ci/gpu.mjs",
+    "save": "sh tools/save.sh",
+    "restore-git": "sh tools/restore-git.sh"
   },
   "dependencies": {
     "@types/three": "^0.187.0",
     "clsx": "2.1.1",
+    "lucide-react": "^1.73.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "tailwind-merge": "3.4.0",

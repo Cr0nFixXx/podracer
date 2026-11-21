@@ -1,0 +1,13 @@
+Git-Sicherung des Podracer-Projekts (Branch B)
+Stand: 4d26d58 Session 19: Podracer-Aufwertung (6 Muster, 3 Finishes, Piloten-Spezies, Gegner-Hitzeflimmern, Schadens
+Commits: 21   Remote: https://github.com/Cr0nFixXx/podracer.git
+
+Enthält sowohl eine direkte Kopie von .git (in .archive/git) als auch "podracer-git.tar.gz.b64.txt"
+(vollständiges .git als Base64-Text, falls Binär-Packdateien beim Download gefiltert werden).
+
+Wiederherstellen – im Projektordner ausführen:
+  Linux/macOS:  sh .archive/wiederherstellen.sh
+  Windows:      powershell -ExecutionPolicy Bypass -File .archive\wiederherstellen.ps1
+  Oder manuell: cp -a .archive/git .git   bzw.   base64 -d .archive/podracer-git.tar.gz.b64.txt | tar -xz
+
+Danach:  git log --oneline   und   git push origin B

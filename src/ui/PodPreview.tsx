@@ -4,11 +4,11 @@ import { PODS, THEMES } from '../game/data';
 import { buildPodModel, type PodVisual } from '../game/podModel';
 import { makeSky } from '../game/sky';
 
-interface Props { podId: string; colors: [string, string, string]; className?: string; autoRotate?: boolean; }
+interface Props { podId: string; colors: [string, string, string]; pattern?: number; finish?: number; className?: string; autoRotate?: boolean; }
 interface St { scene: THREE.Scene; cam: THREE.PerspectiveCamera; pod: PodVisual | null; podId: string; drag: boolean; rot: number; lastX: number; zoom: number; }
 
 /** Rotating hangar preview – WebGPURenderer (WebGPU, automatic WebGL2 fallback). */
-export default function PodPreview({ podId, colors, className, autoRotate = true }: Props) {
+export default function PodPreview({ podId, colors, pattern, finish, className, autoRotate = true }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const stateRef = useRef<St | null>(null);
 
@@ -38,14 +38,19 @@ export default function PodPreview({ podId, colors, className, autoRotate = true
     const loop = () => {
       const t = (performance.now() - t0) / 1000;
       if (!st.drag && autoRotate) st.rot += 0.004;
-      if (st.pod) { st.pod.group.rotation.y = st.rot; st.pod.group.position.y = Math.sin(t * 2) * 0.15; st.pod.update(t, 0.4, 0, 0, 1, 1, 0); }
+      if (st.pod) {
+        const sw = Math.sin(t * 1.4) * 0.24;
+        st.pod.group.rotation.y = st.rot; st.pod.group.position.y = 0.45 + Math.sin(t * 2) * 0.12;
+        st.pod.setEngineMotion(sw, -sw, 0, 0, 0);
+        st.pod.update(t, 0.4, 0, 0, 1, 1, 0);
+      }
       const def = PODS.find(p => p.id === st.podId) ?? PODS[0]; const dist = ((def.cable + def.engineLen) * 0.95 + 6) * st.zoom;
       cam.position.set(dist * 0.75, dist * 0.32, dist * 0.75); cam.lookAt(0, 0.3, 0);
       r.render(scene, cam);
     };
     r.init().then(() => {
       if (disposed) return;
-      const pm = new THREE.PMREMGenerator(r); const es = new THREE.Scene(); es.add(makeSky(THEMES.desert).mesh);
+      const pm = new THREE.PMREMGenerator(r); const es = new THREE.Scene(); es.add(makeSky(THEMES.desert, true).mesh);
       scene.environment = pm.fromScene(es, 0.02, 1, 20000).texture; pm.dispose();
       if (!disposed) r.setAnimationLoop(loop);
     }).catch(e => console.error('PodPreview renderer init failed', e));
@@ -66,9 +71,9 @@ export default function PodPreview({ podId, colors, className, autoRotate = true
     const st = stateRef.current; if (!st) return;
     if (st.pod) { st.scene.remove(st.pod.group); st.pod.dispose(); }
     const def = PODS.find(p => p.id === podId)!;
-    const pod = buildPodModel(def, colors, 3);
+    const pod = buildPodModel(def, colors, 3, 1024, false, { pattern, finish });
     st.scene.add(pod.group); st.pod = pod; st.podId = podId;
-  }, [podId, colors]);
+  }, [podId, colors, pattern, finish]);
 
   return <div ref={ref} className={className} style={{ cursor: 'grab', touchAction: 'none' }} />;
 }

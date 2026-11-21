@@ -40,7 +40,7 @@ let pod: PodVisual | null = null;
   let tris = 0;
   for (let i = 0; i < PODS.length; i++) { const def = PODS[i];
     if (pod) { scene.remove(pod.group); pod.dispose(); }
-    pod = buildPodModel(def, def.colors, 2, 1024); scene.add(pod.group); pod.update(2, 1, 0, 0, 1, 1, 0.2); pod.group.updateMatrixWorld(true);
+    pod = buildPodModel(def, def.colors, 2, 1024); scene.add(pod.group); pod.update(2, 1, location.search.includes('boost') ? 1 : 0, 0, 1, 1, 0.2); pod.group.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(pod.group); const size = box.getSize(new THREE.Vector3()); const c = box.getCenter(new THREE.Vector3());
     const D = Math.max(size.x, size.z) * 0.85 + 3; cam.position.set(c.x + D * 0.66, c.y + D * 0.42, c.z + D * 0.5); cam.lookAt(c); sky.mesh.position.copy(cam.position);
     const x = (i % cols) * w, y = Math.floor(i / cols) * h; r.setViewport(x, y, w, h); r.setScissor(x, y, w, h); await r.renderAsync(scene, cam); tris += r.info.render.triangles;
