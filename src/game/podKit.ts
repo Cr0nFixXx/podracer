@@ -308,6 +308,21 @@ export function radial(make: () => THREE.BufferGeometry, n: number, phase = 0) {
 }
 
 /** Exhaust flame: a tapering body of revolution from the nozzle (z = 0, radius `rn`) backwards over `len`. */
+/**
+ * Heat glow and soot spread along an engine from its nozzle: the hull shader reads `aLiv.y` (0 rear .. 1 front) for that. The paint of parts
+ * in plain or solid secondary colour (livery modes 0 and 3) does not use the coordinate, so here it gets their true place along the engine,
+ * `(z + dz - z0) / len`. Without it a flat plate (built without livery coordinates: y = 0) glows white-hot and soots like the nozzle
+ * wherever it sits. Parts with a livery pattern (modes 1 and 2) keep their own coordinate.
+ */
+export function heatAlong(g: THREE.BufferGeometry, z0: number, len: number, dz = 0) {
+  const liv = g.attributes.aLiv, pos = g.attributes.position; if (!liv || !(len > 0)) return g;
+  for (let i = 0; i < liv.count; i++) {
+    const mode = liv.getZ(i); if (mode > 0.5 && mode < 2.5) continue;
+    liv.setY(i, Math.max(0, Math.min(1, (pos.getZ(i) + dz - z0) / len)));
+  }
+  return g;
+}
+
 export function flameGeo(rn: number, len: number, seg: number) {
   const pts: [number, number, 0][] = [];
   for (let i = 0; i <= 12; i++) { const t = 1 - i / 12; const r = rn * Math.pow(1 - t, 0.55) * (1 + 0.18 * Math.sin(Math.PI * t)) + 0.01; pts.push([r, -t * len, 0]); }

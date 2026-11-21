@@ -19,7 +19,7 @@ import { buildPodModel, setPodLodScale } from './podModel';
 import { Particles } from './particles';
 import { PostFX } from './post';
 import { AudioFX, type WorldAudioState } from './audio';
-import { HOVER, aiInputs, applyDamage, podParams, respawn, stepPod, type PodState, collidePods } from './physics';
+import { HOVER, aiInputs, applyDamage, bodyToWorld, podParams, respawn, stepPod, worldToBody, type PodState, collidePods } from './physics';
 import { damageModel, lostMessage, partLamps } from './podDamage';
 import { applyAtmosphere } from './atmosphere';
 import type { LifeAudio } from './wildlife';
@@ -558,7 +558,9 @@ export class Game {
             if (e.type === 'wall') this.world.flashField(e.x, e.y + 0.6, e.z, e.strength);
           }
           if (p.isPlayer || dist < 140) this.audio.hit(e.strength * (p.isPlayer ? 1 : 0.28));
-          if (p.isPlayer && e.strength > 5) v.hitMark?.(e.x, e.y, e.z, e.strength); // Treffermarke where the hit landed
+          if (p.isPlayer && e.strength > 5 && v.hitMark) { // Treffermarke where the hit landed (this step's pose: the model still stands where it was last frame)
+            worldToBody(p, v.body.position.z, this.tmpV2.set(e.x, e.y, e.z)); v.hitMark(this.tmpV2.x, this.tmpV2.y, this.tmpV2.z, e.strength);
+          }
         } else if (e.type === 'break') {
           if (e.ref) this.world.breakObstacle(e.ref);
           if (dist < 420) { this.tmpC.copy(this.dustBase).multiplyScalar(0.6); this.particles.debris(this.tmpV, p.vel, this.tmpC); this.debris.spawn(e.x, e.y, e.z, e.y, p.vel, this.tmpC, e.strength, 16); }
@@ -579,7 +581,7 @@ export class Game {
           if (p.isPlayer) this.audio.fieldZap(e.strength);
         } else if (e.type === 'fall' && p.isPlayer) this.showMsg('ABSTURZ!', 2);
         else if (e.type === 'part') { // a Bruchteil broke off: sparks where it sat, a hard knock, and the player is told which part
-          v.setParts(p.parts ?? 0); v.partWorld(e.part ?? 0, this.tmpV);
+          v.setParts(p.parts ?? 0); bodyToWorld(p, v.body.position.z, v.partBody(e.part ?? 0, this.tmpV));
           if (p.isPlayer || dist < 120) { // sparks and a few plates in the pod's second colour where the part sat (Gegner: only close by)
             this.particles.sparks(this.tmpV, UP, p.vel, 14);
             this.scrap.spawn(this.tmpV.x, this.tmpV.y, this.tmpV.z, p.groundY, p.vel, this.tmpC.set((p.isPlayer ? this.profile.custom[p.def.id].colors : p.def.colors)[1]), 0.9, 4);

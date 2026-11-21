@@ -32,7 +32,7 @@ let pod: PodVisual | null = null;
 
 interface ShowOpts { rival?: boolean; save?: string; boost?: boolean; quality?: number; /** rival only: show the far LOD (> 48 m) */ far?: boolean; /** Style-Teile { fins, intake, nozzle, canopy } and tuning steps (number = all values) */ kit?: PodLook['kit']; tune?: number | PodLook['tune'];
   /** damage on both engine sides (default: `show` damages the left side only) · explicit mask of lost Bruchteile */ both?: boolean; parts?: number;
-  /** engine heat 0..1 (hull glow); default 0.2 */ heat?: number;
+  /** engine heat 0..1 (hull glow, fully settled); default 0.03 = a cold engine · air brake 0..1 (`show` only; default 0.6) */ heat?: number; airbrake?: number;
   /** player pod: Treffermarken at these points of the pod (body space: x right, y up, z forward) with an impact speed */ marks?: [number, number, number, number][] }
 /** Must run in the same task as the last render call: the canvas keeps its picture only until the frame is presented. */
 async function saveFrame(name?: string) {
@@ -50,14 +50,19 @@ function build(idx: number, quality: number, rival: boolean, far = false, o: Sho
   return p;
 }
 
+/** The model's heat glow and nozzle petals lag their inputs (metal warms up slowly): run the pose long enough to arrive at the asked state. */
+function settle(p: PodVisual, t: number, boost: number, airbrake: number, hpL: number, hpR: number, heat: number) {
+  for (let i = 39; i >= 0; i--) p.update(t - i * 0.1, 1, boost, airbrake, hpL, hpR, heat);
+}
+
 win.show = async (idx: number, dmg = 1, quality = 3, o: ShowOpts = {}) => {
   if (pod) { scene.remove(pod.group); pod.dispose(); }
   const def = PODS[idx]; pod = build(idx, quality, !!o.rival, false, o); scene.add(pod.group);
   const hpR = o.both ? dmg : 1;
   pod.setParts(o.parts ?? partsDue(damageModel(def.id), dmg * 100, hpR * 100)); // Bruchteile below their step are gone
-  pod.update(1.3, 1, o.boost ? 1 : 0, 0.6, dmg, hpR, o.heat ?? 0.2);
+  settle(pod, 1.3, o.boost ? 1 : 0, o.airbrake ?? 0.6, dmg, hpR, o.heat ?? 0.03);
   pod.group.updateMatrixWorld(true);
-  for (const [x, y, z, k] of o.marks ?? []) { const w = pod.body.localToWorld(new THREE.Vector3(x, y, z)); pod.hitMark?.(w.x, w.y, w.z, k); }
+  for (const [x, y, z, k] of o.marks ?? []) pod.hitMark?.(x, y, z, k);
   pod.group.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(pod.group); const size = box.getSize(new THREE.Vector3()); const c = box.getCenter(new THREE.Vector3());
   const D = Math.max(size.x, size.z) * 0.95 + 4;
@@ -88,7 +93,7 @@ async function sheet(view: SheetView, o: ShowOpts & { health?: number } = {}) {
     if (pod) { scene.remove(pod.group); pod.dispose(); }
     pod = build(i, o.quality ?? 2, !!o.rival, !!o.far, o); scene.add(pod.group);
     pod.setParts(o.parts ?? partsDue(damageModel(PODS[i].id), hp * 100, hp * 100)); // Bruchteile below their step are gone
-    pod.update(2, 1, boost ? 1 : 0, 0, hp, hp, o.heat ?? 0.2); pod.group.updateMatrixWorld(true);
+    settle(pod, 2, boost ? 1 : 0, 0, hp, hp, o.heat ?? 0.03); pod.group.updateMatrixWorld(true);
     const Lc = podLayout(PODS[i]).cockpit; const ck = pod.body.localToWorld(new THREE.Vector3(0, Lc.y + 0.12, Lc.z)); // cockpit centre
     if (view === 'pod') {
       const sph = new THREE.Box3().setFromObject(pod.group).getBoundingSphere(new THREE.Sphere()); const d = sph.radius / Math.sin(half) * 0.92;

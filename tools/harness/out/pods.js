@@ -72789,6 +72789,16 @@ function radial(make, n, phase = 0) {
   list.forEach((g) => g.dispose());
   return m;
 }
+function heatAlong(g, z0, len, dz = 0) {
+  const liv = g.attributes.aLiv, pos = g.attributes.position;
+  if (!liv || !(len > 0)) return g;
+  for (let i = 0; i < liv.count; i++) {
+    const mode = liv.getZ(i);
+    if (mode > 0.5 && mode < 2.5) continue;
+    liv.setY(i, Math.max(0, Math.min(1, (pos.getZ(i) + dz - z0) / len)));
+  }
+  return g;
+}
 function flameGeo(rn, len, seg) {
   const pts = [];
   for (let i = 0; i <= 12; i++) {
@@ -73379,6 +73389,16 @@ function engineExtent(spec2) {
   };
 }
 var cache2 = /* @__PURE__ */ new Map();
+function placeHeat(eg, L) {
+  const hull = eg.parts.get("hull");
+  if (hull) heatAlong(hull, -L / 2, L);
+  for (const bp of eg.breakParts) {
+    const g = bp.parts.get("hull");
+    if (g) heatAlong(g, -L / 2, L);
+  }
+  for (const f of eg.flaps) heatAlong(f.geo, -L / 2, L, f.pivot.z);
+  return eg;
+}
 function engineGeo(spec2, seg) {
   const key = `${spec2.L}|${spec2.R}|${spec2.style}|${spec2.bands}|${spec2.blades}|${spec2.spike}|${spec2.fins}|${seg}`;
   const hit = cache2.get(key);
@@ -73386,7 +73406,7 @@ function engineGeo(spec2, seg) {
   const { L, R, style } = spec2;
   const own = OWN_ENGINES[style];
   if (own) {
-    const made = own(spec2, seg);
+    const made = placeHeat(own(spec2, seg), L);
     cache2.set(key, made);
     return made;
   }
@@ -73657,7 +73677,7 @@ function engineGeo(spec2, seg) {
       };
     })()
   };
-  cache2.set(key, out);
+  cache2.set(key, placeHeat(out, L));
   return out;
 }
 
@@ -73890,6 +73910,11 @@ function engineKit(spec2, seg, kit) {
     }
   }
   const out = { parts: pb.build(), flaps };
+  {
+    const hull = out.parts.get("hull");
+    if (hull) heatAlong(hull, -spec2.L / 2, spec2.L);
+  }
+  if (flaps !== eg.flaps) for (const f of flaps) heatAlong(f.geo, -spec2.L / 2, spec2.L, f.pivot.z);
   cache3.set(key, out);
   return out;
 }
@@ -75379,7 +75404,15 @@ function base(def, seg, head, isOpponent) {
   return { b, ck, engineExtras: build2(L.engineExtras), cockpitExtras: build2(L.cockpitExtras), model, wanted: new Set(model.parts.map((p) => p.id)) };
 }
 var sideOf = (x) => x < 0 ? -1 : 1;
-function addSideExtras(T2, extras, side, piv, model, br) {
+function bankSpan(mounts) {
+  let z0 = Infinity, z1 = -Infinity;
+  for (const { em } of mounts) {
+    z0 = Math.min(z0, em.z - em.spec.L / 2);
+    z1 = Math.max(z1, em.z + em.spec.L / 2);
+  }
+  return [z0, z1 - z0];
+}
+function addSideExtras(T2, extras, side, piv, model, br, span) {
   const shift = M4.t(-piv.x, -piv.y, -piv.z);
   for (const [k, eg] of extras.parts) {
     const idx = eg.index.array;
@@ -75392,6 +75425,7 @@ function addSideExtras(T2, extras, side, piv, model, br) {
     if (keep.length) {
       const sub2 = eg.clone();
       sub2.setIndex(keep);
+      if (k === "hull") heatAlong(sub2, span[0], span[1]);
       sub2.applyMatrix4(shift);
       T2.push(k, sub2);
     }
@@ -75401,6 +75435,7 @@ function addSideExtras(T2, extras, side, piv, model, br) {
     if ((part2 && part2.side !== 0 ? part2.side : sideOf(bp.center.x)) !== side) continue;
     for (const [k, g] of bp.parts) {
       const c = g.clone();
+      if (k === "hull") heatAlong(c, span[0], span[1]);
       c.applyMatrix4(shift);
       T2.push(k, c, part2?.id);
     }
@@ -75521,11 +75556,16 @@ function assembleHero(def, seg, head, kit = NO_KIT) {
       for (const [k, g] of ek.parts) {
         const gc = g.clone();
         gc.applyMatrix4(emM);
-        T3.push(k, gc);
+        T3.push(k, gc, k === "glow" ? outOf.get(index) : void 0);
       }
-      engines.push({ index, off, geo: eg, flaps: ek.flaps });
+      const flaps = ek.flaps.map((f) => {
+        const hinge = new Vector3(off.x + f.pivot.x, off.y + f.pivot.y, off.z + f.pivot.z), geo = f.geo.clone().translate(hinge.x, hinge.y, hinge.z);
+        owned.push(geo);
+        return { geo, hinge, sign: f.sign, gain: f.gain };
+      });
+      engines.push({ index, off, geo: eg, flaps });
     }
-    addSideExtras(T3, engineExtras, side, piv, model, br);
+    addSideExtras(T3, engineExtras, side, piv, model, br, bankSpan(mounts));
     br.tags(T3, banks.length);
     banks.push({ side, pivot: piv, engines, buckets: mergeAll(T3.lists, owned, `${def.id} engine bank ${side}`) });
   }
@@ -75622,7 +75662,7 @@ function assembleRival(def, seg, head, colors, pattern, kit = NO_KIT) {
         if (id) br.at(id, em.x + bp.center.x, em.y + bp.center.y, em.z + bp.center.z);
       }
       const ek = engineKit(em.spec, seg, kit);
-      for (const [k, g] of ek.parts) pushC(T3, k, g, emM);
+      for (const [k, g] of ek.parts) pushC(T3, k, g, emM, k === "glow" ? outOf.get(index) : void 0);
       if (eg.openRotor) rotors.push({ geo: eg.fan, pos: new Vector3(ox, oy, oz + eg.fanZ), mat: eg.fanMat ?? "dark", spin: eg.fanSpin ?? 1, engine: index, lost: eg.fanLost });
       else pushC(T3, eg.fanMat ?? "dark", eg.fan, M4.t(ox, oy, oz + eg.fanZ));
       for (const f of ek.flaps) pushC(T3, "hull", f.geo, M4.t(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z));
@@ -75633,7 +75673,7 @@ function assembleRival(def, seg, head, colors, pattern, kit = NO_KIT) {
       flameN += fo.index.count;
       pts.push(eg.petals.clone().translate(ox, oy, oz));
     }
-    addSideExtras(T3, engineExtras, side, piv, model, br);
+    addSideExtras(T3, engineExtras, side, piv, model, br, bankSpan(sideMs));
     br.tags(T3, banks.length);
     const buckets = mergeAll(T3.lists, owned, `${def.id} rival bank ${side}`, bake);
     let petals = null, flames = null;
@@ -76891,14 +76931,14 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       for (const e of sh.engines) engineOut2[e] = lost;
       for (const e of sh.fans) for (const r2 of oppRotors) if (r2.engine === e && r2.lost) r2.m.geometry = lost ? r2.lost : r2.geo;
     });
-    const partWorld2 = (i, out) => {
+    const partBody2 = (i, out) => {
       const sh = A2.breaks.get(damageModel(def.id).parts[i]?.id ?? "");
-      return body.localToWorld(sh ? out.copy(sh.center) : out.set(0, 0, 0));
+      return sh ? out.copy(sh.center) : out.set(0, 0, 0);
     };
     const dispose2 = () => {
       A2.owned.forEach((g) => g.dispose());
     };
-    return { group, body, engines: engines2, exhaustLocal: A2.exhaustLocal, eye: A2.eye, hood: A2.hood, update: update2, setEngineMotion: setEngineMotion2, setDistance, setParts: setParts2, engineOut: engineOut2, partWorld: partWorld2, dispose: dispose2 };
+    return { group, body, engines: engines2, exhaustLocal: A2.exhaustLocal, eye: A2.eye, hood: A2.hood, update: update2, setEngineMotion: setEngineMotion2, setDistance, setParts: setParts2, engineOut: engineOut2, partBody: partBody2, dispose: dispose2 };
   }
   const A = assembleHero(def, seg, pilot2.head, kit);
   body.position.z = A.bodyZ;
@@ -76973,12 +77013,15 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
         petals.push(pm2);
       }
       for (const f of egFlaps) {
+        const hinge = new Group();
+        hinge.position.copy(f.hinge);
         const m = new Mesh(f.geo, hull);
-        m.position.set(off.x + f.pivot.x, off.y + f.pivot.y, off.z + f.pivot.z);
+        m.position.copy(f.hinge).negate();
         m.castShadow = false;
         m.receiveShadow = true;
-        engGrp.add(m);
-        flaps.push({ m, sign: f.sign, side, gain: f.gain ?? 1 });
+        hinge.add(m);
+        engGrp.add(hinge);
+        flaps.push({ m: hinge, sign: f.sign, side, gain: f.gain ?? 1 });
       }
       for (const core of [false, true]) {
         const m = new Mesh(core ? eg.flameCore : eg.flameOuter, side < 0 ? core ? coreL : flameL : core ? coreR : flameR);
@@ -77124,17 +77167,17 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       if (fg?.lost && fm) fm.geometry = lost ? fg.lost : fg.fan;
     }
   });
-  const partWorld = (i, out) => {
+  const partBody = (i, out) => {
     const sh = A.breaks.get(damageModel(def.id).parts[i]?.id ?? "");
-    return body.localToWorld(sh ? out.copy(sh.center) : out.set(0, 0, 0));
+    return sh ? out.copy(sh.center) : out.set(0, 0, 0);
   };
   const hulls = [hullL, hullR, hullC].map((h) => h.userData.u.uHits), hitNext = [0, 0, 0], hv = new Vector3();
   const mark = (hull, x, y, z, k) => {
     hulls[hull][hitNext[hull]++ % HIT_MARKS].value.set(x, y, z, k);
   };
-  const hitMark = (wx, wy, wz, strength) => {
+  const hitMark = (bx, by, bz, strength) => {
     const k = Math.max(0.4, Math.min(1, strength / 28)), ck = A.layout.cockpit;
-    body.worldToLocal(hv.set(wx, wy, wz));
+    hv.set(bx, by, bz);
     const side = Math.abs(hv.x) < 0.4;
     if (!side && hv.z < ck.z + ck.len * 0.5 + 0.5 && Math.abs(hv.x) < ck.hw + 1.4) {
       mark(2, Math.max(-ck.hw, Math.min(ck.hw, hv.x)), ck.y + Math.max(-0.5, Math.min(0.4, hv.y - ck.y)) * ck.hw, Math.max(ck.z - ck.len * 0.5, Math.min(ck.z + ck.len * 0.5, hv.z)), k);
@@ -77170,7 +77213,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     A.owned.forEach((g) => g.dispose());
   };
   return { group, body, engines, exhaustLocal: A.exhaustLocal, eye: A.eye, hood: A.hood, update, setEngineMotion, setDistance: () => {
-  }, setCockpitSway, setCockpitView, eyeWorld, setParts, engineOut, partWorld, hitMark, clearMarks, dispose };
+  }, setCockpitSway, setCockpitView, eyeWorld, setParts, engineOut, partBody, hitMark, clearMarks, dispose };
 }
 
 // ../../src/game/texCore.ts
@@ -77473,6 +77516,9 @@ function build(idx, quality, rival, far = false, o = {}) {
   if (rival) p.setDistance(far ? 100 : 10);
   return p;
 }
+function settle(p, t, boost, airbrake, hpL, hpR, heat) {
+  for (let i = 39; i >= 0; i--) p.update(t - i * 0.1, 1, boost, airbrake, hpL, hpR, heat);
+}
 win.show = async (idx, dmg = 1, quality = 3, o = {}) => {
   if (pod) {
     scene.remove(pod.group);
@@ -77483,12 +77529,9 @@ win.show = async (idx, dmg = 1, quality = 3, o = {}) => {
   scene.add(pod.group);
   const hpR = o.both ? dmg : 1;
   pod.setParts(o.parts ?? partsDue(damageModel(def.id), dmg * 100, hpR * 100));
-  pod.update(1.3, 1, o.boost ? 1 : 0, 0.6, dmg, hpR, o.heat ?? 0.2);
+  settle(pod, 1.3, o.boost ? 1 : 0, o.airbrake ?? 0.6, dmg, hpR, o.heat ?? 0.03);
   pod.group.updateMatrixWorld(true);
-  for (const [x, y, z, k] of o.marks ?? []) {
-    const w = pod.body.localToWorld(new Vector3(x, y, z));
-    pod.hitMark?.(w.x, w.y, w.z, k);
-  }
+  for (const [x, y, z, k] of o.marks ?? []) pod.hitMark?.(x, y, z, k);
   pod.group.updateMatrixWorld(true);
   const box = new Box3().setFromObject(pod.group);
   const size = box.getSize(new Vector3());
@@ -77537,7 +77580,7 @@ async function sheet(view, o = {}) {
     pod = build(i, o.quality ?? 2, !!o.rival, !!o.far, o);
     scene.add(pod.group);
     pod.setParts(o.parts ?? partsDue(damageModel(PODS[i].id), hp * 100, hp * 100));
-    pod.update(2, 1, boost ? 1 : 0, 0, hp, hp, o.heat ?? 0.2);
+    settle(pod, 2, boost ? 1 : 0, 0, hp, hp, o.heat ?? 0.03);
     pod.group.updateMatrixWorld(true);
     const Lc = podLayout(PODS[i]).cockpit;
     const ck = pod.body.localToWorld(new Vector3(0, Lc.y + 0.12, Lc.z));

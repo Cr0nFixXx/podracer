@@ -1,7 +1,7 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-1. **Pod-Überholung: alle acht Phasen (0–7) sind fertig** – Tabelle im Abschnitt „Session 20" unten. **Offen ist nur noch, was der Nutzer selbst prüfen muss:** „Ultra" am Gaming-PC (Bildrate mit vollen Details, Teilen und Schaden), die Schadens-Balance von Hand fahren, die Teile-Kombinationen durchklicken. Die Listen „Nicht verifiziert" je Phase stehen unten. Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
+1. **Pod-Überholung: alle acht Phasen (0–7) sind fertig, die Abschluss-Durchsicht ist eingearbeitet** (fünf Korrekturen, Abschnitt „Abschluss-Durchsicht" unten; dort stehen auch die zurückgestellten Kleinigkeiten) – Tabelle im Abschnitt „Session 20" unten. **Offen ist nur noch, was der Nutzer selbst prüfen muss:** „Ultra" am Gaming-PC (Bildrate mit vollen Details, Teilen und Schaden), die Schadens-Balance von Hand fahren, die Teile-Kombinationen durchklicken. Die Listen „Nicht verifiziert" je Phase stehen unten. Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
 2. Vor jeder Änderung: `npm run check` (Typecheck + Pod-Audit + Sim) muss grün sein. Pods ansehen: `npm run dev` → `http://localhost:5173/tools/harness/pods.dev.html`.
 3. Weiterhin offen aus Session 19: `npm run dev` → **Aquilaris-Küstenlauf** (19,5-m-Unterwassertunnel, 2 Skyway-Brücken, Flutschleuse) und **Frostspalt-Ring** (22,5-m-Gletschertunnel, verzweigte Eishöhle, Eisschleuse, Viadukt) Probe fahren; im **Hangar** die 6 Lackiermuster & 3 Finishes testen (≈ 6 Min.).
 
@@ -16,7 +16,7 @@
 - **Lokaler Windows-Rechner (Claude-Desktop, Git-Worktrees unter `.claude/worktrees/`):** dort ist `.git` nur eine Zeigerdatei – `npm run save` würde nur diesen Zeiger „sichern" und die versionierte Sicherungsdatei durch einen Stummel ersetzen. Entscheidung des Nutzers (2026-11-21): `.archive` und die Git-Sicherung sind in dieser Umgebung nicht relevant → dort einfache `git commit`s. Session 20 liegt auf dem Branch `claude/caveman-mode-fa82ce` (abgezweigt von `new_pods` = `origin/B`, Commit `d7b9c4b`).
 - Seit dem Commit `d7b9c4b` ist `.archiv/repo-sicherung/` versioniert: im Haupt-Checkout committet dadurch jedes `npm run save` eine Kopie des ganzen Repos ins Repo (Größe wächst je Sicherung etwa um den Faktor 2,3). Nicht angefasst – Entscheidung des Nutzers offen.
 
-## Stand: 2026-11-21 (Session 20, läuft) – Pod-Überholung: Cockpits, Details, 4 neue Pods, Tuning-Optik, Schadensmodelle
+## Stand: 2026-11-21 (Session 20, alle Phasen fertig) – Pod-Überholung: Cockpits, Details, 4 neue Pods, Tuning-Optik, Schadensmodelle
 
 ### Auftrag und abgestimmte Entscheidungen
 1. **Umfang (nur Pods):** alle 10 Cockpits individuell neu, mehr Details, 4 neue Pods (Halo, Manta, Voltspire, Cyclone – eigene Entwürfe und Namen), Tuning mit sichtbaren Teilen, eigenes Schadensmodell je Racer.
@@ -274,6 +274,42 @@ Ultra-Grenze 250 Tsd. – der größte Pod (Tenroc, sechs Triebwerke) liegt bei 
 - **Bildrate auf „Ultra"** – weiterhin nur am Gaming-PC zu klären.
 - Der beschädigte Gegner „direkt neben dem Spieler" ist im Rennen nur in zwei Standbildern gesehen (Schwenk und Überholen nicht), dazu die Harness-Bilder.
 - Treffermarken tragen nur der Spieler-Pod (Gegner: Ruß je Seite, keine einzelnen Marken).
+
+### Abschluss-Durchsicht (unabhängiger Prüfer über den ganzen Branch, `d7b9c4b..0e624dc`)
+Urteil des Prüfers: **bereit zum Zusammenführen, mit Korrekturen** – kein kritischer Fund. Der riskante Kern (verlorene Teile aus den Index-Puffern schneiden) hielt: 4542 Bruchteil-Bereiche über 14 Pods × 6 Teile-Sätze × alle Detailstufen ohne Fehler.
+
+**Fünf Korrekturen (jede zuerst als fehlschlagende Prüfung gesehen):**
+1. **Treffermarken saßen in der Verfolgerkamera zu weit vorn.** `Game.updateVisuals` wertet die Ereignisse eines Schritts aus, bevor das Modell seine neue Lage bekommt – `body.worldToLocal` rechnete mit der Lage des Bilds davor (bei 100 m/s und 60 Bildern/s 1,7 m, bei Boost mehr). Jetzt rechnen `worldToBody` / `bodyToWorld` (`physics.ts`) aus der Lage des aktuellen Physik-Schritts; `PodVisual.hitMark` und das neue `partBody` (vorher `partWorld`) arbeiten im Rumpf-Raum. Gilt genauso für den Startpunkt der Trümmer eines verlorenen Bruchteils.
+2. **Treffermarken schlugen auf die Luftbremsklappen durch.** Eine Klappe hatte ihren eigenen Ursprung (das Scharnier), die Marken werden aber im Raum der Triebwerksbank gemessen – ein Treffer färbte Klappen an ganz anderer Stelle (Tenroc, Quadra, Needle, Ironclad, Halo, Manta). Jetzt liefert die Montage die Klappen des Spieler-Pods im Bank-Raum (`HeroFlap`), das Modell hängt sie an eine Scharnier-Gruppe. Kein Eingriff in den Shader.
+3. **Lichter von Tuning- und Style-Teilen brannten an ausgefallenen Triebwerken weiter** (Nachbrenner-Ring ab Höchstgeschwindigkeit 4, lange Düse, Repulsor-Leiste – Tenroc und Ironclad, Spieler und Gegner). Sie tragen jetzt dieselbe Markierung wie die Werks-Lichter.
+4. **Flache Rumpfteile glühten wie die Düse, egal wo sie saßen** (Flügelplatten, Finnen, Klappen, Kit-Finnen: `aLiv.y = 0`). Im Harness war die Manta bei voller Hitze bis zu den Flügelspitzen weiß; Klappen schimmerten schon im Leerlauf rosa. Jetzt bekommt jedes Rumpfteil in Grund- oder Zweitfarbe (Lackmodus 0 / 3) seine wahre Lage längs des Triebwerks (`heatAlong` in `podKit.ts`; Triebwerke, Bruchteile, Klappen, Kit-Teile, Flügel aus dem Layout). Glut und Ruß laufen damit auf Platten genauso von der Düse nach vorn wie auf dem Rumpf. Teile mit Lackmuster behalten ihre Koordinate.
+5. **Prüflücke geschlossen:** die Bereichs-Prüfungen der Bruchteile liefen nur für den Spieler-Pod ab Werk. Jetzt für Spieler (alle Detailstufen + drei Teile-Sätze) und Gegner (einfach + Ultra + drei Style-Sätze), dazu neu: „ein Bereich besteht aus ganzen Teilen" (kein Dreieck außerhalb benutzt einen seiner Eckpunkte) sowie Flammen-Bereiche und Blitze der Gegner. Gegenprobe: lässt man Kit-Teile der Gegner ungezählt in den Topf, schlägt genau diese Prüfung an.
+
+**Dabei gefunden:** die Harness-Option `heat` zeigte nur 15 % der verlangten Hitze (die Glut des Modells läuft nach). `settle()` lässt sie jetzt ankommen; Standard ist 0,03 (kalter Motor, wie die bisherigen Bilder). Neu: `airbrake` für `show`; `marks` erwartet Punkte im Rumpf-Raum.
+
+### Verifiziert (Abschluss-Durchsicht)
+- `npm run check` grün: **69/69** Unit-Prüfungen, Audit 14/14 (Mesh- und Dreieckszahlen unverändert), Sim 13/13 – **Tabelle zeilengleich zu Phase 7** (die Korrekturen ändern kein Fahrverhalten).
+- **Echtes Rennen (WebGPU, Boonta, Aurora, 11 Pods):** 12 Probe-Treffer bei 60–129 m/s – der Punkt, den das Modell bekommt, stimmt auf 0 genau; dieselben Punkte über die Matrizen des Modells gerechnet lagen 1,6–6,5 m daneben (das Notebook schafft 22 Bilder/s). 0 Konsolenfehler.
+- **Pipelines am Start unverändert** (100 / 166 Programme). In der ersten Rennsekunde kommen 3 dazu – Meshes direkt unter einer Welt-Gruppe (MeshBasic / MeshStandard), keine Pod-Meshes; nicht Teil dieses Auftrags.
+- **Hangar-Layout** mit Schadens-Regler und Reitern bei 1280×720, 1920×1080, 1024×600, 800×1000, 2560×1440: `data-fit-shrunk="0"`, keine Scrollbalken.
+- Harness: Manta bei Hitze 0,5 / 1,0, Aurora mit doppelten Klappen (keine rosa Klappen mehr), Treffermarken auf Aurora und Tenroc.
+
+### Entscheidungen zu den Punkten, die der Prüfer offen ließ
+1. **Äußeres Klappenblatt öffnet 96°** (Luftbremse ab Stufe 4): bleibt. Angesehen – es liest sich als voll geöffnete Bremse.
+2. **Wandtreffer zählen immer als Zone „Seite"** (auch frontal): bleibt. Folge: Rammbug (Ram) und harte Nase (Splitter-X) helfen nur gegen Hindernisse und Pods, nicht beim Frontaleinschlag in die Wand. **Der Nutzer kann das anders wollen** – dann Zone nach Aufprallwinkel wählen (`physics.ts`, Wandkontakt).
+3. **Bildrate auf „Ultra", Aussehen und Schadens-Balance** kann nur der Nutzer am Gaming-PC beurteilen.
+
+### Zurückgestellt (klein, nicht behoben)
+- Halo: die Abschlussplatten der Ringsegmente stehen bis 4,1 cm durch die Ringhaut, Nieten schweben 1,2–1,8 cm über ihr (`podEngines.ts`, `ringArc`).
+- Treffermarken liegen bei nicht runden Triebwerken auf dem Kernradius: Manta rund 1 m innen neben der Flanke, Halo / Cyclone auf dem Kern statt auf dem Ring.
+- Pod-gegen-Pod: das Ereignis bekommt nur einer der beiden (`collidePods`) – berührt ein Gegner mit kleinerer Startnummer den Spieler, entsteht keine Marke.
+- CI: die Teleport-Messung überspringt nach einem Respawn 2–3 Bilder statt eines (`tools/ci/sim.ts`; besser `prevY` beim Respawn zurücksetzen).
+- Hangar: die Vorschau baut das Modell bei jedem Tuning-Klick neu, auch wenn sich keine Teile-Stufe ändert (`PodPreview.tsx`, Schlüssel auf `tuneTiers`).
+- Bild-Server des Harness nimmt Anfragen jeder Herkunft an (nur Entwicklungswerkzeug, Dateiname ist bereinigt).
+- Toter Code: `cockpit.style` / `CockpitStyle`, `cockpitExtras` (ohne Nutzer; seine Bruchteile würden ohne Markierung eingebaut), `cockpitDesigns`, `glass` / `skin` in `sharedPodMaterials`.
+- `loadProfile` prüft `race.difficulty`, `race.laps` und die Grafik-Werte nicht (ein von Hand geänderter Spielstand mit `difficulty: 9` lässt `Game.createPods` abstürzen – alt, nicht aus dieser Session).
+- Wörter: Hangar-Liste heißt „Podracer" (Glossar: Pod / Racer); Meldungen „verklemmt", „leck", „ausgefallen", obwohl das Teil sichtbar abfällt. Kommentare in `data.ts` nennen `pilotParts` (gibt es nicht) und nur 3 von 6 Hauttönen.
+- Älter als diese Session: `DebrisPool.dispose` wird nie aufgerufen (jetzt zwei Pools), ein Feld je Bild im `update` des Spieler-Pods.
 
 ### Messwerte vor der Überholung (Meshes / Dreiecke)
 | Pod | Spieler „Hoch" | Spieler „Ultra" | Gegner nah | Gegner fern |

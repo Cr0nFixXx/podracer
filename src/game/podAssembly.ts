@@ -4,8 +4,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { PilotHead, PodDef } from './data';
-import { M4, PartBuilder, cyl, lathe, prof, rbox, tube, torus, type MatKey } from './podKit';
-import { engineExtent, engineGeo, type BreakPart, type EngineGeo, type FlapGeo } from './podParts';
+import { M4, PartBuilder, cyl, heatAlong, lathe, prof, rbox, tube, torus, type MatKey } from './podKit';
+import { engineExtent, engineGeo, type BreakPart, type EngineGeo } from './podParts';
 import { engineKit, NO_KIT, type KitSpec } from './podKitParts';
 import { cockpitGeo, type CockpitDetail } from './podCockpits';
 import { podLayout, type Extras, type PodLayout } from './podLayouts';
@@ -281,9 +281,16 @@ function base(def: PodDef, seg: number, head: PilotHead, isOpponent: boolean) {
   return { b, ck, engineExtras: build(L.engineExtras), cockpitExtras: build(L.cockpitExtras), model, wanted: new Set(model.parts.map(p => p.id)) as ReadonlySet<string> };
 }
 const sideOf = (x: number): -1 | 1 => (x < 0 ? -1 : 1);
+/** Rear end and length of an engine bank in layout space: wings and plates mounted on it take their heat place from it (`heatAlong`). */
+function bankSpan(mounts: { em: { z: number; spec: { L: number } } }[]): [number, number] {
+  let z0 = Infinity, z1 = -Infinity;
+  for (const { em } of mounts) { z0 = Math.min(z0, em.z - em.spec.L / 2); z1 = Math.max(z1, em.z + em.spec.L / 2); }
+  return [z0, z1 - z0];
+}
 /** Engine-mounted extras (wings, struts …) ride with the engine bank of their side: the triangles on `side` (by centroid) go into
- *  that bank's lists, relative to its pivot. Extras that are Bruchteile go in whole, tagged with their id. */
-function addSideExtras(T: Tagged, extras: ExtraSet, side: -1 | 1, piv: THREE.Vector3, model: DamageModel, br: Breaks) {
+ *  that bank's lists, relative to its pivot. Extras that are Bruchteile go in whole, tagged with their id.
+ *  `span`: the bank's rear end and length (`bankSpan`) – their plain and secondary-paint hull parts get their heat place from it. */
+function addSideExtras(T: Tagged, extras: ExtraSet, side: -1 | 1, piv: THREE.Vector3, model: DamageModel, br: Breaks, span: [number, number]) {
   const shift = M4.t(-piv.x, -piv.y, -piv.z);
   for (const [k, eg] of extras.parts) {
     const idx = eg.index!.array; const pos = eg.attributes.position;
@@ -292,12 +299,12 @@ function addSideExtras(T: Tagged, extras: ExtraSet, side: -1 | 1, piv: THREE.Vec
       const cx = (pos.getX(idx[t]) + pos.getX(idx[t + 1]) + pos.getX(idx[t + 2])) / 3;
       if (sideOf(cx) === side) keep.push(idx[t], idx[t + 1], idx[t + 2]);
     }
-    if (keep.length) { const sub = eg.clone(); sub.setIndex(keep); sub.applyMatrix4(shift); T.push(k, sub); }
+    if (keep.length) { const sub = eg.clone(); sub.setIndex(keep); if (k === 'hull') heatAlong(sub, span[0], span[1]); sub.applyMatrix4(shift); T.push(k, sub); }
   }
   for (const bp of extras.breaks) {
     const part = model.parts.find(p => p.id === bp.id);
     if ((part && part.side !== 0 ? part.side : sideOf(bp.center.x)) !== side) continue;
-    for (const [k, g] of bp.parts) { const c = g.clone(); c.applyMatrix4(shift); T.push(k, c, part?.id); }
+    for (const [k, g] of bp.parts) { const c = g.clone(); if (k === 'hull') heatAlong(c, span[0], span[1]); c.applyMatrix4(shift); T.push(k, c, part?.id); }
     if (part) br.at(part.id, bp.center.x, bp.center.y, bp.center.z);
   }
 }
@@ -336,7 +343,10 @@ function layoutBreaks(L: PodLayout, wanted: ReadonlySet<string>, br: Breaks, arc
 }
 
 // ------------------------------------------------------------------ player / hangar pod
-export interface EnginePart { /** index into layout.engines */ index: number; /** position relative to the bank pivot */ off: THREE.Vector3; geo: EngineGeo; /** air-brake flaps with the kit applied (larger / doubled by the Luftbremse tuning) */ flaps: FlapGeo[] }
+/** An air-brake flap of the player pod. Its geometry is given in the space of its engine bank – the space the hull's Treffermarken are
+ *  measured in – and it turns about `hinge` (same space); the model hangs it on a hinge group. */
+export interface HeroFlap { geo: THREE.BufferGeometry; hinge: THREE.Vector3; sign: number; gain?: number }
+export interface EnginePart { /** index into layout.engines */ index: number; /** position relative to the bank pivot */ off: THREE.Vector3; geo: EngineGeo; /** air-brake flaps with the kit applied (larger / doubled by the Luftbremse tuning) */ flaps: HeroFlap[] }
 export interface HeroBank { side: -1 | 1; /** 3D centroid of this side's engines (body space) */ pivot: THREE.Vector3; engines: EnginePart[]; /** merged static parts of all engines of this side (+ engine-mounted extras), relative to the pivot */ buckets: Map<string, THREE.BufferGeometry> }
 export interface HeroAssembly extends Base {
   /** left bank first, then right */
@@ -396,10 +406,14 @@ export function assembleHero(def: PodDef, seg: number, head: PilotHead, kit: Kit
         if (id) br.at(id, em.x + bp.center.x, em.y + bp.center.y, em.z + bp.center.z);
       }
       const ek = engineKit(em.spec, seg, kit);
-      for (const [k, g] of ek.parts) { const gc = g.clone(); gc.applyMatrix4(emM); T.push(k, gc); }
-      engines.push({ index, off, geo: eg, flaps: ek.flaps });
+      for (const [k, g] of ek.parts) { const gc = g.clone(); gc.applyMatrix4(emM); T.push(k, gc, k === 'glow' ? outOf.get(index) : undefined); } // (kit lights go out with their engine as well)
+      const flaps = ek.flaps.map(f => { // into bank space (a flap left in its hinge space showed the hull's Treffermarken in the wrong places)
+        const hinge = new THREE.Vector3(off.x + f.pivot.x, off.y + f.pivot.y, off.z + f.pivot.z), geo = f.geo.clone().translate(hinge.x, hinge.y, hinge.z);
+        owned.push(geo); return { geo, hinge, sign: f.sign, gain: f.gain };
+      });
+      engines.push({ index, off, geo: eg, flaps });
     }
-    addSideExtras(T, engineExtras, side, piv, model, br);
+    addSideExtras(T, engineExtras, side, piv, model, br, bankSpan(mounts));
     br.tags(T, banks.length);
     banks.push({ side, pivot: piv, engines, buckets: mergeAll(T.lists, owned, `${def.id} engine bank ${side}`) });
   }
@@ -488,7 +502,7 @@ export function assembleRival(def: PodDef, seg: number, head: PilotHead, colors:
         if (id) br.at(id, em.x + bp.center.x, em.y + bp.center.y, em.z + bp.center.z);
       }
       const ek = engineKit(em.spec, seg, kit);
-      for (const [k, g] of ek.parts) pushC(T, k, g, emM);
+      for (const [k, g] of ek.parts) pushC(T, k, g, emM, k === 'glow' ? outOf.get(index) : undefined);
       if (eg.openRotor) rotors.push({ geo: eg.fan, pos: new THREE.Vector3(ox, oy, oz + eg.fanZ), mat: eg.fanMat ?? 'dark', spin: eg.fanSpin ?? 1, engine: index, lost: eg.fanLost });
       else pushC(T, eg.fanMat ?? 'dark', eg.fan, M4.t(ox, oy, oz + eg.fanZ));
       for (const f of ek.flaps) pushC(T, 'hull', f.geo, M4.t(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z));
@@ -496,7 +510,7 @@ export function assembleRival(def: PodDef, seg: number, head: PilotHead, colors:
       flameAt.set(index, { bank: banks.length, start: flameN, count: fo.index!.count }); flameN += fo.index!.count;
       pts.push(eg.petals.clone().translate(ox, oy, oz));
     }
-    addSideExtras(T, engineExtras, side, piv, model, br); // Session 20: Gegner extras heave with their engines too (wings, struts)
+    addSideExtras(T, engineExtras, side, piv, model, br, bankSpan(sideMs)); // Session 20: Gegner extras heave with their engines too (wings, struts)
     br.tags(T, banks.length);
     const buckets = mergeAll(T.lists, owned, `${def.id} rival bank ${side}`, bake);
     let petals: THREE.BufferGeometry | null = null, flames: THREE.BufferGeometry | null = null;

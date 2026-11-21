@@ -95,6 +95,8 @@ Leitidee: **Jeder Racer ist an seinem Cockpit erkennbar – auch als Silhouette.
 - **Treffermarken statt Dellen:** wo der eigene Pod getroffen wird, bleibt ein Brandfleck mit blankem Metall in der Mitte – höchstens vier je Rumpfseite, der älteste wird überschrieben. Nach dem Respawn ist der Pod wieder sauber.
 - **Explosion in Pod-Farben:** ein zerstörter Pod zerlegt sich in Platten seiner Erst- und Zweitfarbe.
 - **Gegner zeigen ihren Zustand (Phase 7):** je Triebwerksseite Ruß auf dem Lack, unter 35 % schwächere, unter 15 % stotternde Flammen, dazu dieselben fehlenden Teile wie beim Spieler. So erkennt man im Zweikampf, wer angeschlagen ist – ohne Anzeige.
+- **Hitze hat einen Ort:** Glut und Ruß laufen von der Düse nach vorn – auf dem Rumpf und genauso auf Flügeln, Finnen, Platten und Klappen. Ein Blech vorn am Triebwerk bleibt kühl, eines an der Düse glüht mit. (Vorher glühte jedes flache Teil wie die Düse.)
+- **Treffermarken sitzen, wo der Treffer war** – auch bei 500 km/h in der Verfolgerkamera; eine Marke auf dem Triebwerk färbt eine Klappe nur dort, wo die Klappe wirklich liegt.
 
 ## Überführungen, Schleusen, verzweigte Höhlen, Blitze & Pods (Session 19)
 - **Über-/Unterführungen:** Wo sich eine Strecke kreuzt (≥ 35 m Höhenabstand), trägt die obere Piste einen abgeschrägten Stahl-Hohlkasten mit Querträgern, seitlichen Leuchtstreifen, Widerlagern und Zwillingspfeilern; die untere führt durch einen 20-m-Unterführungstunnel oder frei unter dem Viadukt hindurch. Auf Karte und Minimap hebt eine dunkle Kontur die Brücke ab.

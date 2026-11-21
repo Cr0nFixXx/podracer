@@ -36,9 +36,10 @@ export interface PodVisual {
   setParts: (mask: number) => void;
   /** engines that have flamed out (same order as `exhaustLocal`) */
   engineOut: boolean[];
-  /** world position of the place where Bruchteil `i` sat (debris and sparks start there) */
-  partWorld: (i: number, out: THREE.Vector3) => THREE.Vector3;
-  /** hero pod: leaves a Treffermarke (burn + bare metal) on the hull nearest to the world point of a hit; `strength` = impact speed */
+  /** the place where Bruchteil `i` sat, in body space (debris and sparks start there; to the world with `bodyToWorld` of the physics pose) */
+  partBody: (i: number, out: THREE.Vector3) => THREE.Vector3;
+  /** hero pod: leaves a Treffermarke (burn + bare metal) on the hull nearest to a hit. The point is given in BODY space
+   *  (`worldToBody` of the physics pose – never through this model's matrices, they lag one frame); `strength` = impact speed */
   hitMark?: (x: number, y: number, z: number, strength: number) => void;
   /** hero pod: wipes all Treffermarken (respawn) */
   clearMarks?: () => void;
@@ -206,9 +207,9 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
       for (const e of sh.engines) engineOut[e] = lost;
       for (const e of sh.fans) for (const r of oppRotors) if (r.engine === e && r.lost) r.m.geometry = lost ? r.lost : r.geo;
     });
-    const partWorld = (i: number, out: THREE.Vector3) => { const sh = A.breaks.get(damageModel(def.id).parts[i]?.id ?? ''); return body.localToWorld(sh ? out.copy(sh.center) : out.set(0, 0, 0)); };
+    const partBody = (i: number, out: THREE.Vector3) => { const sh = A.breaks.get(damageModel(def.id).parts[i]?.id ?? ''); return sh ? out.copy(sh.center) : out.set(0, 0, 0); };
     const dispose = () => { A.owned.forEach(g => g.dispose()); };
-    return { group, body, engines, exhaustLocal: A.exhaustLocal, eye: A.eye, hood: A.hood, update, setEngineMotion, setDistance, setParts, engineOut, partWorld, dispose };
+    return { group, body, engines, exhaustLocal: A.exhaustLocal, eye: A.eye, hood: A.hood, update, setEngineMotion, setDistance, setParts, engineOut, partBody, dispose };
   }
 
   // ==================== FULL HERO PLAYER / HANGAR POD ====================
@@ -244,7 +245,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
 
   const engines: THREE.Object3D[] = [];
   const fans: THREE.Mesh[] = []; const fanGeo: { fan: THREE.BufferGeometry; lost?: THREE.BufferGeometry }[] = [];
-  const flaps: { m: THREE.Mesh; sign: number; side: number; gain: number }[] = []; const petals: THREE.Mesh[] = [];
+  const flaps: { m: THREE.Object3D; sign: number; side: number; gain: number }[] = []; const petals: THREE.Mesh[] = []; // (`m`: the hinge group of a flap)
   const flames: { m: THREE.Mesh; side: number; engine: number }[] = [];
   /** engines that have flamed out (Bruchteile of the multi-engine racers) */
   const engineOut = A.layout.engines.map(() => false);
@@ -260,7 +261,10 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
       const fan = new THREE.Mesh(eg.fan, shared[eg.fanMat ?? 'dark'] ?? shared.dark); fan.position.set(off.x, off.y, off.z + eg.fanZ);
       fan.castShadow = !!eg.openRotor; fan.receiveShadow = !!eg.openRotor; fan.userData.spin = eg.fanSpin ?? 1; fan.userData.engine = index; engGrp.add(fan); fans.push(fan); fanGeo[index] = { fan: eg.fan, lost: eg.fanLost }; // a big open rotor throws a shadow, an enclosed fan does not
       { const pm = new THREE.Mesh(eg.petals, petalMaterial()); pm.position.copy(off); pm.userData.open = 0; pm.castShadow = false; engGrp.add(pm); petals.push(pm); }
-      for (const f of egFlaps) { const m = new THREE.Mesh(f.geo, hull); m.position.set(off.x + f.pivot.x, off.y + f.pivot.y, off.z + f.pivot.z); m.castShadow = false; m.receiveShadow = true; engGrp.add(m); flaps.push({ m, sign: f.sign, side, gain: f.gain ?? 1 }); }
+      for (const f of egFlaps) { // a flap turns on a hinge group; its geometry stays in bank space, so the hull's Treffermarken land on it where they should
+        const hinge = new THREE.Group(); hinge.position.copy(f.hinge); const m = new THREE.Mesh(f.geo, hull); m.position.copy(f.hinge).negate();
+        m.castShadow = false; m.receiveShadow = true; hinge.add(m); engGrp.add(hinge); flaps.push({ m: hinge, sign: f.sign, side, gain: f.gain ?? 1 });
+      }
       for (const core of [false, true]) {
         const m = new THREE.Mesh(core ? eg.flameCore : eg.flameOuter, side < 0 ? (core ? coreL : flameL) : (core ? coreR : flameR));
         m.position.set(off.x, off.y, off.z + eg.flameZ); m.renderOrder = 2; engGrp.add(m); flames.push({ m, side, engine: index });
@@ -363,13 +367,13 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     for (const e of sh.engines) engineOut[e] = lost;
     for (const e of sh.fans) { const fg = fanGeo[e], fm = fans.find(f => f.userData.engine === e); if (fg?.lost && fm) fm.geometry = lost ? fg.lost : fg.fan; }
   });
-  const partWorld = (i: number, out: THREE.Vector3) => { const sh = A.breaks.get(damageModel(def.id).parts[i]?.id ?? ''); return body.localToWorld(sh ? out.copy(sh.center) : out.set(0, 0, 0)); };
+  const partBody = (i: number, out: THREE.Vector3) => { const sh = A.breaks.get(damageModel(def.id).parts[i]?.id ?? ''); return sh ? out.copy(sh.center) : out.set(0, 0, 0); };
   // Treffermarken: each of the three hull materials (left bank, right bank, cockpit) remembers its last HIT_MARKS hits
   const hulls = [hullL, hullR, hullC].map(h => (h.userData.u as HullU).uHits), hitNext = [0, 0, 0], hv = new THREE.Vector3();
   const mark = (hull: number, x: number, y: number, z: number, k: number) => { hulls[hull][hitNext[hull]++ % HIT_MARKS].value.set(x, y, z, k); };
-  const hitMark = (wx: number, wy: number, wz: number, strength: number) => {
+  const hitMark = (bx: number, by: number, bz: number, strength: number) => {
     const k = Math.max(0.4, Math.min(1, strength / 28)), ck = A.layout.cockpit;
-    body.worldToLocal(hv.set(wx, wy, wz)); // body space (engines at rest – near enough for a mark)
+    hv.set(bx, by, bz); // body space (engines at rest – near enough for a mark)
     const side = Math.abs(hv.x) < 0.4;   // a hit without a side (ceiling, landing, portal lip): the mark goes on top of an engine
     if (!side && hv.z < ck.z + ck.len * 0.5 + 0.5 && Math.abs(hv.x) < ck.hw + 1.4) { // on the cockpit: pulled onto its skin
       mark(2, Math.max(-ck.hw, Math.min(ck.hw, hv.x)), ck.y + Math.max(-0.5, Math.min(0.4, hv.y - ck.y)) * ck.hw, Math.max(ck.z - ck.len * 0.5, Math.min(ck.z + ck.len * 0.5, hv.z)), k);
@@ -386,5 +390,5 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
   };
   const clearMarks = () => { for (const h of hulls) for (const u of h) u.value.set(0, 0, 0, 0); };
   const dispose = () => { own.forEach(m => m.dispose()); A.owned.forEach(g => g.dispose()); };
-  return { group, body, engines, exhaustLocal: A.exhaustLocal, eye: A.eye, hood: A.hood, update, setEngineMotion, setDistance: () => {}, setCockpitSway, setCockpitView, eyeWorld, setParts, engineOut, partWorld, hitMark, clearMarks, dispose };
+  return { group, body, engines, exhaustLocal: A.exhaustLocal, eye: A.eye, hood: A.hood, update, setEngineMotion, setDistance: () => {}, setCockpitSway, setCockpitView, eyeWorld, setParts, engineOut, partBody, hitMark, clearMarks, dispose };
 }

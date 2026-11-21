@@ -1,6 +1,6 @@
 # TODO
 
-## 0. Session 20 – Pod-Überholung (läuft; Phasen und Entscheidungen in `HANDOFF.md`)
+## 0. Session 20 – Pod-Überholung (alle Phasen fertig; Phasen und Entscheidungen in `HANDOFF.md`)
 - [x] **Phase 0 – Setup + Sicherheitsnetz:** Node, Ausgangsmessung, Sichtprüfung im In-App-Browser, `podAssembly.ts`, Pod-Audit in `npm run check`, `CONTEXT.md`, ADR 0001/0002
 - [x] **Phase 1 – Refactoring ohne Spieländerung:** Layout-Registry, `engineExtent`, `podCockpits.ts`, `applyDamage`, Profil v2, Unit-Prüfungen
 - [x] **Phase 2 – 10 neue Cockpits + Details + Cockpit-Innenansicht** – wartet auf die Sichtung durch den Nutzer („Ultra" am Gaming-PC testen)
@@ -15,7 +15,11 @@
 - [x] **Phase 7 – Gegner:** Ruß und sterbende Flammen in den geteilten Materialien (je Mesh, eine Pipeline), Pipeline-Zählung unverändert (100), WebGL2-Lauf fehlerfrei
 - [ ] **Am Gaming-PC prüfen (Nutzer):** „Ultra"-Bildrate mit vollen Details + Teilen + Schaden; Schadens-Balance fahren
 - [ ] Dampf- / Ölstrahlen je Modell (Fireflare-Radiator, Kühlschleifen) – im Plan vorgesehen, nicht gebaut
-- [ ] Flache Bleche in Zweitfarbe glühen bei Hitze wie die Düse (`aLiv.y = 0` in `SEC`) – kühler setzen?
+- [x] Flache Bleche glühten bei Hitze wie die Düse – behoben: jedes Rumpfteil in Grund- oder Zweitfarbe trägt seine Lage längs des Triebwerks (`heatAlong`)
+- [x] **Abschluss-Durchsicht eingearbeitet:** Treffermarken sitzen exakt (Lage des aktuellen Schritts), schlagen nicht mehr auf die Klappen durch, Kit-Lichter gehen mit dem Triebwerk aus, Bruchteil-Prüfungen auch für Gegner und Teile-Sätze (69 Unit-Prüfungen)
+- [ ] **Entscheidung des Nutzers:** sollen frontale Wandtreffer als Zone „Front" zählen (dann helfen Rammbug und harte Nase auch an der Wand)? Heute zählt jede Wand als „Seite"
+- [ ] Kleinigkeiten aus der Durchsicht (Liste in `HANDOFF.md` → „Zurückgestellt"): Halo-Abschlussplatten 4 cm durch die Ringhaut · Treffermarken bei Manta / Halo / Cyclone auf dem Kernradius · keine Marke bei der Hälfte der Pod-Kontakte · Hangar baut das Modell bei jedem Tuning-Klick neu · toter Code (`cockpit.style`, `cockpitExtras`) · `loadProfile` prüft `difficulty` / `laps` nicht
+- [ ] In der ersten Rennsekunde werden 3 Pipelines nachübersetzt (Welt-Meshes, keine Pods) – ins Aufwärmen nehmen?
 - [ ] Schadens-Balance von Hand fahren (bisher nur KI-Sim): sind 5–10 % je Bruchteil richtig?
 - [ ] Tunnel-Logik: Pod gilt als „im Tunnel", ist aber über der Decke und wird heruntergesetzt (Malastare, Sample 964; `DEBUG=1 SECS=120 node tools/ci/out/sim.mjs`)
 - [ ] `tools/harness/pui.mjs:39` prüft noch die gelöschte „Neon-Spirale" → anpassen; `tools/harness/run.sh` läuft nur unter Linux

@@ -50,6 +50,25 @@ const MIN_ROAD_CLEAR = 0.68;
  *  `zone`: where the hit comes from – the racer's Schadensmodell (podDamage.ts) weighs it: armour of that Panzerzone times the guards
  *  still attached on that side. Afterwards every Bruchteil whose side fell through its step breaks off (event `part`).
  *  Stat factors (`sturdy`), AI factors, cooldowns and invulnerability stay with the caller. */
+/** A pod's pose as its model is posed: yaw about the vertical axis at `pos`, then pitch and roll of the body about an origin `bodyZ` ahead. */
+type Pose = { pos: THREE.Vector3; yaw: number; pitch: number; roll: number };
+/** World point -> the pod's body space (x right, y up, z forward: the frame its model is built in), in place. Takes the pose of THIS
+ *  step: while the events of a step are handled, the model's own matrices still hold the pose of the frame before (1.7 m back at 100 m/s). */
+export function worldToBody(p: Pose, bodyZ: number, v: THREE.Vector3) {
+  const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw), sp = Math.sin(p.pitch), cp = Math.cos(p.pitch), sr = Math.sin(p.roll), cr = Math.cos(p.roll);
+  const dx = v.x - p.pos.x, dy = v.y - p.pos.y, dz = v.z - p.pos.z;
+  const x1 = dx * cy - dz * sy, z1 = dx * sy + dz * cy - bodyZ; // undo the yaw, step back to the body origin
+  const y2 = dy * cp + z1 * sp, z2 = -dy * sp + z1 * cp;         // undo the pitch
+  return v.set(x1 * cr + y2 * sr, -x1 * sr + y2 * cr, z2);      // undo the roll
+}
+/** Body space -> world, in place (the inverse of `worldToBody`). */
+export function bodyToWorld(p: Pose, bodyZ: number, v: THREE.Vector3) {
+  const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw), sp = Math.sin(p.pitch), cp = Math.cos(p.pitch), sr = Math.sin(p.roll), cr = Math.cos(p.roll);
+  const x1 = v.x * cr - v.y * sr, y1 = v.x * sr + v.y * cr;       // roll
+  const y2 = y1 * cp - v.z * sp, z2 = y1 * sp + v.z * cp + bodyZ; // pitch, out to the body origin
+  return v.set(p.pos.x + x1 * cy + z2 * sy, p.pos.y + y2, p.pos.z - x1 * sy + z2 * cy); // yaw
+}
+
 export function applyDamage(p: PodState, side: number | 'both', amount: number, zone: DamageZone) {
   const m = DAMAGE_RULES.armor || DAMAGE_RULES.parts ? damageModel(p.def.id) : null;
   let aL = side === 'both' || side < 0 ? amount : side > 0 ? 0 : amount * 0.5;

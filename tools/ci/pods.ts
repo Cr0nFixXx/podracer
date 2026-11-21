@@ -69,7 +69,7 @@ function hero(def: PodDef, quality: number, kit: KitSpec = NO_KIT) {
       const o = V(b.pivot, e.off);
       both(e.geo.fan, `${w} fan`, ['position', 'normal'], V(o, undefined, e.geo.fanZ));
       both(e.geo.petals, `${w} petals`, ['position', 'normal', 'aPet'], o);
-      for (const f of e.flaps) both(f.geo, `${w} flap`, BUCKET, V(o, f.pivot));
+      for (const f of e.flaps) both(f.geo, `${w} flap`, BUCKET, b.pivot); // (bank space)
       both(e.geo.flameOuter, `${w} flame`, ['position', 'aLiv'], o, false);
       both(e.geo.flameCore, `${w} flame core`, ['position', 'aLiv'], o, false);
     }

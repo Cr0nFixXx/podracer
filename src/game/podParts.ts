@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { EngineStyle } from './data';
-import { PartBuilder, M4, blade, boltRing, cyl, extrude, flameGeo, lathe, prof, radial, rbox, sphere, torus, tube, type MatKey } from './podKit';
+import { PartBuilder, M4, blade, boltRing, cyl, extrude, flameGeo, heatAlong, lathe, prof, radial, rbox, sphere, torus, tube, type MatKey } from './podKit';
 import { OWN_ENGINES, OWN_EXTENTS } from './podEngines';
 
 /** Parametric podracer engine. Geometry is merged per material and cached per spec. */
@@ -72,12 +72,20 @@ export function engineExtent(spec: EngineSpec): EngineExtent {
 
 const cache = new Map<string, EngineGeo>();
 
+/** Plain and secondary-paint hull parts of an engine take their heat place from where they sit along it (`heatAlong`; flaps are hinge-local). */
+function placeHeat(eg: EngineGeo, L: number) {
+  const hull = eg.parts.get('hull'); if (hull) heatAlong(hull, -L / 2, L);
+  for (const bp of eg.breakParts) { const g = bp.parts.get('hull'); if (g) heatAlong(g, -L / 2, L); }
+  for (const f of eg.flaps) heatAlong(f.geo, -L / 2, L, f.pivot.z);
+  return eg;
+}
+
 export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
   const key = `${spec.L}|${spec.R}|${spec.style}|${spec.bands}|${spec.blades}|${spec.spike}|${spec.fins}|${seg}`;
   const hit = cache.get(key); if (hit) return hit;
   const { L, R, style } = spec;
   const own = OWN_ENGINES[style]; // Session 20 styles have builders of their own (podEngines.ts)
-  if (own) { const made = own(spec, seg); cache.set(key, made); return made; }
+  if (own) { const made = placeHeat(own(spec, seg), L); cache.set(key, made); return made; }
   const pb = new PartBuilder();
   const Z = (t: number) => -L / 2 + t * L;
   const segS = Math.max(10, Math.round(seg * 0.5));
@@ -307,6 +315,6 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
       };
     })(),
   };
-  cache.set(key, out);
+  cache.set(key, placeHeat(out, L));
   return out;
 }

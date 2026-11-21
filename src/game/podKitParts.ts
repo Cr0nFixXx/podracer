@@ -5,7 +5,7 @@
 // Geometry only – no materials, no three/webgpu, no DOM (this file is bundled into the node CI).
 import * as THREE from 'three';
 import { STAT_KEYS, type StatKey } from './data';
-import { PartBuilder, M4, cyl, extrude, lathe, prof, radial, rbox, sphere, torus, tube, type MatKey } from './podKit';
+import { PartBuilder, M4, cyl, extrude, heatAlong, lathe, prof, radial, rbox, sphere, torus, tube, type MatKey } from './podKit';
 import { engineGeo, type EngineSpec, type FlapGeo } from './podParts';
 
 export interface KitSpec { fins: number; intake: number; nozzle: number; /** tier 0..2 per tuning value */ tune: Record<StatKey, number> }
@@ -252,6 +252,8 @@ export function engineKit(spec: EngineSpec, seg: number, kit: KitSpec): EngineKi
   }
 
   const out: EngineKit = { parts: pb.build(), flaps };
+  { const hull = out.parts.get('hull'); if (hull) heatAlong(hull, -spec.L / 2, spec.L); } // kit plates and fins glow by their place along the engine
+  if (flaps !== eg.flaps) for (const f of flaps) heatAlong(f.geo, -spec.L / 2, spec.L, f.pivot.z);
   cache.set(key, out);
   return out;
 }

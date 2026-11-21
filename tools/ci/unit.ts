@@ -10,7 +10,7 @@ import { assembleHero, assembleRival, segFor, visibleIndices, type BreakShow } f
 import { pickRivals, rivalKit } from '../../src/game/roster';
 import { engineKit, tuneTiers, NO_KIT } from '../../src/game/podKitParts';
 import { ciRoster } from './roster';
-import { applyDamage, podParams, respawn, FX_NONE, type PodState } from '../../src/game/physics';
+import { applyDamage, bodyToWorld, podParams, respawn, worldToBody, FX_NONE, type PodState } from '../../src/game/physics';
 import { DAMAGE_RULES, damageModel, partLamps, partsFx, zoneFactor, type DamageZone } from '../../src/game/podDamage';
 import { buildTrack } from '../../src/game/trackBuilder';
 import { loadProfile, saveProfile } from '../../src/game/settings';
@@ -349,35 +349,57 @@ test('Bruchteile: every part shows on a Gegner pod too (lite and Ultra build)', 
     A.owned.forEach(g => g.dispose());
   }
 });
-test('Bruchteile: hidden triangles stay inside their bucket, never overlap, and a left part lies left of the pod axis', () => {
-  for (const p of PODS) {
-    const A = assembleHero(p, segFor(2, false), headOf(p)), used = new Map<string, [number, number, string][]>();
-    for (const b of damageModel(p.id).parts) for (const r of A.breaks.get(b.id)!.ranges) {
-      const geo = r.where === 'cockpit' ? A.cockpit.get(r.key) : A.banks[r.where].buckets.get(r.key);
-      ok(geo && geo.index, `${p.id} ${b.id}: bucket ${r.where}/${r.key} missing or not indexed`);
-      ok(r.count > 0 && r.count % 3 === 0 && r.start % 3 === 0 && r.start + r.count <= geo!.index!.count, `${p.id} ${b.id}: range ${r.start}+${r.count} of ${geo!.index!.count}`);
+/** What a model hides for its Bruchteile must be whole parts (triangle runs inside their own bucket that share no vertex with the rest),
+ *  never overlap and sit on their own side;
+ *  flame-outs name real engines of that side, dying arcs and (Gegner) plume runs lie inside their meshes. */
+type Built = { banks: { side: number; pivot: THREE.Vector3; buckets: Map<string, THREE.BufferGeometry>; flames?: THREE.BufferGeometry | null }[]; cockpit: Map<string, THREE.BufferGeometry>; breaks: Map<string, BreakShow>; owned: THREE.BufferGeometry[] };
+function breakRunsOk(p: PodDef, what: string, A: Built, binder: (i: number) => THREE.BufferGeometry | undefined, pilotStart?: Map<string, number>) {
+  const used = new Map<string, [number, number, string][]>(), L = podLayout(p);
+  const run = (g: THREE.BufferGeometry | null | undefined, start: number, count: number) => !!g && !!g.index && count > 0 && count % 3 === 0 && start % 3 === 0 && start + count <= g.index.count;
+  for (const b of damageModel(p.id).parts) {
+    const s = A.breaks.get(b.id); ok(shows(s), `${what}: Bruchteil "${b.id}" (${b.label}) shows nothing`);
+    for (const r of s!.ranges) {
+      const geo = r.where === 'cockpit' ? A.cockpit.get(r.key) : A.banks[r.where]?.buckets.get(r.key);
+      ok(run(geo, r.start, r.count), `${what} ${b.id}: range ${r.start}+${r.count} in ${r.where}/${r.key} (${geo?.index?.count ?? 'no'} indices)`);
       const key = `${r.where}/${r.key}`, list = used.get(key) ?? []; used.set(key, list);
-      for (const [a, n, id] of list) ok(r.start >= a + n || r.start + r.count <= a, `${p.id}: ${b.id} overlaps ${id} in ${key}`);
+      for (const [at, n, id] of list) ok(r.start >= at + n || r.start + r.count <= at, `${what}: ${b.id} overlaps ${id} in ${key}`);
       list.push([r.start, r.count, b.id]);
       if (b.side !== 0) { // mean x of its vertices (body space) is on its own side
         const idx = geo!.index!, pos = geo!.attributes.position, ox = r.where === 'cockpit' ? 0 : A.banks[r.where].pivot.x; let sx = 0;
         for (let i = r.start; i < r.start + r.count; i++) sx += pos.getX(idx.getX(i)) + ox;
-        ok(Math.sign(sx) === b.side, `${p.id} ${b.id}: mean x ${(sx / r.count).toFixed(2)} is on the wrong side`);
+        ok(Math.sign(sx) === b.side, `${what} ${b.id}: mean x ${(sx / r.count).toFixed(2)} is on the wrong side`);
       }
     }
-    for (const [k, start] of A.pilotStart) { const list = used.get(`cockpit/${k}`) ?? []; for (const [a, n, id] of list) ok(a + n <= start, `${p.id}: Bruchteil ${id} lies behind the pilot's triangles in ${k}`); }
-    A.owned.forEach(g => g.dispose());
+    for (const e of s!.engines) { ok(L.engines[e], `${what} ${b.id}: no engine ${e}`); if (b.side !== 0) eq(Math.sign(L.engines[e].x), b.side, `${what} ${b.id}: engine ${e} side`); }
+    for (const e of s!.fans) ok(L.engines[e], `${what} ${b.id}: no engine ${e} for the fan`);
+    for (const arc of s!.arcs) ok(run(binder(arc.binder), arc.start, arc.count), `${what} ${b.id}: arc range ${arc.start}+${arc.count} in binder ${arc.binder}`);
+    for (const f of s!.flames) {
+      ok(run(A.banks[f.bank]?.flames, f.start, f.count), `${what} ${b.id}: plume run ${f.start}+${f.count} in bank ${f.bank}`);
+      if (b.side !== 0) eq(A.banks[f.bank].side, b.side, `${what} ${b.id}: plume on the wrong side`);
+    }
+  }
+  for (const [k, start] of pilotStart ?? []) for (const [at, n, id] of used.get(`cockpit/${k}`) ?? []) ok(at + n <= start, `${what}: Bruchteil ${id} lies behind the pilot's triangles in ${k}`);
+  // a run is made of whole parts: no triangle outside it uses one of its vertices (a run that slipped along the bucket would cut through parts)
+  for (const [key, list] of used) {
+    const [where, k] = key.split('/'), geo = (where === 'cockpit' ? A.cockpit.get(k) : A.banks[+where].buckets.get(k))!, idx = geo.index!;
+    const inRun = new Int32Array(idx.count).fill(-1), owner = new Int32Array(geo.attributes.position.count).fill(-1);
+    list.forEach(([at, n], i) => { for (let j = at; j < at + n; j++) { inRun[j] = i; owner[idx.getX(j)] = i; } });
+    for (let j = 0; j < idx.count; j++) { const o = owner[idx.getX(j)]; if (o !== inRun[j]) throw new Error(`${what}: Bruchteil ${list[Math.max(o, inRun[j])][2]} cuts through a part in ${key} (index ${j})`); }
+  }
+  A.owned.forEach(g => g.dispose());
+}
+const TUNED = Object.fromEntries(STAT_KEYS.map(k => [k, 2])) as Record<StatKey, number>, HALF_TUNED = Object.fromEntries(STAT_KEYS.map(k => [k, 1])) as Record<StatKey, number>;
+const KIT_BUILDS = [{ fins: 1, intake: 1, nozzle: 1, tune: HALF_TUNED }, { fins: 2, intake: 2, nozzle: 2, tune: TUNED }, { fins: 3, intake: 3, nozzle: 3, tune: NO_KIT.tune }];
+test('Bruchteile: hidden triangles stay inside their bucket, never overlap and sit on their own side - player pod, every detail level, factory and kit builds', () => {
+  for (const p of PODS) {
+    for (const q of [1, 2, 3]) { const A = assembleHero(p, segFor(q, false), headOf(p)); breakRunsOk(p, `${p.id} player q${q}`, A, i => A.binders[i], A.pilotStart); }
+    KIT_BUILDS.forEach((kit, n) => { const A = assembleHero(p, segFor(2, false), headOf(p), kit); breakRunsOk(p, `${p.id} player kit ${n + 1}`, A, i => A.binders[i], A.pilotStart); });
   }
 });
-test('Bruchteile: flame-outs and dying arcs point at real engines and binders on the right side', () => {
+test('Bruchteile: the same holds on Gegner pods (lite and Ultra build, with Style-Teile), and the plume of a dying engine lies inside the flame mesh of its side', () => {
   for (const p of PODS) {
-    const A = assembleHero(p, segFor(2, false), headOf(p)), L = podLayout(p);
-    for (const b of damageModel(p.id).parts) {
-      const s = A.breaks.get(b.id)!;
-      for (const e of s.engines) { ok(L.engines[e], `${p.id} ${b.id}: no engine ${e}`); if (b.side !== 0) eq(Math.sign(L.engines[e].x), b.side, `${p.id} ${b.id}: engine ${e} side`); }
-      for (const a of s.arcs) ok(A.binders[a.binder] && a.count > 0 && a.start + a.count <= A.binders[a.binder].index!.count, `${p.id} ${b.id}: arc range`);
-    }
-    A.owned.forEach(g => g.dispose());
+    for (const q of [2, 3]) { const A = assembleRival(p, segFor(q, true), headOf(p), p.colors); breakRunsOk(p, `${p.id} Gegner q${q}`, A, i => A.binders[i]?.geo); }
+    KIT_BUILDS.forEach((kit, n) => { const A = assembleRival(p, segFor(2, true), headOf(p), p.colors, undefined, { ...kit, tune: NO_KIT.tune }); breakRunsOk(p, `${p.id} Gegner kit ${n + 1}`, A, i => A.binders[i]?.geo); });
   }
 });
 test('Bruchteile: an engine that flames out goes dark – its glowing parts (nozzle, light strips) are cut out with it', () => {
@@ -390,6 +412,22 @@ test('Bruchteile: an engine that flames out goes dark – its glowing parts (noz
     }
     ok(R.breaks.get(part)!.flames.length === 1, `${id} ${part}: the Gegner plume of that engine`);
     A.owned.forEach(g => g.dispose()); R.owned.forEach(g => g.dispose());
+  }
+});
+test('Bruchteile: the lights of Tuning-Teile and Style-Teile go dark with their engine too (afterburner ring, long nozzle, repulsor strip)', () => {
+  const kit = { fins: 0, intake: 0, nozzle: 1, tune: { ...NO_KIT.tune, topSpeed: 2, traction: 2 } };
+  const glowOf = (s: BreakShow) => s.ranges.filter(r => r.key === 'glow').reduce((n, r) => n + r.count, 0);
+  for (const [id, part] of [['gasvaro', 'engCL'], ['gasvaro', 'engBR'], ['teemo', 'engUL']] as const) {
+    const p = PODS.find(x => x.id === id)!, L = podLayout(p);
+    for (const who of ['player', 'Gegner'] as const) {
+      const seg = segFor(2, who === 'Gegner');
+      const W = who === 'player' ? assembleHero(p, seg, headOf(p)) : assembleRival(p, seg, headOf(p), p.colors);
+      const K = who === 'player' ? assembleHero(p, seg, headOf(p), kit) : assembleRival(p, seg, headOf(p), p.colors, undefined, kit);
+      const e = W.breaks.get(part)!.engines[0], lights = engineKit(L.engines[e].spec, seg, kit).parts.get('glow')?.index!.count ?? 0;
+      ok(lights > 0, `${id}: this kit adds no lights to engine ${e}`);
+      eq(glowOf(K.breaks.get(part)!), glowOf(W.breaks.get(part)!) + lights, `${id} ${part} (${who}): glow triangles that go out with the engine`);
+      W.owned.forEach(g => g.dispose()); K.owned.forEach(g => g.dispose());
+    }
   }
 });
 test('Bruchteile: a part that falls off is big enough to see (at least 0.4 m across) and the racer keeps most of its body (under 45 % of the triangles)', () => {
@@ -407,6 +445,67 @@ test('Bruchteile: a part that falls off is big enough to see (at least 0.4 m acr
       const size = box.getSize(v).length(); ok(size >= 0.4, `${p.id} ${b.id}: only ${size.toFixed(2)} m across`);
     }
     ok(gone / all < 0.45, `${p.id}: Bruchteile are ${(100 * gone / all).toFixed(1)} % of the pod`);
+    A.owned.forEach(g => g.dispose());
+  }
+});
+// ------------------------------------------------------------------ heat and soot along the engine
+// The hull shader lets heat glow and soot creep forward from the nozzle along `aLiv.y` (0 rear .. 1 front). Parts in plain or solid secondary
+// paint (livery modes 0 and 3) do not need that coordinate for their paint, so it must hold their true place along the engine.
+const heatPlaces = (g: THREE.BufferGeometry | undefined, z0: number, len: number, dz: number, what: string) => {
+  if (!g) return;
+  const liv = g.attributes.aLiv, pos = g.attributes.position;
+  for (let i = 0; i < liv.count; i++) {
+    const mode = liv.getZ(i); if (mode > 0.5 && mode < 2.5) continue; // engine / cockpit livery: the pattern owns the coordinate
+    const want = Math.max(0, Math.min(1, (pos.getZ(i) + dz - z0) / len));
+    if (Math.abs(liv.getY(i) - want) > 1e-4) throw new Error(`${what}: a vertex at z ${(pos.getZ(i) + dz).toFixed(2)} has heat place ${liv.getY(i).toFixed(3)}, expected ${want.toFixed(3)}`);
+  }
+};
+test('heat: plates, fins and flaps of every engine glow by their place along it, not like the nozzle (factory parts, Bruchteile, kit parts)', () => {
+  const kit = { fins: 2, intake: 1, nozzle: 2, tune: { ...NO_KIT.tune, turn: 2, cooling: 2, airbrake: 2, repair: 2, traction: 2 } };
+  for (const p of PODS) for (const em of podLayout(p).engines) {
+    const L = em.spec.L, eg = engineGeo(em.spec, 28), ek = engineKit(em.spec, 28, kit);
+    heatPlaces(eg.parts.get('hull'), -L / 2, L, 0, `${p.id} engine`);
+    for (const bp of eg.breakParts) heatPlaces(bp.parts.get('hull'), -L / 2, L, 0, `${p.id} Bruchteil ${bp.id}`);
+    for (const f of eg.flaps) heatPlaces(f.geo, -L / 2, L, f.pivot.z, `${p.id} flap`);
+    heatPlaces(ek.parts.get('hull'), -L / 2, L, 0, `${p.id} kit part`);
+    for (const f of ek.flaps) heatPlaces(f.geo, -L / 2, L, f.pivot.z, `${p.id} kit flap`);
+  }
+});
+test('heat: wings and plates of the pod layout follow the engine bank they sit on (the long wing plate of the Aurora runs from hot to cold)', () => {
+  for (const who of ['player', 'Gegner'] as const) {
+    const p = byId('aurora'), A = who === 'player' ? assembleHero(p, segFor(2, false), headOf(p)) : assembleRival(p, segFor(2, true), headOf(p), p.colors);
+    const r = A.breaks.get('wingL')!.ranges.find(x => x.key === 'hull')!; ok(r && r.where !== 'cockpit', 'the wing plate is on an engine bank');
+    const g = A.banks[r.where as number].buckets.get('hull')!, liv = g.attributes.aLiv, idx = g.index!; let lo = 1, hi = 0;
+    for (let i = r.start; i < r.start + r.count; i++) { const v = idx.getX(i); if (liv.getZ(v) > 2.5) { lo = Math.min(lo, liv.getY(v)); hi = Math.max(hi, liv.getY(v)); } }
+    ok(hi - lo > 0.5, `${who}: the heat place of the wing plate spans only ${lo.toFixed(2)} .. ${hi.toFixed(2)}`);
+    A.owned.forEach(x => x.dispose());
+  }
+});
+// ------------------------------------------------------------------ pod pose (where a hit landed on the model)
+test('pod pose: a world point lands in the body space of THIS step (same frame as the model: group yaw, then body pitch + roll about an origin bodyZ ahead)', () => {
+  const pose = { pos: new THREE.Vector3(412, 7.5, -233), yaw: 2.1, pitch: -0.17, roll: 0.4 }, bodyZ = 1.3;
+  const frame = (p: typeof pose) => { // the scene graph the game gives every pod model
+    const group = new THREE.Group(), body = new THREE.Group(); group.add(body); body.position.z = bodyZ;
+    group.position.copy(p.pos); group.rotation.set(0, p.yaw, 0); body.rotation.set(p.pitch, 0, p.roll); group.updateMatrixWorld(true); return body;
+  };
+  const local = new THREE.Vector3(1.9, 0.4, -2.2), world = frame(pose).localToWorld(local.clone());
+  const close = (a: number, b: number, msg: string) => ok(Math.abs(a - b) < 1e-6, `${msg}: expected ${b}, got ${a}`);
+  const b = worldToBody(pose, bodyZ, world.clone()); close(b.x, local.x, 'body x'); close(b.y, local.y, 'body y'); close(b.z, local.z, 'body z');
+  const w = bodyToWorld(pose, bodyZ, local.clone()); close(w.x, world.x, 'world x'); close(w.y, world.y, 'world y'); close(w.z, world.z, 'world z');
+  // the finding: at 100 m/s the pod is 1.67 m further on than the model stood last frame - the mark must not slide forward by that much
+  const now = { ...pose, pos: pose.pos.clone().add(new THREE.Vector3(Math.sin(pose.yaw), 0, Math.cos(pose.yaw)).multiplyScalar(100 / 60)) };
+  const hit = frame(now).localToWorld(local.clone()), m = worldToBody(now, bodyZ, hit.clone());
+  close(m.z, local.z, 'the mark slid along the pod');
+});
+test('Treffermarken: the flaps of the player pod are built in the space of their engine bank (a mark burns a flap only where the flap really is)', () => {
+  const kit = { ...NO_KIT, tune: { ...NO_KIT.tune, airbrake: 2 } }; // with the double flaps of the Luftbremse tuning as well
+  for (const p of PODS) for (const k of [NO_KIT, kit]) {
+    const A = assembleHero(p, segFor(2, false), headOf(p), k); let n = 0;
+    for (const bank of A.banks) for (const e of bank.engines) for (const f of e.flaps) {
+      const d = new THREE.Box3().setFromBufferAttribute(f.geo.attributes.position as THREE.BufferAttribute).distanceToPoint(f.hinge); n++;
+      ok(d < 0.05, `${p.id}: a flap's geometry lies ${d.toFixed(2)} m away from its hinge (still in hinge space?)`);
+    }
+    ok(n > 0 || !podLayout(p).engines.some(em => engineGeo(em.spec, segFor(2, false)).flaps.length), `${p.id}: flaps got lost`);
     A.owned.forEach(g => g.dispose());
   }
 });
