@@ -127,7 +127,7 @@ export const PODS: PodDef[] = [
     colors: ['#26282e', '#c99a2e', '#ff5f2e'],
   },
   {
-    id: 'volt', name: 'Quill Voltspire', pilotId: 'ixo', desc: 'Offene Gitterkäfige mit Plasmaspulen und drei Energiebögen – reißt aus dem Stand davon, verträgt aber wenig.',
+    id: 'volt', name: 'Quill Voltspire', pilotId: 'ixo', desc: 'Reaktor-Triebwerke mit vergittertem Plasmafenster und drei Energiebögen – reißt aus dem Stand davon, verträgt aber wenig.',
     stats: { topSpeed: 0.74, accel: 0.92, turn: 0.66, traction: 0.62, airbrake: 0.6, cooling: 0.9, repair: 0.4 },
     colors: ['#34407a', '#c7ccd4', '#b79bff'],
   },

@@ -645,20 +645,38 @@ const manta: Design = (k) => {
   return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T) };
 };
 
-/** Quill Voltspire – cage ball: floor pan and seat inside a ball of hoops (two of them frame the view like A-pillars), a console on a
- *  stalk and a tall discharge mast on top. */
+/** Quill Voltspire – reactor ball: a closed bowl below, a glass ball inside a cage of hoops above (two hoops frame the view like
+ *  A-pillars, the back is ribbed and plated), equipment pack behind the seat, console on a stalk, tall discharge mast on top.
+ *  (First version: an open ball of five hoops – the user found the pod too open.) */
 const volt: Design = (k) => {
-  const { hw, pb } = k; const r = hw * 0.86, cy = 0.06, n = k.hi ? 36 : 12, tr = 0.028, yaw = 0.72;
-  const pan = lathe(prof([[0, -0.62 * hw], [0.5 * hw, -0.62 * hw, 1], [0.7 * hw, -0.52 * hw], [0.8 * hw, -0.34 * hw, 1], [0.74 * hw, -0.34 * hw, 1], [0.66 * hw, -0.48 * hw], [0, -0.52 * hw]]), n, 2); pan.rotateX(-HALF);
-  pb.add('hull', pan);
-  const hoop = (m: THREE.Matrix4) => pb.add('steel', torus(r, tr, 6, n), m);
-  hoop(M4.trs(0, cy, 0, HALF, 0, 0));                                          // equator
-  hoop(M4.t(0, cy, 0));                                                         // over the pilot from side to side
-  for (const sd of [-1, 1]) hoop(M4.trs(0, cy, 0, 0, HALF + sd * yaw, 0));      // two diagonal hoops: pillars left and right of the view
-  for (const [dy, mat] of [[0.72, 'steel'], [-0.6, 'dark']] as const) pb.add(mat, torus(r * Math.sqrt(1 - dy * dy), tr * 0.8, 5, n), M4.trs(0, cy + dy * r, 0, HALF, 0, 0));
-  if (k.hi) for (const a of [yaw, -yaw, HALF, -HALF, Math.PI - yaw, yaw - Math.PI]) pb.add('copper', sphere(0.05, 8, 6), M4.t(Math.sin(a) * r, cy, Math.cos(a) * r)); // joints on the equator
+  const { hw, pb } = k; const r = hw * 0.86, cy = 0.06, n = k.hi ? 36 : 12, tr = 0.028, yaw = 0.72, ri = r - 0.05, m = k.hi ? 8 : 4;
+  // bowl: outer skin from the bottom up to the equator, rim, inner skin down to a flat floor
+  const bowl: [number, number, (0 | 1)?][] = [];
+  for (let i = 0; i <= m; i++) { const a = (i / m) * HALF; bowl.push([r * Math.sin(a), cy - r * Math.cos(a)]); }
+  bowl[m][2] = 1; bowl.push([ri, cy, 1]);
+  const aF = Math.acos(Math.min(0.99, (cy + 0.5 * hw) / ri)); // where the inner skin meets the floor (0.5·hw under the cockpit origin)
+  for (let i = m - 1; i >= 1; i--) { const a = aF + (HALF - aF) * (i / m); bowl.push([ri * Math.sin(a), cy - ri * Math.cos(a)]); }
+  bowl.push([ri * Math.sin(aF), -0.5 * hw, 1], [0, -0.5 * hw]);
+  pb.add('hull', lathe(prof(bowl), n, 2).rotateX(-HALF));
+  pb.add('steel', torus(r, tr * 1.2, 6, n), M4.trs(0, cy, 0, HALF, 0, 0));                       // rim on the equator
+  // glass ball over the bowl, plated at the back (secondary paint) up to the lower rib ring
+  pb.add('glass', sphere(r * 0.985, n, k.hi ? 10 : 5, 0, Math.PI * 2, 0, HALF), M4.t(0, cy, 0));
+  pb.add('hull', sphere(r * 0.995, k.hi ? 14 : 6, k.hi ? 4 : 2, Math.PI * 1.5 - 0.9, 1.8, Math.acos(0.4), HALF - Math.acos(0.4)), M4.t(0, cy, 0), SEC);
+  // cage: one hoop over the pilot from side to side, two diagonal hoops (pillars left and right of the view), ribs down the back
+  const arc = (ry: number, a = Math.PI) => pb.add('steel', torus(r, tr, 6, Math.max(6, Math.round(n * a / (Math.PI * 2))), a), M4.trs(0, cy, 0, 0, ry, 0));
+  arc(0); for (const sd of [-1, 1]) arc(HALF + sd * yaw);
+  for (const b of k.hi ? [-0.5, 0, 0.5] : [0]) arc(HALF + b, HALF);                              // quarter ribs from the top joint down to the rear rim
+  pb.add('steel', torus(r * Math.sqrt(1 - 0.72 * 0.72), tr * 0.8, 5, n), M4.trs(0, cy + 0.72 * r, 0, HALF, 0, 0));
+  pb.add('steel', torus(r * Math.sqrt(1 - 0.4 * 0.4), tr * 0.8, 5, Math.max(6, n >> 1), Math.PI), M4.trs(0, cy + 0.4 * r, 0, -HALF, 0, 0)); // rib ring round the back
+  if (k.hi) for (const a of [yaw, -yaw, HALF, -HALF, Math.PI - yaw, yaw - Math.PI]) pb.add('copper', sphere(0.05, 8, 6), M4.t(Math.sin(a) * r, cy, Math.cos(a) * r)); // joints on the rim
   const hip = V(0, -0.3 * hw, -0.1);
   seat(k, hip); const P = pilot(k, hip); levers(k, P.hands, -0.5 * hw);
+  // equipment pack behind the seat: capacitor block, two coils, feed line up the centre rib to the mast
+  pb.add('dark', rbox(0.5, 0.3, 0.16, 0.03), M4.t(0, hip.y + 0.2, hip.z - 0.36));
+  if (k.hi) {
+    for (const sd of [-1, 1]) { pb.add('copper', torus(0.07, 0.02, 5, 10), M4.trs(sd * 0.14, hip.y + 0.42, hip.z - 0.36, HALF, 0, 0)); pb.add('glow', sphere(0.022, 6, 4), M4.t(sd * 0.2, hip.y + 0.26, hip.z - 0.27)); }
+    pb.add('rubber', tube([V(0, hip.y + 0.36, hip.z - 0.4), V(0, cy + 0.5 * r, -0.8 * r), V(0, cy + 0.9 * r, -0.36 * r), V(0, cy + r - 0.02, -0.04)], 0.022, 10, 5));
+  }
   // console on a stalk
   dash(k, V(0, cy + 0.01, r * 0.68), 0.46, 2, 1, -1.05);
   pb.add('steel', tube([V(0, -0.5 * hw, r * 0.36), V(0, cy - 0.2, r * 0.6), V(0, cy - 0.03, r * 0.68)], 0.03, 6, 6));
@@ -669,9 +687,8 @@ const volt: Design = (k) => {
     for (let i = 0; i < 3; i++) g.add('dark', torus(0.07 - i * 0.015, 0.014, 5, k.hi ? 12 : 6), M4.trs(0, cy + r + 0.32 + i * 0.3, 0, HALF, 0, 0));
     g.add('glow', sphere(0.04, 8, 6), M4.t(0, cy + r + 1.35, 0));
   });
-  // light ring and repulsor studs under the pan
-  pb.add('glow', torus(0.42 * hw, 0.022, 5, n), M4.trs(0, -0.64 * hw, 0, HALF, 0, 0));
-  for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2; pb.add('dark', sphere(0.1, k.hi ? 10 : 6, k.hi ? 5 : 3, 0, Math.PI * 2, HALF, HALF), M4.t(Math.sin(a) * 0.3 * hw, -0.62 * hw, Math.cos(a) * 0.3 * hw)); }
+  // light ring under the bowl
+  { const rg = 0.34 * hw, a = Math.asin(rg / r); pb.add('glow', torus(rg, 0.02, 5, n), M4.trs(0, cy - r * Math.cos(a) - 0.012, 0, HALF, 0, 0)); }
   return { head: P.head, eye: P.eye, anchors: anchors(k, [V(-Math.sin(yaw) * r, cy + 0.07, Math.cos(yaw) * r), V(Math.sin(yaw) * r, cy + 0.07, Math.cos(yaw) * r)]) };
 };
 

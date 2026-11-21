@@ -15,7 +15,7 @@
     "far meshes",
     "far tris"
   ],
-  "measured": "Session 20 / Phase 3: four new pods (cyclone, halo, manta, volt) added; the ten old rows are unchanged",
+  "measured": "Session 20 / Phase 3 + rework of the Quill Voltspire (closed cowls, caged window, glass ball cockpit); the ten old rows are unchanged",
   "rows": [
     ["aurora",41,26806,41,42334,41,57170,30,14612,31,40576,3,444],
     ["brute",39,26126,39,41210,39,55462,28,16052,29,39452,3,492],
@@ -30,7 +30,7 @@
     ["cyclone",41,22854,41,35174,41,46578,32,12032,33,33416,3,648],
     ["halo",39,23462,39,32538,39,45062,28,12724,29,30780,3,732],
     ["manta",38,16254,38,21554,38,27042,27,8140,28,19796,3,748],
-    ["volt",36,26748,36,37232,36,50192,24,16334,26,35474,3,508]
+    ["volt",37,31130,39,44090,39,58782,25,18944,29,42332,3,508]
   ],
   "budgetRef": { "note": "Session 19 numbers (before the pod overhaul, measured in the browser at commit d7b9c4b). Budget reference for the old pods: never edit.", "rows": [
     ["aurora",40,26132,40,39692,40,51068,31,22184,31,23824,3,544],

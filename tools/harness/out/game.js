@@ -89918,40 +89918,54 @@ function cageEngine(spec2, seg) {
   const pb = new PartBuilder();
   const Z = (t) => -L / 2 + t * L;
   const hi = seg >= 24, ultra = seg >= 40, segC = Math.max(10, Math.round(seg * 0.6));
-  const frames = [0.1, 0.3, 0.5, 0.7, 0.9];
-  for (const tf of frames) pb.add("steel", torus(R, 0.045, 6, seg), M4.t(0, 0, Z(tf)));
-  pb.add("steel", radial(() => cyl(0.034, 0.034, 0.84 * L, 6).rotateX(HALF).translate(0, R, Z(0.5)), 6, Math.PI / 6));
-  for (let b = 0; b < frames.length - 1; b++) for (let q = 0; q < 6; q++) {
-    if (!hi && (q + b) % 2) continue;
-    const flip = (q + b) % 2 === 0, a0 = Math.PI / 6 + (q + (flip ? 0 : 1)) * Math.PI / 3, a1 = Math.PI / 6 + (q + (flip ? 1 : 0)) * Math.PI / 3;
-    pb.add("steel", tube([V(Math.sin(a0) * R, Math.cos(a0) * R, Z(frames[b])), V(Math.sin(a1) * R, Math.cos(a1) * R, Z(frames[b + 1]))], 0.017, 1, 4));
-  }
-  pb.add("glow", cyl(0.1 * R, 0.1 * R, 0.74 * L, 10).rotateX(HALF), M4.t(0, 0, Z(0.5)));
-  const drums = [0.3, 0.5, 0.7], nW = ultra ? 40 : hi ? 26 : 12;
-  for (let i = 0; i < nW; i++) {
-    const tt = 0.15 + 0.7 * (i / (nW - 1));
-    if (drums.some((td) => Math.abs(tt - td) < 0.045)) continue;
-    pb.add("copper", torus(0.33 * R, 0.03 * R, 5, segC), M4.t(0, 0, Z(tt)));
-  }
-  for (const td of drums) {
-    pb.add("dark", cyl(0.5 * R, 0.5 * R, 0.07 * L, segC).rotateX(HALF), M4.t(0, 0, Z(td)));
-    pb.add("glow", torus(0.505 * R, 0.022 * R, 5, segC), M4.t(0, 0, Z(td)));
-    pb.add("steel", radial(() => cyl(0.022, 0.022, 0.5 * R, 5).translate(0, 0.75 * R, Z(td)), 6, Math.PI / 6));
-  }
-  {
-    const r0 = R + 0.05, r1 = r0 + 0.045, shell2 = prof([[r1, Z(0.16), 1], [r1, Z(0.84), 1], [r0, Z(0.84), 1], [r0, Z(0.16), 1], [r1, Z(0.16)]]);
-    for (const c of [0, Math.PI]) pb.add("hull", lathe(shell2, Math.max(8, Math.round(seg * 0.3)), 1, c - 0.8, 1.6));
-  }
-  pb.add("hull", lathe(prof([[R + 0.02, Z(0.9), 1], [R + 0.07, Z(0.93)], [R + 0.06, Z(0.985)], [R - 0.02, Z(1), 1], [R - 0.09, Z(0.985), 1], [R - 0.05, Z(0.9), 1], [R + 0.02, Z(0.9)]]), seg, 3));
+  const tA = 0.33, tB = 0.67, Rc = R * 1.04, wl = (tB - tA) * L;
+  pb.add("hull", lathe(prof([[0.62 * R, Z(0), 1], [0.8 * R, Z(0.035)], [0.97 * R, Z(0.09)], [Rc, Z(0.15)], [Rc, Z(tA - 0.02)], [R * 0.99, Z(tA), 1]]), seg, 1));
+  pb.add("dark", lathe(prof([[R * 0.99, Z(tA)], [0.36 * R, Z(tA)]]), seg, 0));
+  for (const tb of [0.165, 0.295]) pb.add("steel", torus(Rc + 0.012, 0.03, 6, seg), M4.t(0, 0, Z(tb)));
+  pb.add("dark", radial(() => rbox(0.02, 0.13, 0.5, 6e-3).translate(0, Rc + 0.06, Z(0.23)), hi ? 18 : 9, 0.1));
+  pb.add("hull", lathe(prof([[R * 0.99, Z(tB), 1], [Rc, Z(tB + 0.02)], [Rc, Z(0.88)], [R + 0.02, Z(0.9), 1]]), seg, 1));
+  pb.add("dark", lathe(prof([[0.36 * R, Z(tB)], [R * 0.99, Z(tB)]]), seg, 0));
+  pb.add("hull", lathe(prof([[R + 0.02, Z(0.9), 1], [R + 0.07, Z(0.93)], [R + 0.06, Z(0.985)], [R - 0.02, Z(1), 1], [R - 0.09, Z(0.985), 1], [R - 0.05, Z(0.9), 1]]), seg, 3));
+  pb.add("dark", lathe(prof([[R - 0.05, Z(0.9)], [R - 0.12, Z(0.84)], [0.62 * R, Z(0.76), 1], [0.14 * R, Z(0.76)]]), seg, 0));
   pb.add("glow", torus(R - 0.03, 0.02, 5, seg), M4.t(0, 0, Z(1) + 5e-3));
-  pb.add("chrome", lathe(prof([[0.16 * R, Z(0.86), 1], [0.14 * R, Z(0.93)], [0.05 * R, Z(1) + 0.04 * L], [0, Z(1) + 0.1 * L]]), segC, 0));
-  pb.add("steel", radial(() => rbox(0.03, 0.84 * R, 0.16, 8e-3).translate(0, 0.58 * R, Z(0.93)), 3));
+  pb.add("glow", torus(0.6 * R, 0.014, 5, segC), M4.t(0, 0, Z(0.762)));
+  pb.add("chrome", lathe(prof([[0.16 * R, Z(0.76), 1], [0.14 * R, Z(0.93)], [0.05 * R, Z(1) + 0.04 * L], [0, Z(1) + 0.1 * L]]), segC, 0));
+  pb.add("steel", radial(() => rbox(0.03, 0.8 * R, 0.16, 8e-3).translate(0, 0.56 * R, Z(0.93)), 3));
+  pb.add("steel", torus(Rc + 0.012, 0.03, 6, seg), M4.t(0, 0, Z(0.7)));
+  pb.add("glow", cyl(0.1 * R, 0.1 * R, wl, 10).rotateX(HALF), M4.t(0, 0, Z(0.5)));
+  const nW = ultra ? 20 : hi ? 14 : 7;
+  for (let i = 0; i < nW; i++) pb.add("copper", torus(0.3 * R, 0.03 * R, 5, segC), M4.t(0, 0, Z(tA + 0.035 + (tB - tA - 0.07) * (i / (nW - 1)))));
+  for (const [tt, sg] of [[tA, 1], [tB, -1]]) {
+    pb.add("dark", cyl(0.44 * R, 0.44 * R, 0.03 * L, segC).rotateX(HALF), M4.t(0, 0, Z(tt) + sg * 0.015 * L));
+    pb.add("glow", torus(0.445 * R, 0.02 * R, 5, segC), M4.t(0, 0, Z(tt) + sg * 0.03 * L));
+  }
   const fpb = new PartBuilder();
-  fpb.add("copper", radial(() => rbox(0.05, 0.62 * R, 0.07, 0.012).translate(0, 0.45 * R, 0), 6));
-  fpb.add("copper", torus(0.76 * R, 0.03, 5, segC));
-  fpb.add("copper", cyl(0.16 * R, 0.16 * R, 0.16, 10).rotateX(HALF));
+  fpb.add("copper", radial(() => cyl(0.028, 0.028, 0.8 * wl, 5).rotateX(HALF).translate(0, 0.62 * R, 0), 8));
+  for (const sg of [-1, 1]) {
+    fpb.add("copper", torus(0.62 * R, 0.036, 5, segC), M4.t(0, 0, sg * 0.4 * wl));
+    fpb.add("copper", radial(() => rbox(0.04, 0.2 * R, 0.04, 8e-3).translate(0, 0.52 * R, sg * 0.4 * wl), 4, Math.PI / 4));
+  }
   const fan = fpb.build().get("copper");
   fan.computeBoundingSphere();
+  for (let q = 0; q < 4; q++) {
+    const a = Math.PI / 4 + q * HALF;
+    pb.add("hull", rbox(0.2, 0.1, wl + 0.12, 0.02), M4.trs(Math.sin(a) * R, Math.cos(a) * R, Z(0.5), 0, 0, -a), SEC);
+  }
+  for (const tf of [tA + 0.012, 0.5, tB - 0.012]) pb.add("steel", torus(R, 0.04, 6, seg), M4.t(0, 0, Z(tf)));
+  pb.add("steel", radial(() => cyl(0.03, 0.03, wl, 6).rotateX(HALF).translate(0, R, Z(0.5)), 4));
+  if (hi) for (const tf of [(tA + 0.5) / 2, (tB + 0.5) / 2]) pb.add("steel", torus(R, 0.018, 4, seg), M4.t(0, 0, Z(tf)));
+  for (let b = 0; b < 2; b++) for (let q = 0; q < 8; q++) {
+    const z0 = Z(b === 0 ? tA + 0.012 : 0.5), z1 = Z(b === 0 ? 0.5 : tB - 0.012), a0 = q * Math.PI / 4, a1 = a0 + Math.PI / 4;
+    const P = (a, z) => V(Math.sin(a) * R, Math.cos(a) * R, z);
+    pb.add("steel", tube([P((q + b) % 2 ? a0 : a1, z0), P((q + b) % 2 ? a1 : a0, z1)], 0.014, 1, 4));
+    if (hi) pb.add("steel", tube([P((q + b) % 2 ? a1 : a0, z0), P((q + b) % 2 ? a0 : a1, z1)], 0.014, 1, 4));
+  }
+  {
+    const r0 = Rc + 5e-3, r1 = Rc + 0.05, cover2 = prof([[r1, Z(tA - 0.035), 1], [r1, Z(tB + 0.035), 1], [r0, Z(tB + 0.035), 1], [r0, Z(tA - 0.035), 1], [r1, Z(tA - 0.035)]]);
+    for (const c of [0, Math.PI]) pb.add("hull", lathe(cover2, Math.max(4, Math.round(seg * 0.14)), 3, c - 0.35, 0.7));
+  }
+  bellyStrip(pb, 0.34 * R, 0.38 * L, -(Rc + 0.05), Z(0.5));
+  const { py: py2, pylon } = cablePylon(pb, Rc + 0.05, Z(0.56));
   const zB = -0.3;
   for (const sd of [-1, 1]) for (const k of [-1, 0, 1]) {
     const z = zB + k * CAGE_ARC_STEP, m = (x) => M4.trs(sd * (R + x), 0, z, 0, 0, sd * -HALF);
@@ -89960,21 +89974,33 @@ function cageEngine(spec2, seg) {
     pb.add("dark", cyl(0.055, 0.07, 0.06, 10), m(0.18));
     pb.add("copper", torus(0.06, 0.016, 5, 10), M4.trs(sd * (R + 0.225), 0, z, 0, HALF, 0));
     pb.add("glow", sphere(0.05, 8, 6), M4.t(sd * (R + 0.27), 0, z));
-    if (hi) pb.add("copper", tube([V(sd * 0.5 * R, 0.06, z), V(sd * 0.8 * R, 0.14, z), V(sd * R, 0.02, z)], 0.014, 4, 4));
+    if (hi && k >= 0) pb.add("copper", tube([V(sd * 0.44 * R, 0.1, z), V(sd * 0.74 * R, 0.2, z), V(sd * R, 0.03, z)], 0.014, 4, 4));
   }
-  bellyStrip(pb, 0.34 * R, 0.4 * L, -(R + 0.095), Z(0.5));
-  const { py: py2, pylon } = cablePylon(pb, R + 0.095, Z(0.56));
-  pb.add("dark", lathe(prof([[0.62 * R, Z(0), 1], [0.74 * R, Z(0.05)], [R * 0.98, Z(0.1), 1]]), seg, 0));
+  for (let q = 0; q < 4; q++) {
+    const a = Math.PI / 4 + q * HALF, m = M4.trs(Math.sin(a) * (Rc + 0.05), Math.cos(a) * (Rc + 0.05), Z(0.79), 0, 0, -a);
+    pb.add("dark", rbox(0.3, 0.12, 0.52, 0.03), m);
+    if (hi) {
+      pb.add("glow", rbox(0.05, 0.02, 0.05, 6e-3), m.clone().multiply(M4.t(0.08, 0.062, 0.14)));
+      pb.add("copper", rbox(0.2, 0.03, 0.06, 8e-3), m.clone().multiply(M4.t(0, 0.065, -0.14)));
+    }
+  }
   if (hi) {
-    for (const tf of frames) pb.add("chrome", boltRing(R + 0.05, 6, 0.028, Z(tf), true));
-    if (ultra) for (const tf of frames) pb.add("glow", radial(() => sphere(0.016, 5, 4).translate(0, R + 0.075, Z(tf)), 6, Math.PI / 6));
+    for (const sd of [-1, 1]) {
+      const a = sd * 0.62, P = (z, lift) => V(Math.sin(a) * (R + lift), Math.cos(a) * (R + lift), z);
+      pb.add("rubber", tube([P(Z(tA - 0.04), 0.08), P(Z(0.42), 0.13), P(Z(0.58), 0.13), P(Z(tB + 0.04), 0.08)], 0.032, 12, 6));
+    }
+    for (const tf of [tA - 0.03, tB + 0.03, 0.885]) pb.add("chrome", boltRing(Rc + 8e-3, Math.round(seg * 0.6), 0.014, Z(tf), true));
+    if (ultra) {
+      for (const tf of [tA + 0.012, 0.5, tB - 0.012]) pb.add("glow", radial(() => sphere(0.016, 5, 4).translate(0, R + 0.05, Z(tf)), 8, Math.PI / 8));
+      pb.add("chrome", boltRing(Rc + 8e-3, Math.round(seg * 0.6), 0.014, Z(0.1), true));
+    }
   }
-  const flaps = [-1, 1].map((sd) => sideFlap(0.04, 0.5 * R, 0.86, V(sd * (R + 0.075), 0, 0.82), -sd));
+  const flaps = [-1, 1].map((sd) => sideFlap(0.04, 0.5 * R, 0.18 * L, V(sd * (Rc + 0.035), 0, Z(0.87)), -sd));
   const nz = roundNozzle(pb, 0.6 * R, Z(0), L, seg, hi);
   return {
     parts: pb.build(),
     fan,
-    fanZ: Z(0.8),
+    fanZ: Z(0.5),
     fanMat: "copper",
     fanSpin: 0.6,
     flaps,
@@ -91493,7 +91519,7 @@ var PODS = [
     id: "volt",
     name: "Quill Voltspire",
     pilotId: "ixo",
-    desc: "Offene Gitterk\xE4fige mit Plasmaspulen und drei Energieb\xF6gen \u2013 rei\xDFt aus dem Stand davon, vertr\xE4gt aber wenig.",
+    desc: "Reaktor-Triebwerke mit vergittertem Plasmafenster und drei Energieb\xF6gen \u2013 rei\xDFt aus dem Stand davon, vertr\xE4gt aber wenig.",
     stats: { topSpeed: 0.74, accel: 0.92, turn: 0.66, traction: 0.62, airbrake: 0.6, cooling: 0.9, repair: 0.4 },
     colors: ["#34407a", "#c7ccd4", "#b79bff"]
   }
@@ -100815,20 +100841,43 @@ var manta = (k) => {
 };
 var volt = (k) => {
   const { hw, pb } = k;
-  const r = hw * 0.86, cy = 0.06, n = k.hi ? 36 : 12, tr = 0.028, yaw = 0.72;
-  const pan = lathe(prof([[0, -0.62 * hw], [0.5 * hw, -0.62 * hw, 1], [0.7 * hw, -0.52 * hw], [0.8 * hw, -0.34 * hw, 1], [0.74 * hw, -0.34 * hw, 1], [0.66 * hw, -0.48 * hw], [0, -0.52 * hw]]), n, 2);
-  pan.rotateX(-HALF2);
-  pb.add("hull", pan);
-  const hoop = (m) => pb.add("steel", torus(r, tr, 6, n), m);
-  hoop(M4.trs(0, cy, 0, HALF2, 0, 0));
-  hoop(M4.t(0, cy, 0));
-  for (const sd of [-1, 1]) hoop(M4.trs(0, cy, 0, 0, HALF2 + sd * yaw, 0));
-  for (const [dy, mat] of [[0.72, "steel"], [-0.6, "dark"]]) pb.add(mat, torus(r * Math.sqrt(1 - dy * dy), tr * 0.8, 5, n), M4.trs(0, cy + dy * r, 0, HALF2, 0, 0));
+  const r = hw * 0.86, cy = 0.06, n = k.hi ? 36 : 12, tr = 0.028, yaw = 0.72, ri = r - 0.05, m = k.hi ? 8 : 4;
+  const bowl = [];
+  for (let i = 0; i <= m; i++) {
+    const a = i / m * HALF2;
+    bowl.push([r * Math.sin(a), cy - r * Math.cos(a)]);
+  }
+  bowl[m][2] = 1;
+  bowl.push([ri, cy, 1]);
+  const aF = Math.acos(Math.min(0.99, (cy + 0.5 * hw) / ri));
+  for (let i = m - 1; i >= 1; i--) {
+    const a = aF + (HALF2 - aF) * (i / m);
+    bowl.push([ri * Math.sin(a), cy - ri * Math.cos(a)]);
+  }
+  bowl.push([ri * Math.sin(aF), -0.5 * hw, 1], [0, -0.5 * hw]);
+  pb.add("hull", lathe(prof(bowl), n, 2).rotateX(-HALF2));
+  pb.add("steel", torus(r, tr * 1.2, 6, n), M4.trs(0, cy, 0, HALF2, 0, 0));
+  pb.add("glass", sphere(r * 0.985, n, k.hi ? 10 : 5, 0, Math.PI * 2, 0, HALF2), M4.t(0, cy, 0));
+  pb.add("hull", sphere(r * 0.995, k.hi ? 14 : 6, k.hi ? 4 : 2, Math.PI * 1.5 - 0.9, 1.8, Math.acos(0.4), HALF2 - Math.acos(0.4)), M4.t(0, cy, 0), SEC3);
+  const arc = (ry, a = Math.PI) => pb.add("steel", torus(r, tr, 6, Math.max(6, Math.round(n * a / (Math.PI * 2))), a), M4.trs(0, cy, 0, 0, ry, 0));
+  arc(0);
+  for (const sd of [-1, 1]) arc(HALF2 + sd * yaw);
+  for (const b of k.hi ? [-0.5, 0, 0.5] : [0]) arc(HALF2 + b, HALF2);
+  pb.add("steel", torus(r * Math.sqrt(1 - 0.72 * 0.72), tr * 0.8, 5, n), M4.trs(0, cy + 0.72 * r, 0, HALF2, 0, 0));
+  pb.add("steel", torus(r * Math.sqrt(1 - 0.4 * 0.4), tr * 0.8, 5, Math.max(6, n >> 1), Math.PI), M4.trs(0, cy + 0.4 * r, 0, -HALF2, 0, 0));
   if (k.hi) for (const a of [yaw, -yaw, HALF2, -HALF2, Math.PI - yaw, yaw - Math.PI]) pb.add("copper", sphere(0.05, 8, 6), M4.t(Math.sin(a) * r, cy, Math.cos(a) * r));
   const hip = V4(0, -0.3 * hw, -0.1);
   seat(k, hip);
   const P = pilot(k, hip);
   levers(k, P.hands, -0.5 * hw);
+  pb.add("dark", rbox(0.5, 0.3, 0.16, 0.03), M4.t(0, hip.y + 0.2, hip.z - 0.36));
+  if (k.hi) {
+    for (const sd of [-1, 1]) {
+      pb.add("copper", torus(0.07, 0.02, 5, 10), M4.trs(sd * 0.14, hip.y + 0.42, hip.z - 0.36, HALF2, 0, 0));
+      pb.add("glow", sphere(0.022, 6, 4), M4.t(sd * 0.2, hip.y + 0.26, hip.z - 0.27));
+    }
+    pb.add("rubber", tube([V4(0, hip.y + 0.36, hip.z - 0.4), V4(0, cy + 0.5 * r, -0.8 * r), V4(0, cy + 0.9 * r, -0.36 * r), V4(0, cy + r - 0.02, -0.04)], 0.022, 10, 5));
+  }
   dash(k, V4(0, cy + 0.01, r * 0.68), 0.46, 2, 1, -1.05);
   pb.add("steel", tube([V4(0, -0.5 * hw, r * 0.36), V4(0, cy - 0.2, r * 0.6), V4(0, cy - 0.03, r * 0.68)], 0.03, 6, 6));
   pb.add("dark", cyl(0.07, 0.09, 0.08, 10), M4.t(0, cy + r + 0.02, 0));
@@ -100837,10 +100886,9 @@ var volt = (k) => {
     for (let i = 0; i < 3; i++) g2.add("dark", torus(0.07 - i * 0.015, 0.014, 5, k.hi ? 12 : 6), M4.trs(0, cy + r + 0.32 + i * 0.3, 0, HALF2, 0, 0));
     g2.add("glow", sphere(0.04, 8, 6), M4.t(0, cy + r + 1.35, 0));
   });
-  pb.add("glow", torus(0.42 * hw, 0.022, 5, n), M4.trs(0, -0.64 * hw, 0, HALF2, 0, 0));
-  for (let i = 0; i < 3; i++) {
-    const a = i / 3 * Math.PI * 2;
-    pb.add("dark", sphere(0.1, k.hi ? 10 : 6, k.hi ? 5 : 3, 0, Math.PI * 2, HALF2, HALF2), M4.t(Math.sin(a) * 0.3 * hw, -0.62 * hw, Math.cos(a) * 0.3 * hw));
+  {
+    const rg = 0.34 * hw, a = Math.asin(rg / r);
+    pb.add("glow", torus(rg, 0.02, 5, n), M4.trs(0, cy - r * Math.cos(a) - 0.012, 0, HALF2, 0, 0));
   }
   return { head: P.head, eye: P.eye, anchors: anchors(k, [V4(-Math.sin(yaw) * r, cy + 0.07, Math.cos(yaw) * r), V4(Math.sin(yaw) * r, cy + 0.07, Math.cos(yaw) * r)]) };
 };

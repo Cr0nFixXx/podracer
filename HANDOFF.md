@@ -120,6 +120,11 @@
 7. **Hangar:** Pod-Liste einzeilig (Pod-Name links, Vorname des Piloten rechts) – 14 Zeilen passen ohne Verkleinerung.
 8. **Nebenbei behoben:** Stachel der Tyr Vespa war von innen nach außen gewickelt (Drehprofil lief Richtung −z); Harness-Bögen können das Fern-Modell zeigen (`far: true`).
 
+### Nachbesserung aus der Sichtung (Phase 3): Quill Voltspire geschlossener und komplexer (Nutzer 2026-11-21: „zu offen (Gitterstruktur), etwas komplexer")
+1. **Triebwerk (`cageEngine` in `podEngines.ts`, neu aufgebaut):** vorn und hinten geschlossene Verkleidungen (Triebwerks-Lackierung), dazwischen nur noch ein Fenster (33–67 % der Länge) auf die Plasmaspule: vier Kastenholme (Sekundärfarbe), drei Spanten, Längsholme, gekreuzte Diagonalen; darin dreht ein Käfigläufer (`fan`, Kupfer) um die Wicklungen. Dazu Kühlrippenring, vier Kondensatorkästen, Kabelstränge, Ansaugkanal, Rücken- und Bauchabdeckung. Größe, Elektroden und Blitz-Anker unverändert → Physikform und Sim unverändert.
+2. **Cockpit (`volt` in `podCockpits.ts`):** unten geschlossene Schale, darüber Glaskugel im Reifenkäfig, Rücken beplankt und gerippt, Gerätepaket hinter dem Sitz. Die beiden vorderen Reifen bleiben links und rechts der Blickmitte.
+3. **Prüfung:** neue Unit-Prüfung „Voltspire: … Außenhaut deckt mindestens 65 % der Tonne" (vorher 49 %). Neue Zahlen: Spieler 39 / 44 090 („Hoch"), 39 / 58 782 („Ultra"), Gegner nah 25 / 18 944 bzw. 29 / 42 332. Bilder `tools/harness/out/p3b_volt*.jpg`.
+
 ### Verifiziert (Phase 3)
 - `npm run check` grün: 34/34 Unit-Prüfungen (neu u. a. „vier neue Racer mit eigenem Piloten", „Grenzen 1,9 m / 4,6 m / 1,85 m", „keine `keel`", „Cyclone-Rotoren drehen bei Gegnern", „drei Bögen = ein Mesh, 2,5 m hinter der Front", „Quadra behält ihr X", „Gegner-Auslosung", „CI-Feld"), Pod-Audit 14/14, Sim 13/13 (0 Ausfälle, kein NaN, Bodenfreiheit ≥ 0,67 m).
 - **`ROSTER_OLD=1`: Sim-Tabelle zeilengleich zu Phase 2** → die zehn alten Pods fahren exakt wie vorher. Mesh-/Dreieckszahlen und Physikformen der zehn alten Pods unverändert (nur vier Zeilen dazu).

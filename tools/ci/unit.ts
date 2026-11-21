@@ -3,7 +3,7 @@
 import { PILOTS, PODS, STAT_KEYS, type StatKey } from '../../src/game/data';
 import { podLayout } from '../../src/game/podLayouts';
 import { cockpitGeo } from '../../src/game/podCockpits';
-import { engineExtent } from '../../src/game/podParts';
+import { engineExtent, engineGeo } from '../../src/game/podParts';
 import { podCollision, podEnvelope } from '../../src/game/podDesigns';
 import { assembleHero, assembleRival } from '../../src/game/podAssembly';
 import { pickRivals } from '../../src/game/roster';
@@ -110,6 +110,19 @@ test('Voltspire: its three arcs are one binder mesh and stay 2.5 m behind the en
   const front = Math.min(...L.engines.map(e => e.z + engineExtent(e.spec).halfL)); h.binders[0].computeBoundingBox();
   const maxZ = h.binders[0].boundingBox!.max.z - 0.4; // the ribbon is 0.4 m wide around its centre line
   ok(maxZ <= front - 2.5 + 1e-6, `foremost arc at z = ${maxZ.toFixed(2)}, engine front at ${front.toFixed(2)}`);
+});
+test('Voltspire: its engines are mostly closed – painted outer skin covers at least 65 % of the barrel (user: "zu offen")', () => {
+  const s = podLayout(podById('volt')).engines[0].spec, g = engineGeo(s, 28).parts.get('hull')!;
+  const p = g.attributes.position, ix = g.index!.array; let skin = 0;
+  for (let t = 0; t < ix.length; t += 3) { // area of the triangles that face outwards and lie on the barrel
+    const a = [0, 1, 2].map(k => [p.getX(ix[t + k]), p.getY(ix[t + k]), p.getZ(ix[t + k])]);
+    const u = [a[1][0] - a[0][0], a[1][1] - a[0][1], a[1][2] - a[0][2]], v = [a[2][0] - a[0][0], a[2][1] - a[0][1], a[2][2] - a[0][2]];
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]], area = Math.hypot(n[0], n[1], n[2]) / 2;
+    const cx = (a[0][0] + a[1][0] + a[2][0]) / 3, cy = (a[0][1] + a[1][1] + a[2][1]) / 3, rad = Math.hypot(cx, cy);
+    if (area > 0 && rad > 0.9 * s.R && (n[0] * cx + n[1] * cy) / (2 * area * rad) > 0.5) skin += area;
+  }
+  const share = skin / (2 * Math.PI * s.R * s.L);
+  ok(share >= 0.65, `outer skin covers ${(share * 100).toFixed(0)} % of the barrel`);
 });
 test('Quadra Lumber keeps its X: binders between different engine pairs stay separate meshes', () => {
   const p = podById('bomquad'); eq(assembleHero(p, 28, 'dome').binders.length, 2); eq(assembleRival(p, 14, 'dome', p.colors).binders.length, 2);
