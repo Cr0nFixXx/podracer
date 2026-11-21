@@ -163,7 +163,7 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 
 ## Git: lokale Commits und Kopie im Archiv
 
-Alle Änderungen sind lokal committet (Branch `B`, Remote `origin` = `github.com/Cr0nFixXx/podracer`). Der Stand von Session 20 ist lokal committet, aber **nicht gepusht** und nicht in der Textkopie unten enthalten (sie steht auf Session 19; `npm run save` erneuert sie).
+Alle Änderungen sind lokal committet (Branch `B`, Remote `origin` = `github.com/Cr0nFixXx/podracer`). Der Stand von Session 20 ist committet und nach `origin/B` gepusht. In der Textkopie unten ist er nicht enthalten (sie steht auf Session 19; `npm run save` erneuert sie).
 
 **Der versteckte Ordner `.git` fehlt im Download.** Er steckt deshalb als Textdatei in **`.archiv/repo-sicherung/podracer-git.tar.gz.b64.txt`**. Wiederherstellen (im Projektordner ausführen):
 
