@@ -753,7 +753,7 @@ export class Game {
 
   updateCamera(dt: number) {
     const p = this.player; const cam = this.camera; const gfx = this.profile.gfx;
-    p.visual?.setCockpitVisible?.(this.camMode !== 2); // first-person: the near plane (0.8 m) cut the cockpit in half → hidden, engines and cables stay
+    p.visual?.setCockpitView?.(this.camMode === 2); // Session 20: the cockpit camera sits in the pilot's head and shows the cockpit from inside (see PodVisual.setCockpitView)
     const sp = Math.hypot(p.vel.x, p.vel.z); const vmax = podParams(p).vmax;
     let fov = gfx.fov + Math.min(1.3, sp / vmax) * 16 + (p.boosting ? 8 : 0) + (p.zeroG ? 8 : 0); // zero-G: wider view = more sense of speed
     const velYaw = sp > 8 ? Math.atan2(p.vel.x, p.vel.z) : p.yaw;
@@ -779,12 +779,12 @@ export class Game {
     } else if (mode === 2 || mode === 3) {
       const v = p.visual!; v.group.position.copy(p.pos); v.group.rotation.set(0, p.yaw, 0); v.body.rotation.set(p.pitch, 0, p.roll); v.group.updateMatrixWorld(true);
       const src = mode === 2 ? v.eye : v.hood;
-      this.tmpV.copy(src); if (mode === 2) this.tmpV.add(this.tmpV3.set(p.ckX ?? 0, (p.ckY ?? 0) + 0.2, (p.ckZ ?? 0) + 0.5)); // the eye rides with the swaying cockpit
-      v.body.localToWorld(this.tmpV);
+      if (mode === 2 && v.eyeWorld) v.eyeWorld(this.tmpV); // the eye rides with the swaying cockpit
+      else { this.tmpV.copy(src); v.body.localToWorld(this.tmpV); }
       cam.position.set(this.tmpV.x + sx * 0.5, this.tmpV.y + sy * 0.5, this.tmpV.z);
       v.body.getWorldQuaternion(this.tmpQ);
       cam.up.copy(UP).applyQuaternion(this.tmpQ);
-      this.tmpV2.set(0, src.y - (mode === 2 ? 0.35 : 0.45), 60); v.body.localToWorld(this.tmpV2);
+      this.tmpV2.set(0, src.y - (mode === 2 ? 3.2 : 0.45), 60); v.body.localToWorld(this.tmpV2); // cockpit: look slightly down over the dashboard
       cam.lookAt(this.tmpV2);
       fov += 4;
     } else if (mode === 4) {

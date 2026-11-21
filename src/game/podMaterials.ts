@@ -216,6 +216,13 @@ export function suitMaterial(color: string) {
   if (!m) { m = new THREE.MeshStandardMaterial({ color, roughness: 0.66, metalness: 0.05 }); m.userData.shared = true; suitCache.set(color, m); }
   return m;
 }
+/** Session 20: skin tone per pilot (`PilotDef.skin`) – cached per colour like the suits, same shader for all. */
+const skinCache = new Map<string, THREE.MeshStandardMaterial>();
+export function skinMaterial(color: string) {
+  let m = skinCache.get(color);
+  if (!m) { m = new THREE.MeshStandardMaterial({ color, roughness: 0.64 }); m.userData.shared = true; skinCache.set(color, m); }
+  return m;
+}
 
 /* ------------------------------------- hero player exhaust, binder & flex cables ------------------------------------- */
 export interface FxU { uColor: { value: THREE.Color }; uTime: { value: number }; uPower: { value: number }; uLift?: { value: THREE.Vector2 }; }

@@ -31,23 +31,25 @@ export interface PilotDef {
   name: string;
   species: string;
   head: PilotHead;
+  /** skin tone of the pilot figure (heads that show skin: goggles, snout, crest) */
+  skin: string;
   skill: number; // 0..1
   aggression: number; // 0..1
   color: string;
 }
 
 export const PILOTS: PilotDef[] = [
-  { id: 'kai', name: 'Kai Varrin', species: 'Mensch', head: 'goggles', skill: 0.9, aggression: 0.4, color: '#4aa3ff' },
-  { id: 'zeb', name: 'Zebulox Vrak', species: 'Dugkin', head: 'snout', skill: 0.95, aggression: 0.95, color: '#ff9a2e' },
-  { id: 'gas', name: 'Gasvaro Ten', species: 'Xantori', head: 'crest', skill: 0.8, aggression: 0.3, color: '#3fe0a0' },
-  { id: 'bom', name: 'Bomquad Rii', species: 'Lurbani', head: 'dome', skill: 0.55, aggression: 0.2, color: '#e3e04a' },
-  { id: 'mav', name: 'Mavik Hollo', species: 'Gurrani', head: 'aero', skill: 0.75, aggression: 0.6, color: '#ff4a6e' },
-  { id: 'rat', name: 'Rattis Tyr', species: 'Aleeni', head: 'crest', skill: 0.7, aggression: 0.8, color: '#b46bff' },
-  { id: 'ald', name: 'Aldo Beerak', species: 'Kraveen', head: 'aero', skill: 0.85, aggression: 0.7, color: '#7fd3ff' },
-  { id: 'tee', name: 'Teemo Pagali', species: 'Vexi', head: 'dome', skill: 0.65, aggression: 0.5, color: '#ff7b2e' },
-  { id: 'ela', name: 'Elana Mak', species: 'Mensch', head: 'goggles', skill: 0.78, aggression: 0.35, color: '#ff5ad1' },
-  { id: 'ody', name: 'Odo Mandrel', species: 'Erriton', head: 'aero', skill: 0.6, aggression: 0.55, color: '#9fff5a' },
-  { id: 'cle', name: 'Clegg Halden', species: 'Mensch', head: 'goggles', skill: 0.68, aggression: 0.45, color: '#ffd27a' },
+  { id: 'kai', name: 'Kai Varrin', species: 'Mensch', head: 'goggles', skin: '#b98c68', skill: 0.9, aggression: 0.4, color: '#4aa3ff' },
+  { id: 'zeb', name: 'Zebulox Vrak', species: 'Dugkin', head: 'snout', skin: '#b5673a', skill: 0.95, aggression: 0.95, color: '#ff9a2e' },
+  { id: 'gas', name: 'Gasvaro Ten', species: 'Xantori', head: 'crest', skin: '#7fb6a8', skill: 0.8, aggression: 0.3, color: '#3fe0a0' },
+  { id: 'bom', name: 'Bomquad Rii', species: 'Lurbani', head: 'dome', skin: '#8fa3b5', skill: 0.55, aggression: 0.2, color: '#e3e04a' },
+  { id: 'mav', name: 'Mavik Hollo', species: 'Gurrani', head: 'aero', skin: '#a4b06a', skill: 0.75, aggression: 0.6, color: '#ff4a6e' },
+  { id: 'rat', name: 'Rattis Tyr', species: 'Aleeni', head: 'crest', skin: '#a99bc0', skill: 0.7, aggression: 0.8, color: '#b46bff' },
+  { id: 'ald', name: 'Aldo Beerak', species: 'Kraveen', head: 'aero', skin: '#c9a15a', skill: 0.85, aggression: 0.7, color: '#7fd3ff' },
+  { id: 'tee', name: 'Teemo Pagali', species: 'Vexi', head: 'dome', skin: '#b8795a', skill: 0.65, aggression: 0.5, color: '#ff7b2e' },
+  { id: 'ela', name: 'Elana Mak', species: 'Mensch', head: 'goggles', skin: '#b98c68', skill: 0.78, aggression: 0.35, color: '#ff5ad1' },
+  { id: 'ody', name: 'Odo Mandrel', species: 'Erriton', head: 'aero', skin: '#8f9a8a', skill: 0.6, aggression: 0.55, color: '#9fff5a' },
+  { id: 'cle', name: 'Clegg Halden', species: 'Mensch', head: 'goggles', skin: '#b98c68', skill: 0.68, aggression: 0.45, color: '#ffd27a' },
 ];
 
 export const PODS: PodDef[] = [

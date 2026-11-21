@@ -195,6 +195,28 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
     pb.add('glow', sphere(0.075 * R, 8, 6), M4.t(sd * (cR + 0.075 * R), 0.2 * R, Z(0.62)));
   }
 
+  // ---------------- Session 20 detail pass (player pod, Gegner on Ultra) ----------------
+  if (detailHi) {
+    // injector ring: copper nozzles feeding the afterburner
+    pb.add('copper', radial(() => cyl(0.014 * R, 0.022 * R, 0.07 * R, 6).rotateX(Math.PI / 2).translate(0, 0.705 * R, Z(0.085)), 12));
+    // junction boxes on the spine with a status light, linked by a conduit to the cable pylon
+    for (const tt of [0.3, 0.76]) { const r = bodyR(tt) * R; pb.add('steel', rbox(0.2 * R, 0.07 * R, 0.16 * R + 0.06, 0.012), M4.t(0, r + 0.03 * R, Z(tt))); pb.add('glow', sphere(0.018 * R + 0.008, 6, 4), M4.t(0.06 * R, r + 0.075 * R, Z(tt))); }
+    pb.add('dark', tube([new THREE.Vector3(0, bodyR(0.3) * R + 0.05 * R, Z(0.3)), new THREE.Vector3(0.06 * R, bodyR(0.45) * R + 0.07 * R, Z(0.45)), new THREE.Vector3(0, topR + 0.06, Z(0.56))], 0.014 * R + 0.006, 8, 5));
+    // strakes along the lower flanks (secondary paint) and grab handles for the pit crew
+    for (const sd of [-1, 1]) {
+      const a = sd * 2.25, r = bodyR(0.45) * R + 0.035 * R;
+      pb.add('hull', rbox(0.02 * R + 0.008, 0.09 * R, 0.36 * L, 0.004), M4.trs(Math.sin(a) * r, Math.cos(a) * r, Z(0.47), 0, 0, -a), [0, 0, 3]);
+      const h = sd * 0.52, rh = bodyR(0.42) * R;
+      pb.add('chrome', torus(0.05 * R + 0.03, 0.008 * R + 0.005, 5, 8, Math.PI), M4.trs(Math.sin(h) * rh, Math.cos(h) * rh, Z(0.42), 0, Math.PI / 2, -h));
+    }
+    // air-brake actuators: a ram behind each side flap
+    { const fr = bodyR(0.5) * R; for (const sd of [-1, 1]) { pb.add('dark', cyl(0.03 * R, 0.03 * R, 0.13 * L, 6).rotateX(Math.PI / 2), M4.t(sd * (fr + 0.02 * R), -0.2 * R, Z(0.55))); pb.add('chrome', cyl(0.015 * R, 0.015 * R, 0.1 * L, 5).rotateX(Math.PI / 2), M4.t(sd * (fr + 0.02 * R), -0.2 * R, Z(0.45))); } }
+    if (seg >= 40) { // Ultra: static wicks on the nozzle rim, bolts on every band
+      pb.add('dark', radial(() => cyl(0.004 * R + 0.003, 0.004 * R + 0.003, 0.12 * R + 0.05, 4).rotateX(Math.PI / 2).translate(0, 0.76 * R, Z(0) - 0.05 * R), 6, 0.4));
+      bandTs.forEach((tb, i) => { if (tb > bodyEnd - 0.04 || i % 2 === 0) return; pb.add('chrome', boltRing(bodyR(tb) * 0.955 * R + 0.035 * R, Math.round(seg * 0.45), 0.018 * R, Z(tb), true)); });
+    }
+  }
+
   // ---------------- style specific ----------------
   if (split) {
     // Split-X: four armoured petals around the intake, hinged open

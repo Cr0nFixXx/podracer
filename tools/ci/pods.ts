@@ -6,6 +6,7 @@
 //   4. the physics shapes themselves against pods-shapes.json: the handling of an existing pod must not move by accident
 // Env: POD=<id> only that pod · UPDATE=1 prints fresh baseline rows instead of comparing.
 import * as THREE from 'three';
+import fs from 'node:fs';
 import { PILOTS, PODS, type PodDef } from '../../src/game/data';
 import { podCollision, podEnvelope } from '../../src/game/podDesigns';
 import { assembleHero, assembleRival, segFor } from '../../src/game/podAssembly';
@@ -15,6 +16,9 @@ import SHAPES from './pods-shapes.json';
 /** How far the visible model may exceed the physics shapes (metres). Calibrated on the Session 19 pods: worst case + 5 cm
  *  (wide: Tyr Vespa's blade wings 0.50 · engines: Splitter-X 0.02 · no cockpit hangs below its ground clamp). */
 const TOL = { wide: 0.55, lowEngine: 0.07, lowCockpit: 0 };
+/** Triangle / draw budgets. Old pods are measured against their Session 19 numbers (`budgetRef` in pods-baseline.json):
+ *  the player pod may grow 20 % below Ultra, a near Gegner must not grow at all. New pods and Ultra have absolute caps. */
+const BUDGET = { playerGrow: 1.2, newPlayerHigh: 70000, newRivalNear: 26000, ultraPlayer: 250000, ultraPlayerDraws: 110, ultraRival: 100000, rivalDraws: 60, far: 1100 };
 const ONLY = process.env.POD, UPDATE = !!process.env.UPDATE;
 let failed = 0;
 const fail = (msg: string) => { failed++; console.log('  FAIL ' + msg); };
@@ -70,6 +74,9 @@ function hero(def: PodDef, quality: number) {
     }
   }
   for (const [k, g] of a.cockpit) { all.add(g, `${w} cockpit ${k}`, BUCKET); ck.add(g, `${w} cockpit ${k}`, BUCKET); }
+  if (a.lamps) all.add(a.lamps, `${w} dash lamps`, ['position', 'normal', 'color'], undefined, false);
+  for (const [k, start] of a.pilotStart) { const g = a.cockpit.get(k); if (!g || start > (g.index ? g.index.count : g.attributes.position.count)) fail(`${w}: pilot range of bucket "${k}" is outside the geometry`); }
+  if (!(a.viewScale >= 1.4 && a.viewScale <= 3.2)) fail(`${w}: cockpit view scale ${a.viewScale} out of range`);
   all.add(a.cables, `${w} cables`, ['position', 'normal', 'uv', 'aLiv'], undefined, false);
   for (const g of a.binders) all.add(g, `${w} binder`, ['position', 'uv'], undefined, false);
   for (const g of a.owned) g.dispose();
@@ -113,6 +120,14 @@ for (const def of PODS) {
     if (!gold) fail(`${def.id}: no baseline row (run with UPDATE=1 and add it on purpose)`);
     else for (let i = 1; i < row.length; i++) if (row[i] !== gold[i]) fail(`${def.id}: ${BASE.columns[i]} = ${row[i]}, baseline ${gold[i]}`);
   }
+  // budgets (HANDOFF "Session 20"): below Ultra a pod must not cost more than before the overhaul, Ultra targets a gaming PC
+  const ref = (BASE.budgetRef.rows as (string | number)[][]).find(r => r[0] === def.id) as number[] | undefined; // Session 19 numbers
+  const over = (what: string, v: number, lim: number) => { if (v > lim) fail(`${def.id}: ${what} = ${v}, budget ${Math.round(lim)}`); };
+  if (ref) { over('player triangles on "Niedrig"', h[0].tris, ref[2] * BUDGET.playerGrow); over('player triangles on "Hoch"', h[1].tris, ref[4] * BUDGET.playerGrow); over('Gegner (near) triangles below Ultra', n2.near.tris, ref[8]); }
+  else { over('player triangles on "Hoch"', h[1].tris, BUDGET.newPlayerHigh); over('Gegner (near) triangles below Ultra', n2.near.tris, BUDGET.newRivalNear); }
+  over('player triangles on Ultra', h[2].tris, BUDGET.ultraPlayer); over('player draws on Ultra', h[2].meshes, BUDGET.ultraPlayerDraws);
+  over('Gegner (near) triangles on Ultra', n3.near.tris, BUDGET.ultraRival); over('Gegner (near) draws', Math.max(n2.near.meshes, n3.near.meshes), BUDGET.rivalDraws);
+  over('far LOD triangles', n2.far.tris, BUDGET.far); over('far LOD draws', n2.far.meshes, 3);
   // physics shapes vs their golden numbers
   const shape = shapeOf(def); shapes.push(`    ${JSON.stringify(def.id)}: ${JSON.stringify(shape)}`);
   if (!UPDATE && JSON.stringify(shape) !== JSON.stringify((SHAPES as Record<string, unknown>)[def.id]))
@@ -129,5 +144,14 @@ for (const def of PODS) {
   console.log(`${def.id.padEnd(9)} ${c(h[0].meshes, h[0].tris)}     ${c(h[1].meshes, h[1].tris)}     ${c(h[2].meshes, h[2].tris)}    ${c(n2.near.meshes, n2.near.tris)}    ${c(n3.near.meshes, n3.near.tris)}  ${c(n2.far.meshes, n2.far.tris).trim().padStart(6)} ${f(wide)} ${f(lowL)} ${f(lowR)} ${f(lowCk)}  ${failed > before ? 'FAIL' : 'ok'}`);
 }
 if (UPDATE) console.log('\npods-baseline.json rows:\n' + fresh.map(r => '    ' + JSON.stringify(r)).join(',\n') + '\n\npods-shapes.json:\n{\n' + shapes.join(',\n') + '\n  }');
+if (process.env.UPDATE === 'write' && !ONLY) { // take the fresh numbers over (deliberate step: say why in HANDOFF.md)
+  const file = 'tools/ci/pods-baseline.json', j = JSON.parse(fs.readFileSync(file, 'utf8'));
+  j.rows = fresh; j.measured = process.env.NOTE ?? j.measured;
+  const head = JSON.stringify({ ...j, rows: 0, budgetRef: 0 }, null, 2).replace(/\n\}$/, '');
+  const list = (rows: unknown[][]) => '[\n' + rows.map(r => '    ' + JSON.stringify(r)).join(',\n') + '\n  ]';
+  fs.writeFileSync(file, head.replace('"rows": 0', '"rows": ' + list(j.rows)).replace('"budgetRef": 0', '"budgetRef": { "note": ' + JSON.stringify(j.budgetRef.note) + ', "rows": ' + list(j.budgetRef.rows) + ' }') + '\n}\n');
+  fs.writeFileSync('tools/ci/pods-shapes.json', '{\n' + shapes.join(',\n') + '\n  }\n');
+  console.log(`\nwrote ${file} and tools/ci/pods-shapes.json`);
+}
 console.log(failed ? `\n${failed} pod audit failure(s).` : '\nAll pods passed the audit (meshes/triangles per build; wide/low = metres outside the physics shape).');
 process.exit(failed ? 1 : 0);

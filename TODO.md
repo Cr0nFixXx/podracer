@@ -3,7 +3,7 @@
 ## 0. Session 20 – Pod-Überholung (läuft; Phasen und Entscheidungen in `HANDOFF.md`)
 - [x] **Phase 0 – Setup + Sicherheitsnetz:** Node, Ausgangsmessung, Sichtprüfung im In-App-Browser, `podAssembly.ts`, Pod-Audit in `npm run check`, `CONTEXT.md`, ADR 0001/0002
 - [x] **Phase 1 – Refactoring ohne Spieländerung:** Layout-Registry, `engineExtent`, `podCockpits.ts`, `applyDamage`, Profil v2, Unit-Prüfungen
-- [ ] **Phase 2 – 10 neue Cockpits + Details + Cockpit-Innenansicht** (danach sichtet der Nutzer)
+- [x] **Phase 2 – 10 neue Cockpits + Details + Cockpit-Innenansicht** – wartet auf die Sichtung durch den Nutzer („Ultra" am Gaming-PC testen)
 - [ ] **Phase 3 – 4 neue Pods:** Cyclone, Halo, Manta, Voltspire (danach sichtet der Nutzer)
 - [ ] **Phase 4 – Tuning-Optik:** Tuning-Teile + Style-Teile, Hangar-Reiter „Lack | Teile"
 - [ ] **Phase 5–7 – Schadensmodelle:** Fahrverhalten, Optik Spieler, Optik Gegner

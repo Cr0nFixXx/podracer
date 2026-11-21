@@ -1,7 +1,7 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-1. **Pod-Überholung fortsetzen:** Phasentabelle im Abschnitt „Session 20" unten – die erste offene Phase ist dran. Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
+1. **Pod-Überholung fortsetzen:** Phasentabelle im Abschnitt „Session 20" unten – die erste offene Phase ist dran. **Stand: Phase 2 fertig, der Nutzer sichtet die 10 neuen Cockpits (Bilder `tools/harness/out/p2_*.jpg`); erst nach seinem „weiter" beginnt Phase 3 (4 neue Pods).** Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
 2. Vor jeder Änderung: `npm run check` (Typecheck + Pod-Audit + Sim) muss grün sein. Pods ansehen: `npm run dev` → `http://localhost:5173/tools/harness/pods.dev.html`.
 3. Weiterhin offen aus Session 19: `npm run dev` → **Aquilaris-Küstenlauf** (19,5-m-Unterwassertunnel, 2 Skyway-Brücken, Flutschleuse) und **Frostspalt-Ring** (22,5-m-Gletschertunnel, verzweigte Eishöhle, Eisschleuse, Viadukt) Probe fahren; im **Hangar** die 6 Lackiermuster & 3 Finishes testen (≈ 6 Min.).
 
@@ -30,7 +30,7 @@
 |---|---|---|
 | 0 | Setup + Sicherheitsnetz | ✅ erledigt |
 | 1 | Refactoring ohne Spieländerung: Layout-Registry (`podLayouts.ts`), `engineExtent`, `podCockpits.ts`, `applyDamage` + Wirkungs-Struct, Profil v2 | ✅ erledigt |
-| 2 | 10 neue Cockpits + Detailpass + Cockpit-Innenansicht → **Stopp: Nutzer sichtet** | offen |
+| 2 | 10 neue Cockpits + Detailpass + Cockpit-Innenansicht → **Stopp: Nutzer sichtet** | ✅ erledigt – **wartet auf Sichtung durch den Nutzer** |
 | 3 | 4 neue Pods (Cyclone → Halo → Manta → Voltspire), Hangar-Liste für 14, Gegner-Auslosung → **Stopp** | offen |
 | 4 | Tuning-Optik: `PodCustom.kit`, `podKitParts.ts`, Hangar-Reiter „Lack \| Teile" | offen |
 | 5 | Schaden – Fahrverhalten: `podDamage.ts`, Bruchteil-Maske, HUD-Lampen | offen |
@@ -64,6 +64,37 @@
 - Browser (WebGPU): `statsAll()` identisch zu den Goldwerten, vier Bögen **bytegleich** zu den Vorher-Bildern.
 - Echte App im In-App-Browser: v1-Spielstand wird importiert (Pod, Farben, Tuning – Wert 9 auf 5 begrenzt), v1 bleibt unangetastet; Hangar ohne Schrumpfen/Scrollen; Rennen Boonta bei Nacht mit 10 Gegnern 28 Rennsekunden per Hand getaktet: 0 Fehler, 0 NaN, Treffer landen auf der richtigen Seite.
 - Bekannt: bei verdecktem Browser-Bereich läuft `requestAnimationFrame` nicht – das Rennen bleibt im Countdown, bis man die Schleife von Hand taktet (siehe `CLAUDE.md`).
+
+### Erledigt in Phase 2 (10 Cockpits, Details, Innenansicht)
+1. **`podCockpits.ts` neu aufgebaut:** Bausatz (`shell`, `seat`, `pilot`, `levers`, `dash`, `windscreen`, `anchors`, `belly`, `part`) + **ein eigener Entwurf je Pod** (`DESIGNS`; Beschreibung in `DESIGN.md`). Bruchteile sind bereits als eigene Teilesätze angelegt (`part(…)`: Kreisel, Sonde, Finne, Schwingen, Rammbug, Radiatoren, Panzerplatten …), werden aber bis Phase 6 mit dem Cockpit zusammengeführt.
+2. **Cockpit-Innenansicht:** Kamera „Cockpit" sitzt im Kopf des Piloten (`PodVisual.setCockpitView`, `eyeWorld`). Technik siehe `docs/adr/0003`: Cockpit wird um den Augpunkt vergrößert (1,4–3,2×), Pilot per Draw-Range ausgeblendet, Near-Plane bleibt 0,8 m. Drei Warnlampen (Boost, Hitze, Schaden) auf jedem Armaturenbrett.
+3. **Triebwerks-Detailpass (`podParts.ts`, ab `seg ≥ 24`):** Einspritzring, Verteilerkästen mit Leitung zum Pylon, Leitbleche, Griffbügel, Bremsklappen-Stempel; auf „Ultra" zusätzlich Ableiter und Bolzenringe.
+4. **Eigener Anbausatz je Pod (`podLayouts.ts → engineExtras`):** z. B. Flügel-Endkappen (Aurora), Ansaugdorne + Kufenplatte (Splitter-X), Verteilerrohre (Tenroc), Kreuzverstrebung + Blitzdorne (Quadra), Canards + Staurohr (Needle), Fühler + Kufen (Vespa), Kühlschleife + Tank (Fireflare), Panzerschürzen (Ironclad), Schwanzfedern (Starling), Rammringe (Ram). Gegner-Anbauteile schwingen jetzt mit den Triebwerken mit.
+5. **Detailstufen:** Gegner unter „Ultra" mit leichtem Cockpit/Piloten; auf „Ultra" 28 statt 18 Segmente und volle Details. Fern-LOD mit Cockpit-Grundform und allen Blitzen.
+6. **Piloten:** `PilotDef.skin` + `skinMaterial`, Kragenring, Schulterpolster, Brustgerät.
+
+### Verifiziert (Phase 2)
+- `npm run check`: 21/21 Unit-Prüfungen (u. a. „kein Cockpit doppelt", „Pilot ist eigener Teilesatz", „drei Lampen", „leichtes Cockpit < 4 600 Dreiecke"), Pod-Audit 10/10 inkl. Budgets, **Physikformen unverändert, Sim-Ausgabe zeilengleich zur Ausgangslage** (alte Pods fahren exakt wie vorher).
+- Browser (WebGPU): `statsAll()` = Audit-Zahlen; Bögen `tools/harness/out/p2_{front,rear,side,inside,pod,front_gegner}.jpg` gesichtet; echtes Rennen mit Kamera „Cockpit" (Fireflare, Boonta) per Hand getaktet: 0 Fehler, Bild `p2_race_cockpit.jpg`.
+
+### Messwerte nach Phase 2 (Meshes / Dreiecke; in Klammern die Veränderung gegenüber vorher)
+| Pod | Spieler „Hoch" | Spieler „Ultra" | Gegner nah (unter Ultra) | Gegner nah (Ultra) | fern |
+|---|---|---|---|---|---|
+| Aurora XR-7 | 41 / 42 334 (+7 %) | 41 / 57 170 | 30 / 14 612 (−34 %) | 31 / 40 576 | 3 / 444 |
+| Vrak Splitter-X | 39 / 41 210 (+3 %) | 39 / 55 462 | 28 / 16 052 (−30 %) | 29 / 39 452 | 3 / 492 |
+| Tenroc 6-Fach | 64 / 89 698 (+8 %) | 64 / 119 050 | 29 / 33 016 (−16 %) | 30 / 84 484 | 3 / 884 |
+| Quadra Lumber | 51 / 68 276 (+4 %) | 51 / 89 280 | 27 / 25 018 (−21 %) | 29 / 64 790 | 3 / 536 |
+| Hollo Needle | 38 / 36 314 (+2 %) | 38 / 50 754 | 27 / 12 944 (−36 %) | 28 / 34 556 | 3 / 456 |
+| Tyr Vespa | 40 / 34 454 (−1 %) | 40 / 43 710 | 28 / 12 424 (−36 %) | 30 / 32 696 | 3 / 444 |
+| Beerak Fireflare | 39 / 42 914 (+10 %) | 39 / 57 662 | 28 / 14 688 (−30 %) | 29 / 41 156 | 3 / 444 |
+| Pagali Ironclad | 51 / 62 022 (+1 %) | 51 / 80 194 | 28 / 23 952 (−23 %) | 29 / 58 536 | 3 / 528 |
+| Mak Starling | 39 / 37 670 (+3 %) | 39 / 51 878 | 28 / 12 940 (−38 %) | 29 / 35 912 | 3 / 456 |
+| Mandrel Ram | 41 / 39 670 (+5 %) | 41 / 52 638 | 30 / 14 660 (−30 %) | 31 / 37 912 | 3 / 492 |
+
+### Nicht verifiziert (Phase 2)
+- **Bildrate auf „Ultra"** (Gegner jetzt 33–84 Tsd. Dreiecke je nahem Pod) – bitte am Gaming-PC prüfen.
+- Innenansicht bei Regen/Staub (Partikel können vor Cockpit-Teilen erscheinen, siehe ADR 0003), bei 90°-Rolle und in Tunneln nicht gesichtet.
+- Innenansicht aller 10 Pods nur im Harness (Standbild), im Rennen nur Fireflare.
 
 ### Messwerte vor der Überholung (Meshes / Dreiecke)
 | Pod | Spieler „Hoch" | Spieler „Ultra" | Gegner nah | Gegner fern |

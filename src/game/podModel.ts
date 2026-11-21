@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { PILOTS, type PodDef } from './data';
 import { assembleHero, assembleRival, segFor } from './podAssembly';
+import { LAMP_VERTS } from './podCockpits';
 import {
   binderMaterial, cableFlexMaterial, flameMaterial, hullMaterial, podSharedTime,
   sharedOpponentBinderMaterial, sharedOpponentFlameMaterial, sharedOpponentHullMaterial,
-  sharedPodMaterials, suitMaterial, type FxU, type HullU, petalMaterial } from './podMaterials';
+  sharedPodMaterials, skinMaterial, suitMaterial, type FxU, type HullU, petalMaterial } from './podMaterials';
 
 export interface PodVisual {
   group: THREE.Group;
@@ -20,9 +21,13 @@ export interface PodVisual {
   setEngineMotion: (yL: number, yR: number, pitchL: number, pitchR: number, rollBank: number) => void;
   /** Switches automatic distance LOD & shadow casting on opponent pods (use forceAll=true for shader warmup) */
   setDistance: (dist: number, forceAll?: boolean) => void;
-  /** hero pod: cockpit pendulum offset in body space (cables follow) / hide the cockpit in the first-person view */
+  /** hero pod: cockpit pendulum offset in body space (cables follow) */
   setCockpitSway?: (x: number, y: number, z: number) => void;
-  setCockpitVisible?: (v: boolean) => void;
+  /** hero pod: `true` = cockpit camera. The pilot's body is hidden and the cockpit is enlarged about his eye, so the dashboard,
+   *  frame and his hands stay in view although they sit inside the camera's 0.8 m near plane (the picture is unchanged). */
+  setCockpitView?: (inside: boolean) => void;
+  /** hero pod: world position of the pilot's eye (rides with the cockpit pendulum) */
+  eyeWorld?: (out: THREE.Vector3) => THREE.Vector3;
   dispose: () => void;
 }
 
@@ -46,7 +51,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
   const shared = sharedPodMaterials(texSize) as Record<string, THREE.Material>;
   const glowCol = new THREE.Color(colors[2]);
   const pilot = PILOTS.find(p => p.id === def.pilotId) ?? PILOTS[0];
-  const suit = suitMaterial(pilot.color);
+  const suit = suitMaterial(pilot.color), skin = skinMaterial(pilot.skin);
 
   const group = new THREE.Group(); const body = new THREE.Group(); group.add(body);
 
@@ -64,7 +69,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     const nearGrp = new THREE.Group(); body.add(nearGrp);
     const addBuckets = (buckets: Map<string, THREE.BufferGeometry>, parent: THREE.Object3D) => {
       for (const [k, mg] of buckets) {
-        const mat = k === 'hull' ? oppHull : k === 'glow' ? oppGlow : k === 'suit' ? suit : shared[k];
+        const mat = k === 'hull' ? oppHull : k === 'glow' ? oppGlow : k === 'suit' ? suit : k === 'skin' ? skin : shared[k];
         if (!mat) continue;
         const m = new THREE.Mesh(mg, mat);
         const fx = k === 'glow' || k === 'glass';
@@ -135,15 +140,17 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
   const cabMat = cableFlexMaterial();
   const cabLift = cabMat.userData.uLift as { value: THREE.Vector2 }; const cabCk = cabMat.userData.uCk as { value: THREE.Vector3 };
   const own: THREE.Material[] = [hullL, hullR, hullC, glow, flameL, coreL, flameR, coreR, cabMat];
-  const matFor = (k: string, hull: THREE.Material) => (k === 'hull' ? hull : k === 'glow' ? glow : k === 'suit' ? suit : shared[k]);
+  const matFor = (k: string, hull: THREE.Material) => (k === 'hull' ? hull : k === 'glow' ? glow : k === 'suit' ? suit : k === 'skin' ? skin : shared[k]);
 
   const addMeshes = (parts: Map<string, THREE.BufferGeometry>, parent: THREE.Object3D, hull: THREE.Material) => {
+    const made: { k: string; m: THREE.Mesh }[] = [];
     for (const [k, g] of parts) {
       const mat = matFor(k, hull); if (!mat) continue;
       const m = new THREE.Mesh(g, mat); const fx = k === 'glow' || k === 'glass';
       m.castShadow = !fx && SHADOW_KEYS.has(k); m.receiveShadow = !fx;
-      if (k === 'glass') m.renderOrder = 1; parent.add(m);
+      if (k === 'glass') m.renderOrder = 1; parent.add(m); made.push({ k, m });
     }
+    return made;
   };
 
   const engines: THREE.Object3D[] = [];
@@ -170,8 +177,18 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     addMeshes(bank.buckets, engGrp, hull);
   }
 
-  // Cockpit + cockpit-mounted extras + GPU-flexing control cables
-  body.add(ckGrp); addMeshes(A.cockpit, ckGrp, hullC);
+  // Cockpit + cockpit-mounted extras + GPU-flexing control cables. `ckView` carries the enlargement of the cockpit camera.
+  const ckView = new THREE.Group(); ckGrp.add(ckView); body.add(ckGrp);
+  const ckMeshes = addMeshes(A.cockpit, ckView, hullC);
+  // three live dash lamps (boost · heat · damage): one small vertex-coloured mesh
+  let lampCol: THREE.BufferAttribute | null = null; const lampNow = new Float32Array(9).fill(-1);
+  if (A.lamps) { const lm = new THREE.Mesh(A.lamps, getOppGlow()); ckView.add(lm); lampCol = A.lamps.attributes.color as THREE.BufferAttribute; }
+  const setLamp = (i: number, r: number, g: number, b: number) => {
+    if (!lampCol || (lampNow[i * 3] === r && lampNow[i * 3 + 1] === g && lampNow[i * 3 + 2] === b)) return;
+    lampNow[i * 3] = r; lampNow[i * 3 + 1] = g; lampNow[i * 3 + 2] = b;
+    for (let v = i * LAMP_VERTS; v < (i + 1) * LAMP_VERTS; v++) lampCol.setXYZ(v, r, g, b);
+    lampCol.needsUpdate = true;
+  };
   const cabMesh = new THREE.Mesh(A.cables, cabMat); cabMesh.castShadow = false; cabMesh.receiveShadow = true; body.add(cabMesh);
 
   let binderU: FxU | null = null; const binderSwap = false;
@@ -180,7 +197,18 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     for (const g of A.binders) { const bm = new THREE.Mesh(g, bMat); bm.renderOrder = 3; body.add(bm); }
   }
   const setCockpitSway = (x: number, y: number, z: number) => { ckGrp.position.set(x, y, z); ckGrp.rotation.z = -x * 0.14; ckGrp.rotation.x = z * 0.07; cabCk.value.set(x, y, z); };
-  const setCockpitVisible = (v: boolean) => { ckGrp.visible = v; };
+  let inside = false;
+  const setCockpitView = (on: boolean) => {
+    if (on === inside) return; inside = on;
+    const kS = on ? A.viewScale : 1;
+    ckView.scale.setScalar(kS); ckView.position.copy(A.eye).multiplyScalar(1 - kS); // p → eye + k·(p − eye)
+    for (const { k, m } of ckMeshes) {
+      const start = A.pilotStart.get(k);
+      if (start !== undefined) { m.geometry.setDrawRange(0, on ? start : Infinity); m.visible = !on || start > 0; } // the pilot's triangles are the last ones
+      if (SHADOW_KEYS.has(k)) m.castShadow = !on; // the enlarged cockpit must not throw an enlarged shadow
+    }
+  };
+  const eyeWorld = (out: THREE.Vector3) => ckGrp.localToWorld(out.copy(A.eye));
 
   const setEngineMotion = (yL: number, yR: number, pitchL: number, pitchR: number, rollBank: number) => {
     if (engines[0]) { engines[0].position.y = heroPivots[0].y + yL; engines[0].rotation.set(pitchL, 0, rollBank * 0.22); }
@@ -230,7 +258,12 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
       binderU.uTime.value = t; binderU.uColor.value.copy(hc);
       binderU.uPower.value = (0.55 + throttle * 0.35 + boost * 0.6) * Math.min(1, Math.min(dmgL, dmgR) * 3);
     }
+    // dash lamps: boost (cyan while boosting) · heat (green → amber → red, blinks near the limit) · damage (worse engine side)
+    const blink = Math.sin(t * 14) > 0 ? 1 : 0.25, hpMin = Math.min(dmgL, dmgR);
+    if (boostK > 0.08) setLamp(0, 0.2, 1.9, 2.6); else setLamp(0, 0.02, 0.12, 0.2);
+    if (heat > 0.85) setLamp(1, 2.6 * blink, 0.16 * blink, 0.05); else if (heat > 0.55) setLamp(1, 2.2, 1.1, 0.08); else setLamp(1, 0.12, 1.3, 0.25);
+    if (hpMin < 0.3) setLamp(2, 2.6 * blink, 0.14 * blink, 0.06); else if (hpMin < 0.6) setLamp(2, 2.2, 1.1, 0.08); else setLamp(2, 0.12, 1.3, 0.25);
   };
   const dispose = () => { own.forEach(m => m.dispose()); A.owned.forEach(g => g.dispose()); };
-  return { group, body, engines, exhaustLocal: A.exhaustLocal, eye: A.eye, hood: A.hood, update, setEngineMotion, setDistance: () => {}, setCockpitSway, setCockpitVisible, dispose };
+  return { group, body, engines, exhaustLocal: A.exhaustLocal, eye: A.eye, hood: A.hood, update, setEngineMotion, setDistance: () => {}, setCockpitSway, setCockpitView, eyeWorld, dispose };
 }

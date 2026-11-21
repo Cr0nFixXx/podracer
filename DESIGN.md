@@ -35,6 +35,27 @@ Schwarz/Dunkelbraun, Glas-Panels, Amber-Akzent (`#ffb040`), Orbitron + Rajdhani,
 | Vulkanwelt | `lava` (Pahoehoe-Stricke + Schlackeporen) | Basaltsäulen, Lavakrusten, treibendes Magmameer, glühende Schlucht-Lavafälle |
 | Kristall / Aquilaris | `crystal` / `beach` | Kristall-Spaltstufen / Atoll-Inseln, Felsnadeln, Uferschaum, Küsten-Wasserfälle |
 
+## Racer: eigene Cockpits, Innenansicht, Detailstufen (Session 20)
+Leitidee: **Jeder Racer ist an seinem Cockpit erkennbar – auch als Silhouette.** Form zuerst, Kleinteile danach; kein Cockpit teilt sich mehr Wanne, Scheibe oder Heck mit einem anderen.
+
+| Racer | Cockpit | Erkennungszeichen |
+|---|---|---|
+| Aurora XR-7 | schlanker Renn-Tropfen | flache Rundum-Scheibe, zwei Kopfstützen-Höcker, Canards wie die Triebwerksflügel, Kreisel-Stabilisator am Heck |
+| Vrak Splitter-X | gepanzerter Kriegsschlitten | Überrollkäfig, Panzerblende mit Sehschlitz, Stoßzähne, zwei Auspuffrohre |
+| Tenroc 6-Fach | lange Spindel | Glaskuppel, sechsarmiger Kabelverteiler („Spinne"), Fühler-Antennen |
+| Quadra Lumber | fliegende Untertasse | volle Glaskuppel, vier Ausleger wie das Blitz-X, Lichtring am Bauch |
+| Hollo Needle | Wurfpfeil | lange Nasensonde, hohe Finne, liegender Pilot unter schmaler Haube |
+| Tyr Vespa | Wespen-Scooter | offener Sattelrahmen mit Lenker, gestreifter Hinterleib, Stachel |
+| Beerak Fireflare | Kühler-Cockpit | Kiemen-Radiatoren an den Flanken, Kupferleitungen, Tanks und Schlote am Heck |
+| Pagali Ironclad | Panzerturm | genietete Platten, Sehschlitze, aufgeklappte Luke, Stoßstangen |
+| Mak Starling | Vogel | Schnabel, gepfeilte Schwingen, lange Rückenfinne, gespreizte Heck-Bremsklappen |
+| Mandrel Ram | Planierraupe | V-Rammbug mit Warnstreifen und Räumgitter, Hydraulikstempel, Käfig |
+
+- **Innenansicht (Kamera „Cockpit"):** man sitzt im Pod. Unteres Bilddrittel = Armaturenbrett (Rundinstrumente mit Zeiger, Balkenanzeigen, drei Warnlampen Boost · Hitze · Schaden), darüber Scheibenrahmen bzw. Käfig, voraus Triebwerke, Kabel und Blitz. Kopf und Rumpf des Piloten sind ausgeblendet, Unterarme und Hände an den Hebeln bleiben. Der Blick auf die Strecke bleibt frei: nichts Massives auf Augenhöhe (Panzerblenden lassen einen Sehschlitz). Die freie Sicht ohne Cockpit ist die Kamera „Motorhaube".
+- **Triebwerke:** Einspritzring an der Düse, Verteilerkästen mit Statuslicht, Leitbleche an den Flanken, Griffbügel, Bremsklappen-Stempel; dazu je Pod ein eigener Anbausatz (Flügel-Endkappen, Ansaugdorne, Kühlschleifen, Rammringe, Schwanzfedern …).
+- **Detailstufen:** Spieler-Pod immer voll; Gegner unter „Ultra" mit leichtem Cockpit (Silhouette + einfacher Pilot) und damit leichter als vor der Überholung; auf „Ultra" (Ziel: Gaming-PC) nahe Gegner mit vollen Details. Fern-LOD zeigt die Cockpit-Grundform (Kiste, Scheibe, Finne, Käfig) und jeden Energieblitz.
+- **Piloten:** Hautfarbe je Spezies, Kragenring, Schulterpolster, Brustgerät.
+
 ## Überführungen, Schleusen, verzweigte Höhlen, Blitze & Pods (Session 19)
 - **Über-/Unterführungen:** Wo sich eine Strecke kreuzt (≥ 35 m Höhenabstand), trägt die obere Piste einen abgeschrägten Stahl-Hohlkasten mit Querträgern, seitlichen Leuchtstreifen, Widerlagern und Zwillingspfeilern; die untere führt durch einen 20-m-Unterführungstunnel oder frei unter dem Viadukt hindurch. Auf Karte und Minimap hebt eine dunkle Kontur die Brücke ab.
 - **Futuristische Schleusen (statt Fallgitter):** 3-spurige Panzerschleuse mit Überkopf-Kammer, hydraulischen Verbund-Schotts, Plasma-Dichtnaht und dezentem Warn-Energiefeld; seitlich wachsen Fels-, Gletscher-, Kristall- oder Stations-Monolithen organisch in die Landschaft.

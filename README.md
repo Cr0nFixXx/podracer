@@ -28,7 +28,7 @@ npm run build    # erzeugt dist/index.html (alles inline, offline lauffähig)
 | Ansicht wechseln | `C` | Y |
 | Pause | `Esc` / `P` | Start |
 
-In der Ansicht „Cockpit" (`C`) blickt man ohne Cockpit-Rahmen frei über die Triebwerke.
+In der Ansicht „Cockpit" (`C`) sitzt man im Pod und sieht das eigene Cockpit von innen: Armaturenbrett mit drei Warnlampen (Boost, Hitze, Schaden), Scheibenrahmen und die Hände des Piloten – bei jedem Racer anders. Die freie Sicht über die Triebwerke bietet weiterhin die Ansicht „Motorhaube".
 
 **Gamepad ändern:** Einstellungen → Steuerung → Abschnitt „Gamepad": Aktion anklicken, dann Taste drücken oder Stick bewegen. „Standard" stellt die Belegung aus der Tabelle wieder her.
 
@@ -108,7 +108,8 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 - **Über-/Unterführungen & Steigungen (neu):** 10 Strecken kreuzen sich auf Hohlkasten-Viaduktbrücken und durch Unterführungstunnel (35–41 m Höhenabstand); alle 13 Strecken bieten lange Anstiege/Gefälle sowie überhöhte Kurven (bis ca. 21°).
 - **Bedienoberfläche:** alle Menüs haben dieselbe Schriftgröße und wachsen mit dem Fenster (Bezugsgröße 1180 × 720); keine Scrollbalken. In der Streckenwahl filtert ein Auswahlfeld nach Planet; die Karte markiert Brücken und Höhlenabzweige.
 - **Schnellere Folgestarts:** berechnete Texturen werden im Browser gespeichert (IndexedDB); ab dem zweiten Start einer Welt entfällt die Berechnung. `?nocache` an der Adresse schaltet das ab.
-- **Hangar & Podracer (neu):** 6 Lackiermuster (Klassik, Streifen, Flammen, Rennringe, Chevron, Rallye), 3 Finishes (Klarlack, Metallic, Matt) und 8 Vorlagen neben freier Farbwahl; individuelle Piloten-Spezies, seitengetrennte lose Schadensklappen und Hitzeflimmern auch hinter Gegner-Pods.
+- **Eigene Cockpits (neu):** jeder Racer hat ein unverwechselbares Cockpit – Renn-Tropfen mit Kreisel-Stabilisator (Aurora XR-7), gepanzerter Kriegsschlitten mit Überrollkäfig und Stoßzähnen (Vrak Splitter-X), Spindel mit Kuppel und sechsarmigem Kabelverteiler (Tenroc 6-Fach), fliegende Untertasse (Quadra Lumber), Wurfpfeil mit liegendem Piloten (Hollo Needle), Wespen-Scooter mit Lenker und Stachel (Tyr Vespa), Kühler-Cockpit mit Kiemen und Tanks (Beerak Fireflare), Panzerturm mit offener Luke (Pagali Ironclad), Vogel mit Schwingen und Rückenfinne (Mak Starling), Planierraupe mit Rammbug (Mandrel Ram). Dazu mehr Triebwerksdetails, eigene Anbauteile je Pod und Piloten mit eigener Hautfarbe.
+- **Hangar & Podracer:** 6 Lackiermuster (Klassik, Streifen, Flammen, Rennringe, Chevron, Rallye), 3 Finishes (Klarlack, Metallic, Matt) und 8 Vorlagen neben freier Farbwahl; individuelle Piloten-Spezies, seitengetrennte lose Schadensklappen und Hitzeflimmern auch hinter Gegner-Pods.
 - **Größere Strecken:** alle 13 Kurse sind 7–16 km lang, mit S-Kurven, zwei weiten offenen Flächen je Strecke (bis über 100 m breit) und hohen Tunneln (19,5–22,5 m).
 - **Verzweigte Höhlensysteme (neu):** auf Vulkanwelt (5 Kammern, 2 Gabelungen), Ando Prime, Kristallschluchten und Dschungelmond – bis 38 m hohe, verbreiterte Kammern mit Höhlenboden, Lichtschächten, Felssäulen, Leuchtadern und wieder zusammenführenden Seitenröhren.
 - **HQ-Vegetation und echte Texturen:** Urwaldbäume mit Blattwerk aus einzelnen Zweigen und fotografierter Rinde; Fels, Sand und Waldboden tragen Detail aus echten Fotos.

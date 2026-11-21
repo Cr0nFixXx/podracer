@@ -6,6 +6,7 @@
 import * as THREE from 'three/webgpu';
 import { PODS, THEMES } from '../../src/game/data';
 import { buildPodModel, type PodVisual } from '../../src/game/podModel';
+import { podLayout } from '../../src/game/podLayouts';
 import { makeSky } from '../../src/game/sky';
 const W = 1280, H = 720;
 const FORCE_WEBGL = location.search.includes('webgl');
@@ -65,19 +66,22 @@ win.show = async (idx: number, dmg = 1, quality = 3, o: ShowOpts = {}) => {
 /** One cell per pod. `view`: 'pod' whole pod ¾ · 'front' / 'rear' / 'side' cockpit close-ups · 'inside' from the pilot's eye. */
 type SheetView = 'pod' | 'front' | 'rear' | 'side' | 'inside';
 async function sheet(view: SheetView, o: ShowOpts & { health?: number } = {}) {
-  const n = PODS.length, cols = n <= 10 ? 5 : Math.ceil(n / 3), rows = Math.ceil(n / cols); const w = W / cols, h = H / rows; cam.aspect = w / h; cam.updateProjectionMatrix(); r.setScissorTest(true);
+  const n = PODS.length, cols = n <= 10 ? 5 : Math.ceil(n / 3), rows = Math.ceil(n / cols); const w = W / cols, h = H / rows; cam.aspect = w / h;
+  cam.fov = view === 'inside' ? 79 : 40; cam.near = view === 'inside' ? 0.8 : 0.1; cam.updateProjectionMatrix(); r.setScissorTest(true);
   const boost = o.boost ?? location.search.includes('boost'), hp = o.health ?? 1;
   const half = Math.min(THREE.MathUtils.degToRad(cam.fov / 2), Math.atan(Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * cam.aspect)); // tighter of the vertical / horizontal half angle
   let tris = 0;
   for (let i = 0; i < n; i++) {
     if (pod) { scene.remove(pod.group); pod.dispose(); }
     pod = build(i, o.quality ?? 2, !!o.rival); scene.add(pod.group); pod.update(2, 1, boost ? 1 : 0, 0, hp, hp, hp < 1 ? 0.9 : 0.2); pod.group.updateMatrixWorld(true);
-    const ck = pod.body.localToWorld(pod.eye.clone().add(new THREE.Vector3(0, -0.75, -0.45))); // ≈ cockpit centre (eye = head + small offset)
+    const Lc = podLayout(PODS[i]).cockpit; const ck = pod.body.localToWorld(new THREE.Vector3(0, Lc.y + 0.12, Lc.z)); // cockpit centre
     if (view === 'pod') {
       const sph = new THREE.Box3().setFromObject(pod.group).getBoundingSphere(new THREE.Sphere()); const d = sph.radius / Math.sin(half) * 0.92;
       cam.position.copy(sph.center).add(new THREE.Vector3(0.66, 0.42, 0.5).normalize().multiplyScalar(d)); cam.lookAt(sph.center);
-    } else if (view === 'inside') {
-      const e = pod.body.localToWorld(pod.eye.clone()); cam.position.copy(e); cam.lookAt(e.x, e.y - 0.35, e.z + 60);
+    } else if (view === 'inside') { // exactly the game's cockpit camera: pilot's eye, 79° field of view, 0.8 m near plane
+      pod.setCockpitView?.(true); pod.group.updateMatrixWorld(true);
+      const e = pod.eyeWorld ? pod.eyeWorld(new THREE.Vector3()) : pod.body.localToWorld(pod.eye.clone());
+      cam.position.copy(e); cam.lookAt(e.x, e.y - 3.2, e.z + 60);
     } else {
       const dir = view === 'front' ? new THREE.Vector3(0.55, 0.42, 0.72) : view === 'rear' ? new THREE.Vector3(-0.6, 0.45, -0.66) : new THREE.Vector3(1, 0.16, 0.05);
       cam.position.copy(ck).add(dir.normalize().multiplyScalar(2.6 / Math.sin(half) * 0.8)); cam.lookAt(ck);
@@ -86,6 +90,7 @@ async function sheet(view: SheetView, o: ShowOpts & { health?: number } = {}) {
     const x = (i % cols) * w, y = Math.floor(i / cols) * h; r.setViewport(x, y, w, h); r.setScissor(x, y, w, h); await r.renderAsync(scene, cam); tris += r.info.render.triangles;
   }
   const saved = await saveFrame(o.save);
+  cam.fov = 40; cam.near = 0.1; cam.updateProjectionMatrix();
   return `${view} sheet, ${n} pods${o.rival ? ' (rival)' : ''} tris(sum incl shadow)=${tris}${saved}`;
 }
 win.grid = (o: ShowOpts = {}) => sheet('pod', o);

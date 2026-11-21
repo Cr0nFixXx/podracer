@@ -34640,10 +34640,10 @@ function detailNormalTexture(kind) {
           const wp = N3.fbm(u, v, 3, 3) * 1.6;
           const swash = Math.sin((u * 10 + v * 10 + wp) * Math.PI * 2) * 0.5 + 0.5;
           N3.worley(u, v, 52, w);
-          const shell = (1 - sstep(0.04, 0.2, w[0])) * (w[2] > 0.85 ? 1 : 0);
+          const shell2 = (1 - sstep(0.04, 0.2, w[0])) * (w[2] > 0.85 ? 1 : 0);
           const f = N3.fbm(u, v, 24, 3);
-          h = swash * 0.46 + f * 0.3 + shell * 0.28;
-          a = clamp01(0.48 + swash * 0.16 + shell * 0.32 + (f - 0.5) * 0.22);
+          h = swash * 0.46 + f * 0.3 + shell2 * 0.28;
+          a = clamp01(0.48 + swash * 0.16 + shell2 * 0.32 + (f - 0.5) * 0.22);
           break;
         }
         default: {
@@ -88419,10 +88419,10 @@ function buildTrack(def) {
         }
         if (best < 0) continue;
         dip(best, LEN, DEPTH, EASE);
-        const gap = 18, part3 = (LEN - 48 - gap * (CH - 1)) / CH;
+        const gap = 18, part4 = (LEN - 48 - gap * (CH - 1)) / CH;
         const chSpans = [];
         for (let c = 0; c < CH; c++) {
-          const a = 24 + Math.round(c * (part3 + gap)), b = a + Math.round(part3), hi = 8.5 + rt() * 7.5, wi = 6.5 + rt() * 5.5;
+          const a = 24 + Math.round(c * (part4 + gap)), b = a + Math.round(part4), hi = 8.5 + rt() * 7.5, wi = 6.5 + rt() * 5.5;
           chSpans.push([best + a, best + b]);
           for (let k = a; k <= b; k++) {
             const q = W2(best + k), t = (k - a) / (b - a), sn = Math.sin(Math.PI * t), s2 = sn * sn;
@@ -88430,7 +88430,7 @@ function buildTrack(def) {
             q.tun = 3;
             q.caveW = wi * s2;
           }
-          cavePillars.push([best + Math.round((a + b) / 2 + (rt() - 0.5) * part3 * 0.28), (c % 2 ? 1 : -1) * (0.28 + rt() * 0.18)]);
+          cavePillars.push([best + Math.round((a + b) / 2 + (rt() - 0.5) * part4 * 0.28), (c % 2 ? 1 : -1) * (0.28 + rt() * 0.18)]);
         }
         const tryCaveBranch = (c0, c1) => {
           if (c0 < 0 || c1 >= chSpans.length || c1 <= c0) return false;
@@ -89377,17 +89377,17 @@ function sectionPoint(s, phi) {
   }
   return [x, y + (s.y ?? 0)];
 }
-function loft(sections2, seg, mode = 0, caps = [true, true], inward = false) {
-  const R = sections2.length, cols = seg + 1;
+function loft(sections, seg, mode = 0, caps = [true, true], inward = false) {
+  const R = sections.length, cols = seg + 1;
   const pos = new Float32Array(R * cols * 3), uv11 = new Float32Array(R * cols * 2), liv = new Float32Array(R * cols * 3);
-  const z0 = sections2[0].z, z1 = sections2[R - 1].z;
+  const z0 = sections[0].z, z1 = sections[R - 1].z;
   const zr = Math.max(1e-4, z1 - z0);
   let vAcc = 0;
   for (let j = 0; j < R; j++) {
-    const s = sections2[j];
+    const s = sections[j];
     const gap = (s.open ?? 0) * Math.PI;
     if (j > 0) {
-      const p = sections2[j - 1];
+      const p = sections[j - 1];
       vAcc += Math.hypot(s.z - p.z, (s.y ?? 0) - (p.y ?? 0), (s.hT - p.hT) * 0.5);
     }
     let uAcc = 0;
@@ -89423,7 +89423,7 @@ function loft(sections2, seg, mode = 0, caps = [true, true], inward = false) {
   g2.computeVertexNormals();
   const nrm = g2.attributes.normal;
   for (let j = 0; j < R; j++) {
-    if ((sections2[j].open ?? 0) > 0) continue;
+    if ((sections[j].open ?? 0) > 0) continue;
     const a = j * cols, b = j * cols + seg;
     const nx = nrm.getX(a) + nrm.getX(b), ny = nrm.getY(a) + nrm.getY(b), nz = nrm.getZ(a) + nrm.getZ(b);
     const l = Math.hypot(nx, ny, nz) || 1;
@@ -89433,7 +89433,7 @@ function loft(sections2, seg, mode = 0, caps = [true, true], inward = false) {
   const parts = [g2];
   caps.forEach((on, ci) => {
     if (!on) return;
-    const s = sections2[ci === 0 ? 0 : R - 1];
+    const s = sections[ci === 0 ? 0 : R - 1];
     if (s.w < 0.01 && s.hT < 0.01) return;
     const cp = [], cu = [], ci2 = [], cn = [], cl = [];
     const dir = (ci === 0 ? -1 : 1) * (inward ? -1 : 1);
@@ -89662,9 +89662,9 @@ function engineGeo(spec2, seg) {
     let rmax = 0;
     for (let s = a0; s <= a1; s += 0.02) rmax = Math.max(rmax, bodyR(s));
     const r0 = rmax * R + 0.01, r1 = r0 + (style === "heavy" ? 0.06 : 0.035) * R;
-    const plate = prof([[r1, Z(a0), 1], [r1, Z(a1), 1], [r0, Z(a1), 1], [r0, Z(a0), 1], [r1, Z(a0), 1]]);
+    const plate2 = prof([[r1, Z(a0), 1], [r1, Z(a1), 1], [r0, Z(a1), 1], [r0, Z(a0), 1], [r1, Z(a0), 1]]);
     const span = style === "heavy" ? 1.1 : 0.8;
-    for (const c of [Math.PI / 2, Math.PI * 1.5]) pb.add("hull", lathe(plate, Math.max(6, Math.round(seg * 0.2)), 3, c - span / 2, span));
+    for (const c of [Math.PI / 2, Math.PI * 1.5]) pb.add("hull", lathe(plate2, Math.max(6, Math.round(seg * 0.2)), 3, c - span / 2, span));
     if (detailHi) for (const sd of [-1, 1]) for (let s = a0 + 0.04; s < a1 - 0.01; s += 0.08) for (const dy of [-0.3, 0.3]) {
       pb.add("chrome", cyl(0.018 * R, 0.018 * R, 0.02 * R, 6), M4.trs(sd * (r1 + 5e-3) * Math.cos(dy), r1 * Math.sin(dy), Z(s), 0, 0, Math.PI / 2));
     }
@@ -89711,6 +89711,35 @@ function engineGeo(spec2, seg) {
     pb.add("dark", cyl(0.15 * R, 0.19 * R, 0.1 * R, 10), M4.trs(sd * (cR + 0.02 * R), 0.2 * R, Z(0.62), 0, 0, sd * -Math.PI / 2));
     pb.add("copper", torus(0.13 * R, 0.024 * R, 5, 12), M4.trs(sd * (cR + 0.06 * R), 0.2 * R, Z(0.62), 0, Math.PI / 2, 0));
     pb.add("glow", sphere(0.075 * R, 8, 6), M4.t(sd * (cR + 0.075 * R), 0.2 * R, Z(0.62)));
+  }
+  if (detailHi) {
+    pb.add("copper", radial(() => cyl(0.014 * R, 0.022 * R, 0.07 * R, 6).rotateX(Math.PI / 2).translate(0, 0.705 * R, Z(0.085)), 12));
+    for (const tt of [0.3, 0.76]) {
+      const r = bodyR(tt) * R;
+      pb.add("steel", rbox(0.2 * R, 0.07 * R, 0.16 * R + 0.06, 0.012), M4.t(0, r + 0.03 * R, Z(tt)));
+      pb.add("glow", sphere(0.018 * R + 8e-3, 6, 4), M4.t(0.06 * R, r + 0.075 * R, Z(tt)));
+    }
+    pb.add("dark", tube([new Vector3(0, bodyR(0.3) * R + 0.05 * R, Z(0.3)), new Vector3(0.06 * R, bodyR(0.45) * R + 0.07 * R, Z(0.45)), new Vector3(0, topR + 0.06, Z(0.56))], 0.014 * R + 6e-3, 8, 5));
+    for (const sd of [-1, 1]) {
+      const a = sd * 2.25, r = bodyR(0.45) * R + 0.035 * R;
+      pb.add("hull", rbox(0.02 * R + 8e-3, 0.09 * R, 0.36 * L, 4e-3), M4.trs(Math.sin(a) * r, Math.cos(a) * r, Z(0.47), 0, 0, -a), [0, 0, 3]);
+      const h = sd * 0.52, rh = bodyR(0.42) * R;
+      pb.add("chrome", torus(0.05 * R + 0.03, 8e-3 * R + 5e-3, 5, 8, Math.PI), M4.trs(Math.sin(h) * rh, Math.cos(h) * rh, Z(0.42), 0, Math.PI / 2, -h));
+    }
+    {
+      const fr = bodyR(0.5) * R;
+      for (const sd of [-1, 1]) {
+        pb.add("dark", cyl(0.03 * R, 0.03 * R, 0.13 * L, 6).rotateX(Math.PI / 2), M4.t(sd * (fr + 0.02 * R), -0.2 * R, Z(0.55)));
+        pb.add("chrome", cyl(0.015 * R, 0.015 * R, 0.1 * L, 5).rotateX(Math.PI / 2), M4.t(sd * (fr + 0.02 * R), -0.2 * R, Z(0.45)));
+      }
+    }
+    if (seg >= 40) {
+      pb.add("dark", radial(() => cyl(4e-3 * R + 3e-3, 4e-3 * R + 3e-3, 0.12 * R + 0.05, 4).rotateX(Math.PI / 2).translate(0, 0.76 * R, Z(0) - 0.05 * R), 6, 0.4));
+      bandTs.forEach((tb, i) => {
+        if (tb > bodyEnd - 0.04 || i % 2 === 0) return;
+        pb.add("chrome", boltRing(bodyR(tb) * 0.955 * R + 0.035 * R, Math.round(seg * 0.45), 0.018 * R, Z(tb), true));
+      });
+    }
   }
   if (split2) {
     const petal = prof([[rf * 1.02 * R, Z(bodyEnd), 1], [rf * 1.06 * R, Z(0.9)], [rf * 1.05 * R, Z(0.98)], [rf * 0.98 * R, Z(1), 1], [rf * 0.93 * R, Z(1), 1], [rf * 0.95 * R, Z(bodyEnd), 1], [rf * 1.02 * R, Z(bodyEnd)]]);
@@ -89784,6 +89813,13 @@ var V = (x, y, z) => new Vector3(x, y, z);
 var spec = (L, R, style, bands, blades2, spike = true, fins = 0) => ({ L, R, style, bands, blades: blades2, spike, fins });
 var pair = (s, sp, y, z) => [{ spec: s, x: -sp, y, z }, { spec: s, x: sp, y, z }];
 var MAIN = [{ a: 0, b: 1 }];
+var SEC = [0, 0, 3];
+var SIDES = [-1, 1];
+var plate = (pts, t) => {
+  const g2 = extrude(pts, t, Math.min(0.012, t * 0.3));
+  g2.rotateY(-Math.PI / 2);
+  return g2;
+};
 var LAYOUTS = {
   aurora: () => {
     const s = spec(9, 1.15, "turbine", 6, 18);
@@ -89792,14 +89828,21 @@ var LAYOUTS = {
       cockpit: { style: "pod", hw: 0.95, len: 3.4, y: 0.1, z: -6, pilot: 1 },
       binders: MAIN,
       livery: 0,
-      engineExtras: (pb) => {
-        for (const sd of [-1, 1]) for (const s2 of [-1, 1]) {
-          pb.add("hull", rbox(0.95, 0.08, 8.2, 0.03), M4.trs(sd * 2.5 + s2 * 1.5, -0.32, 4, 0, 0, s2 * -0.12), [0, 0, 3]);
-          pb.add("steel", rbox(0.06, 0.12, 8.3, 0.02), M4.trs(sd * 2.5 + s2 * 1.97, -0.38, 4, 0, 0, s2 * -0.12));
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) for (const s2 of SIDES) {
+          const cx = sd * 2.5 + s2 * 1.5, tip = sd * 2.5 + s2 * 1.97;
+          pb.add("hull", rbox(0.95, 0.08, 8.2, 0.03), M4.trs(cx, -0.32, 4, 0, 0, s2 * -0.12), SEC);
+          pb.add("steel", rbox(0.06, 0.12, 8.3, 0.02), M4.trs(tip, -0.38, 4, 0, 0, s2 * -0.12));
+          pb.add("dark", lathe(prof([[0, -0.5], [0.07, -0.3], [0.08, 0.3], [0, 0.56]]), hi ? 10 : 6, 0), M4.t(tip, -0.34, 7.9));
+          pb.add("glow", sphere(0.05, 6, 4), M4.t(tip, -0.34, 8.47));
+          if (hi) {
+            for (let i = 0; i < 5; i++) pb.add("steel", rbox(0.016, 0.07, 0.2, 4e-3), M4.trs(cx, -0.25, 1.4 + i * 1.3, 0, s2 * 0.3, s2 * -0.12));
+            for (const z of [1.6, 6.4]) pb.add("steel", tube([V(sd * 2.5 + s2 * 0.86, -0.72, z), V(cx, -0.38, z)], 0.035, 2, 5));
+          }
         }
       },
       // the wing plates reach further out and lower than the turbines
-      extraCircles: [-1, 1].flatMap((sd) => [2.5, -2.5].map((f) => ({ x: sd * 4, z: 4 + f, r: 0.6, side: sd }))),
+      extraCircles: SIDES.flatMap((sd) => [2.5, -2.5].map((f) => ({ x: sd * 4, z: 4 + f, r: 0.6, side: sd }))),
       envelope: { outerX: 4.45, minY: -0.62 }
     };
   },
@@ -89807,14 +89850,20 @@ var LAYOUTS = {
     const s = spec(8, 1.5, "split", 7, 20, false);
     return {
       engines: pair(s, 2.4, 0, 2),
-      cockpit: { style: "wedge", hw: 1.1, len: 3, y: 0.25, z: -9, pilot: 1.05 },
+      cockpit: { style: "wedge", hw: 1.1, len: 3, y: 0.25, z: -9, pilot: 1.05, far: "cage" },
       binders: MAIN,
       livery: 2,
-      engineExtras: (pb) => {
-        const fin = extrude([[0, 0], [2.2, 0], [2.7, 2.7], [1.6, 2.7]], 0.12, 0.03);
-        fin.rotateY(Math.PI / 2);
-        pb.add("hull", fin, M4.t(-2.4, 1.45, 1.2), [0, 0, 3]);
+      engineExtras: (pb, _L, hi) => {
+        const fin2 = extrude([[0, 0], [2.2, 0], [2.7, 2.7], [1.6, 2.7]], 0.12, 0.03);
+        fin2.rotateY(Math.PI / 2);
+        pb.add("hull", fin2, M4.t(-2.4, 1.45, 1.2), SEC);
         pb.add("steel", rbox(0.3, 0.4, 1.6, 0.05), M4.t(-2.4, 1.6, 0.2));
+        for (const sd of SIDES) {
+          for (const [ax, ay] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) pb.add("chrome", lathe(prof([[0.085, 0], [0.05, 0.35], [0, 0.9]]), hi ? 8 : 5, 0), M4.trs(sd * 2.4 + ax * 1, ay * 1, 5.25, ay * -0.16, ax * 0.16, 0));
+          pb.add("dark", rbox(1.5, 0.07, 3, 0.025), M4.t(sd * 2.4, -1.6, 1.6));
+          if (hi) for (const z of [0.4, 2.8]) pb.add("steel", rbox(1.56, 0.1, 0.12, 0.02), M4.t(sd * 2.4, -1.61, z));
+        }
+        pb.add("hull", plate([[0, 0], [1.3, 0], [0.5, 0.8], [0.1, 0.84]], 0.08), M4.t(2.4, 1.46, 0.2), SEC);
       }
     };
   },
@@ -89825,10 +89874,16 @@ var LAYOUTS = {
       cockpit: { style: "long", hw: 0.75, len: 3.6, y: 0, z: -7, pilot: 0.95 },
       binders: MAIN,
       livery: 1,
-      engineExtras: (pb) => {
-        for (const sd of [-1, 1]) {
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
           pb.add("steel", tube([V(sd * 1.6, 0.7, 3.4), V(sd * 2.05, 1.3, 3.7), V(sd * 2.5, 2.1, 4)], 0.07, 12, 8));
           pb.add("steel", tube([V(sd * 3.4, 0.7, 3.4), V(sd * 2.95, 1.3, 3.7), V(sd * 2.5, 2.1, 4)], 0.07, 12, 8));
+          pb.add("steel", tube([V(sd * 1.6, 0.7, 1.2), V(sd * 2.5, 1, 1.7), V(sd * 3.4, 0.7, 1.2)], 0.06, hi ? 10 : 5, 6));
+          pb.add("copper", tube([V(sd * 1.6, 0.86, 0.5), V(sd * 2.5, 1.26, 0.9), V(sd * 2.5, 2.3, 1.5)], 0.05, hi ? 12 : 6, 6));
+          pb.add("copper", tube([V(sd * 3.4, 0.86, 0.5), V(sd * 2.9, 1.1, 0.75), V(sd * 2.5, 1.26, 0.9)], 0.05, hi ? 8 : 4, 6));
+          pb.add("dark", sphere(0.14, hi ? 10 : 6, hi ? 8 : 4), M4.t(sd * 2.5, 1.26, 0.9));
+          pb.add("steel", tube([V(sd * 1.6, -0.2, 5), V(sd * 3.4, -0.2, 5)], 0.05, 2, 6));
+          if (hi) for (const x of [1.6, 3.4]) pb.add("chrome", torus(0.09, 0.02, 5, 10), M4.trs(sd * x, 0.82, 0.5, Math.PI / 2, 0, 0));
         }
       }
     };
@@ -89837,37 +89892,96 @@ var LAYOUTS = {
     const s = spec(7.6, 0.66, "ring", 5, 12);
     return {
       engines: [{ spec: s, x: -2.3, y: -0.35, z: 3 }, { spec: s, x: 2.3, y: -0.35, z: 3 }, { spec: s, x: -2.3, y: 2.05, z: 3 }, { spec: s, x: 2.3, y: 2.05, z: 3 }],
-      cockpit: { style: "saucer", hw: 1, len: 2.4, y: 0.2, z: -6, pilot: 0.95 },
+      cockpit: { style: "saucer", hw: 1, len: 2.4, y: 0.2, z: -6, pilot: 0.95, far: "disc" },
       binders: [{ a: 0, b: 3 }, { a: 2, b: 1 }],
       livery: 3,
-      engineExtras: (pb) => {
-        for (const sd of [-1, 1]) for (const z of [1, 4.8]) pb.add("steel", tube([V(sd * 2.3, 0.35, z), V(sd * 2.3, 1.35, z)], 0.08, 4, 6));
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
+          for (const z of [1, 4.8]) pb.add("steel", tube([V(sd * 2.3, 0.35, z), V(sd * 2.3, 1.35, z)], 0.08, 4, 6));
+          pb.add("steel", tube([V(sd * 2.3, 0.34, 1), V(sd * 2.3, 1.36, 4.8)], 0.035, 2, 5));
+          pb.add("steel", tube([V(sd * 2.3, 1.36, 1), V(sd * 2.3, 0.34, 4.8)], 0.035, 2, 5));
+          for (const y of [-0.35, 2.05]) {
+            pb.add("chrome", lathe(prof([[0.06, 0], [0.035, 0.3], [0, 0.62]]), hi ? 8 : 5, 0), M4.trs(sd * (2.3 - 0.6), y + 0.13, 3.91, 0, sd * -Math.PI / 2, 0));
+            if (hi) pb.add("copper", torus(0.1, 0.022, 5, 12), M4.trs(sd * (2.3 - 0.7), y + 0.13, 3.91, 0, Math.PI / 2, 0));
+          }
+        }
       }
     };
   },
   mavik: () => {
     const s = spec(8, 0.62, "needle", 6, 10);
-    return { engines: pair(s, 1.7, 0, 3), cockpit: { style: "pod", hw: 0.72, len: 2.5, y: -0.05, z: -5.5, pilot: 0.92 }, binders: MAIN, livery: 1 };
+    return {
+      engines: pair(s, 1.7, 0, 3),
+      cockpit: { style: "pod", hw: 0.72, len: 2.5, y: -0.05, z: -5.5, pilot: 0.92, far: "fin" },
+      binders: MAIN,
+      livery: 1,
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
+          for (const a of [1.05, -1.05]) pb.add("hull", plate([[0, 0], [0.9, 0], [0.1, 0.5], [-0.12, 0.5]], 0.035), M4.trs(sd * 1.7 + Math.sin(a) * 0.56, Math.cos(a) * 0.56, 5.3, 0, 0, -a), SEC);
+          pb.add("chrome", tube([V(sd * 2.34, 0.06, 4.6), V(sd * 2.36, 0.06, 8.2)], 0.018, 2, 5));
+          pb.add("dark", cyl(0.04, 0.04, 0.2, 6), M4.trs(sd * 2.3, 0.06, 4.7, 0, 0, Math.PI / 2));
+          pb.add("hull", plate([[0, 0], [1.7, 0], [1.3, -0.16], [0.2, -0.16]], 0.03), M4.t(sd * 1.7, -0.6, 0.6), SEC);
+          if (hi) pb.add("glow", sphere(0.03, 6, 4), M4.t(sd * 2.36, 0.06, 8.24));
+        }
+      }
+    };
   },
   rattis: () => {
     const s = spec(6, 0.85, "blade", 4, 14);
-    return { engines: pair(s, 1.7, 0, 2.5), cockpit: { style: "wedge", hw: 0.78, len: 2.6, y: -0.1, z: -3.2, pilot: 0.92 }, binders: MAIN, livery: 2 };
+    return {
+      engines: pair(s, 1.7, 0, 2.5),
+      cockpit: { style: "wedge", hw: 0.78, len: 2.6, y: -0.1, z: -3.2, pilot: 0.92, viewScale: 1.9 },
+      binders: MAIN,
+      livery: 2,
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
+          for (const a of SIDES) {
+            pb.add("dark", tube([V(sd * 1.7 + a * 0.2, 0.86, 4.6), V(sd * 1.7 + a * 0.42, 1.3, 5.3), V(sd * 1.7 + a * 0.56, 1.42, 6.1)], 0.018, hi ? 8 : 4, 4));
+            pb.add("glow", sphere(0.035, 6, 4), M4.t(sd * 1.7 + a * 0.56, 1.42, 6.1));
+            pb.add("steel", tube([V(sd * 1.7 + a * 0.42, -0.86, 0.6), V(sd * 1.7 + a * 0.46, -1, 1.4), V(sd * 1.7 + a * 0.46, -1, 3.6), V(sd * 1.7 + a * 0.42, -0.86, 4.4)], 0.035, hi ? 10 : 5, 5));
+          }
+          if (hi) for (const z of [0.9, 1.4]) pb.add("hazard", torus(0.86, 0.035, 5, 20), M4.t(sd * 1.7, 0, z));
+        }
+      }
+    };
   },
   aldo: () => {
     const s = spec(9, 1, "long", 7, 16, true, 6);
-    return { engines: pair(s, 2.3, 0, 3.5), cockpit: { style: "long", hw: 0.85, len: 3.2, y: 0, z: -6, pilot: 1 }, binders: MAIN, livery: 0 };
+    return {
+      engines: pair(s, 2.3, 0, 3.5),
+      cockpit: { style: "long", hw: 0.85, len: 3.2, y: 0, z: -6, pilot: 1 },
+      binders: MAIN,
+      livery: 0,
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
+          const x = sd * 2.3;
+          pb.add("copper", tube([V(x, 1.02, 0.4), V(x + 0.34, 1.4, 1.1), V(x, 1.5, 1.9), V(x - 0.34, 1.4, 2.7), V(x, 1.5, 3.5), V(x + 0.34, 1.4, 4.3), V(x, 1.02, 5)], 0.055, hi ? 26 : 10, 6));
+          pb.add("steel", cyl(0.17, 0.17, 2.2, hi ? 12 : 6).rotateX(Math.PI / 2), M4.t(x, -1, 3.2));
+          for (const z of [2.2, 4.2]) pb.add("dark", sphere(0.17, hi ? 10 : 6, hi ? 6 : 3), M4.t(x, -1, z));
+          for (const a of SIDES) pb.add("hull", plate([[0, 0], [1.4, 0], [1.2, 0.5], [0.1, 0.42]], 0.035), M4.trs(x + a * 0.72, 0.72, -0.9, 0, 0, a * -0.75), SEC);
+          if (hi) {
+            pb.add("glow", rbox(0.03, 0.03, 1.8, 8e-3), M4.t(x, -1.18, 3.2));
+            for (const z of [1.1, 2.7, 4.3]) pb.add("dark", torus(0.075, 0.02, 5, 10), M4.trs(x + (z === 2.7 ? -0.34 : 0.34), 1.4, z, 0, 0, 0));
+          }
+        }
+      }
+    };
   },
   teemo: () => {
     const s = spec(5, 1.25, "heavy", 4, 20, true);
     return {
       engines: [{ spec: s, x: -2.3, y: -0.4, z: 0 }, { spec: s, x: 2.3, y: -0.4, z: 0 }, { spec: s, x: -2.3, y: 1.45, z: 6 }, { spec: s, x: 2.3, y: 1.45, z: 6 }],
-      cockpit: { style: "saucer", hw: 0.82, len: 2.2, y: 0.35, z: -5.5, pilot: 0.95 },
+      cockpit: { style: "saucer", hw: 0.82, len: 2.2, y: 0.35, z: -5.5, pilot: 0.95, far: "disc" },
       binders: MAIN,
       livery: 3,
-      engineExtras: (pb) => {
-        for (const sd of [-1, 1]) {
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
           pb.add("dark", rbox(0.3, 0.3, 3.6, 0.06), M4.trs(sd * 2.3, 0.55, 3, -0.31, 0, 0));
           pb.add("hazard", rbox(0.32, 0.06, 1.2, 0.02), M4.trs(sd * 2.3, 0.73, 3, -0.31, 0, 0));
+          pb.add("steel", rbox(0.07, 1.5, 3.4, 0.025), M4.trs(sd * 3.6, -0.5, 0, 0, 0, sd * 0.08));
+          pb.add("dark", rbox(0.22, 0.22, 3.2, 0.05), M4.trs(sd * 2.3 + sd * 0.7, 0.2, 2.6, -0.31, 0, 0));
+          for (const a of SIDES) pb.add("chrome", lathe(prof([[0.09, 0], [0.05, 0.3], [0, 0.7]]), hi ? 8 : 5, 0), M4.t(sd * 2.3 + a * 0.8, 1.45 + 0.8, 8.3));
+          if (hi) for (let i = 0; i < 5; i++) pb.add("chrome", cyl(0.035, 0.035, 0.03, 6), M4.trs(sd * 3.645, -0.1, -1.4 + i * 0.7, 0, 0, Math.PI / 2));
         }
       }
     };
@@ -89876,13 +89990,20 @@ var LAYOUTS = {
     const s = spec(8.5, 0.78, "needle", 6, 12);
     return {
       engines: pair(s, 2, 0, 3),
-      cockpit: { style: "long", hw: 0.8, len: 3.3, y: 0, z: -6, pilot: 0.95 },
+      cockpit: { style: "long", hw: 0.8, len: 3.3, y: 0, z: -6, pilot: 0.95, topY: 1.42, far: "fin" },
       binders: MAIN,
       livery: 1,
-      cockpitExtras: (pb, L) => {
-        const fin = extrude([[0, 0], [1.1, 0], [1.4, 1.3], [0.9, 1.3]], 0.07, 0.02);
-        fin.rotateY(Math.PI / 2);
-        pb.add("hull", fin, M4.t(0, L.cockpit.y + 0.3, L.cockpit.z - 0.7), [0, 0, 3]);
+      // (dorsal fin = part of the cockpit design)
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
+          for (const a of [0, 2.1, -2.1]) pb.add("hull", plate([[0, 0], [0.95, 0], [0.1, 0.42], [-0.3, 0.4]], 0.03), M4.trs(sd * 2 + Math.sin(a) * 0.62, Math.cos(a) * 0.62, -0.9, 0, 0, -a), SEC);
+          const w = extrude([[0, 0], [0.5, 0.42], [0.54, 0.66], [0.34, 0.62], [0, 0.32]], 0.03, 0.01);
+          w.rotateX(-Math.PI / 2);
+          const m = M4.trs(sd * 2.7, 0, 4.4, 0, 0, sd * 0.1);
+          if (sd < 0) m.multiply(M4.mirrorX());
+          pb.add("hull", w, m, SEC);
+          if (hi) pb.add("chrome", torus(0.8, 0.02, 5, 22), M4.t(sd * 2, 0, 4.9));
+        }
       }
     };
   },
@@ -89890,14 +90011,21 @@ var LAYOUTS = {
     const s = spec(7, 1.3, "heavy", 5, 16, false);
     return {
       engines: pair(s, 2.4, 0, 3),
-      cockpit: { style: "wedge", hw: 1, len: 2.8, y: 0, z: -5.5, pilot: 1 },
+      cockpit: { style: "wedge", hw: 1, len: 2.8, y: 0, z: -5.5, pilot: 1, far: "cage" },
       binders: MAIN,
       livery: 2,
-      cockpitExtras: (pb, L) => {
-        const z = L.cockpit.z + L.cockpit.len * 0.5 + 0.35;
-        pb.add("steel", rbox(3, 0.5, 0.35, 0.06), M4.trs(0, L.cockpit.y - 0.25, z, 0.35, 0, 0));
-        pb.add("hazard", rbox(3.02, 0.16, 0.37, 0.03), M4.trs(0, L.cockpit.y - 0.08, z + 0.06, 0.35, 0, 0));
-        for (const sd of [-1, 1]) pb.add("dark", rbox(0.12, 0.12, 0.9, 0.03), M4.t(sd * 0.9, L.cockpit.y - 0.3, z - 0.45));
+      // (ram prow = part of the cockpit design)
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
+          const x = sd * 2.4;
+          pb.add("steel", torus(0.86, 0.07, 6, hi ? 20 : 10), M4.t(x, 0, 7));
+          for (let i = 0; i < 3; i++) {
+            const a = i * 2.094 + 0.5;
+            pb.add("steel", tube([V(x + Math.sin(a) * 1.22, Math.cos(a) * 1.22, 6.3), V(x + Math.sin(a) * 0.86, Math.cos(a) * 0.86, 7)], 0.045, 2, 5));
+          }
+          pb.add("hazard", torus(1.32, 0.05, 5, hi ? 24 : 12), M4.t(x, 0, 5.2));
+          pb.add("dark", rbox(1.2, 0.08, 2.6, 0.03), M4.t(x, -1.5, 2.4));
+        }
       }
     };
   }
@@ -89905,7 +90033,9 @@ var LAYOUTS = {
 function podLayout(def) {
   const make = LAYOUTS[def.id];
   if (!make) throw new Error(`No layout for pod "${def.id}" \u2013 add it to LAYOUTS in src/game/podLayouts.ts`);
-  return make(def);
+  const L = make(def);
+  L.cockpit.design ??= def.id;
+  return L;
 }
 
 // src/game/podDesigns.ts
@@ -90691,17 +90821,17 @@ var CSMShadowNode = class extends ShadowBaseNode {
 // src/game/data.ts
 var STAT_KEYS = ["topSpeed", "accel", "turn", "traction", "airbrake", "cooling", "repair"];
 var PILOTS = [
-  { id: "kai", name: "Kai Varrin", species: "Mensch", head: "goggles", skill: 0.9, aggression: 0.4, color: "#4aa3ff" },
-  { id: "zeb", name: "Zebulox Vrak", species: "Dugkin", head: "snout", skill: 0.95, aggression: 0.95, color: "#ff9a2e" },
-  { id: "gas", name: "Gasvaro Ten", species: "Xantori", head: "crest", skill: 0.8, aggression: 0.3, color: "#3fe0a0" },
-  { id: "bom", name: "Bomquad Rii", species: "Lurbani", head: "dome", skill: 0.55, aggression: 0.2, color: "#e3e04a" },
-  { id: "mav", name: "Mavik Hollo", species: "Gurrani", head: "aero", skill: 0.75, aggression: 0.6, color: "#ff4a6e" },
-  { id: "rat", name: "Rattis Tyr", species: "Aleeni", head: "crest", skill: 0.7, aggression: 0.8, color: "#b46bff" },
-  { id: "ald", name: "Aldo Beerak", species: "Kraveen", head: "aero", skill: 0.85, aggression: 0.7, color: "#7fd3ff" },
-  { id: "tee", name: "Teemo Pagali", species: "Vexi", head: "dome", skill: 0.65, aggression: 0.5, color: "#ff7b2e" },
-  { id: "ela", name: "Elana Mak", species: "Mensch", head: "goggles", skill: 0.78, aggression: 0.35, color: "#ff5ad1" },
-  { id: "ody", name: "Odo Mandrel", species: "Erriton", head: "aero", skill: 0.6, aggression: 0.55, color: "#9fff5a" },
-  { id: "cle", name: "Clegg Halden", species: "Mensch", head: "goggles", skill: 0.68, aggression: 0.45, color: "#ffd27a" }
+  { id: "kai", name: "Kai Varrin", species: "Mensch", head: "goggles", skin: "#b98c68", skill: 0.9, aggression: 0.4, color: "#4aa3ff" },
+  { id: "zeb", name: "Zebulox Vrak", species: "Dugkin", head: "snout", skin: "#b5673a", skill: 0.95, aggression: 0.95, color: "#ff9a2e" },
+  { id: "gas", name: "Gasvaro Ten", species: "Xantori", head: "crest", skin: "#7fb6a8", skill: 0.8, aggression: 0.3, color: "#3fe0a0" },
+  { id: "bom", name: "Bomquad Rii", species: "Lurbani", head: "dome", skin: "#8fa3b5", skill: 0.55, aggression: 0.2, color: "#e3e04a" },
+  { id: "mav", name: "Mavik Hollo", species: "Gurrani", head: "aero", skin: "#a4b06a", skill: 0.75, aggression: 0.6, color: "#ff4a6e" },
+  { id: "rat", name: "Rattis Tyr", species: "Aleeni", head: "crest", skin: "#a99bc0", skill: 0.7, aggression: 0.8, color: "#b46bff" },
+  { id: "ald", name: "Aldo Beerak", species: "Kraveen", head: "aero", skin: "#c9a15a", skill: 0.85, aggression: 0.7, color: "#7fd3ff" },
+  { id: "tee", name: "Teemo Pagali", species: "Vexi", head: "dome", skin: "#b8795a", skill: 0.65, aggression: 0.5, color: "#ff7b2e" },
+  { id: "ela", name: "Elana Mak", species: "Mensch", head: "goggles", skin: "#b98c68", skill: 0.78, aggression: 0.35, color: "#ff5ad1" },
+  { id: "ody", name: "Odo Mandrel", species: "Erriton", head: "aero", skin: "#8f9a8a", skill: 0.6, aggression: 0.55, color: "#9fff5a" },
+  { id: "cle", name: "Clegg Halden", species: "Mensch", head: "goggles", skin: "#b98c68", skill: 0.68, aggression: 0.45, color: "#ffd27a" }
 ];
 var PODS = [
   {
@@ -97084,10 +97214,10 @@ function bantha(fur, horn) {
   return merge4(L);
 }
 function giant(skin) {
-  const belly = [skin[0] * 1.25, skin[1] * 1.2, skin[2] * 1.1];
+  const belly2 = [skin[0] * 1.25, skin[1] * 1.2, skin[2] * 1.1];
   const L = [];
   L.push(part2(new SphereGeometry(1, 18, 12), M2(0, 7, 0, 0, 0, 0, 2.6, 2.4, 4.6), skin));
-  L.push(part2(new SphereGeometry(1, 12, 8), M2(0, 5.6, 0, 0, 0, 0, 2, 1.2, 3.6), belly));
+  L.push(part2(new SphereGeometry(1, 12, 8), M2(0, 5.6, 0, 0, 0, 0, 2, 1.2, 3.6), belly2));
   for (const [x, z, a] of [[-1.7, 2.8, 1], [1.7, 2.8, 2], [-1.7, -2.8, 2], [1.7, -2.8, 1]]) L.push(part2(new CylinderGeometry(0.75, 0.65, 6.5, 8), M2(x, 3.25, z), skin, a));
   const neck = new TubeGeometry(new CatmullRomCurve3([new Vector3(0, 8, 3.5), new Vector3(0, 13, 6.5), new Vector3(0, 17, 8.5)]), 12, 0.8, 8);
   L.push(part2(neck, null, skin, 3));
@@ -98466,7 +98596,7 @@ function buildTunnel(path, group, mat, roadMat, ribMat, disp, theme, seaY, heigh
   }
   if (!runs.length) return;
   const mk = () => ({ pos: [], uv: [], ind: [] });
-  const shell = mk(), deck = mk(), berm = mk(), steel = mk(), glowB = mk(), caveFloor = mk(), veinB = mk();
+  const shell2 = mk(), deck = mk(), berm = mk(), steel = mk(), glowB = mk(), caveFloor = mk(), veinB = mk();
   const winInd = [];
   const segA = 20, DECK = TUNNEL_DECK;
   const lamps = [], ribs = [], tites = [];
@@ -98511,11 +98641,11 @@ function buildTunnel(path, group, mat, roadMat, ribMat, disp, theme, seaY, heigh
         const top = Math.sin(Math.PI * a / segA);
         return top > 0.5 ? Math.max(-0.35, raw + 0.35 * amp * top) : raw;
       };
-      const ring = shell.pos.length / 3;
+      const ring = shell2.pos.length / 3;
       for (let a = 0; a <= segA; a++) {
         const ang = Math.PI * a / segA, nz = noise(a);
         const yBase = a === 0 || a === segA ? -2.2 : 1.5;
-        put(shell, s, Math.cos(ang) * (Wd + nz), Math.sin(ang) * (H + nz) + yBase, s.s / 15, a / segA * 2.4);
+        put(shell2, s, Math.cos(ang) * (Wd + nz), Math.sin(ang) * (H + nz) + yBase, s.s / 15, a / segA * 2.4);
       }
       if (pRing >= 0) {
         const cutR = cave && (s.openR || pOpenR), cutL = cave && (s.openL || pOpenL);
@@ -98523,7 +98653,7 @@ function buildTunnel(path, group, mat, roadMat, ribMat, disp, theme, seaY, heigh
           if (cutR && a <= 4 || cutL && a >= segA - 5) continue;
           const p0 = pRing + a, p1 = ring + a;
           const isWin = pUnder && under && (a >= 1 && a <= 7 || a >= 12 && a <= 18);
-          (isWin ? winInd : shell.ind).push(p0, p0 + 1, p1, p1, p0 + 1, p1 + 1);
+          (isWin ? winInd : shell2.ind).push(p0, p0 + 1, p1, p1, p0 + 1, p1 + 1);
         }
       }
       pRing = ring;
@@ -98660,7 +98790,7 @@ function buildTunnel(path, group, mat, roadMat, ribMat, disp, theme, seaY, heigh
   const m2 = mat.clone();
   m2.side = DoubleSide;
   disp.push(m2);
-  const sg = geo(shell);
+  const sg = geo(shell2);
   add2(sg, m2, true);
   if (caveFloor.ind.length) add2(geo(caveFloor), m2, false);
   if (winInd.length) {
@@ -98907,7 +99037,7 @@ function scatterDecor(theme, group, td, heightAt, near, gfx, disp, rng2, wallTex
   const decorCells = [];
   const place = (geo, mat, count, dMin, dMax, sMin, sMax, opts = {}) => {
     count = Math.floor(count * det2 * dens);
-    const SEC = dMax > 900 ? 900 : 340;
+    const SEC3 = dMax > 900 ? 900 : 340;
     const sectors = /* @__PURE__ */ new Map();
     const q = new Quaternion(), e = new Euler(), v = new Vector3(), sc = new Vector3();
     let placed = 0, tries = 0;
@@ -98932,11 +99062,11 @@ function scatterDecor(theme, group, td, heightAt, near, gfx, disp, rng2, wallTex
       e.set((rng2() - 0.5) * (opts.tilt ?? 0), rng2() * Math.PI * 2, (rng2() - 0.5) * (opts.tilt ?? 0));
       q.setFromEuler(e);
       const chunk = (count > 80 || !!opts.lod) && !opts.air;
-      const sxI = Math.floor(x / SEC), szI = Math.floor(z / SEC);
+      const sxI = Math.floor(x / SEC3), szI = Math.floor(z / SEC3);
       const key = chunk ? `${sxI},${szI}` : "all";
       let sec = sectors.get(key);
       if (!sec) {
-        sec = { m: [], c: [], cx: (sxI + 0.5) * SEC, cz: (szI + 0.5) * SEC };
+        sec = { m: [], c: [], cx: (sxI + 0.5) * SEC3, cz: (szI + 0.5) * SEC3 };
         sectors.set(key, sec);
       }
       sec.m.push(new Matrix4().compose(v.set(x, y, z), q, sc.set(size, size * sy, size)));
@@ -98945,7 +99075,7 @@ function scatterDecor(theme, group, td, heightAt, near, gfx, disp, rng2, wallTex
     }
     const cast = opts.shadow ?? (dMin < 40 && sMax >= 2.2);
     const viewD = opts.view ?? (dMax > 900 ? 3400 : Math.min(1350, dMax * 2.1 + 380));
-    const pad = SEC * 0.72;
+    const pad = SEC3 * 0.72;
     for (const [k, sec] of sectors) {
       const im = new InstancedMesh(geo, mat, sec.m.length);
       for (let i = 0; i < sec.m.length; i++) {
@@ -99441,19 +99571,14 @@ init_three_module();
 
 // src/game/podCockpits.ts
 init_three_module();
+var LAMP_VERTS = 12;
 var V2 = (x, y, z) => new Vector3(x, y, z);
-var TEMPLATES = {
-  pod: [[-0.5, 0.3, 0.26, 0.26, 2.2, 0], [-0.45, 0.7, 0.46, 0.44, 2.4, 0], [-0.36, 0.9, 0.46, 0.52, 2.6, 0], [-0.24, 0.98, 0.4, 0.55, 2.6, 0.5], [-0.08, 1, 0.36, 0.56, 2.6, 0.6], [0.06, 0.96, 0.36, 0.54, 2.6, 0.5], [0.18, 0.86, 0.42, 0.48, 2.4, 0], [0.32, 0.64, 0.38, 0.38, 2.3, 0], [0.44, 0.34, 0.24, 0.24, 2.2, 0], [0.5, 0.08, 0.07, 0.08, 2, 0]],
-  wedge: [[-0.5, 0.55, 0.3, 0.3, 4, 0], [-0.44, 0.92, 0.38, 0.4, 4, 0], [-0.3, 1, 0.34, 0.42, 4, 0.5], [-0.1, 1, 0.3, 0.4, 4, 0.58], [0.06, 0.96, 0.28, 0.36, 4, 0.5], [0.18, 0.88, 0.3, 0.3, 3.6, 0], [0.34, 0.66, 0.2, 0.22, 3.2, 0], [0.5, 0.3, 0.05, 0.08, 3, 0]],
-  saucer: [[-0.5, 0.4, 0.3, 0.3, 2, 0], [-0.4, 0.85, 0.5, 0.5, 2.1, 0], [-0.25, 1, 0.46, 0.58, 2.2, 0.5], [-0.05, 1.04, 0.42, 0.6, 2.2, 0.6], [0.12, 0.98, 0.42, 0.58, 2.2, 0.5], [0.26, 0.84, 0.48, 0.5, 2.1, 0], [0.4, 0.58, 0.4, 0.4, 2, 0], [0.5, 0.2, 0.16, 0.16, 2, 0]],
-  long: [[-0.5, 0.3, 0.24, 0.24, 2.4, 0], [-0.44, 0.74, 0.4, 0.4, 2.5, 0], [-0.32, 0.9, 0.36, 0.46, 2.6, 0.5], [-0.16, 0.92, 0.32, 0.48, 2.6, 0.58], [-0.02, 0.88, 0.32, 0.46, 2.6, 0.5], [0.1, 0.78, 0.36, 0.42, 2.5, 0], [0.26, 0.58, 0.32, 0.34, 2.4, 0], [0.4, 0.36, 0.22, 0.22, 2.2, 0], [0.5, 0.08, 0.06, 0.07, 2, 0]]
-};
+var HALF = Math.PI / 2;
 function catmull(p0, p1, p2, p3, t) {
   const t2 = t * t, t3 = t2 * t;
   return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
 }
-function sections(style, hw, len, perSpan) {
-  const T2 = TEMPLATES[style];
+function resample(T2, hw, len, perSpan) {
   const out = [];
   for (let i = 0; i < T2.length - 1; i++) for (let k = 0; k < perSpan; k++) {
     const t = k / perSpan;
@@ -99467,144 +99592,540 @@ function sections(style, hw, len, perSpan) {
   out.push({ z: l[0] * len, w: l[1] * hw, hT: l[2] * hw, hB: l[3] * hw, n: l[4], open: 0 });
   return out;
 }
-function pilotParts(pb, s, hip, kind) {
-  const base2 = new Matrix4().compose(hip, new Quaternion(), V2(s, s, s));
-  const at = (m) => base2.clone().multiply(m);
-  const torso = lathe(prof([[0, 0], [0.16, 0, 1], [0.19, 0.12], [0.21, 0.32], [0.19, 0.44], [0.12, 0.52], [0.06, 0.56], [0, 0.57]]), 18, 0);
-  torso.rotateX(-Math.PI / 2);
-  torso.scale(1.15, 1, 0.82);
-  pb.add("suit", torso, at(M4.trs(0, 0, 0, 0.22, 0, 0)));
-  for (const sd of [-1, 1]) pb.add("leather", rbox(0.05, 0.5, 0.02, 0.01), at(M4.trs(sd * 0.09, 0.27, 0.19, 0.22, 0, sd * 0.12)));
-  pb.add("chrome", cyl(0.035, 0.035, 0.02, 10), at(M4.trs(0, 0.25, 0.205, Math.PI / 2 + 0.22, 0, 0)));
-  const head = V2(0, 0.71, 0.17);
-  if (kind === "snout") {
-    pb.add("skin", sphere(0.115, 16, 12), at(M4.trs(head.x, head.y, head.z + 0.03, 0.18, 0, 0, 0.88, 0.92, 1.38)));
-    pb.add("leather", sphere(0.124, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), at(M4.trs(head.x, head.y + 0.02, head.z - 0.02, -0.3, 0, 0, 0.94, 0.95, 1.15)));
-    for (const sd of [-1, 1]) {
-      pb.add("leather", cyl(0.012, 0.032, 0.14, 7), at(M4.trs(head.x + sd * 0.085, head.y + 0.09, head.z - 0.06, -0.75, 0, sd * -0.35)));
-      pb.add("chrome", cyl(0.048, 0.052, 0.05, 12), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.13, Math.PI / 2, 0, 0)));
-      pb.add("glow", sphere(0.038, 10, 8), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.15, 0, 0, 0, 1, 0.8, 0.45)));
-    }
-  } else if (kind === "crest") {
-    pb.add("skin", sphere(0.112, 16, 12), at(M4.trs(head.x, head.y, head.z, -0.25, 0, 0, 0.9, 1.15, 1.25)));
-    pb.add("suit", rbox(0.045, 0.14, 0.24, 0.018), at(M4.trs(head.x, head.y + 0.11, head.z - 0.06, -0.35, 0, 0)));
-    for (const sd of [-1, 1]) pb.add("skin", tube([V2(head.x + sd * 0.08, head.y + 0.02, head.z - 0.06), V2(head.x + sd * 0.11, head.y - 0.1, head.z - 0.18), V2(head.x + sd * 0.09, head.y - 0.24, head.z - 0.22)], 0.032, 8, 7), base2);
-    pb.add("visor", sphere(0.118, 16, 8, 0, Math.PI, Math.PI * 0.25, Math.PI * 0.32), at(M4.trs(head.x, head.y + 0.02, head.z + 0.02, 0, 0, 0, 1.02, 0.9, 1.05)));
-  } else if (kind === "aero") {
-    pb.add("suit", sphere(0.138, 18, 14), at(M4.trs(head.x, head.y + 0.015, head.z, 0, 0, 0, 0.98, 1.06, 1.22)));
-    pb.add("dark", rbox(0.04, 0.09, 0.26, 0.012), at(M4.trs(head.x, head.y + 0.13, head.z - 0.05, -0.2, 0, 0)));
-    pb.add("visor", sphere(0.141, 18, 8, 0, Math.PI, Math.PI * 0.28, Math.PI * 0.34), at(M4.trs(head.x, head.y + 0.015, head.z + 0.015, 0, 0, 0, 1, 0.95, 1.2)));
-    pb.add("glow", rbox(0.16, 0.016, 0.02, 4e-3), at(M4.t(head.x, head.y + 0.02, head.z + 0.165)));
-  } else if (kind === "dome") {
-    pb.add("chrome", sphere(0.136, 18, 12), at(M4.trs(head.x, head.y + 0.01, head.z, 0, 0, 0, 1.12, 0.96, 1.08)));
-    pb.add("dark", rbox(0.24, 0.065, 0.09, 0.016), at(M4.t(head.x, head.y + 0.025, head.z + 0.11)));
-    pb.add("glow", rbox(0.2, 0.026, 0.02, 5e-3), at(M4.t(head.x, head.y + 0.025, head.z + 0.156)));
-    for (const sd of [-1, 1]) pb.add("steel", cyl(8e-3, 0.012, 0.16, 6), at(M4.trs(head.x + sd * 0.13, head.y + 0.11, head.z - 0.02, -0.3, 0, sd * -0.2)));
-  } else {
-    pb.add("skin", sphere(0.112, 18, 14), at(M4.trs(head.x, head.y - 0.015, head.z + 0.02, 0, 0, 0, 0.95, 1.05, 1)));
-    pb.add("leather", sphere(0.13, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.64), at(M4.trs(head.x, head.y + 0.012, head.z - 0.015, -0.25, 0, 0, 1, 1.05, 1.1)));
-    pb.add("chrome", rbox(0.032, 0.04, 0.22, 8e-3), at(M4.trs(head.x, head.y + 0.135, head.z - 0.02, -0.18, 0, 0)));
-    pb.add("rubber", torus(0.122, 0.013, 6, 24), at(M4.trs(head.x, head.y + 0.035, head.z, Math.PI / 2 - 0.2, 0, 0)));
-    for (const sd of [-1, 1]) {
-      pb.add("chrome", cyl(0.046, 0.05, 0.046, 14), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.105, Math.PI / 2, 0, 0)));
-      pb.add("visor", sphere(0.041, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.128, Math.PI / 2, 0, 0, 1, 0.45, 1)));
-    }
-  }
-  pb.add("leather", torus(0.075, 0.03, 8, 18), at(M4.trs(0, 0.56, 0.12, Math.PI / 2 - 0.25, 0, 0)));
-  const hands = [];
-  for (const sd of [-1, 1]) {
-    const sh = V2(sd * 0.22, 0.46, 0.09), el = V2(sd * 0.3, 0.27, 0.3), hd = V2(sd * 0.21, 0.31, 0.5);
-    pb.add("suit", sphere(0.085, 12, 10), at(M4.t(sh.x, sh.y, sh.z)));
-    pb.add("suit", tube([sh, el, hd], 0.055, 14, 10), base2);
-    pb.add("leather", sphere(0.062, 12, 10), at(M4.trs(hd.x, hd.y, hd.z + 0.02, 0, 0, 0, 1, 0.9, 1.2)));
-    hands.push(hd.clone().multiplyScalar(s).add(hip));
-  }
-  return { head: head.clone().multiplyScalar(s).add(hip), hands };
-}
-var cockpitCache = /* @__PURE__ */ new Map();
-function cockpitGeo(L, seg, head = "goggles") {
-  const c = L.cockpit;
-  const key = `${c.style}|${c.hw}|${c.len}|${c.pilot}|${head}|${seg}`;
-  const hit = cockpitCache.get(key);
-  if (hit) return hit;
-  const pb = new PartBuilder();
-  const hw = c.hw, len = c.len;
-  const secs = sections(c.style, hw, len, seg >= 40 ? 6 : seg >= 28 ? 4 : 3);
-  const segC = Math.max(24, seg);
-  pb.add("hull", loft(secs, segC, 2));
-  let iA = secs.findIndex((s) => (s.open ?? 0) > 1e-3) - 1;
-  let iB = secs.length - 1;
+function shell(k, rows) {
+  const { hw, len } = k;
+  const secs = resample(rows, hw, len, k.d === 0 ? 2 : k.seg >= 40 ? 6 : k.seg >= 28 ? 4 : 3);
+  const segC = k.d === 0 ? 14 : Math.max(24, k.seg);
+  k.pb.add("hull", loft(secs, segC, 2));
+  let iA = secs.findIndex((s) => (s.open ?? 0) > 1e-3) - 1, iB = secs.length - 1;
   for (let j = secs.length - 1; j >= 0; j--) if ((secs[j].open ?? 0) > 1e-3) {
     iB = j + 1;
     break;
   }
+  const hasOpen = iA >= -1 && secs.some((s) => (s.open ?? 0) > 1e-3);
   iA = Math.max(0, iA);
   iB = Math.min(secs.length - 1, iB);
   const th = 0.05 * hw + 0.02;
-  const outerSub = secs.slice(iA, iB + 1);
-  const inner = outerSub.map((s) => ({ ...s, w: s.w - th, hT: s.hT - th, hB: s.hB - th }));
-  pb.add("interior", loft(inner, segC, 0, [true, true], true));
-  pb.add("chrome", loftRim(outerSub, inner, segC));
-  const zA = secs[iA].z, zB = secs[iB].z;
+  const sub2 = hasOpen ? secs.slice(iA, iB + 1) : secs.slice(Math.floor(secs.length * 0.3), Math.floor(secs.length * 0.7) + 1);
+  if (hasOpen) {
+    const inner = sub2.map((s) => ({ ...s, w: s.w - th, hT: s.hT - th, hB: s.hB - th }));
+    k.pb.add("interior", loft(inner, segC, 0, [true, true], true));
+    if (k.hi) k.pb.add("chrome", loftRim(sub2, inner, segC));
+  }
+  const zA = sub2[0].z, zB = sub2[sub2.length - 1].z;
   let wMax = 0, hBm = 0;
-  for (const s of outerSub) {
+  for (const s of sub2) {
     wMax = Math.max(wMax, s.w);
     hBm = Math.max(hBm, s.hB);
   }
-  const mid = outerSub[Math.floor(outerSub.length / 2)];
+  const mid = sub2[Math.floor(sub2.length / 2)];
   const rimY = mid.hT * Math.pow(Math.cos((mid.open ?? 0.5) * Math.PI / 2), 2 / (mid.n ?? 2.4));
   const floorY = -(mid.hB - th);
-  const hipZ = zA + (zB - zA) * 0.4, hipY = floorY * 0.5;
-  pb.add("leather", rbox(0.56, 0.12, 0.5, 0.05), M4.t(0, hipY - 0.06, hipZ + 0.08));
-  pb.add("leather", rbox(0.56, 0.7, 0.12, 0.06), M4.trs(0, hipY + 0.3, hipZ - 0.2, -0.15, 0, 0));
-  pb.add("leather", rbox(0.3, 0.2, 0.12, 0.05), M4.trs(0, hipY + 0.78, hipZ - 0.27, -0.15, 0, 0));
-  const pil = pilotParts(pb, c.pilot, V2(0, hipY, hipZ), head);
-  pb.add("chrome", torus(0.24 * c.pilot, 0.022, 7, 18, Math.PI), M4.t(0, hipY + 0.78 * c.pilot, hipZ - 0.34));
-  pb.add("glow", torus(0.055, 6e-3, 5, 16), M4.t(0, rimY + 0.11, zB - 0.34 * (zB - zA)));
-  for (const hd of pil.hands) {
-    const base2 = V2(hd.x, floorY + 0.05, hd.z + 0.1);
-    pb.add("steel", tube([base2, V2(hd.x, (base2.y + hd.y) / 2, hd.z + 0.08), V2(hd.x, hd.y - 0.07, hd.z)], 0.022, 8, 6));
-    pb.add("rubber", cyl(0.032, 0.032, 0.12, 10), M4.t(hd.x, hd.y - 0.06, hd.z));
-    pb.add("glow", sphere(0.018, 8, 6), M4.t(hd.x, hd.y + 0.01, hd.z + 0.03));
+  return { secs, zA, zB, wMax, hBm, rimY, floorY, hip: V2(0, floorY * 0.5, zA + (zB - zA) * 0.4), iB };
+}
+function seat(k, hip, lean = 0) {
+  const m = (x, y, z, rx) => M4.trs(hip.x + x, hip.y + y, hip.z + z, rx - lean, 0, 0);
+  k.pb.add("leather", rbox(0.56, 0.12, 0.5, 0.05), m(0, -0.06, 0.08, 0));
+  k.pb.add("leather", rbox(0.56, 0.7, 0.12, 0.06), m(0, 0.3 * Math.cos(lean), -0.2 - 0.3 * Math.sin(lean), -0.15));
+  if (k.hi) k.pb.add("leather", rbox(0.3, 0.2, 0.12, 0.05), m(0, 0.78 * Math.cos(lean), -0.27 - 0.78 * Math.sin(lean), -0.15));
+}
+function pilot(k, hip, lean = 0, reach) {
+  const s = k.s, lite = k.d === 0, pp = k.pp;
+  const base2 = new Matrix4().compose(hip, new Quaternion().setFromEuler(new Euler(-lean, 0, 0)), V2(s, s, s));
+  const at = (m) => base2.clone().multiply(m);
+  const W2 = (p) => p.clone().applyMatrix4(base2);
+  const torso = lathe(prof([[0, 0], [0.16, 0, 1], [0.19, 0.12], [0.21, 0.32], [0.19, 0.44], [0.12, 0.52], [0.06, 0.56], [0, 0.57]]), lite ? 8 : 18, 0);
+  torso.rotateX(-HALF);
+  torso.scale(1.15, 1, 0.82);
+  pp.add("suit", torso, at(M4.trs(0, 0, 0, 0.22, 0, 0)));
+  if (!lite) {
+    for (const sd of [-1, 1]) pp.add("leather", rbox(0.05, 0.5, 0.02, 0.01), at(M4.trs(sd * 0.09, 0.27, 0.19, 0.22, 0, sd * 0.12)));
+    pp.add("chrome", cyl(0.035, 0.035, 0.02, 10), at(M4.trs(0, 0.25, 0.205, HALF + 0.22, 0, 0)));
+    pp.add("leather", torus(0.075, 0.03, 8, 18), at(M4.trs(0, 0.56, 0.12, HALF - 0.25, 0, 0)));
+    for (const sd of [-1, 1]) pp.add("dark", sphere(0.1, 10, 6, 0, Math.PI * 2, 0, HALF), at(M4.trs(sd * 0.225, 0.47, 0.085, 0, 0, sd * -0.5, 1.1, 0.7, 1.2)));
+    pp.add("dark", rbox(0.15, 0.1, 0.04, 0.012), at(M4.trs(0, 0.4, 0.2, 0.22, 0, 0)));
+    pp.add("glow", rbox(0.05, 0.02, 0.012, 4e-3), at(M4.trs(-0.03, 0.42, 0.224, 0.22, 0, 0)));
   }
-  const D = new Matrix4().compose(V2(0, rimY - 0.06, zB - 0.16 * len * 0.3 - 0.12), new Quaternion().setFromEuler(new Euler(-0.65, 0, 0)), V2(1, 1, 1));
-  const dw = Math.min(wMax * 1.3, 1.5);
-  pb.add("interior", rbox(dw, 0.06, 0.34, 0.03), D);
-  for (let i = 0; i < 5; i++) {
-    const gx = (i - 2) * dw * 0.18;
-    const m = D.clone().multiply(M4.trs(gx, 0.032, 0.02 * (i % 2), -Math.PI / 2, 0, 0));
-    pb.add("glow", new CircleGeometry(0.04, 16), m);
-    pb.add("chrome", torus(0.045, 8e-3, 6, 18), m);
+  const head = V2(0, 0.71, 0.17), kind = k.head, hs = lite ? 8 : 16, hr = lite ? 6 : 12;
+  if (kind === "snout") {
+    pp.add("skin", sphere(0.115, hs, hr), at(M4.trs(head.x, head.y, head.z + 0.03, 0.18, 0, 0, 0.88, 0.92, 1.38)));
+    pp.add("leather", sphere(0.124, hs, lite ? 5 : 10, 0, Math.PI * 2, 0, Math.PI * 0.55), at(M4.trs(head.x, head.y + 0.02, head.z - 0.02, -0.3, 0, 0, 0.94, 0.95, 1.15)));
+    for (const sd of [-1, 1]) {
+      pp.add("leather", cyl(0.012, 0.032, 0.14, lite ? 5 : 7), at(M4.trs(head.x + sd * 0.085, head.y + 0.09, head.z - 0.06, -0.75, 0, sd * -0.35)));
+      if (!lite) pp.add("chrome", cyl(0.048, 0.052, 0.05, 12), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.13, HALF, 0, 0)));
+      pp.add("glow", sphere(0.038, lite ? 6 : 10, lite ? 4 : 8), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.15, 0, 0, 0, 1, 0.8, 0.45)));
+    }
+  } else if (kind === "crest") {
+    pp.add("skin", sphere(0.112, hs, hr), at(M4.trs(head.x, head.y, head.z, -0.25, 0, 0, 0.9, 1.15, 1.25)));
+    pp.add("suit", rbox(0.045, 0.14, 0.24, 0.018), at(M4.trs(head.x, head.y + 0.11, head.z - 0.06, -0.35, 0, 0)));
+    for (const sd of [-1, 1]) pp.add("skin", tube([V2(head.x + sd * 0.08, head.y + 0.02, head.z - 0.06), V2(head.x + sd * 0.11, head.y - 0.1, head.z - 0.18), V2(head.x + sd * 0.09, head.y - 0.24, head.z - 0.22)], 0.032, lite ? 4 : 8, lite ? 5 : 7), base2);
+    pp.add("visor", sphere(0.118, hs, lite ? 4 : 8, 0, Math.PI, Math.PI * 0.25, Math.PI * 0.32), at(M4.trs(head.x, head.y + 0.02, head.z + 0.02, 0, 0, 0, 1.02, 0.9, 1.05)));
+  } else if (kind === "aero") {
+    pp.add("suit", sphere(0.138, hs, hr), at(M4.trs(head.x, head.y + 0.015, head.z, 0, 0, 0, 0.98, 1.06, 1.22)));
+    pp.add("dark", rbox(0.04, 0.09, 0.26, 0.012), at(M4.trs(head.x, head.y + 0.13, head.z - 0.05, -0.2, 0, 0)));
+    pp.add("visor", sphere(0.141, hs, lite ? 4 : 8, 0, Math.PI, Math.PI * 0.28, Math.PI * 0.34), at(M4.trs(head.x, head.y + 0.015, head.z + 0.015, 0, 0, 0, 1, 0.95, 1.2)));
+    pp.add("glow", rbox(0.16, 0.016, 0.02, 4e-3), at(M4.t(head.x, head.y + 0.02, head.z + 0.165)));
+  } else if (kind === "dome") {
+    pp.add("chrome", sphere(0.136, hs, hr), at(M4.trs(head.x, head.y + 0.01, head.z, 0, 0, 0, 1.12, 0.96, 1.08)));
+    pp.add("dark", rbox(0.24, 0.065, 0.09, 0.016), at(M4.t(head.x, head.y + 0.025, head.z + 0.11)));
+    pp.add("glow", rbox(0.2, 0.026, 0.02, 5e-3), at(M4.t(head.x, head.y + 0.025, head.z + 0.156)));
+    if (!lite) for (const sd of [-1, 1]) pp.add("steel", cyl(8e-3, 0.012, 0.16, 6), at(M4.trs(head.x + sd * 0.13, head.y + 0.11, head.z - 0.02, -0.3, 0, sd * -0.2)));
+  } else {
+    pp.add("skin", sphere(0.112, hs, hr), at(M4.trs(head.x, head.y - 0.015, head.z + 0.02, 0, 0, 0, 0.95, 1.05, 1)));
+    pp.add("leather", sphere(0.13, hs, lite ? 5 : 12, 0, Math.PI * 2, 0, Math.PI * 0.64), at(M4.trs(head.x, head.y + 0.012, head.z - 0.015, -0.25, 0, 0, 1, 1.05, 1.1)));
+    if (!lite) {
+      pp.add("chrome", rbox(0.032, 0.04, 0.22, 8e-3), at(M4.trs(head.x, head.y + 0.135, head.z - 0.02, -0.18, 0, 0)));
+      pp.add("rubber", torus(0.122, 0.013, 6, 24), at(M4.trs(head.x, head.y + 0.035, head.z, HALF - 0.2, 0, 0)));
+    }
+    for (const sd of [-1, 1]) {
+      if (!lite) pp.add("chrome", cyl(0.046, 0.05, 0.046, 14), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.105, HALF, 0, 0)));
+      pp.add("visor", sphere(0.041, lite ? 6 : 12, lite ? 4 : 8, 0, Math.PI * 2, 0, HALF), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.128, HALF, 0, 0, 1, 0.45, 1)));
+    }
   }
-  const ws = c.style === "wedge" ? [0.85, 0.2, 0.42] : c.style === "saucer" ? [1, 0.45, 0.7] : c.style === "long" ? [0.72, 0.34, 0.58] : [0.9, 0.32, 0.48];
-  const wsM = M4.trs(0, rimY - 0.02, zB - 0.42 * (zB - zA), 0, 0, 0, wMax * ws[0], ws[1], ws[2]);
-  pb.add("glass", sphere(1, 28, 10, 0, Math.PI, 0, Math.PI / 2), wsM);
-  pb.add("chrome", torus(1, 0.022, 6, 28, Math.PI), wsM.clone().multiply(new Matrix4().makeRotationX(Math.PI / 2)));
-  const spZ = zA + (zB - zA) * 0.25;
+  const hands = [];
+  [-1, 1].forEach((sd, i) => {
+    const sh = W2(V2(sd * 0.22, 0.46, 0.09)), hd = reach ? reach[i].clone() : W2(V2(sd * 0.21, 0.31, 0.5));
+    const el = sh.clone().lerp(hd, 0.5).add(V2(sd * 0.09 * s, -0.11 * s, -0.02 * s));
+    if (!lite) pp.add("suit", sphere(0.085 * s, 12, 10), M4.t(sh.x, sh.y, sh.z));
+    pp.add("suit", tube([sh, sh.clone().lerp(el, 0.55), el], 0.055 * s, lite ? 3 : 8, lite ? 5 : 10));
+    k.pb.add("suit", tube([el, el.clone().lerp(hd, 0.55), hd], 0.05 * s, lite ? 3 : 8, lite ? 5 : 10));
+    k.pb.add("leather", sphere(0.062 * s, lite ? 6 : 12, lite ? 5 : 10), M4.trs(hd.x, hd.y, hd.z + 0.02 * s, 0, 0, 0, 1, 0.9, 1.2));
+    hands.push(hd);
+  });
+  return { head: W2(head), eye: W2(V2(0, head.y + 0.03, head.z + 0.03)), hands };
+}
+function levers(k, hands, floorY) {
+  if (!k.hi) return;
+  for (const hd of hands) {
+    const b = V2(hd.x, floorY + 0.05, hd.z + 0.1);
+    k.pb.add("steel", tube([b, V2(hd.x, (b.y + hd.y) / 2, hd.z + 0.08), V2(hd.x, hd.y - 0.07, hd.z)], 0.022, 8, 6));
+    k.pb.add("rubber", cyl(0.032, 0.032, 0.12, 10), M4.t(hd.x, hd.y - 0.06, hd.z));
+    k.pb.add("glow", sphere(0.018, 8, 6), M4.t(hd.x, hd.y + 0.01, hd.z + 0.03));
+  }
+}
+function dash(k, pos, dw, gauges, screens = 0, tilt = -0.65) {
+  const D = new Matrix4().compose(pos, new Quaternion().setFromEuler(new Euler(tilt, 0, 0)), V2(1, 1, 1));
+  k.pb.add("dark", rbox(dw, 0.06, 0.34, 0.03), D);
+  if (k.hi) {
+    const slots = gauges + screens * 2, step9 = dw / (slots + 0.5);
+    let x = -(slots - 1) / 2 * step9;
+    const dial = (gx, i) => {
+      const m = D.clone().multiply(M4.trs(gx, 0.032, 0.03 + 0.02 * (i % 2), -HALF, 0, 0)), r = Math.min(0.04, step9 * 0.4);
+      k.pb.add("glow", new CircleGeometry(r, 16), m);
+      k.pb.add("chrome", torus(r * 1.12, 8e-3, 6, 18), m);
+      k.pb.add("dark", rbox(6e-3, r * 0.9, 4e-3, 1e-3), m.clone().multiply(M4.trs(0, r * 0.4, 4e-3, 0, 0, i * 1.9 % 2.4 - 1.2)));
+    };
+    const left = Math.ceil(gauges / 2);
+    for (let i = 0; i < left; i++) {
+      dial(x, i);
+      x += step9;
+    }
+    for (let s = 0; s < screens; s++) {
+      const cx = x + step9 * 0.5, sw = step9 * 1.7;
+      x += step9 * 2;
+      k.pb.add("steel", rbox(sw, 0.016, 0.17, 4e-3), D.clone().multiply(M4.t(cx, 0.032, 0)));
+      const nB = 7;
+      for (let b = 0; b < nB; b++) {
+        const h = 0.03 + 0.1 * Math.abs(Math.sin((b + 1) * (2.1 + s * 1.3)));
+        k.pb.add("glow", rbox(sw / (nB * 1.7), 6e-3, h, 1e-3), D.clone().multiply(M4.t(cx + (b - (nB - 1) / 2) * (sw * 0.86 / nB), 0.043, 0.07 - h / 2)));
+      }
+    }
+    for (let i = left; i < gauges; i++) {
+      dial(x, i);
+      x += step9;
+    }
+    k.pb.add("chrome", rbox(dw + 0.03, 0.02, 0.02, 6e-3), D.clone().multiply(M4.t(0, 0.03, -0.165)));
+    if (k.ultra) {
+      const nT = Math.max(4, Math.round(dw / 0.07));
+      for (let i = 0; i < nT; i++) {
+        const tx = (i - (nT - 1) / 2) * (dw * 0.86 / nT);
+        k.pb.add("chrome", rbox(0.012, 0.03, 0.012, 2e-3), D.clone().multiply(M4.trs(tx, 0.044, 0.14, (i % 3 - 1) * 0.35, 0, 0)));
+        if (i % 2 === 0) k.pb.add("glow", rbox(0.014, 6e-3, 0.014, 1e-3), D.clone().multiply(M4.t(tx, 0.034, 0.115)));
+      }
+      for (const sd of [-1, 1]) k.pb.add("chrome", tube([V2(sd * dw * 0.52, 0, -0.14).applyMatrix4(D), V2(sd * dw * 0.56, 0.06, 0).applyMatrix4(D), V2(sd * dw * 0.52, 0, 0.14).applyMatrix4(D)], 0.012, 8, 5));
+    }
+  }
+  k.lampN.set(0, 1, 0).transformDirection(D);
+  k.lampAt = [-1, 0, 1].map((i) => V2(i * dw * 0.3, 0.036, -0.125).applyMatrix4(D));
+}
+function windscreen(k, kind, pos, sx, sy, sz) {
+  const m = M4.trs(pos.x, pos.y, pos.z, 0, 0, 0, sx, sy, sz), ws = k.d === 0 ? 12 : 28, hs = k.d === 0 ? 5 : 10;
+  if (kind === "bubble") {
+    k.pb.add("glass", sphere(1, ws, hs, 0, Math.PI * 2, 0, HALF), m);
+    if (k.hi) {
+      k.pb.add("chrome", torus(1, 0.02, 6, 28), m.clone().multiply(new Matrix4().makeRotationX(HALF)));
+      k.pb.add("chrome", torus(1, 0.014, 5, 20, Math.PI), m);
+    }
+  } else if (kind === "wrap") {
+    k.pb.add("glass", sphere(1, ws, hs, 0, Math.PI, Math.PI * 0.18, Math.PI * 0.32), m);
+    if (k.hi) {
+      k.pb.add("chrome", torus(1, 0.02, 6, 28, Math.PI), m.clone().multiply(new Matrix4().makeRotationX(HALF)));
+      k.pb.add("chrome", torus(Math.sin(Math.PI * 0.18), 0.016, 5, 20, Math.PI), m.clone().multiply(M4.trs(0, Math.cos(Math.PI * 0.18), 0, HALF, 0, 0)));
+    }
+  } else if (kind === "fly") {
+    k.pb.add("glass", sphere(1, ws, hs, Math.PI * 0.2, Math.PI * 0.6, Math.PI * 0.1, Math.PI * 0.4), m);
+    if (k.hi) k.pb.add("chrome", torus(1, 0.03, 5, 16, Math.PI * 0.6), m.clone().multiply(M4.trs(0, 0, 0, HALF, 0, Math.PI * 0.2)));
+  } else {
+    k.pb.add("glass", sphere(1, ws, hs, 0, Math.PI, 0, HALF), m);
+    if (k.hi) k.pb.add("chrome", torus(1, 0.022, 6, 28, Math.PI), m.clone().multiply(new Matrix4().makeRotationX(HALF)));
+  }
+}
+function anchors(k, a) {
+  for (const p of a) {
+    k.pb.add("chrome", torus(0.06, 0.02, 6, k.hi ? 14 : 8), M4.trs(p.x, p.y, p.z, 0, HALF, 0));
+    k.pb.add("steel", rbox(0.1, 0.1, 0.16, 0.02), M4.t(p.x, p.y - 0.07, p.z));
+  }
+  return a;
+}
+function tubAnchors(k, T2) {
+  const fr = T2.secs[Math.min(T2.secs.length - 1, T2.iB + 2)];
+  return anchors(k, [V2(-fr.w * 0.45, fr.hT * 0.75 + 0.06, fr.z), V2(fr.w * 0.45, fr.hT * 0.75 + 0.06, fr.z)]);
+}
+function belly(k, w, l, y, z) {
+  k.pb.add("dark", rbox(w, 0.07, l, 0.03), M4.t(0, y, z));
+  k.pb.add("glow", rbox(w * 0.64, 0.025, l * 0.84, 0.01), M4.t(0, y - 0.045, z));
+  if (k.ultra) for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) k.pb.add("chrome", cyl(0.022, 0.022, 0.016, 6), M4.t(sx * w * 0.42, y - 0.04, z + (i - 1.5) * l * 0.26));
+}
+function fin(pts, t) {
+  const g2 = extrude(pts, t, Math.min(0.012, t * 0.3));
+  g2.rotateY(-HALF);
+  return g2;
+}
+var SEC2 = [0, 0, 3];
+function part3(k, id, center, build) {
+  const pb = new PartBuilder();
+  build(pb);
+  k.breaks.push({ id, parts: pb.build(), center });
+}
+var aurora = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.12, 0.1, 0.1, 2.2, 0], [-0.44, 0.5, 0.34, 0.34, 2.3, 0], [-0.34, 0.84, 0.44, 0.5, 2.5, 0], [-0.22, 0.98, 0.4, 0.56, 2.6, 0.5], [-0.06, 1, 0.36, 0.57, 2.6, 0.6], [0.08, 0.95, 0.36, 0.54, 2.6, 0.5], [0.2, 0.82, 0.42, 0.47, 2.4, 0], [0.34, 0.56, 0.36, 0.36, 2.3, 0], [0.45, 0.26, 0.2, 0.2, 2.2, 0], [0.5, 0.05, 0.05, 0.05, 2, 0]]);
+  seat(k, T2.hip);
+  const P = pilot(k, T2.hip);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V2(0, T2.rimY - 0.06, T2.zB - 0.2), Math.min(T2.wMax * 1.3, 1.4), 5);
+  windscreen(k, "wrap", V2(0, T2.rimY - 0.2, T2.zB - 0.38 * (T2.zB - T2.zA)), T2.wMax * 0.95, 0.72, 0.78);
+  for (const sd of [-1, 1]) pb.add("hull", loft([{ z: -0.62, w: 0.02, hT: 0.02, hB: 0.02 }, { z: -0.4, w: 0.13, hT: 0.2, hB: 0.1 }, { z: -0.1, w: 0.17, hT: 0.3, hB: 0.12 }, { z: 0.16, w: 0.13, hT: 0.2, hB: 0.1 }, { z: 0.3, w: 0.03, hT: 0.04, hB: 0.03 }], k.hi ? 12 : 6, 3), M4.t(sd * hw * 0.42, T2.rimY + 0.06, T2.zA + 0.1));
   for (const sd of [-1, 1]) {
-    pb.add("hull", rbox(0.3 * hw, 0.34 * hw, 0.42 * len, 0.06), M4.t(sd * wMax * 0.97, -0.08 * hw, spZ), [0, 0, 3]);
-    for (let i = 0; i < 5; i++) pb.add("dark", rbox(0.02, 0.22 * hw, 0.03, 6e-3), M4.trs(sd * (wMax * 0.97 + 0.15 * hw + 0.01), -0.08 * hw, spZ - 0.12 * len + i * 0.06 * len, 0, sd * 0.6, 0));
-    pb.add("dark", lathe(prof([[0.11 * hw, -0.1, 1], [0.11 * hw, 0.05, 1], [0.08 * hw, 0.05, 1], [0, -0.05]]), 16, 0), M4.t(sd * wMax * 0.97, -0.08 * hw, spZ + 0.21 * len + 0.02));
+    pb.add("hull", rbox(hw * 0.75, 0.04, 0.5, 0.015), M4.trs(sd * hw * 0.92, -0.04, len * 0.3, 0, sd * -0.32, sd * -0.1), SEC2);
+    if (k.hi) pb.add("steel", rbox(hw * 0.78, 0.05, 0.04, 0.01), M4.trs(sd * hw * 0.96, -0.04, len * 0.3 + 0.27, 0, sd * -0.32, sd * -0.1));
   }
-  pb.add("dark", rbox(wMax * 1.1, 0.07, len * 0.5, 0.03), M4.t(0, -hBm - 0.03, zA + (zB - zA) * 0.5));
-  pb.add("glow", rbox(wMax * 0.7, 0.025, len * 0.42, 0.01), M4.t(0, -hBm - 0.075, zA + (zB - zA) * 0.5));
-  const rear = secs[1];
+  const gz = -len * 0.5 - 0.42;
+  pb.add("steel", tube([V2(0, 0.1, -len * 0.5 + 0.2), V2(0, 0.16, gz + 0.2)], 0.045, 4, 6));
+  part3(k, "gyro", V2(0, 0.16, gz), (g2) => {
+    g2.add("chrome", torus(0.26, 0.022, 6, k.hi ? 22 : 10), M4.t(0, 0.16, gz));
+    g2.add("chrome", torus(0.2, 0.02, 6, k.hi ? 20 : 10), M4.trs(0, 0.16, gz, 0, HALF, 0));
+    g2.add("dark", sphere(0.11, k.hi ? 12 : 6, k.hi ? 8 : 4), M4.t(0, 0.16, gz));
+    g2.add("glow", torus(0.115, 0.012, 5, k.hi ? 16 : 8), M4.trs(0, 0.16, gz, HALF, 0, 0));
+  });
+  belly(k, T2.wMax * 1.05, len * 0.5, -T2.hBm - 0.03, 0);
+  if (k.hi) for (const sd of [-1, 1]) pb.add("glow", sphere(0.04, 8, 6), M4.t(sd * hw * 0.5, 0, -len * 0.47));
+  pb.add("chrome", lathe(prof([[0.05 * hw, 0], [0.035 * hw, 0.14], [0, 0.34]]), k.hi ? 14 : 6, 0), M4.t(0, 0, len * 0.5 - 0.02));
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T2) };
+};
+var mavik = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.1, 0.1, 0.1, 2.2, 0], [-0.42, 0.52, 0.34, 0.3, 2.4, 0], [-0.3, 0.84, 0.44, 0.46, 2.6, 0], [-0.2, 0.96, 0.42, 0.52, 2.6, 0.42], [-0.04, 1, 0.38, 0.54, 2.6, 0.5], [0.1, 0.92, 0.38, 0.5, 2.6, 0.4], [0.2, 0.76, 0.4, 0.42, 2.4, 0], [0.34, 0.46, 0.3, 0.3, 2.3, 0], [0.45, 0.2, 0.15, 0.15, 2.2, 0], [0.5, 0.06, 0.05, 0.05, 2, 0]]);
+  const hip = V2(0, T2.floorY * 0.42, T2.hip.z - 0.06), lean = 0.5;
+  seat(k, hip, lean);
+  const P = pilot(k, hip, lean, [V2(-0.2 * k.s, hip.y + 0.26, hip.z + 0.62), V2(0.2 * k.s, hip.y + 0.26, hip.z + 0.62)]);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V2(0, T2.rimY - 0.05, T2.zB - 0.12), Math.min(T2.wMax * 1.2, 1), 3, 0, -0.75);
+  windscreen(k, "bubble", V2(0, T2.rimY - 0.04, (T2.zA + T2.zB) * 0.5 - 0.02), T2.wMax * 0.8, 0.5, (T2.zB - T2.zA) * 0.56);
+  part3(k, "probe", V2(0, 0, len * 0.5 + 0.5), (g2) => {
+    g2.add("chrome", lathe(prof([[0.05, 0], [0.032, 0.25], [0.02, 0.9], [0, 1.15]]), k.hi ? 12 : 6, 0), M4.t(0, 0, len * 0.5 - 0.04));
+    g2.add("dark", torus(0.05, 0.016, 5, k.hi ? 12 : 6), M4.t(0, 0, len * 0.5 + 0.2));
+    g2.add("glow", sphere(0.022, 6, 4), M4.t(0, 0, len * 0.5 + 1.1));
+  });
+  part3(k, "fin", V2(0, T2.rimY + 0.5, -len * 0.3), (g2) => {
+    g2.add("hull", fin([[0, 0], [0.95, 0], [0.4, 0.95], [0.08, 0.98]], 0.05), M4.t(0, 0.28 * hw, -len * 0.5 + 0.12), SEC2);
+    if (k.hi) g2.add("glow", sphere(0.03, 6, 4), M4.t(0, 0.28 * hw + 0.98, -len * 0.5 + 0.22));
+  });
+  if (k.hi) for (const sd of [-1, 1]) for (let i = 0; i < 3; i++) pb.add("dark", rbox(0.02, 0.12 * hw, 0.16, 6e-3), M4.trs(sd * hw * 0.97, -0.02, -len * 0.16 + i * 0.2, 0, sd * 0.5, 0));
+  belly(k, T2.wMax * 0.9, len * 0.5, -T2.hBm - 0.02, 0);
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T2) };
+};
+var rattis = (k) => {
+  const { hw, len, pb } = k;
+  const body = [
+    { z: -0.5 * len, w: 0.03, hT: 0.03, hB: 0.03 },
+    { z: -0.4 * len, w: 0.26 * hw, hT: 0.2 * hw, hB: 0.22 * hw },
+    { z: -0.22 * len, w: 0.5 * hw, hT: 0.3 * hw, hB: 0.4 * hw },
+    { z: -0.06 * len, w: 0.36 * hw, hT: 0.2 * hw, hB: 0.34 * hw },
+    { z: 0.1 * len, w: 0.52 * hw, hT: 0.26 * hw, hB: 0.44 * hw },
+    { z: 0.3 * len, w: 0.46 * hw, hT: 0.3 * hw, hB: 0.36 * hw },
+    { z: 0.44 * len, w: 0.24 * hw, hT: 0.2 * hw, hB: 0.2 * hw },
+    { z: 0.5 * len, w: 0.05, hT: 0.05, hB: 0.05 }
+  ];
+  const bSeg = k.d === 0 ? 10 : Math.max(20, k.seg);
+  pb.add("hull", loft(body.map((s) => ({ ...s, n: 2.3 })), bSeg, 2));
+  const bodyAt = (z) => {
+    let i = 0;
+    while (i < body.length - 2 && body[i + 1].z < z) i++;
+    const a = body[i], b = body[i + 1], t = (z - a.z) / (b.z - a.z), m = (p, q) => (p + (q - p) * t) * 1.045;
+    return { z, w: m(a.w, b.w), hT: m(a.hT, b.hT), hB: m(a.hB, b.hB), n: 2.3 };
+  };
+  for (const z of [-0.36, -0.29, -0.22, -0.15]) pb.add("hull", loft([bodyAt(z * len), bodyAt((z + 0.035) * len)], bSeg, 3, [false, false]));
+  const hip = V2(0, 0.3 * hw + 0.02, -0.02 * len);
   for (const sd of [-1, 1]) {
-    const fin = extrude([[0, 0], [0.55, 0], [0.75, 0.55 * hw], [0.45, 0.55 * hw]], 0.04, 0.012);
-    fin.rotateY(Math.PI / 2);
-    pb.add("hull", fin, M4.trs(sd * rear.w * 0.45, rear.hT * 0.6, secs[2].z, 0, 0, sd * -0.35), [0, 0, 3]);
-    pb.add("glow", sphere(0.045, 10, 8), M4.t(sd * rear.w * 0.62, 0, secs[0].z + 0.06));
+    pb.add("steel", tube([V2(sd * 0.3 * hw, 0.16 * hw, -0.3 * len), V2(sd * 0.42 * hw, 0.36 * hw, -0.1 * len), V2(sd * 0.36 * hw, 0.3 * hw, 0.2 * len), V2(sd * 0.16 * hw, 0.2 * hw, 0.4 * len)], 0.035, k.hi ? 14 : 6, 6));
+    if (k.hi) pb.add("steel", tube([V2(sd * 0.42 * hw, 0.36 * hw, -0.1 * len), V2(sd * 0.3 * hw, -0.1 * hw, 0.02 * len)], 0.028, 4, 6));
   }
-  pb.add("dark", cyl(0.012, 0.016, 0.9, 6), M4.t(-rear.w * 0.3, rear.hT + 0.45, rear.z + 0.15));
-  pb.add("glow", sphere(0.03, 8, 6), M4.t(-rear.w * 0.3, rear.hT + 0.92, rear.z + 0.15));
-  pb.add("chrome", lathe(prof([[0.07 * hw, 0], [0.05 * hw, 0.12], [0, 0.3]]), 16, 0), M4.t(0, 0, len * 0.5 - 0.02));
-  const fr = secs[Math.min(secs.length - 1, iB + 2)];
-  const anchors = [V2(-fr.w * 0.45, fr.hT * 0.75 + 0.06, fr.z), V2(fr.w * 0.45, fr.hT * 0.75 + 0.06, fr.z)];
-  for (const a of anchors) {
-    pb.add("chrome", torus(0.06, 0.02, 6, 14), M4.trs(a.x, a.y, a.z, 0, Math.PI / 2, 0));
-    pb.add("steel", rbox(0.1, 0.1, 0.16, 0.02), M4.t(a.x, a.y - 0.07, a.z));
+  pb.add("leather", rbox(0.34, 0.1, 0.62, 0.045), M4.t(0, hip.y - 0.05, hip.z + 0.02));
+  pb.add("leather", rbox(0.3, 0.2, 0.1, 0.04), M4.trs(0, hip.y + 0.07, hip.z - 0.32, -0.3, 0, 0));
+  const hb = V2(0, hip.y + 0.36 * k.s, hip.z + 0.56 * k.s), grip = [V2(-0.27, hb.y, hb.z - 0.05), V2(0.27, hb.y, hb.z - 0.05)];
+  pb.add("steel", tube([V2(0, 0.22 * hw, hb.z + 0.12), V2(0, hb.y - 0.1, hb.z + 0.04), hb], 0.03, 6, 6));
+  pb.add("chrome", tube([grip[0], V2(-0.12, hb.y + 0.03, hb.z + 0.02), hb, V2(0.12, hb.y + 0.03, hb.z + 0.02), grip[1]], 0.022, k.hi ? 14 : 6, 6));
+  for (const g2 of grip) pb.add("rubber", cyl(0.03, 0.03, 0.14, k.hi ? 10 : 6), M4.trs(g2.x, g2.y, g2.z, 0, 0, HALF));
+  const P = pilot(k, hip, -0.42, grip);
+  dash(k, V2(0, hb.y - 0.06, hb.z + 0.16), 0.26, 2, 0, -1.1);
+  windscreen(k, "fly", V2(0, hb.y - 0.12, hb.z + 0.02), 0.34, 0.42, 0.36);
+  part3(k, "stinger", V2(0, 0, -0.5 * len - 0.3), (g2) => {
+    g2.add("chrome", lathe(prof([[0.07, 0], [0.045, -0.25], [0, -0.72]]), k.hi ? 12 : 6, 0), M4.t(0, 0, -0.5 * len + 0.04));
+    g2.add("dark", torus(0.07, 0.02, 5, k.hi ? 12 : 6), M4.t(0, 0, -0.5 * len + 0.02));
+  });
+  for (const sd of [-1, 1]) pb.add("hull", fin([[0, 0], [0.5, 0], [0.16, 0.34]], 0.03), M4.trs(sd * 0.2 * hw, 0.1 * hw, -0.47 * len, 0, 0, sd * -1), SEC2);
+  belly(k, 0.6 * hw, len * 0.5, -0.44 * hw - 0.02, 0.05 * len);
+  if (k.hi) {
+    pb.add("glow", sphere(0.05, 8, 6), M4.t(0, 0.04, 0.5 * len + 0.02));
+    for (const sd of [-1, 1]) pb.add("glow", sphere(0.03, 6, 4), M4.t(sd * 0.2 * hw, 0.05, -0.46 * len));
   }
-  const out = { parts: pb.build(), info: { head: pil.head, anchors } };
+  return { head: P.head, eye: P.eye, anchors: anchors(k, [V2(-0.3 * hw, 0.24 * hw, 0.36 * len), V2(0.3 * hw, 0.24 * hw, 0.36 * len)]) };
+};
+var elana = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.16, 0.12, 0.12, 2.3, 0], [-0.44, 0.56, 0.34, 0.32, 2.4, 0], [-0.32, 0.86, 0.38, 0.44, 2.6, 0.45], [-0.16, 0.94, 0.33, 0.48, 2.6, 0.58], [-0.02, 0.9, 0.32, 0.46, 2.6, 0.5], [0.1, 0.78, 0.36, 0.42, 2.5, 0], [0.26, 0.54, 0.34, 0.32, 2.4, 0], [0.4, 0.3, 0.26, 0.18, 2.2, 0], [0.5, 0.06, 0.08, 0.05, 2, 0]]);
+  seat(k, T2.hip);
+  const P = pilot(k, T2.hip);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V2(0, T2.rimY - 0.06, T2.zB - 0.16), Math.min(T2.wMax * 1.25, 1.2), 3, 1);
+  windscreen(k, "dome", V2(0, T2.rimY - 0.02, T2.zB - 0.42 * (T2.zB - T2.zA)), T2.wMax * 0.7, 0.36, 0.62);
+  pb.add("chrome", lathe(prof([[0.07, 0], [0.05, 0.16], [0.012, 0.42], [0, 0.46]]), k.hi ? 12 : 6, 0), M4.trs(0, -0.03, len * 0.5 - 0.03, 0.2, 0, 0));
+  for (const sd of [-1, 1]) part3(k, sd < 0 ? "wingL" : "wingR", V2(sd * hw * 1.3, 0, -0.1 * len), (g2) => {
+    const w = extrude([[0, 0], [0.78, 0.62], [0.86, 0.92], [0.52, 0.86], [0, 0.46]], 0.035, 0.01);
+    w.rotateX(-HALF);
+    const m = M4.trs(sd * hw * 0.9, 0.02, 0.12 * len, 0, 0, sd * 0.14);
+    if (sd < 0) m.multiply(M4.mirrorX());
+    g2.add("hull", w, m, SEC2);
+    if (k.hi) g2.add("glow", sphere(0.028, 6, 4), M4.t(sd * (hw * 0.9 + 0.84), 0.13, 0.12 * len - 0.9));
+  });
+  part3(k, "fin", V2(0, 0.9, -0.3 * len), (g2) => g2.add("hull", fin([[0, 0], [1.25, 0], [0.5, 1.12], [0.1, 1.18]], 0.06), M4.t(0, 0.3 * hw, -0.5 * len + 0.06), SEC2));
+  for (const sd of [-1, 1]) part3(k, sd < 0 ? "petalL" : "petalR", V2(sd * 0.3, 0, -0.5 * len - 0.2), (g2) => g2.add("hull", rbox(0.04, 0.42 * hw, 0.5, 0.012), M4.trs(sd * 0.3 * hw, 0, -0.5 * len - 0.14, 0, sd * -0.42, 0), SEC2));
+  if (k.hi) for (const sd of [-1, 1]) pb.add("chrome", tube([V2(sd * hw * 0.5, T2.rimY + 0.02, T2.zA), V2(sd * hw * 0.92, T2.rimY - 0.02, (T2.zA + T2.zB) / 2), V2(sd * hw * 0.52, T2.rimY + 0.03, T2.zB + 0.1), V2(sd * 0.08, 0.2 * hw, len * 0.44)], 0.016, 20, 5));
+  belly(k, T2.wMax, len * 0.46, -T2.hBm - 0.03, -0.04 * len);
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T2) };
+};
+var gasvaro = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.05, 0.05, 0.05, 2.2, 0], [-0.4, 0.44, 0.3, 0.3, 2.3, 0], [-0.28, 0.82, 0.38, 0.44, 2.5, 0.4], [-0.14, 0.96, 0.34, 0.5, 2.6, 0.56], [0, 0.94, 0.34, 0.5, 2.6, 0.5], [0.12, 0.8, 0.38, 0.44, 2.5, 0], [0.26, 0.56, 0.34, 0.34, 2.3, 0], [0.4, 0.3, 0.2, 0.2, 2.2, 0], [0.5, 0.05, 0.05, 0.05, 2, 0]]);
+  seat(k, T2.hip);
+  const P = pilot(k, T2.hip);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V2(0, T2.rimY - 0.06, T2.zB - 0.14), Math.min(T2.wMax * 1.2, 1.1), 2, 2);
+  windscreen(k, "bubble", V2(0, T2.rimY - 0.05, (T2.zA + T2.zB) * 0.5), T2.wMax * 0.86, 0.64, (T2.zB - T2.zA) * 0.5);
+  const hz = 0.3 * len, hy = 0.26 * hw + 0.1;
+  pb.add("steel", torus(0.2, 0.035, 6, k.hi ? 18 : 8), M4.trs(0, hy, hz, HALF, 0, 0));
+  pb.add("dark", cyl(0.12, 0.15, 0.12, k.hi ? 12 : 6), M4.t(0, hy - 0.02, hz));
+  if (k.hi) pb.add("glow", torus(0.1, 0.012, 5, 14), M4.trs(0, hy + 0.05, hz, HALF, 0, 0));
+  const A = [V2(-0.76, hy + 0.24, hz + 0.34), V2(0.76, hy + 0.24, hz + 0.34)];
+  for (const sd of [-1, 1]) for (let i = 0; i < 3; i++) {
+    const tip = V2(sd * (0.36 + i * 0.2), hy + 0.1 + i * 0.07, hz + 0.34 - (2 - i) * 0.2);
+    pb.add("steel", tube([V2(sd * 0.16, hy, hz), V2(sd * (0.2 + i * 0.1), hy + 0.12, hz + 0.1), tip], 0.026, k.hi ? 8 : 4, 5));
+    pb.add("copper", sphere(0.05, k.hi ? 8 : 5, k.hi ? 6 : 4), M4.t(tip.x, tip.y, tip.z));
+  }
+  for (const sd of [-1, 1]) for (const up of [0, 1]) {
+    pb.add("dark", tube([V2(sd * 0.08, 0.02, len * 0.46), V2(sd * (0.3 + up * 0.14), 0.16 + up * 0.26, len * 0.5 + 0.34), V2(sd * (0.44 + up * 0.2), 0.2 + up * 0.44, len * 0.5 + 0.86)], 0.011, k.hi ? 8 : 4, 4));
+    if (k.hi) pb.add("glow", sphere(0.02, 6, 4), M4.t(sd * (0.44 + up * 0.2), 0.2 + up * 0.44, len * 0.5 + 0.86));
+  }
+  for (const sd of [-1, 1]) pb.add("hull", fin([[0, 0], [0.6, 0], [0.24, 0.5]], 0.035), M4.trs(sd * 0.1, 0.12 * hw, -0.48 * len, 0, 0, sd * -0.6), SEC2);
+  belly(k, T2.wMax, len * 0.44, -T2.hBm - 0.03, -0.02 * len);
+  return { head: P.head, eye: P.eye, anchors: anchors(k, A) };
+};
+var brute = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.62, 0.34, 0.34, 4.5, 0], [-0.44, 0.94, 0.4, 0.42, 4.5, 0], [-0.3, 1, 0.36, 0.44, 4.5, 0.5], [-0.1, 1, 0.32, 0.42, 4.5, 0.58], [0.06, 0.96, 0.3, 0.38, 4.5, 0.5], [0.18, 0.9, 0.3, 0.32, 4, 0], [0.34, 0.7, 0.2, 0.24, 3.6, 0], [0.5, 0.36, 0.06, 0.1, 3.2, 0]]);
+  seat(k, T2.hip);
+  const P = pilot(k, T2.hip);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V2(0, T2.rimY - 0.05, T2.zB - 0.12), Math.min(T2.wMax * 1.2, 1.5), 3, 1);
+  const sz = T2.zB - 0.06, eyeY = P.eye.y, loH = eyeY - 0.2 - T2.rimY;
+  pb.add("dark", rbox(T2.wMax * 1.5, loH, 0.07, 0.02), M4.trs(0, T2.rimY + loH / 2 - 0.02, sz, -0.3, 0, 0));
+  pb.add("dark", rbox(T2.wMax * 1.5, 0.08, 0.09, 0.02), M4.trs(0, eyeY + 0.24, sz - 0.2, -0.3, 0, 0));
+  pb.add("glass", rbox(T2.wMax * 1.4, 0.42, 0.02, 6e-3), M4.trs(0, eyeY + 0.01, sz - 0.11, -0.3, 0, 0));
+  for (const sd of [-1, 1]) pb.add("steel", rbox(0.06, 0.5, 0.08, 0.02), M4.trs(sd * T2.wMax * 0.74, eyeY + 0.01, sz - 0.11, -0.3, 0, 0));
+  for (let i = 0; i < 3; i++) pb.add("steel", rbox(hw * (1.5 - i * 0.34), 0.05, 0.42, 0.015), M4.trs(0, 0.2 * hw - i * 0.045, len * (0.24 + i * 0.09), 0.2, 0, 0));
+  if (k.hi) pb.add("chrome", boltRing(0.3, 8, 0.022, 0), M4.trs(0, 0.2 * hw + 0.03, len * 0.24, -HALF + 0.2, 0, 0));
+  for (const sd of [-1, 1]) part3(k, sd < 0 ? "tuskL" : "tuskR", V2(sd * hw * 0.8, 0, len * 0.5 + 0.3), (g2) => {
+    g2.add("chrome", tube([V2(sd * hw * 0.62, -0.1, len * 0.36), V2(sd * hw * 0.86, -0.06, len * 0.5 + 0.1), V2(sd * hw * 0.74, 0.1, len * 0.5 + 0.62)], 0.06, k.hi ? 10 : 5, 6));
+    g2.add("chrome", lathe(prof([[0.06, 0], [0, 0.26]]), 6, 0), M4.trs(sd * hw * 0.74, 0.1, len * 0.5 + 0.6, -0.32, sd * -0.2, 0));
+  });
+  const cz0 = T2.hip.z - 0.42, cz1 = T2.zB - 0.2, cy = T2.rimY + 0.86 * k.s;
+  for (const sd of [-1, 1]) pb.add("steel", tube([V2(sd * T2.wMax * 0.92, T2.rimY, cz0), V2(sd * T2.wMax * 0.7, cy, cz0 + 0.08), V2(sd * T2.wMax * 0.62, cy - 0.04, (cz0 + cz1) / 2), V2(sd * T2.wMax * 0.86, T2.rimY + 0.06, cz1)], 0.04, k.hi ? 16 : 6, 6));
+  pb.add("steel", tube([V2(-T2.wMax * 0.7, cy, cz0 + 0.08), V2(0, cy + 0.05, cz0 + 0.06), V2(T2.wMax * 0.7, cy, cz0 + 0.08)], 0.04, k.hi ? 8 : 4, 6));
+  for (const sd of [-1, 1]) {
+    pb.add("dark", cyl(0.09, 0.11, 0.7, k.hi ? 12 : 6), M4.trs(sd * hw * 0.62, 0.36, -len * 0.42, -0.26, 0, 0));
+    pb.add("copper", torus(0.095, 0.02, 5, k.hi ? 12 : 6), M4.trs(sd * hw * 0.62, 0.69, -len * 0.42 - 0.09, HALF - 0.26, 0, 0));
+    if (k.hi) pb.add("glow", new CircleGeometry(0.075, 10), M4.trs(sd * hw * 0.62, 0.66, -len * 0.42 - 0.08, -HALF - 0.26, 0, 0));
+  }
+  belly(k, T2.wMax * 1.1, len * 0.5, -T2.hBm - 0.03, -0.02 * len);
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T2) };
+};
+var bomquad = (k) => {
+  const { hw, pb } = k;
+  const R = hw * 1.02, n = k.d === 0 ? 14 : Math.max(28, k.seg);
+  const disc = lathe(prof([[0, -0.5 * hw], [0.5 * R, -0.5 * hw, 1], [0.86 * R, -0.3 * hw], [R, -0.1 * hw, 1], [R, -0.02 * hw, 1], [0.84 * R, 0.14 * hw], [0.62 * R, 0.2 * hw, 1]]), n, 2);
+  disc.rotateX(-HALF);
+  pb.add("hull", disc);
+  const tub = lathe(prof([[0.62 * R, 0.2 * hw], [0.56 * R, 0.1 * hw], [0.5 * R, -0.36 * hw, 1], [0, -0.36 * hw]]), n, 0);
+  tub.rotateX(-HALF);
+  pb.add("interior", tub);
+  if (k.hi) {
+    pb.add("chrome", torus(0.62 * R, 0.022, 6, n), M4.trs(0, 0.2 * hw, 0, HALF, 0, 0));
+    pb.add("hazard", torus(R, 0.035, 5, n), M4.trs(0, -0.06 * hw, 0, HALF, 0, 0));
+    pb.add("chrome", boltRing(0.92 * R, 16, 0.02, 0), M4.trs(0, -0.02 * hw, 0, -HALF, 0, 0));
+  }
+  const hip = V2(0, -0.3 * hw, -0.12);
+  seat(k, hip);
+  const P = pilot(k, hip);
+  levers(k, P.hands, -0.36 * hw);
+  dash(k, V2(0, -0.02 * hw, 0.5 * R - 0.1), 0.7, 2, 2, -0.95);
+  windscreen(k, "bubble", V2(0, 0.2 * hw, 0), 0.6 * R, 0.62 * R, 0.6 * R);
+  [[-1, 1], [1, 1], [-1, -1], [1, -1]].forEach(([sx, sz], i) => part3(k, "arm" + i, V2(sx * R, 0.2, sz * R), (g2) => {
+    const tip = V2(sx * R * 1.16, 0.3 * hw, sz * R * 0.96);
+    g2.add("steel", tube([V2(sx * R * 0.56, 0.02, sz * R * 0.5), V2(sx * R * 0.9, 0.24 * hw, sz * R * 0.78), tip], 0.045, k.hi ? 8 : 4, 6));
+    g2.add("dark", sphere(0.1, k.hi ? 10 : 6, k.hi ? 8 : 4), M4.trs(tip.x, tip.y, tip.z, 0, 0, 0, 1, 0.8, 1.3));
+    g2.add("glow", sphere(0.05, 6, 4), M4.t(tip.x, tip.y, tip.z + sz * 0.11));
+  }));
+  pb.add("glow", torus(0.66 * R, 0.03, 5, n), M4.trs(0, -0.42 * hw, 0, HALF, 0, 0));
+  for (let i = 0; i < 3; i++) {
+    const a = i / 3 * Math.PI * 2;
+    pb.add("dark", sphere(0.14, k.hi ? 10 : 6, k.hi ? 5 : 3, 0, Math.PI * 2, HALF, HALF), M4.t(Math.sin(a) * 0.34 * R, -0.5 * hw, Math.cos(a) * 0.34 * R));
+  }
+  if (k.hi) pb.add("dark", cyl(0.012, 0.016, 0.7, 6), M4.t(-0.5 * R, 0.5, -0.5 * R));
+  return { head: P.head, eye: P.eye, anchors: anchors(k, [V2(-0.5 * R, 0.2 * hw + 0.02, 0.6 * R), V2(0.5 * R, 0.2 * hw + 0.02, 0.6 * R)]) };
+};
+var aldo = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.4, 0.3, 0.3, 3, 0], [-0.44, 0.78, 0.42, 0.42, 3, 0], [-0.32, 0.92, 0.38, 0.48, 3, 0.5], [-0.16, 0.94, 0.33, 0.5, 2.8, 0.58], [-0.02, 0.9, 0.33, 0.48, 2.8, 0.5], [0.1, 0.8, 0.37, 0.43, 2.6, 0], [0.26, 0.6, 0.33, 0.35, 2.5, 0], [0.4, 0.38, 0.23, 0.23, 2.3, 0], [0.5, 0.1, 0.07, 0.08, 2, 0]]);
+  seat(k, T2.hip);
+  const P = pilot(k, T2.hip);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V2(0, T2.rimY - 0.06, T2.zB - 0.16), Math.min(T2.wMax * 1.25, 1.25), 4, 1);
+  windscreen(k, "dome", V2(0, T2.rimY - 0.02, T2.zB - 0.42 * (T2.zB - T2.zA)), T2.wMax * 0.74, 0.34, 0.58);
+  for (const sd of [-1, 1]) part3(k, sd < 0 ? "radL" : "radR", V2(sd * hw * 1.1, 0, -0.05 * len), (g2) => {
+    g2.add("dark", rbox(0.1, 0.5 * hw, 0.36 * len, 0.03), M4.trs(sd * (T2.wMax + 0.06), -0.04 * hw, -0.06 * len, 0, 0, sd * -0.12));
+    const nF = k.hi ? 11 : 4;
+    for (let i = 0; i < nF; i++) g2.add("steel", rbox(0.2, 0.46 * hw, 0.014, 4e-3), M4.trs(sd * (T2.wMax + 0.16), -0.04 * hw, -0.06 * len + (i / (nF - 1) - 0.5) * 0.32 * len, 0, sd * 0.42, sd * -0.12));
+    g2.add("glow", rbox(0.02, 0.03, 0.34 * len, 6e-3), M4.trs(sd * (T2.wMax + 0.12), 0.23 * hw, -0.06 * len, 0, 0, sd * -0.12));
+  });
+  for (const sd of [-1, 1]) pb.add("copper", tube([V2(sd * 0.3, 0.3 * hw, -0.44 * len), V2(sd * T2.wMax * 0.95, 0.24 * hw, -0.26 * len), V2(sd * (T2.wMax + 0.04), 0.26 * hw, 0.1 * len), V2(sd * hw * 0.5, 0.2 * hw, 0.3 * len)], 0.032, k.hi ? 18 : 6, 6));
+  for (const sd of [-1, 1]) {
+    pb.add("steel", cyl(0.15, 0.15, 0.56, k.hi ? 14 : 7), M4.trs(sd * 0.22, 0.34 * hw + 0.08, -0.43 * len, HALF, 0, 0));
+    if (k.hi) for (const z of [-0.18, 0.18]) pb.add("copper", torus(0.155, 0.016, 5, 14), M4.t(sd * 0.22, 0.34 * hw + 0.08, -0.43 * len + z));
+    pb.add("dark", cyl(0.05, 0.07, 0.4, k.hi ? 10 : 5), M4.t(sd * 0.5 * hw, 0.4 * hw + 0.16, -0.36 * len));
+    if (k.hi) pb.add("glow", new CircleGeometry(0.04, 8), M4.trs(sd * 0.5 * hw, 0.4 * hw + 0.365, -0.36 * len, -HALF, 0, 0));
+  }
+  belly(k, T2.wMax, len * 0.48, -T2.hBm - 0.03, -0.02 * len);
+  pb.add("chrome", lathe(prof([[0.06 * hw, 0], [0.04 * hw, 0.12], [0, 0.3]]), k.hi ? 12 : 6, 0), M4.t(0, 0, len * 0.5 - 0.02));
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T2) };
+};
+var teemo = (k) => {
+  const { hw, len, pb } = k;
+  const R = hw, n = k.d === 0 ? 12 : Math.max(24, k.seg);
+  const drum = lathe(prof([[0, -0.54 * hw], [0.7 * R, -0.54 * hw, 1], [0.98 * R, -0.3 * hw, 1], [0.98 * R, 0.2 * hw, 1], [0.8 * R, 0.4 * hw, 1], [0.56 * R, 0.4 * hw, 1]]), n, 2);
+  drum.rotateX(-HALF);
+  pb.add("hull", drum, M4.trs(0, 0, 0, 0, 0, 0, 1, 1, len / (2 * hw) * 0.9));
+  const sz = len / (2 * hw) * 0.9;
+  const well = lathe(prof([[0.56 * R, 0.4 * hw], [0.52 * R, 0.3 * hw], [0.5 * R, -0.4 * hw, 1], [0, -0.4 * hw]]), n, 0);
+  well.rotateX(-HALF);
+  pb.add("interior", well, M4.trs(0, 0, 0, 0, 0, 0, 1, 1, sz));
+  for (const sd of [-1, 1]) part3(k, sd < 0 ? "plateL" : "plateR", V2(sd * R, 0, 0), (g2) => {
+    const a0 = sd > 0 ? 0.25 : Math.PI + 0.25;
+    g2.add("steel", lathe(prof([[R + 0.05, -0.24 * hw, 1], [R + 0.05, 0.14 * hw, 1], [R, 0.14 * hw, 1], [R, -0.24 * hw, 1], [R + 0.05, -0.24 * hw]]), k.hi ? 10 : 4, 0, a0, Math.PI - 0.5).rotateX(-HALF), M4.trs(0, 0, 0, 0, 0, 0, 1, 1, sz));
+    if (k.hi) for (let i = 0; i < 6; i++) {
+      const a = a0 + 0.2 + i * 0.44;
+      g2.add("chrome", cyl(0.024, 0.024, 0.02, 6), M4.trs(Math.sin(a) * (R + 0.055), -0.05 * hw, Math.cos(a) * (R + 0.055) * sz, 0, a, HALF));
+    }
+  });
+  for (const a of [0, 0.62, -0.62]) {
+    pb.add("dark", rbox(0.34, 0.09, 0.05, 0.012), M4.trs(Math.sin(a) * 0.985 * R, 0.27 * hw, Math.cos(a) * 0.985 * R * sz, 0, a, 0));
+    pb.add("glass", rbox(0.28, 0.045, 0.02, 6e-3), M4.trs(Math.sin(a) * R, 0.27 * hw, Math.cos(a) * R * sz, 0, a, 0));
+  }
+  const hip = V2(0, -0.36 * hw, -0.06);
+  seat(k, hip);
+  const P = pilot(k, hip);
+  levers(k, P.hands, -0.4 * hw);
+  dash(k, V2(0, 0.08 * hw, 0.4 * R * sz), 0.52, 2, 1, -1);
+  pb.add("steel", cyl(0.56 * R, 0.56 * R, 0.05, k.hi ? 20 : 10), M4.trs(0, 0.4 * hw + 0.44, -0.56 * R * sz - 0.12, 1.2, 0, 0, 1, 1, 0.92));
+  if (k.hi) {
+    pb.add("chrome", torus(0.09, 0.016, 5, 12, Math.PI), M4.trs(0, 0.4 * hw + 0.5, -0.56 * R * sz - 0.06, 1.2 - HALF, 0, 0));
+    pb.add("steel", tube([V2(0.3, 0.42 * hw, -0.3 * R * sz), V2(0.34, 0.4 * hw + 0.36, -0.56 * R * sz - 0.04)], 0.018, 4, 5));
+    pb.add("chrome", boltRing(0.5 * R, 10, 0.02, 0), M4.trs(0, 0.4 * hw + 0.46, -0.56 * R * sz - 0.1, 1.2 - HALF, 0, 0, 1, 1, 1));
+  }
+  for (const sg of [-1, 1]) pb.add("steel", tube([V2(-0.8 * R, -0.2 * hw, sg * 0.66 * R * sz), V2(-0.42 * R, -0.22 * hw, sg * (R * sz + 0.12)), V2(0.42 * R, -0.22 * hw, sg * (R * sz + 0.12)), V2(0.8 * R, -0.2 * hw, sg * 0.66 * R * sz)], 0.05, k.hi ? 12 : 5, 6));
+  pb.add("glow", torus(0.52 * R, 0.026, 5, n), M4.trs(0, -0.56 * hw, 0, HALF, 0, 0));
+  return { head: P.head, eye: P.eye, anchors: anchors(k, [V2(-0.56 * R, 0.4 * hw + 0.04, 0.5 * R * sz), V2(0.56 * R, 0.4 * hw + 0.04, 0.5 * R * sz)]) };
+};
+var odo = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.7, 0.36, 0.36, 4.2, 0], [-0.44, 0.96, 0.42, 0.42, 4.2, 0], [-0.3, 1, 0.36, 0.44, 4.2, 0.5], [-0.1, 1, 0.32, 0.42, 4.2, 0.58], [0.06, 0.98, 0.3, 0.4, 4.2, 0.5], [0.2, 0.94, 0.34, 0.36, 4, 0], [0.38, 0.86, 0.3, 0.32, 3.8, 0], [0.5, 0.72, 0.2, 0.26, 3.6, 0]]);
+  seat(k, T2.hip);
+  const P = pilot(k, T2.hip);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V2(0, T2.rimY - 0.05, T2.zB - 0.12), Math.min(T2.wMax * 1.2, 1.4), 2, 2);
+  windscreen(k, "wrap", V2(0, T2.rimY - 0.16, T2.zB - 0.36 * (T2.zB - T2.zA)), T2.wMax * 0.9, 0.56, 0.6);
+  const z0 = len * 0.5 + 0.34;
+  part3(k, "ram", V2(0, -0.1, z0), (g2) => {
+    for (const sd of [-1, 1]) {
+      g2.add("steel", rbox(1.5 * hw, 0.46, 0.14, 0.04), M4.trs(sd * 0.7 * hw, -0.16, z0 - 0.16, 0.25, sd * -0.42, 0));
+      g2.add("hazard", rbox(1.5 * hw, 0.14, 0.15, 0.03), M4.trs(sd * 0.7 * hw, 0, z0 - 0.13, 0.25, sd * -0.42, 0));
+      const nS = k.hi ? 5 : 2;
+      for (let i = 0; i < nS; i++) g2.add("dark", rbox(0.05, 0.05, 0.5, 0.012), M4.trs(sd * (0.2 + i * 1.2 / nS) * hw, -0.36, z0 + 0.14 - i / nS * 0.5, 0.5, 0, 0));
+    }
+    g2.add("steel", rbox(0.16, 0.5, 0.2, 0.04), M4.trs(0, -0.14, z0 + 0.14, 0.25, 0, 0));
+  });
+  for (const sd of [-1, 1]) {
+    pb.add("dark", cyl(0.07, 0.07, 0.5, k.hi ? 10 : 6), M4.trs(sd * 0.56 * hw, -0.02, len * 0.5 - 0.16, HALF, sd * -0.22, 0));
+    pb.add("chrome", cyl(0.04, 0.04, 0.52, k.hi ? 8 : 5), M4.trs(sd * 0.47 * hw, -0.02, len * 0.5 + 0.22, HALF, sd * -0.22, 0));
+  }
+  const cz0 = T2.hip.z - 0.4, cz1 = T2.zB - 0.16, cy = T2.rimY + 0.84 * k.s;
+  for (const sd of [-1, 1]) {
+    pb.add("steel", tube([V2(sd * T2.wMax * 0.94, T2.rimY, cz0), V2(sd * T2.wMax * 0.78, cy, cz0 + 0.04), V2(sd * T2.wMax * 0.78, cy, cz1 - 0.2), V2(sd * T2.wMax * 0.92, T2.rimY + 0.04, cz1)], 0.045, k.hi ? 14 : 6, 6));
+    pb.add("hazard", rbox(0.03, 0.2 * hw, 0.3 * len, 8e-3), M4.t(sd * (T2.wMax + 0.012), -0.06 * hw, -0.1 * len));
+  }
+  for (const z of [cz0 + 0.04, cz1 - 0.2]) pb.add("steel", tube([V2(-T2.wMax * 0.78, cy, z), V2(T2.wMax * 0.78, cy, z)], 0.04, 2, 6));
+  pb.add("steel", rbox(1.9 * hw, 0.16, 0.14, 0.04), M4.t(0, -0.2 * hw, -len * 0.5 - 0.08));
+  if (k.hi) for (const sd of [-1, 1]) pb.add("glow", rbox(0.2, 0.06, 0.03, 0.01), M4.t(sd * 0.7 * hw, -0.2 * hw, -len * 0.5 - 0.16));
+  belly(k, T2.wMax * 1.1, len * 0.5, -T2.hBm - 0.03, -0.02 * len);
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T2) };
+};
+var DESIGNS = { aurora, mavik, rattis, elana, gasvaro, brute, bomquad, aldo, teemo, odo };
+function lampGeo(at, n) {
+  const q = new Quaternion().setFromUnitVectors(V2(0, 0, 1), n.clone().normalize());
+  const list = at.map((p) => {
+    const g2 = new CircleGeometry(0.024, LAMP_VERTS - 2);
+    g2.deleteAttribute("uv");
+    g2.applyMatrix4(new Matrix4().compose(p.clone().addScaledVector(n, 4e-3), q, V2(1, 1, 1)));
+    return g2;
+  });
+  const mg = mergeGeometries(list, false);
+  list.forEach((g2) => g2.dispose());
+  mg.setAttribute("color", new BufferAttribute(new Float32Array(mg.attributes.position.count * 3).fill(0.05), 3));
+  mg.computeBoundingSphere();
+  return mg;
+}
+var cockpitCache = /* @__PURE__ */ new Map();
+function cockpitGeo(L, seg, head = "goggles", detail = 1) {
+  const c = L.cockpit, id = c.design ?? "";
+  const key = `${id}|${c.hw}|${c.len}|${c.pilot}|${head}|${seg}|${detail}`;
+  const hit = cockpitCache.get(key);
+  if (hit) return hit;
+  const design = DESIGNS[id];
+  if (!design) throw new Error(`No cockpit design "${id}" \u2013 add it to DESIGNS in src/game/podCockpits.ts and name it in the pod's layout`);
+  const k = { pb: new PartBuilder(), pp: new PartBuilder(), hw: c.hw, len: c.len, s: c.pilot, seg, d: detail, head, hi: detail >= 1, ultra: detail >= 2, lampAt: [], lampN: V2(0, 1, 0), breaks: [] };
+  const info = design(k);
+  if (k.lampAt.length !== 3) throw new Error(`cockpit design "${id}" has no dashboard (three live lamps are required)`);
+  const out = { parts: k.pb.build(), pilot: k.pp.build(), lamps: lampGeo(k.lampAt, k.lampN), lampCount: 3, breakParts: k.breaks, info };
   cockpitCache.set(key, out);
   return out;
 }
@@ -99612,7 +100133,10 @@ function cockpitGeo(L, seg, head = "goggles") {
 // src/game/podAssembly.ts
 var BINDER_PTS = 18;
 function segFor(quality, isOpponent) {
-  return isOpponent ? quality >= 3 ? 18 : 14 : quality >= 3 ? 40 : quality === 2 ? 28 : 20;
+  return isOpponent ? quality >= 3 ? 28 : 14 : quality >= 3 ? 40 : quality === 2 ? 28 : 20;
+}
+function detailFor(seg, isOpponent) {
+  return isOpponent ? seg >= 24 ? 1 : 0 : seg >= 40 ? 2 : 1;
 }
 function push(lists, k, g2) {
   let l = lists.get(k);
@@ -99635,7 +100159,7 @@ function mergeAll(lists, owned, where, each) {
   }
   return out;
 }
-function buildFlexCables(L, seg, anchors) {
+function buildFlexCables(L, seg, anchors2) {
   const cp = new Vector3(0, L.cockpit.y, L.cockpit.z);
   const up = new Vector3(0, 1, 0);
   const list = [];
@@ -99659,7 +100183,7 @@ function buildFlexCables(L, seg, anchors) {
     const eg = engineGeo(em.spec, seg);
     const isR = em.x >= 0 ? 1 : 0;
     const a = eg.pylon.clone().add(new Vector3(em.x, em.y, em.z));
-    const b = anchors[isR].clone().add(cp);
+    const b = anchors2[isR].clone().add(cp);
     const rearZ = eg.exhaustZ + 0.12 * eg.L, topY = Math.max(eg.top, engineExtent(em.spec).top) + 0.14;
     const v1 = new Vector3(em.x, em.y + topY + 0.1, em.z + rearZ - 0.3);
     const v2 = new Vector3(em.x, em.y + topY, em.z + rearZ + (eg.pylon.z - rearZ) * 0.5);
@@ -99799,20 +100323,26 @@ function buildOpponentFarGeo(def, L) {
     const a = new Vector3(em.x, em.y + R, em.z), b = cp.clone();
     pb.add("dark", tube([a, a.clone().lerp(b, 0.5).add(new Vector3(0, -0.4, 0)), b], 0.055, 5, 4));
   }
-  const c = L.cockpit;
-  pb.add("hull", rbox(c.hw * 1.7, c.hw * 0.82, c.len, 0.14, 1), M4.t(0, c.y, c.z), [0, 0.5, 2]);
-  pb.add("dark", rbox(c.hw * 0.9, c.hw * 0.45, c.len * 0.42, 0.05, 1), M4.t(0, c.y + c.hw * 0.42, c.z));
-  const b0 = L.binders[0];
-  if (b0) {
-    const A = L.engines[b0.a], B2 = L.engines[b0.b];
-    pb.add("glow", rbox(Math.abs(B2.x - A.x), 0.18, 0.18, 0.02), M4.t((A.x + B2.x) * 0.5, (A.y + B2.y) * 0.5 + 0.2, (A.z + B2.z) * 0.5));
+  const c = L.cockpit, CK = [0, 0.5, 2];
+  if (c.far === "disc") {
+    pb.add("hull", cyl(c.hw * 0.72, c.hw, c.hw * 0.6, 10), M4.t(0, c.y - c.hw * 0.1, c.z), CK);
+    pb.add("dark", new SphereGeometry(c.hw * 0.58, 8, 3, 0, Math.PI * 2, 0, Math.PI / 2), M4.t(0, c.y + c.hw * 0.2, c.z));
+  } else {
+    pb.add("hull", rbox(c.hw * 1.7, c.hw * 0.82, c.len, 0.14, 1), M4.t(0, c.y, c.z), CK);
+    pb.add("dark", rbox(c.hw * 0.9, c.hw * 0.45, c.len * 0.42, 0.05, 1), M4.t(0, c.y + c.hw * 0.42, c.z));
+    if (c.far === "fin") pb.add("hull", new BoxGeometry(0.06, 1, 0.9), M4.trs(0, c.y + c.hw * 0.4 + 0.5, c.z - c.len * 0.3, 0.35, 0, 0), [0, 0, 3]);
+    if (c.far === "cage") pb.add("dark", torus(c.hw * 0.8, 0.05, 4, 6, Math.PI), M4.t(0, c.y + c.hw * 0.4, c.z));
+  }
+  for (const link of L.binders) {
+    const A = L.engines[link.a], B2 = L.engines[link.b], z = link.zOff ?? 0;
+    pb.add("glow", tube([new Vector3(A.x, A.y + 0.2, A.z + z), new Vector3(B2.x, B2.y + 0.2, B2.z + z)], 0.09, 1, 4));
   }
   const built = pb.build();
   const out = { hull: built.get("hull"), dark: built.get("dark"), glow: built.get("glow") };
   oppFarCache.set(def.id, out);
   return out;
 }
-function base(def, seg, head) {
+function base(def, seg, head, isOpponent) {
   const L = podLayout(def);
   const exhaustLocal = [];
   let frontZ = -Infinity, topY = 0, sumY = 0;
@@ -99823,18 +100353,37 @@ function base(def, seg, head) {
     topY = Math.max(topY, em.y + eg.R);
     sumY += em.y;
   }
-  const ck = cockpitGeo(L, seg, head);
-  const eye = new Vector3(0, L.cockpit.y, L.cockpit.z).add(ck.info.head).add(new Vector3(0, 0.24, 0.32));
+  const ck = cockpitGeo(L, seg, head, detailFor(seg, isOpponent));
+  const eye = new Vector3(0, L.cockpit.y, L.cockpit.z).add(ck.info.eye);
   const hood = new Vector3(0, sumY / Math.max(1, L.engines.length) + topY * 0.35 + 0.35, frontZ - 1.2);
+  const hi = seg >= 24;
   const build = (fn) => {
     const pb = new PartBuilder();
-    fn?.(pb, L);
+    fn?.(pb, L, hi);
     return pb.build();
   };
   const b = { layout: L, bodyZ: -L.cockpit.z * 0.25, exhaustLocal, eye, hood };
   return { b, ck, engineExtras: build(L.engineExtras), cockpitExtras: build(L.cockpitExtras) };
 }
 var sideOf = (x) => x < 0 ? -1 : 1;
+function addSideExtras(lists, extras, side, piv) {
+  const shift = M4.t(-piv.x, -piv.y, -piv.z);
+  for (const [k, eg] of extras) {
+    const idx = eg.index.array;
+    const pos = eg.attributes.position;
+    const keep = [];
+    for (let t = 0; t < idx.length; t += 3) {
+      const cx = (pos.getX(idx[t]) + pos.getX(idx[t + 1]) + pos.getX(idx[t + 2])) / 3;
+      if (sideOf(cx) === side) keep.push(idx[t], idx[t + 1], idx[t + 2]);
+    }
+    if (keep.length) {
+      const sub2 = eg.clone();
+      sub2.setIndex(keep);
+      sub2.applyMatrix4(shift);
+      push(lists, k, sub2);
+    }
+  }
+}
 function binderEnds(L, seg, link) {
   let A = L.engines[link.a], B2 = L.engines[link.b];
   if (A.x > B2.x) {
@@ -99845,8 +100394,22 @@ function binderEnds(L, seg, link) {
   const ea = engineGeo(A.spec, seg), eb = engineGeo(B2.spec, seg), z = link.zOff ?? 0;
   return { A, B: B2, ea, eb, ax: A.x + ea.binder.x, ay: A.y + ea.binder.y, az: A.z + ea.binder.z + z, bx: B2.x - eb.binder.x, by: B2.y + eb.binder.y, bz: B2.z + eb.binder.z + z };
 }
+function cockpitViewScale(parts, eye) {
+  let near = Infinity;
+  for (const g2 of parts) {
+    const p = g2.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const dz = p.getZ(i) - eye.z;
+      if (dz < 0.1) continue;
+      const dx = Math.abs(p.getX(i) - eye.x), dy = p.getY(i) - eye.y;
+      if (dx > dz * 1.6 || dy > dz * 1.1 || dy < -dz * 1.5) continue;
+      if (dz < near) near = dz;
+    }
+  }
+  return Math.max(1.4, Math.min(3.2, 0.86 / near));
+}
 function assembleHero(def, seg, head) {
-  const { b, ck, engineExtras, cockpitExtras } = base(def, seg, head);
+  const { b, ck, engineExtras, cockpitExtras } = base(def, seg, head, false);
   const L = b.layout;
   const owned = [];
   const banks = [];
@@ -99873,36 +100436,34 @@ function assembleHero(def, seg, head) {
       }
       engines.push({ index, off, geo: eg });
     }
-    {
-      const shift = M4.t(-piv.x, -piv.y, -piv.z);
-      for (const [k, eg] of engineExtras) {
-        const idx = eg.index.array;
-        const pos = eg.attributes.position;
-        const keep = [];
-        for (let t = 0; t < idx.length; t += 3) {
-          const cx = (pos.getX(idx[t]) + pos.getX(idx[t + 1]) + pos.getX(idx[t + 2])) / 3;
-          if (sideOf(cx) === side) keep.push(idx[t], idx[t + 1], idx[t + 2]);
-        }
-        if (keep.length) {
-          const sub2 = eg.clone();
-          sub2.setIndex(keep);
-          sub2.applyMatrix4(shift);
-          push(lists2, k, sub2);
-        }
-      }
-    }
+    addSideExtras(lists2, engineExtras, side, piv);
     banks.push({ side, pivot: piv, engines, buckets: mergeAll(lists2, owned, `${def.id} engine bank ${side}`) });
   }
   for (const g2 of engineExtras.values()) g2.dispose();
   const lists = /* @__PURE__ */ new Map();
   const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
-  for (const [k, g2] of ck.parts) {
+  const pushC = (k, g2) => {
     const gc = g2.clone();
     gc.applyMatrix4(ckM);
     push(lists, k, gc);
-  }
+  };
+  for (const [k, g2] of ck.parts) pushC(k, g2);
+  for (const bp of ck.breakParts) for (const [k, g2] of bp.parts) pushC(k, g2);
   for (const [k, g2] of cockpitExtras) push(lists, k, g2);
+  const viewScale = L.cockpit.viewScale ?? cockpitViewScale([...lists.values()].flat(), b.eye);
+  const pilotStart = /* @__PURE__ */ new Map();
+  for (const [k, g2] of ck.pilot) {
+    pilotStart.set(k, (lists.get(k) ?? []).reduce((s, x) => s + (x.index ? x.index.count : x.attributes.position.count), 0));
+    pushC(k, g2);
+  }
   const cockpit = mergeAll(lists, owned, `${def.id} cockpit`);
+  let lamps = null;
+  if (ck.lamps) {
+    lamps = ck.lamps.clone();
+    lamps.applyMatrix4(ckM);
+    lamps.computeBoundingSphere();
+    owned.push(lamps);
+  }
   const cables = buildFlexCables(L, seg, ck.info.anchors);
   owned.push(cables);
   const binders = [];
@@ -99912,10 +100473,10 @@ function assembleHero(def, seg, head) {
     binders.push(g2);
     owned.push(g2);
   }
-  return { ...b, banks, cockpit, cables, binders, owned };
+  return { ...b, banks, cockpit, pilotStart, lamps, lampCount: ck.lampCount, viewScale, cables, binders, owned };
 }
 function assembleRival(def, seg, head, colors, pattern) {
-  const { b, ck, engineExtras, cockpitExtras } = base(def, seg, head);
+  const { b, ck, engineExtras, cockpitExtras } = base(def, seg, head, true);
   const L = b.layout;
   const owned = [];
   const liv = pattern !== void 0 && pattern >= 0 ? pattern : L.livery;
@@ -99954,6 +100515,7 @@ function assembleRival(def, seg, head, colors, pattern) {
       fls.push(fo);
       pts.push(eg.petals.clone().translate(ox, oy, oz));
     }
+    addSideExtras(lists2, engineExtras, side, piv);
     const buckets = mergeAll(lists2, owned, `${def.id} rival bank ${side}`, bake);
     let petals = null, flames = null;
     if (pts.length) {
@@ -99973,7 +100535,10 @@ function assembleRival(def, seg, head, colors, pattern) {
   const lists = /* @__PURE__ */ new Map();
   const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
   for (const [k, g2] of ck.parts) pushC(lists, k, g2, ckM);
-  for (const extras of [engineExtras, cockpitExtras]) for (const [k, g2] of extras) {
+  for (const bp of ck.breakParts) for (const [k, g2] of bp.parts) pushC(lists, k, g2, ckM);
+  for (const [k, g2] of ck.pilot) pushC(lists, k, g2, ckM);
+  for (const g2 of engineExtras.values()) g2.dispose();
+  for (const [k, g2] of cockpitExtras) {
     pushC(lists, k, g2);
     g2.dispose();
   }
@@ -100875,6 +101440,16 @@ function suitMaterial(color9) {
   }
   return m;
 }
+var skinCache = /* @__PURE__ */ new Map();
+function skinMaterial(color9) {
+  let m = skinCache.get(color9);
+  if (!m) {
+    m = new MeshStandardMaterial({ color: color9, roughness: 0.64 });
+    m.userData.shared = true;
+    skinCache.set(color9, m);
+  }
+  return m;
+}
 function flameMaterial(color9, core) {
   const mat = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide });
   const u = { uColor: uniform8(color9.clone()), uTime: uniform8(0), uPower: uniform8(1) };
@@ -100954,16 +101529,16 @@ function getOppFarHull() {
 function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = false, opts) {
   const seg = segFor(quality, isOpponent);
   const texSize = texRes >= 2048 && !isOpponent ? 2048 : 1024;
-  const fin = opts?.finish ?? 0;
+  const fin2 = opts?.finish ?? 0;
   const shared = sharedPodMaterials(texSize);
   const glowCol = new Color(colors[2]);
-  const pilot = PILOTS.find((p) => p.id === def.pilotId) ?? PILOTS[0];
-  const suit = suitMaterial(pilot.color);
+  const pilot2 = PILOTS.find((p) => p.id === def.pilotId) ?? PILOTS[0];
+  const suit = suitMaterial(pilot2.color), skin = skinMaterial(pilot2.skin);
   const group = new Group();
   const body = new Group();
   group.add(body);
   if (isOpponent) {
-    const A2 = assembleRival(def, seg, pilot.head, colors, opts?.pattern);
+    const A2 = assembleRival(def, seg, pilot2.head, colors, opts?.pattern);
     body.position.z = A2.bodyZ;
     const oppHull = sharedOpponentHullMaterial(1024);
     const oppFlame = sharedOpponentFlameMaterial();
@@ -100975,7 +101550,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     body.add(nearGrp);
     const addBuckets = (buckets, parent) => {
       for (const [k, mg] of buckets) {
-        const mat = k === "hull" ? oppHull : k === "glow" ? oppGlow : k === "suit" ? suit : shared[k];
+        const mat = k === "hull" ? oppHull : k === "glow" ? oppGlow : k === "suit" ? suit : k === "skin" ? skin : shared[k];
         if (!mat) continue;
         const m = new Mesh(mg, mat);
         const fx = k === "glow" || k === "glass";
@@ -101066,12 +101641,12 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     };
     return { group, body, engines: engines2, exhaustLocal: A2.exhaustLocal, eye: A2.eye, hood: A2.hood, update: update2, setEngineMotion: setEngineMotion2, setDistance, dispose: dispose2 };
   }
-  const A = assembleHero(def, seg, pilot.head);
+  const A = assembleHero(def, seg, pilot2.head);
   body.position.z = A.bodyZ;
   const liv = opts?.pattern !== void 0 && opts.pattern >= 0 ? opts.pattern : A.layout.livery;
-  const hullL = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
-  const hullR = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
-  const hullC = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
+  const hullL = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin2);
+  const hullR = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin2);
+  const hullC = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin2);
   const ckGrp = new Group();
   const glow = new MeshBasicMaterial({ color: glowCol.clone().multiplyScalar(1.2) });
   const flameL = flameMaterial(glowCol, false), coreL = flameMaterial(glowCol, true);
@@ -101080,8 +101655,9 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
   const cabLift = cabMat.userData.uLift;
   const cabCk = cabMat.userData.uCk;
   const own = [hullL, hullR, hullC, glow, flameL, coreL, flameR, coreR, cabMat];
-  const matFor = (k, hull) => k === "hull" ? hull : k === "glow" ? glow : k === "suit" ? suit : shared[k];
+  const matFor = (k, hull) => k === "hull" ? hull : k === "glow" ? glow : k === "suit" ? suit : k === "skin" ? skin : shared[k];
   const addMeshes = (parts, parent, hull) => {
+    const made = [];
     for (const [k, g2] of parts) {
       const mat = matFor(k, hull);
       if (!mat) continue;
@@ -101091,7 +101667,9 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       m.receiveShadow = !fx;
       if (k === "glass") m.renderOrder = 1;
       parent.add(m);
+      made.push({ k, m });
     }
+    return made;
   };
   const engines = [];
   const fans = [];
@@ -101140,8 +101718,25 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     }
     addMeshes(bank.buckets, engGrp, hull);
   }
+  const ckView = new Group();
+  ckGrp.add(ckView);
   body.add(ckGrp);
-  addMeshes(A.cockpit, ckGrp, hullC);
+  const ckMeshes = addMeshes(A.cockpit, ckView, hullC);
+  let lampCol = null;
+  const lampNow = new Float32Array(9).fill(-1);
+  if (A.lamps) {
+    const lm = new Mesh(A.lamps, getOppGlow());
+    ckView.add(lm);
+    lampCol = A.lamps.attributes.color;
+  }
+  const setLamp = (i, r, g2, b) => {
+    if (!lampCol || lampNow[i * 3] === r && lampNow[i * 3 + 1] === g2 && lampNow[i * 3 + 2] === b) return;
+    lampNow[i * 3] = r;
+    lampNow[i * 3 + 1] = g2;
+    lampNow[i * 3 + 2] = b;
+    for (let v = i * LAMP_VERTS; v < (i + 1) * LAMP_VERTS; v++) lampCol.setXYZ(v, r, g2, b);
+    lampCol.needsUpdate = true;
+  };
   const cabMesh = new Mesh(A.cables, cabMat);
   cabMesh.castShadow = false;
   cabMesh.receiveShadow = true;
@@ -101164,9 +101759,23 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     ckGrp.rotation.x = z * 0.07;
     cabCk.value.set(x, y, z);
   };
-  const setCockpitVisible = (v) => {
-    ckGrp.visible = v;
+  let inside = false;
+  const setCockpitView = (on) => {
+    if (on === inside) return;
+    inside = on;
+    const kS = on ? A.viewScale : 1;
+    ckView.scale.setScalar(kS);
+    ckView.position.copy(A.eye).multiplyScalar(1 - kS);
+    for (const { k, m } of ckMeshes) {
+      const start = A.pilotStart.get(k);
+      if (start !== void 0) {
+        m.geometry.setDrawRange(0, on ? start : Infinity);
+        m.visible = !on || start > 0;
+      }
+      if (SHADOW_KEYS.has(k)) m.castShadow = !on;
+    }
   };
+  const eyeWorld = (out) => ckGrp.localToWorld(out.copy(A.eye));
   const setEngineMotion = (yL, yR, pitchL, pitchR, rollBank) => {
     if (engines[0]) {
       engines[0].position.y = heroPivots[0].y + yL;
@@ -101228,13 +101837,22 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       binderU.uColor.value.copy(hc);
       binderU.uPower.value = (0.55 + throttle * 0.35 + boost * 0.6) * Math.min(1, Math.min(dmgL, dmgR) * 3);
     }
+    const blink = Math.sin(t * 14) > 0 ? 1 : 0.25, hpMin = Math.min(dmgL, dmgR);
+    if (boostK > 0.08) setLamp(0, 0.2, 1.9, 2.6);
+    else setLamp(0, 0.02, 0.12, 0.2);
+    if (heat > 0.85) setLamp(1, 2.6 * blink, 0.16 * blink, 0.05);
+    else if (heat > 0.55) setLamp(1, 2.2, 1.1, 0.08);
+    else setLamp(1, 0.12, 1.3, 0.25);
+    if (hpMin < 0.3) setLamp(2, 2.6 * blink, 0.14 * blink, 0.06);
+    else if (hpMin < 0.6) setLamp(2, 2.2, 1.1, 0.08);
+    else setLamp(2, 0.12, 1.3, 0.25);
   };
   const dispose = () => {
     own.forEach((m) => m.dispose());
     A.owned.forEach((g2) => g2.dispose());
   };
   return { group, body, engines, exhaustLocal: A.exhaustLocal, eye: A.eye, hood: A.hood, update, setEngineMotion, setDistance: () => {
-  }, setCockpitSway, setCockpitVisible, dispose };
+  }, setCockpitSway, setCockpitView, eyeWorld, dispose };
 }
 
 // src/game/particles.ts
@@ -104283,7 +104901,7 @@ var Game = class _Game {
       idx = this.td.main.closed ? (idx % N3 + N3) % N3 : Math.max(0, idx);
       const s = S[idx];
       const lat = (col - 1) * s.hw * 0.55;
-      const pilot = PILOTS.find((p) => p.id === e.def.pilotId) ?? PILOTS[0];
+      const pilot2 = PILOTS.find((p) => p.id === e.def.pilotId) ?? PILOTS[0];
       const custom = e.isPlayer ? prof2.custom[e.def.id] : void 0;
       const colors = custom ? custom.colors : g2 > 10 ? [e.def.colors[1], e.def.colors[0], e.def.colors[2]] : e.def.colors;
       const geo = this.profile.gfx.geometry;
@@ -104293,15 +104911,15 @@ var Game = class _Game {
       const eLat = Math.min(1, Math.abs(lat) / s.hw);
       const gY = s.y - lat * s.bank + (1 - eLat * eLat) * 0.2 + 0.08;
       const pos = new Vector3(s.x + s.rx * lat, gY + HOVER, s.z + s.rz * lat);
-      const skill = diff.skill * (0.7 + 0.3 * pilot.skill);
+      const skill = diff.skill * (0.7 + 0.3 * pilot2.skill);
       const pod = {
         id: g2,
         isPlayer: e.isPlayer,
         def: e.def,
-        pilot,
+        pilot: pilot2,
         stats: effectiveStats(e.def.id, custom),
-        name: e.isPlayer ? "Du" : pilot.name,
-        color: e.isPlayer ? "#ffffff" : pilot.color,
+        name: e.isPlayer ? "Du" : pilot2.name,
+        color: e.isPlayer ? "#ffffff" : pilot2.color,
         pos,
         vel: new Vector3(),
         yaw: Math.atan2(s.tx, s.tz),
@@ -104347,7 +104965,7 @@ var Game = class _Game {
         shake: 0,
         events: [],
         visual: vis,
-        ai: e.isPlayer ? null : { skill, speedF: diff.speed * (0.93 + 0.09 * pilot.skill), lineOff: Math.random() * 2 - 1, takeShortcut: Math.random() < skill * 0.75, boostUntil: 0, repairMode: false, noiseT: Math.random() * 100, rubber: 1, gridLat: lat },
+        ai: e.isPlayer ? null : { skill, speedF: diff.speed * (0.93 + 0.09 * pilot2.skill), lineOff: Math.random() * 2 - 1, takeShortcut: Math.random() < skill * 0.75, boostUntil: 0, repairMode: false, noiseT: Math.random() * 100, rubber: 1, gridLat: lat },
         place: g2 + 1
       };
       const rel = ((idx - this.td.startIdx) % N3 + N3) % N3;
@@ -105022,7 +105640,7 @@ var Game = class _Game {
     const p = this.player;
     const cam = this.camera;
     const gfx = this.profile.gfx;
-    p.visual?.setCockpitVisible?.(this.camMode !== 2);
+    p.visual?.setCockpitView?.(this.camMode === 2);
     const sp = Math.hypot(p.vel.x, p.vel.z);
     const vmax = podParams(p).vmax;
     let fov2 = gfx.fov + Math.min(1.3, sp / vmax) * 16 + (p.boosting ? 8 : 0) + (p.zeroG ? 8 : 0);
@@ -105062,13 +105680,15 @@ var Game = class _Game {
       v.body.rotation.set(p.pitch, 0, p.roll);
       v.group.updateMatrixWorld(true);
       const src = mode === 2 ? v.eye : v.hood;
-      this.tmpV.copy(src);
-      if (mode === 2) this.tmpV.add(this.tmpV3.set(p.ckX ?? 0, (p.ckY ?? 0) + 0.2, (p.ckZ ?? 0) + 0.5));
-      v.body.localToWorld(this.tmpV);
+      if (mode === 2 && v.eyeWorld) v.eyeWorld(this.tmpV);
+      else {
+        this.tmpV.copy(src);
+        v.body.localToWorld(this.tmpV);
+      }
       cam.position.set(this.tmpV.x + sx * 0.5, this.tmpV.y + sy * 0.5, this.tmpV.z);
       v.body.getWorldQuaternion(this.tmpQ);
       cam.up.copy(UP4).applyQuaternion(this.tmpQ);
-      this.tmpV2.set(0, src.y - (mode === 2 ? 0.35 : 0.45), 60);
+      this.tmpV2.set(0, src.y - (mode === 2 ? 3.2 : 0.45), 60);
       v.body.localToWorld(this.tmpV2);
       cam.lookAt(this.tmpV2);
       fov2 += 4;

@@ -2,6 +2,7 @@
 // Env: ONLY=<substring> runs only the tests whose name contains it.
 import { PODS, STAT_KEYS, type StatKey } from '../../src/game/data';
 import { podLayout } from '../../src/game/podLayouts';
+import { cockpitGeo } from '../../src/game/podCockpits';
 import { applyDamage, podParams, FX_NONE, type PodState } from '../../src/game/physics';
 import { loadProfile, saveProfile } from '../../src/game/settings';
 
@@ -21,6 +22,35 @@ function throws(fn: () => void, re: RegExp) {
 test('podLayout: every pod in PODS has its own layout', () => { for (const p of PODS) ok(podLayout(p).engines.length >= 2, p.id); });
 test('podLayout: an unknown pod id throws instead of silently building another pod', () => {
   throws(() => podLayout({ ...PODS[0], id: 'no-such-pod' }), /no layout.*no-such-pod/i);
+});
+
+// ------------------------------------------------------------------ cockpits
+const triCount = (g: { index: { count: number } | null; attributes: { position: { count: number } } }) => (g.index ? g.index.count : g.attributes.position.count) / 3;
+/** Shape fingerprint of a cockpit: triangles per material bucket (pilot excluded – two racers may share a head variant). */
+function cockpitPrint(id: string) {
+  const def = PODS.find(p => p.id === id)!; const ck = cockpitGeo(podLayout(def), 28, 'goggles', 1);
+  return [...ck.parts].sort(([a], [b]) => a.localeCompare(b)).map(([k, g]) => `${k}:${triCount(g)}`).join(' ');
+}
+test('cockpits: no two pods share the same cockpit', () => {
+  const seen = new Map<string, string>();
+  for (const p of PODS) { const f = cockpitPrint(p.id); const twin = seen.get(f); if (twin) throw new Error(`${p.id} has the same cockpit as ${twin}`); seen.set(f, p.id); }
+});
+test('cockpits: the pilot body is its own part set (the cockpit camera hides it) and the eye sits in the head', () => {
+  for (const p of PODS) {
+    const ck = cockpitGeo(podLayout(p), 28, 'goggles', 1);
+    ok(ck.pilot.size > 0, `${p.id}: no pilot part set`);
+    ok(ck.info.eye.distanceTo(ck.info.head) < 0.2 * podLayout(p).cockpit.pilot + 0.05, `${p.id}: eye is not at the head`);
+  }
+});
+test('cockpits: every cockpit has the three live dash lamps (boost, heat, damage)', () => {
+  for (const p of PODS) { const ck = cockpitGeo(podLayout(p), 28, 'goggles', 1); eq(ck.lampCount, 3, p.id); ok(ck.lamps && ck.lamps.attributes.color, `${p.id}: lamp geometry without colours`); }
+});
+test('cockpits: the lite build for Gegner is much lighter than the full one', () => {
+  for (const p of PODS) {
+    const sum = (ck: ReturnType<typeof cockpitGeo>) => [...ck.parts.values(), ...ck.pilot.values()].reduce((s, g) => s + triCount(g), 0);
+    const lite = sum(cockpitGeo(podLayout(p), 14, 'goggles', 0)), full = sum(cockpitGeo(podLayout(p), 28, 'goggles', 1));
+    ok(lite < 4600, `${p.id}: lite cockpit has ${lite} triangles (limit 4600)`); ok(lite < full * 0.5, `${p.id}: lite ${lite} is not under half of full ${full}`);
+  }
 });
 
 // ------------------------------------------------------------------ damage plumbing
