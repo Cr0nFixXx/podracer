@@ -102888,9 +102888,11 @@ function sharedOpponentHullMaterial(texSize) {
   col = mix10(col, vec313(0.78, 0.56, 0.07), hDec.g);
   col = mix10(col, vec313(0.52, 0.53, 0.56), hWear);
   col = col.mul(mix10(vec313(1), vec313(0.44, 0.38, 0.32), hGrime));
+  const hScorch = clamp13(userDataN("scorch", "float").mul(hMask.a.mul(0.7).add(0.55)), 0, 0.92);
+  col = mix10(col, vec313(0.02, 0.018, 0.016), hScorch);
   mat.colorNode = col.mul(hMask.r);
-  mat.roughnessNode = clamp13(mix10(hMask.g.mul(0.18).add(0.22), float9(0.34), hWear).add(hGrime.mul(0.32)), 0.14, 1);
-  mat.metalnessNode = mix10(float9(0.48), float9(0.94), hWear).mul(oneMinus12(hGrime.mul(0.28)));
+  mat.roughnessNode = clamp13(mix10(hMask.g.mul(0.18).add(0.22), float9(0.34), hWear).add(hGrime.mul(0.32)).add(hScorch.mul(0.42)), 0.14, 1);
+  mat.metalnessNode = mix10(float9(0.48), float9(0.94), hWear).mul(oneMinus12(hGrime.mul(0.28))).mul(oneMinus12(hScorch.mul(0.7)));
   mat.normalNode = safeHullNormal(tex.normal, tuv, 0.7);
   mat.emissiveNode = vec313(1, 0.68, 0.28).mul(hDec.b.mul(0.9));
   mat.userData.shared = true;
@@ -102909,7 +102911,7 @@ function sharedOpponentFlameMaterial() {
   const fade = pow11(clamp13(oneMinus12(t), 0, 1), 1.3).mul(smoothstep12(0, 0.05, t.add(0.01)));
   const edge = pow11(abs9(dot6(normalViewGeometry3, positionViewDirection3)), 1.3);
   mat.colorNode = mix10(vertexColor6(), vec313(1, 0.96, 0.9), pow11(clamp13(oneMinus12(t), 0, 1), 1.8).mul(0.65));
-  mat.opacityNode = clamp13(fade.mul(edge).mul(fl).mul(dia).mul(0.92), 0, 1);
+  mat.opacityNode = clamp13(fade.mul(edge).mul(fl).mul(dia).mul(0.92).mul(userDataN("power", "float")), 0, 1);
   mat.userData.shared = true;
   oppFlameCache = mat;
   return mat;
@@ -103161,6 +103163,8 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     const nearGrp = new Group();
     body.add(nearGrp);
     const hiders2 = [];
+    const sootMeshes = [];
+    const plumes = [];
     const addBuckets = (buckets, parent, where) => {
       for (const [k, mg] of buckets) {
         const mat = k === "hull" ? oppHull : k === "glow" ? oppGlow : k === "suit" ? suit : k === "skin" ? skin : shared[k];
@@ -103172,6 +103176,10 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
         m.receiveShadow = !fx;
         if (cast) shadowMeshes.push(m);
         if (k === "glass") m.renderOrder = 1;
+        if (k === "hull") {
+          m.userData.scorch = 0;
+          sootMeshes.push({ m, where });
+        }
         parent.add(m);
         const rg = rangesIn(A2.breaks, where, k);
         if (rg.length) hiders2.push(new Hider(m, rg));
@@ -103205,7 +103213,9 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       if (bank.flames) {
         const fm = new Mesh(bank.flames, oppFlame);
         fm.renderOrder = 2;
+        fm.userData.power = 1;
         grp.add(fm);
+        plumes.push({ m: fm, side: bank.side });
         const rg = [];
         for (const [id, sh] of A2.breaks) for (const f of sh.flames) if (f.bank === bi) rg.push({ id, start: f.start, count: f.count });
         if (rg.length) hiders2.push(new Hider(fm, rg));
@@ -103260,9 +103270,20 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
         b.m.rotation.z = Math.atan2(yR - yL, spanX);
       }
     };
-    const update2 = (t, throttle = 0, boost = 0) => {
+    const update2 = (t, throttle = 0, boost = 0, _airbrake = 0, dmgL = 1, dmgR = 1) => {
       podSharedTime.value = t;
       oppOpen += (boost - oppOpen) * 0.14;
+      if (nearGrp.visible) {
+        const hpMin = Math.min(dmgL, dmgR);
+        for (let i = 0; i < sootMeshes.length; i++) {
+          const s = sootMeshes[i];
+          s.m.userData.scorch = s.where === "cockpit" ? Math.min(0.6, (1 - hpMin) * 0.6) : Math.min(1, (1 - (A2.banks[s.where].side < 0 ? dmgL : dmgR)) * 1.1);
+        }
+        for (let i = 0; i < plumes.length; i++) {
+          const hp = plumes[i].side < 0 ? dmgL : dmgR;
+          plumes[i].m.userData.power = (hp < 0.35 ? 0.55 + 0.45 * hp / 0.35 : 1) * (hp < 0.15 ? 0.35 + 0.55 * Math.abs(Math.sin(t * (41 + i * 6))) : 1);
+        }
+      }
       const o = 0.1 * throttle + 0.9 * oppOpen;
       for (let i = 0; i < oppPetals.length; i++) oppPetals[i].userData.open = o;
       if (oppRotors.length && nearGrp.visible) {
@@ -107096,7 +107117,7 @@ var Game = class _Game {
         else if (e.type === "part") {
           v.setParts(p.parts ?? 0);
           v.partWorld(e.part ?? 0, this.tmpV);
-          if (near) {
+          if (p.isPlayer || dist < 120) {
             this.particles.sparks(this.tmpV, UP4, p.vel, 14);
             this.scrap.spawn(this.tmpV.x, this.tmpV.y, this.tmpV.z, p.groundY, p.vel, this.tmpC.set((p.isPlayer ? this.profile.custom[p.def.id].colors : p.def.colors)[1]), 0.9, 4);
           }

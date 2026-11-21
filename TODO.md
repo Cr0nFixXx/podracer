@@ -12,7 +12,8 @@
 - [ ] Teile-Kombinationen am Gaming-PC durchklicken (gesichtet sind 7; Maße und Dreiecke prüft das Audit an drei Sätzen je Pod)
 - [x] **Phase 5 – Schadensmodelle, Fahrverhalten:** Panzerzonen + je drei Bruchteile pro Seite für alle 14 Racer, HUD-Lampen, Meldungen, CI-Schalter `ARMOR=0 PARTS=0`
 - [x] **Phase 6 – Schadensmodelle, Optik:** Bruchteile fallen sichtbar ab (auch bei Gegnern, ohne zusätzliche Zeichenaufrufe), Triebwerke fallen aus, Blitze erlöschen, Treffermarken, Trümmer in Pod-Farben, Schadens-Vorschau im Hangar
-- [ ] **Phase 7 – Gegner:** Ruß und sterbende Flammen in den geteilten Materialien, Pipeline-Zählung, WebGL2-Lauf
+- [x] **Phase 7 – Gegner:** Ruß und sterbende Flammen in den geteilten Materialien (je Mesh, eine Pipeline), Pipeline-Zählung unverändert (100), WebGL2-Lauf fehlerfrei
+- [ ] **Am Gaming-PC prüfen (Nutzer):** „Ultra"-Bildrate mit vollen Details + Teilen + Schaden; Schadens-Balance fahren
 - [ ] Dampf- / Ölstrahlen je Modell (Fireflare-Radiator, Kühlschleifen) – im Plan vorgesehen, nicht gebaut
 - [ ] Flache Bleche in Zweitfarbe glühen bei Hitze wie die Düse (`aLiv.y = 0` in `SEC`) – kühler setzen?
 - [ ] Schadens-Balance von Hand fahren (bisher nur KI-Sim): sind 5–10 % je Bruchteil richtig?

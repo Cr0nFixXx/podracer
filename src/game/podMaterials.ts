@@ -136,9 +136,13 @@ export function sharedOpponentHullMaterial(texSize: number) {
   col = mix(col, vec3(0.78, 0.56, 0.07), hDec.g);
   col = mix(col, vec3(0.52, 0.53, 0.56), hWear);
   col = col.mul(mix(vec3(1), vec3(0.44, 0.38, 0.32), hGrime));
+  // Session 20 – damage on Gegner pods: soot per MESH (userData.scorch: 0 intact … 1 burnt, set from that engine side's health).
+  // One pipeline for all Gegner as before – the value travels with the object. EVERY mesh that uses this material must define it.
+  const hScorch = clamp(userDataN('scorch', 'float').mul(hMask.a.mul(0.7).add(0.55)), 0.0, 0.92);
+  col = mix(col, vec3(0.02, 0.018, 0.016), hScorch);
   mat.colorNode = col.mul(hMask.r);
-  mat.roughnessNode = clamp(mix(hMask.g.mul(0.18).add(0.22), float(0.34), hWear).add(hGrime.mul(0.32)), 0.14, 1.0);
-  mat.metalnessNode = mix(float(0.48), float(0.94), hWear).mul(oneMinus(hGrime.mul(0.28)));
+  mat.roughnessNode = clamp(mix(hMask.g.mul(0.18).add(0.22), float(0.34), hWear).add(hGrime.mul(0.32)).add(hScorch.mul(0.42)), 0.14, 1.0);
+  mat.metalnessNode = mix(float(0.48), float(0.94), hWear).mul(oneMinus(hGrime.mul(0.28))).mul(oneMinus(hScorch.mul(0.7)));
   mat.normalNode = safeHullNormal(tex.normal, tuv, 0.7);
   mat.emissiveNode = vec3(1.0, 0.68, 0.28).mul(hDec.b.mul(0.9));
   mat.userData.shared = true;
@@ -157,7 +161,9 @@ export function sharedOpponentFlameMaterial() {
   const fade = pow(clamp(oneMinus(t), 0.0, 1.0), 1.3).mul(smoothstep(0.0, 0.05, t.add(0.01)));
   const edge = pow(abs(dot(normalViewGeometry, positionViewDirection)), 1.3);
   mat.colorNode = mix(vertexColor(), vec3(1.0, 0.96, 0.9), pow(clamp(oneMinus(t), 0.0, 1.0), 1.8).mul(0.65));
-  mat.opacityNode = clamp(fade.mul(edge).mul(fl).mul(dia).mul(0.92), 0.0, 1.0);
+  // Session 20 – a damaged engine side burns weaker and sputters: plume strength per MESH (userData.power, 1 = healthy).
+  // EVERY mesh that uses this material must define it.
+  mat.opacityNode = clamp(fade.mul(edge).mul(fl).mul(dia).mul(0.92).mul(userDataN('power', 'float')), 0.0, 1.0);
   mat.userData.shared = true;
   oppFlameCache = mat;
   return mat;

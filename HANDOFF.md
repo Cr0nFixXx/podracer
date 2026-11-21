@@ -1,7 +1,7 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-1. **Pod-Überholung fortsetzen:** Phasentabelle im Abschnitt „Session 20" unten – die erste offene Phase ist dran. **Stand: Phase 6 fertig (Schaden – Optik: Bruchteile fallen sichtbar ab, Treffermarken, Trümmer in Pod-Farben, Schadens-Vorschau im Hangar). Als Nächstes Phase 7 (Gegner: Ruß und sterbende Flammen in den geteilten Materialien), danach die Abschluss-Durchsicht.** Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
+1. **Pod-Überholung: alle acht Phasen (0–7) sind fertig** – Tabelle im Abschnitt „Session 20" unten. **Offen ist nur noch, was der Nutzer selbst prüfen muss:** „Ultra" am Gaming-PC (Bildrate mit vollen Details, Teilen und Schaden), die Schadens-Balance von Hand fahren, die Teile-Kombinationen durchklicken. Die Listen „Nicht verifiziert" je Phase stehen unten. Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
 2. Vor jeder Änderung: `npm run check` (Typecheck + Pod-Audit + Sim) muss grün sein. Pods ansehen: `npm run dev` → `http://localhost:5173/tools/harness/pods.dev.html`.
 3. Weiterhin offen aus Session 19: `npm run dev` → **Aquilaris-Küstenlauf** (19,5-m-Unterwassertunnel, 2 Skyway-Brücken, Flutschleuse) und **Frostspalt-Ring** (22,5-m-Gletschertunnel, verzweigte Eishöhle, Eisschleuse, Viadukt) Probe fahren; im **Hangar** die 6 Lackiermuster & 3 Finishes testen (≈ 6 Min.).
 
@@ -35,7 +35,7 @@
 | 4 | Tuning-Optik: `PodCustom.kit`, `podKitParts.ts`, Hangar-Reiter „Lack \| Teile" | ✅ erledigt |
 | 5 | Schaden – Fahrverhalten: `podDamage.ts`, Bruchteil-Maske, HUD-Lampen | ✅ erledigt |
 | 6 | Schaden – Optik Spieler: Bruchteile, Treffermarken, Trümmer, Hangar-Schadensvorschau | ✅ erledigt (fehlende Teile auch schon bei Gegnern) |
-| 7 | Schaden – Optik Gegner: `userData`-Ruß/Flammenleistung in den geteilten Materialien | offen |
+| 7 | Schaden – Optik Gegner: `userData`-Ruß/Flammenleistung in den geteilten Materialien | ✅ erledigt |
 
 ### Erledigt in Phase 0
 1. **Node.js 26.13.1** per winget installiert (war auf dem Rechner nicht vorhanden), `npm ci`. Bereits laufende Shells kennen den neuen PATH nicht → `C:\Program Files\nodejs` voranstellen.
@@ -255,6 +255,25 @@ Ultra-Grenze 250 Tsd. – der größte Pod (Tenroc, sechs Triebwerke) liegt bei 
 - Im Rennen von Hand gesehen: Aurora und Tenroc als Spieler; die übrigen zwölf nur im Harness.
 - WebGL2-Rückfall mit den neuen Shader-Teilen (Treffermarken) noch nicht gelaufen – folgt in Phase 7.
 - Aufgefallen, nicht geändert: flache Bleche in Zweitfarbe (Flügel, Finnen, viele neue Teile) glühen bei hoher Triebwerkshitze wie die Düse (`aLiv.y = 0`) – das war schon vor Session 20 so, fällt mit mehr Blechen aber stärker auf.
+
+### Erledigt in Phase 7 (Schaden – Optik der Gegner)
+1. **Ruß je Mesh im geteilten Gegner-Rumpfmaterial** (`sharedOpponentHullMaterial`): der Wert kommt aus `mesh.userData.scorch` (TSL `userData`), gesetzt aus dem Zustand der jeweiligen Triebwerksseite (Cockpit: die schwächere Seite). **Eine Pipeline für alle Gegner wie bisher.**
+2. **Sterbende Flammen** (`sharedOpponentFlameMaterial`): `mesh.userData.power` – unter 35 % Zustand schwächer, unter 15 % stotternd; je Triebwerksseite ein Flammen-Mesh. Ausgefallene Einzeltriebwerke (Tenroc, Ironclad) verlieren ihren Strahl über denselben Index-Schnitt wie die Bruchteile.
+3. **Fehlende Teile** hatten die Gegner schon seit Phase 6 (gleicher Weg wie beim Spieler, ohne zusätzliche Meshes) – auf jeder Detailstufe alle Bruchteile, nicht nur zwei wie im Plan vorgesehen.
+4. **Funken und Blech** beim Abriss eines Gegner-Bruchteils nur näher als 120 m.
+5. `PodVisual.update` der Gegner liest jetzt `dmgL` / `dmgR` (Zustand 0…1) wie der Spieler-Pod.
+
+### Verifiziert (Phase 7)
+- **Pipeline-Zählung am Start (WebGPU, Boonta, 11 Pods, „Hoch"):** vor Phase 7 `renderer._pipelines.caches.size` = 100, `info.memory.programs` = 166 (69 Vertex / 97 Fragment) – **nach Phase 7 dieselben Zahlen**, und sie bleiben gleich, nachdem alle 11 Pods auf unter 40 % beschädigt wurden und Teile verloren haben (im Rennen wird nichts nachkompiliert).
+- **WebGL2-Lauf der echten App** (`gfx.backend = 'webgl'`, Boonta, Aurora): Rennen läuft mit 31 Bilder/s auf dem Entwicklungs-Notebook, Treffermarken gesetzt, alle 11 Pods beschädigt und mit verlorenen Teilen – **0 Fehler, 0 Warnungen** in der Konsole.
+- `npm run check` grün (64/64 Unit-Prüfungen, Audit 14/14, Sim 13/13, Tabelle zeilengleich zu Phase 5 und 6); `GRIP=0.88`: 13/13 „ok".
+- Harness: Gegner Splitter-X bei 100 % und 12 % (`tools/harness/out/p7_splitter_gegner_*.jpg`), Gegner-Bogen bei 30 % (`p7_gegner_30.jpg`).
+- **Neue Testmethode bei verdecktem Browser-Bereich:** der Seite direkt nach dem Laden einen zeitgesteuerten Ersatz für `requestAnimationFrame` geben (siehe `CLAUDE.md`). Dann laufen Spiel, three.js-Bildzähler und die Shader-Übersetzung des WebGL2-Rückfalls von selbst in Echtzeit – ohne das Takten von Hand. (Ohne den Ersatz bleibt die WebGL2-App im Ladebildschirm hängen: three.js fragt den Übersetzungsstand per `requestAnimationFrame` ab.)
+
+### Nicht verifiziert (Phase 7)
+- **Bildrate auf „Ultra"** – weiterhin nur am Gaming-PC zu klären.
+- Der beschädigte Gegner „direkt neben dem Spieler" ist im Rennen nur in zwei Standbildern gesehen (Schwenk und Überholen nicht), dazu die Harness-Bilder.
+- Treffermarken tragen nur der Spieler-Pod (Gegner: Ruß je Seite, keine einzelnen Marken).
 
 ### Messwerte vor der Überholung (Meshes / Dreiecke)
 | Pod | Spieler „Hoch" | Spieler „Ultra" | Gegner nah | Gegner fern |

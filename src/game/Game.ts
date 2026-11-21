@@ -580,7 +580,7 @@ export class Game {
         } else if (e.type === 'fall' && p.isPlayer) this.showMsg('ABSTURZ!', 2);
         else if (e.type === 'part') { // a Bruchteil broke off: sparks where it sat, a hard knock, and the player is told which part
           v.setParts(p.parts ?? 0); v.partWorld(e.part ?? 0, this.tmpV);
-          if (near) { // sparks and a few plates in the pod's second colour where the part sat
+          if (p.isPlayer || dist < 120) { // sparks and a few plates in the pod's second colour where the part sat (Gegner: only close by)
             this.particles.sparks(this.tmpV, UP, p.vel, 14);
             this.scrap.spawn(this.tmpV.x, this.tmpV.y, this.tmpV.z, p.groundY, p.vel, this.tmpC.set((p.isPlayer ? this.profile.custom[p.def.id].colors : p.def.colors)[1]), 0.9, 4);
           }

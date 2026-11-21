@@ -124,6 +124,8 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
 
     const nearGrp = new THREE.Group(); body.add(nearGrp);
     const hiders: Hider[] = []; // meshes that carry Bruchteile
+    const sootMeshes: { m: THREE.Mesh; where: 'cockpit' | number }[] = []; // hull meshes: soot per mesh (userData.scorch)
+    const plumes: { m: THREE.Mesh; side: number }[] = [];                  // one merged plume mesh per engine side (userData.power)
     const addBuckets = (buckets: Map<string, THREE.BufferGeometry>, parent: THREE.Object3D, where: 'cockpit' | number) => {
       for (const [k, mg] of buckets) {
         const mat = k === 'hull' ? oppHull : k === 'glow' ? oppGlow : k === 'suit' ? suit : k === 'skin' ? skin : shared[k];
@@ -134,6 +136,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
         m.castShadow = cast; m.receiveShadow = !fx;
         if (cast) shadowMeshes.push(m);
         if (k === 'glass') m.renderOrder = 1;
+        if (k === 'hull') { m.userData.scorch = 0; sootMeshes.push({ m, where }); } // (the shared hull material reads it – every mesh on it must define it)
         parent.add(m);
         const rg = rangesIn(A.breaks, where, k); if (rg.length) hiders.push(new Hider(m, rg));
       }
@@ -150,7 +153,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
       for (const r of bank.rotors) { const rm = new THREE.Mesh(r.geo, shared[r.mat] ?? shared.dark); rm.position.copy(r.pos); rm.castShadow = false; rm.receiveShadow = true; grp.add(rm); oppRotors.push({ m: rm, spin: r.spin, engine: r.engine, geo: r.geo, lost: r.lost }); }
       if (bank.petals) { const pm = new THREE.Mesh(bank.petals, petalMaterial()); pm.userData.open = 0; grp.add(pm); oppPetals.push(pm); }
       if (bank.flames) {
-        const fm = new THREE.Mesh(bank.flames, oppFlame); fm.renderOrder = 2; grp.add(fm);
+        const fm = new THREE.Mesh(bank.flames, oppFlame); fm.renderOrder = 2; fm.userData.power = 1; grp.add(fm); plumes.push({ m: fm, side: bank.side });
         const rg: PartRange[] = []; for (const [id, sh] of A.breaks) for (const f of sh.flames) if (f.bank === bi) rg.push({ id, start: f.start, count: f.count }); // plumes of engines that can flame out
         if (rg.length) hiders.push(new Hider(fm, rg));
       }
@@ -186,8 +189,14 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
       if (engines[1]) { engines[1].position.y = oppPivots[1].y + yR; engines[1].rotation.set(pitchR, 0, rollBank * 0.22); }
       for (const b of binderMeshes) { b.m.position.y = b.y + (yL + yR) * 0.5; b.m.rotation.z = Math.atan2(yR - yL, spanX); }
     };
-    const update = (t: number, throttle = 0, boost = 0) => { // rivals: nozzle petals open with boost (shared material, per-mesh userData)
+    // rivals: nozzle petals open with boost (shared material, per-mesh userData). `dmgL` / `dmgR` are HEALTH fractions like on the player pod.
+    const update = (t: number, throttle = 0, boost = 0, _airbrake = 0, dmgL = 1, dmgR = 1) => {
       podSharedTime.value = t; oppOpen += (boost - oppOpen) * 0.14;
+      if (nearGrp.visible) { // damage look: soot per engine side, weaker and sputtering plumes below 35 % / 15 % health
+        const hpMin = Math.min(dmgL, dmgR);
+        for (let i = 0; i < sootMeshes.length; i++) { const s = sootMeshes[i]; s.m.userData.scorch = s.where === 'cockpit' ? Math.min(0.6, (1 - hpMin) * 0.6) : Math.min(1, (1 - (A.banks[s.where].side < 0 ? dmgL : dmgR)) * 1.1); }
+        for (let i = 0; i < plumes.length; i++) { const hp = plumes[i].side < 0 ? dmgL : dmgR; plumes[i].m.userData.power = (hp < 0.35 ? 0.55 + 0.45 * hp / 0.35 : 1) * (hp < 0.15 ? 0.35 + 0.55 * Math.abs(Math.sin(t * (41 + i * 6))) : 1); }
+      }
       const o = 0.1 * throttle + 0.9 * oppOpen; for (let i = 0; i < oppPetals.length; i++) oppPetals[i].userData.open = o;
       if (oppRotors.length && nearGrp.visible) { const ang = t * (16 + throttle * 42); for (let i = 0; i < oppRotors.length; i++) oppRotors[i].m.rotation.z = ang * oppRotors[i].spin + i * 0.7; }
     };
