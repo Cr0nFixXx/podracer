@@ -461,7 +461,7 @@ const bomquad: Design = (k) => {
   dash(k, V(0, -0.02 * hw, 0.5 * R - 0.1), 0.7, 2, 2, -0.95);
   windscreen(k, 'bubble', V(0, 0.2 * hw, 0), 0.6 * R, 0.62 * R, 0.6 * R); // full dome
   // four outrigger arms in an X, tip pods glow (Bruchteile: the ring shroud of the hull they brace)
-  [[-1, 1], [1, 1], [-1, -1], [1, -1]].forEach(([sx, sz], i) => part(k, 'arm' + i, V(sx * R, 0.2, sz * R), g => {
+  [[-1, 1], [1, 1], [-1, -1], [1, -1]].forEach(([sx, sz]) => part(k, sx < 0 ? 'armL' : 'armR', V(sx * R, 0.2, sz * R), g => {
     const tip = V(sx * R * 1.16, 0.3 * hw, sz * R * 0.96);
     g.add('steel', tube([V(sx * R * 0.56, 0.02, sz * R * 0.5), V(sx * R * 0.9, 0.24 * hw, sz * R * 0.78), tip], 0.045, k.hi ? 8 : 4, 6));
     g.add('dark', sphere(0.1, k.hi ? 10 : 6, k.hi ? 8 : 4), M4.trs(tip.x, tip.y, tip.z, 0, 0, 0, 1, 0.8, 1.3));
@@ -628,7 +628,7 @@ const manta: Design = (k) => {
   dash(k, V(0, T.rimY - 0.04, T.zB - 0.12), Math.min(T.wMax * 1.1, 1.3), 4, 1, -0.8);
   windscreen(k, 'wrap', V(0, T.rimY - 0.2, T.zB - 0.36 * (T.zB - T.zA)), T.wMax * 0.9, 0.66, 0.86);
   // delta wing plates from the nose to the stern tips (Bruchteile: grip)
-  for (const sd of [-1, 1]) part(k, sd < 0 ? 'wingL' : 'wingR', V(sd * hw * 1.1, 0, -0.2 * len), g => {
+  for (const sd of [-1, 1]) part(k, sd < 0 ? 'deltaL' : 'deltaR', V(sd * hw * 1.1, 0, -0.2 * len), g => {
     const w = extrude([[0, 0], [0.62 * hw, 0.74 * len], [0.7 * hw, 0.9 * len], [0, 0.82 * len]], 0.04, 0.012); w.rotateX(-HALF); // x = outwards, shape +y = backwards
     const m = M4.trs(sd * hw * 0.5, -0.06, 0.4 * len, 0, 0, sd * -0.07); if (sd < 0) m.multiply(M4.mirrorX());
     g.add('hull', w, m, SEC);

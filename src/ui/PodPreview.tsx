@@ -3,13 +3,15 @@ import * as THREE from 'three/webgpu';
 import { PODS, THEMES } from '../game/data';
 import { buildPodModel, type PodLook, type PodVisual } from '../game/podModel';
 import { podEnvelope } from '../game/podDesigns';
+import { damageModel, partsDue } from '../game/podDamage';
 import { makeSky } from '../game/sky';
 
-interface Props { podId: string; colors: [string, string, string]; pattern?: number; finish?: number; /** Style-Teile */ kit?: PodLook['kit']; /** tuning steps (their parts show on the pod) */ tune?: PodLook['tune']; className?: string; autoRotate?: boolean; }
-interface St { scene: THREE.Scene; cam: THREE.PerspectiveCamera; pod: PodVisual | null; podId: string; drag: boolean; rot: number; lastX: number; zoom: number; }
+interface Props { podId: string; colors: [string, string, string]; pattern?: number; finish?: number; /** Style-Teile */ kit?: PodLook['kit']; /** tuning steps (their parts show on the pod) */ tune?: PodLook['tune'];
+  /** Schadens-Vorschau: engine health in percent (both sides); Bruchteile below their step are gone. Default 100 */ health?: number; className?: string; autoRotate?: boolean; }
+interface St { scene: THREE.Scene; cam: THREE.PerspectiveCamera; pod: PodVisual | null; podId: string; drag: boolean; rot: number; lastX: number; zoom: number; health: number; }
 
 /** Rotating hangar preview – WebGPURenderer (WebGPU, automatic WebGL2 fallback). */
-export default function PodPreview({ podId, colors, pattern, finish, kit, tune, className, autoRotate = true }: Props) {
+export default function PodPreview({ podId, colors, pattern, finish, kit, tune, health = 100, className, autoRotate = true }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const stateRef = useRef<St | null>(null);
 
@@ -31,7 +33,7 @@ export default function PodPreview({ podId, colors, pattern, finish, kit, tune, 
     floor.rotation.x = -Math.PI / 2; floor.position.y = -1.6; floor.receiveShadow = true; scene.add(floor);
     const ring = new THREE.Mesh(new THREE.RingGeometry(9.5, 9.8, 96), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffb040').multiplyScalar(2) }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = -1.58; scene.add(ring);
-    const st: St = { scene, cam, pod: null, podId, drag: false, rot: 0.8, lastX: 0, zoom: 1 };
+    const st: St = { scene, cam, pod: null, podId, drag: false, rot: 0.8, lastX: 0, zoom: 1, health: 100 };
     stateRef.current = st;
     const resize = () => { const w = el.clientWidth, h = el.clientHeight; r.setSize(w, h, false); cam.aspect = w / Math.max(1, h); cam.updateProjectionMatrix(); };
     const ro = new ResizeObserver(resize); ro.observe(el); resize();
@@ -43,7 +45,7 @@ export default function PodPreview({ podId, colors, pattern, finish, kit, tune, 
         const sw = Math.sin(t * 1.4) * 0.24;
         st.pod.group.rotation.y = st.rot; st.pod.group.position.y = 0.45 + Math.sin(t * 2) * 0.12;
         st.pod.setEngineMotion(sw, -sw, 0, 0, 0);
-        st.pod.update(t, 0.4, 0, 0, 1, 1, 0);
+        st.pod.update(t, 0.4, 0, 0, st.health / 100, st.health / 100, 0);
       }
       const def = PODS.find(p => p.id === st.podId) ?? PODS[0]; const dist = (podEnvelope(def).length * 1.12 + 6) * st.zoom; // frame by the pod's real length
       cam.position.set(dist * 0.75, dist * 0.32, dist * 0.75); cam.lookAt(0, 0.3, 0);
@@ -74,8 +76,14 @@ export default function PodPreview({ podId, colors, pattern, finish, kit, tune, 
     const def = PODS.find(p => p.id === podId)!;
     const pod = buildPodModel(def, colors, 3, 1024, false, { pattern, finish, kit, tune });
     st.scene.add(pod.group); st.pod = pod; st.podId = podId;
+    pod.setParts(partsDue(damageModel(podId), st.health, st.health));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [podId, colors, pattern, finish, JSON.stringify(kit), JSON.stringify(tune)]);
+
+  useEffect(() => { // Schadens-Vorschau: no rebuild, the model only drops or gets back its Bruchteile
+    const st = stateRef.current; if (!st) return;
+    st.health = health; st.pod?.setParts(partsDue(damageModel(st.podId), health, health));
+  }, [health]);
 
   return <div ref={ref} className={className} style={{ cursor: 'grab', touchAction: 'none' }} />;
 }

@@ -11,7 +11,10 @@
 - [x] **Phase 4 – Tuning-Optik:** Tuning-Teile (7 Werte × 2 Stufen) + Style-Teile (Finnen, Einlass, Düse, Kanzel), Hangar-Reiter „Lack | Teile", Gegner mit ausgelosten Style-Teilen
 - [ ] Teile-Kombinationen am Gaming-PC durchklicken (gesichtet sind 7; Maße und Dreiecke prüft das Audit an drei Sätzen je Pod)
 - [x] **Phase 5 – Schadensmodelle, Fahrverhalten:** Panzerzonen + je drei Bruchteile pro Seite für alle 14 Racer, HUD-Lampen, Meldungen, CI-Schalter `ARMOR=0 PARTS=0`
-- [ ] **Phase 6–7 – Schadensmodelle, Optik:** Spieler-Pod (Bruchteile fallen ab, Treffermarken), Gegner
+- [x] **Phase 6 – Schadensmodelle, Optik:** Bruchteile fallen sichtbar ab (auch bei Gegnern, ohne zusätzliche Zeichenaufrufe), Triebwerke fallen aus, Blitze erlöschen, Treffermarken, Trümmer in Pod-Farben, Schadens-Vorschau im Hangar
+- [ ] **Phase 7 – Gegner:** Ruß und sterbende Flammen in den geteilten Materialien, Pipeline-Zählung, WebGL2-Lauf
+- [ ] Dampf- / Ölstrahlen je Modell (Fireflare-Radiator, Kühlschleifen) – im Plan vorgesehen, nicht gebaut
+- [ ] Flache Bleche in Zweitfarbe glühen bei Hitze wie die Düse (`aLiv.y = 0` in `SEC`) – kühler setzen?
 - [ ] Schadens-Balance von Hand fahren (bisher nur KI-Sim): sind 5–10 % je Bruchteil richtig?
 - [ ] Tunnel-Logik: Pod gilt als „im Tunnel", ist aber über der Decke und wird heruntergesetzt (Malastare, Sample 964; `DEBUG=1 SECS=120 node tools/ci/out/sim.mjs`)
 - [ ] `tools/harness/pui.mjs:39` prüft noch die gelöschte „Neon-Spirale" → anpassen; `tools/harness/run.sh` läuft nur unter Linux

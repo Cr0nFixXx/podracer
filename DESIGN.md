@@ -91,6 +91,9 @@ Leitidee: **Jeder Racer ist an seinem Cockpit erkennbar – auch als Silhouette.
 - **Mild:** ein Teil kostet 5–10 %, zusammen nie mehr als 15 % je Fahrwert. Der Pod bleibt fahrbar; man merkt den Schaden in schnellen Kurven und beim Beschleunigen, nicht auf der Geraden.
 - **Schutzteile:** Rammbug (Mandrel Ram) und Panzerschürzen (Pagali Ironclad) kosten nichts, wenn sie fehlen – sie haben vorher Treffer abgefangen. Wer sie verliert, steckt danach mehr ein.
 - **Reparatur ist kein Zurückspulen:** `R` heilt die Triebwerke, verlorene Teile bleiben bis zum Respawn weg.
+- **Man sieht, was fehlt (Phase 6):** ein Bruchteil reißt mit Funken ab und fliegt als Blech in der Zweitfarbe des Pods nach hinten weg; die Stelle bleibt leer (Ringflügel mit dunkler Bruchkante, Splitter-X mit offenem Ansaugrohr, Rotor mit vier statt fünf Blättern). Ausgefallene Triebwerke sind dunkel und ziehen Rauch, tote Energiebögen fehlen.
+- **Treffermarken statt Dellen:** wo der eigene Pod getroffen wird, bleibt ein Brandfleck mit blankem Metall in der Mitte – höchstens vier je Rumpfseite, der älteste wird überschrieben. Nach dem Respawn ist der Pod wieder sauber.
+- **Explosion in Pod-Farben:** ein zerstörter Pod zerlegt sich in Platten seiner Erst- und Zweitfarbe.
 
 ## Überführungen, Schleusen, verzweigte Höhlen, Blitze & Pods (Session 19)
 - **Über-/Unterführungen:** Wo sich eine Strecke kreuzt (≥ 35 m Höhenabstand), trägt die obere Piste einen abgeschrägten Stahl-Hohlkasten mit Querträgern, seitlichen Leuchtstreifen, Widerlagern und Zwillingspfeilern; die untere führt durch einen 20-m-Unterführungstunnel oder frei unter dem Viadukt hindurch. Auf Karte und Minimap hebt eine dunkle Kontur die Brücke ab.

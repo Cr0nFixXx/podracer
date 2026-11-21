@@ -1,7 +1,7 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-1. **Pod-Überholung fortsetzen:** Phasentabelle im Abschnitt „Session 20" unten – die erste offene Phase ist dran. **Stand: Phase 5 fertig (Schadensmodelle – Fahrverhalten: Panzerzonen + Bruchteile je Racer, HUD-Lampen). Als Nächstes Phase 6 (Schaden – Optik am Spieler-Pod), danach Phase 7 (Gegner); beide laufen laut Absprache ohne Stopp durch.** Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
+1. **Pod-Überholung fortsetzen:** Phasentabelle im Abschnitt „Session 20" unten – die erste offene Phase ist dran. **Stand: Phase 6 fertig (Schaden – Optik: Bruchteile fallen sichtbar ab, Treffermarken, Trümmer in Pod-Farben, Schadens-Vorschau im Hangar). Als Nächstes Phase 7 (Gegner: Ruß und sterbende Flammen in den geteilten Materialien), danach die Abschluss-Durchsicht.** Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
 2. Vor jeder Änderung: `npm run check` (Typecheck + Pod-Audit + Sim) muss grün sein. Pods ansehen: `npm run dev` → `http://localhost:5173/tools/harness/pods.dev.html`.
 3. Weiterhin offen aus Session 19: `npm run dev` → **Aquilaris-Küstenlauf** (19,5-m-Unterwassertunnel, 2 Skyway-Brücken, Flutschleuse) und **Frostspalt-Ring** (22,5-m-Gletschertunnel, verzweigte Eishöhle, Eisschleuse, Viadukt) Probe fahren; im **Hangar** die 6 Lackiermuster & 3 Finishes testen (≈ 6 Min.).
 
@@ -34,7 +34,7 @@
 | 3 | 4 neue Pods (Cyclone → Halo → Manta → Voltspire), Hangar-Liste für 14, Gegner-Auslosung → **Stopp** | ✅ erledigt, vom Nutzer freigegeben („Go Phase 4"), Nachbesserung „Quill geschlossener" eingearbeitet |
 | 4 | Tuning-Optik: `PodCustom.kit`, `podKitParts.ts`, Hangar-Reiter „Lack \| Teile" | ✅ erledigt |
 | 5 | Schaden – Fahrverhalten: `podDamage.ts`, Bruchteil-Maske, HUD-Lampen | ✅ erledigt |
-| 6 | Schaden – Optik Spieler: Bruchteile, Treffermarken, Trümmer, Hangar-Schadensvorschau | offen |
+| 6 | Schaden – Optik Spieler: Bruchteile, Treffermarken, Trümmer, Hangar-Schadensvorschau | ✅ erledigt (fehlende Teile auch schon bei Gegnern) |
 | 7 | Schaden – Optik Gegner: `userData`-Ruß/Flammenleistung in den geteilten Materialien | offen |
 
 ### Erledigt in Phase 0
@@ -230,6 +230,31 @@ Ultra-Grenze 250 Tsd. – der größte Pod (Tenroc, sechs Triebwerke) liegt bei 
 - **Langlauf `SECS=120` mit Schadensmodellen: Malastare meldet 1 echten „downward teleport"** (Gegner-Pod Splitter-X, t = 14,7 s, Sample 964, Standard-Tunnel: der Pod gilt als „im Tunnel" (`upper = false`, `inRoof = true`), ist aber 23 m über der Straße und wird unter die Decke gesetzt). Das ist Tunnel-Logik aus Session 17, kein Pod-Thema; im Standardlauf (45 s) und im Langlauf ohne Schadensmodelle tritt es nicht auf – andere Flugbahnen. Nachstellen: `DEBUG=1 SECS=120 node tools/ci/out/sim.mjs` (ganzer Lauf nötig, wegen des Zufallsstroms).
 - Die Lampen stehen in gleichen Abständen, nicht auf Höhe der Stufen 50 / 35 / 20 % der Füllung.
 - Verlorene Teile sind am Pod **noch nicht zu sehen** (Phase 6) – bisher nur Lampe, Meldung, Ton, Funken und Fahrwirkung.
+
+### Erledigt in Phase 6 (Schaden – Optik)
+1. **Bruchteile verschwinden ohne zusätzliche Meshes.** Jedes Bruchteil ist dort markiert, wo es gebaut wird: `pb.brk(id, …)` (neue Methode des `PartBuilder`) in den Triebwerks-Bauern und in `engineExtras`, `part(k, id, …)` in den Cockpits. Die Montage (`podAssembly.ts`) führt die Teile wie bisher in die Material-Töpfe zusammen und merkt sich je Bruchteil die Index-Bereiche (`BreakShow.ranges`). Geht ein Teil verloren, schreibt `podModel.ts` (`Hider`) den Index-Puffer des betroffenen Meshes neu – ohne das Teil (`visibleIndices`). **Zeichenaufrufe und Pipelines bleiben gleich**; derselbe Weg blendet jetzt auch den Piloten für die Cockpit-Kamera aus.
+2. **Was ein Bruchteil außer Geometrie sein kann** (`PodLayout.flameOut / fanLoss / arcLoss`): ein Triebwerk fällt aus (Flamme weg, Fan steht, Düsen- und Lichtbänder dunkel, es zieht nur noch Rauch) · ein Rotor verliert ein Blatt (`EngineGeo.fanLost`) · ein Energieblitz erlischt (Bereich im Blitz-Mesh).
+3. **`PodVisual`:** `setParts(mask)` (jede Frame aus `PodState.parts`, kostet nichts, solange sich nichts ändert), `engineOut[]`, `partWorld(i, out)`, Spieler zusätzlich `hitMark(x, y, z, stärke)` und `clearMarks()`.
+4. **Treffermarken (nur Spieler-Pod, `hullMaterial`):** je Rumpf-Material (links, rechts, Cockpit) vier `uniform(vec4)` als Ringpuffer – Brandfleck mit ausgefranstem Rand, blankes Metall in der Mitte, dunkle Kerbe im Zentrum. Entfernung im Mesh-Raum, also bleibt die Marke am Blech. Keine echten Dellen (Entscheidung). Beim Respawn weg.
+5. **Trümmer:** zweiter `DebrisPool('plate')` (`Game.scrap`): Blechplatten in der Zweitfarbe des Pods, wo ein Bruchteil abreißt; bei einer Explosion 16 Platten in Erst- und Zweitfarbe. Beide Pools werden beim Aufwärmen einmal leer gezeigt (Pipeline wird vor dem Start übersetzt).
+6. **Hangar:** „Schadens-Vorschau" in der Pod-Vorschau unten links – Regler 100 → 0 % und die drei Stufen des Racers im Klartext (z. B. „50 % Flügelplatte · 35 % Kreisel-Stabilisator · 20 % Innenflügel"); die Vorschau lässt die Teile ohne Neuaufbau fallen.
+7. **Lyss Halo-9:** der Ringflügel ist jetzt aus Bögen gebaut (oben, unten, zwei Flanken + je Flanke ein oberer und ein unterer Bogen als Bruchteil), mit Lichtbändern, Nieten und Trimmklappen je Bogen und dunklen Endplatten an den Bruchstellen. Nur seine Goldwerte haben sich geändert (+32 … +520 Dreiecke je Bau).
+8. **Harness:** `show(idx, health, q, { both, parts, heat, marks })` und `sheet(view, { health })` lassen Bruchteile unter ihrer Stufe weg; `marks: [[x, y, z, stärke], …]` setzt Treffermarken (Pod-Koordinaten).
+
+### Verifiziert (Phase 6)
+- `npm run check` grün: 64/64 Unit-Prüfungen (7 neue: Index-Ausblendung, „jedes Bruchteil jedes Racers zeigt etwas" für Spieler (3 Detailstufen) und Gegner (leicht + Ultra), Bereiche überlappen nicht / linke Teile liegen links / Pilot zuletzt, Ausfälle und Blitze zeigen auf echte Triebwerke der richtigen Seite, ausgefallenes Triebwerk wird dunkel, Teil ≥ 0,4 m und < 45 % der Dreiecke), Pod-Audit 14/14 (13 Pods **unverändert** in Mesh- und Dreieckszahl, nur Halo neu), **Sim-Tabelle zeilengleich zu Phase 5** (reine Optik).
+- Gegenprobe der Hauptprüfung: ein falsch benannter Bruchteil-Tag (`kanard`) lässt 5 Prüfungen scheitern.
+- Browser (WebGPU): Bögen aller 14 Pods bei 100 / 45 / 30 / 15 % (`tools/harness/out/p6_pods_*.jpg`), Nahaufnahmen Aurora, Halo, Cyclone, Splitter-X (15 %), Voltspire, Tenroc (30 %), Gegner-Bogen bei 15 % (`p6_gegner_15.jpg`), Treffermarken (`p6_aurora_marks.jpg`).
+- Echte App: Hangar-Regler bei 1280 × 720 ohne Schrumpfen / Scrollen, Vorschau verliert die Teile; Rennen Boonta mit dem Tenroc: 70 Schaden → vier von sechs Triebwerken aus (`engineOut`), Lampen und Meldung passen, alle 10 Gegner mit verlorenen Teilen, Explosion wirft grüne und sandfarbene Platten, nach dem Respawn sind alle Teile zurück; keine neuen Konsolenfehler.
+- `npm run build` → `dist/index.html` (2,91 MB).
+
+### Nicht verifiziert / nicht gebaut (Phase 6)
+- **Dampf- und Ölstrahlen je Modell** (Plan, in der Streichliste an zweiter Stelle) sind nicht gebaut: ein ausgefallenes Triebwerk zieht Rauch, der Radiator der Fireflare verschwindet ohne Dampf.
+- Treffermarken ohne geneigte Normale (Plan: „normal tilt") – die Kerbe ist gemalt (dunkles Zentrum, blanker Ring).
+- **Kollisionsform bleibt:** ein abgerissener Flügel fehlt nur im Bild; die Physik rechnet weiter mit der vollen Breite (Entscheidung „alte Pods: Größe bleibt", gilt hier für alle).
+- Im Rennen von Hand gesehen: Aurora und Tenroc als Spieler; die übrigen zwölf nur im Harness.
+- WebGL2-Rückfall mit den neuen Shader-Teilen (Treffermarken) noch nicht gelaufen – folgt in Phase 7.
+- Aufgefallen, nicht geändert: flache Bleche in Zweitfarbe (Flügel, Finnen, viele neue Teile) glühen bei hoher Triebwerkshitze wie die Düse (`aLiv.y = 0`) – das war schon vor Session 20 so, fällt mit mehr Blechen aber stärker auf.
 
 ### Messwerte vor der Überholung (Meshes / Dreiecke)
 | Pod | Spieler „Hoch" | Spieler „Ultra" | Gegner nah | Gegner fern |

@@ -33,7 +33,13 @@ function safeHullNormal(nTex: THREE.Texture, tuv: N, scale: number) {
   return normalize(T.mul(tsN.x.mul(sc)).add(B.mul(tsN.y.mul(sc)).add(Nn.mul(max(tsN.z, float(0.4))))));
 }
 
-export interface HullU { uPaint2: { value: THREE.Color }; uGlowCol: { value: THREE.Color }; uWear: { value: number }; uScorch: { value: number }; uHeat: { value: number }; uGrime: { value: number }; uLivery: { value: number }; }
+export interface HullU {
+  uPaint2: { value: THREE.Color }; uGlowCol: { value: THREE.Color }; uWear: { value: number }; uScorch: { value: number }; uHeat: { value: number }; uGrime: { value: number }; uLivery: { value: number };
+  /** Treffermarken: the last HIT_MARKS hits on this hull – xyz = where (mesh-local), w = strength 0..1 (0 = none) */
+  uHits: { value: THREE.Vector4 }[];
+}
+/** hit marks a hull material remembers (ring buffer, the oldest one is overwritten) */
+export const HIT_MARKS = 4;
 
 /** Full hero hull material (player pod & Hangar showcase): 6 racing livery patterns, 3 paint finishes, chipped metal, scorch, heat glow & LEDs. */
 export function hullMaterial(c1: string, c2: string, glow: string, livery: number, texSize: number, finish = 0) {
@@ -47,6 +53,7 @@ export function hullMaterial(c1: string, c2: string, glow: string, livery: numbe
   const u = {
     uPaint2: uniform(new THREE.Color(c2)), uGlowCol: uniform(new THREE.Color(glow)), uWear: uniform(0.28),
     uScorch: uniform(0), uHeat: uniform(0), uGrime: uniform(0.75), uLivery: uniform(livery),
+    uHits: Array.from({ length: HIT_MARKS }, () => uniform(new THREE.Vector4(0, 0, 0, 0))),
   };
   mat.userData.u = u;
   const L = attribute('aLiv', 'vec3'); const tuv = uv();
@@ -80,12 +87,24 @@ export function hullMaterial(c1: string, c2: string, glow: string, livery: numbe
   col = mix(col, vec3(0.52, 0.53, 0.56), hWear);
   const hGrime = clamp(hMask.a.mul(u.uGrime), 0.0, 1.0);
   col = col.mul(mix(vec3(1), vec3(0.42, 0.36, 0.3), hGrime));
-  const hScorch = clamp(u.uScorch.mul(ssInv(0.72, 0.0, a)).mul(hMask.a.mul(0.7).add(0.55)), 0.0, 0.95);
+  const hScorch0 = clamp(u.uScorch.mul(ssInv(0.72, 0.0, a)).mul(hMask.a.mul(0.7).add(0.55)), 0.0, 0.95);
+  // Session 20 – Treffermarken (no real dents): where a hit landed the paint is burnt in a sooty patch with a ragged edge, scraped to
+  // bare metal in its middle, with a dark pit at the centre. Distances are taken in the mesh's own space, so a mark stays put.
+  let hitSoot: N = float(0), hitBare: N = float(0), hitPit: N = float(0);
+  for (const h of u.uHits) {
+    const d = length(positionLocal.sub(h.xyz)), r = h.w.mul(0.5).add(0.45); // patch radius 0.45 – 0.95 m
+    hitSoot = max(hitSoot, h.w.mul(oneMinus(smoothstep(r.mul(0.5), r, d))));
+    hitBare = max(hitBare, h.w.mul(oneMinus(smoothstep(r.mul(0.14), r.mul(0.3), d))));
+    hitPit = max(hitPit, h.w.mul(oneMinus(smoothstep(r.mul(0.02), r.mul(0.12), d))));
+  }
+  const hSoot = clamp(hitSoot.mul(hMask.a.mul(0.8).add(0.8)), 0.0, 1.0), hBare = clamp(hitBare.mul(hMask.b.mul(0.7).add(0.62)), 0.0, 1.0);
+  const hScorch = clamp(max(hScorch0, hSoot.mul(0.96)), 0.0, 0.96);
   col = mix(col, vec3(0.02, 0.018, 0.016), hScorch);
+  col = mix(col, vec3(0.62, 0.62, 0.66), hBare).mul(oneMinus(hitPit.mul(0.7)));
   mat.colorNode = col.mul(hMask.r);
-  mat.roughnessNode = clamp(mix(materialRoughness.mul(hMask.g.mul(0.55).add(0.72)), hMask.g.mul(0.28).add(0.3), hWear).add(hGrime.mul(0.34)).add(hScorch.mul(0.42)), 0.1, 1.0);
-  mat.metalnessNode = mix(materialMetalness, float(0.95), hWear).mul(oneMinus(hScorch.mul(0.7))).mul(oneMinus(hGrime.mul(0.3)));
-  mat.clearcoatNode = float(baseCoat).mul(oneMinus(hWear)).mul(oneMinus(hGrime.mul(0.7))).mul(oneMinus(hScorch));
+  mat.roughnessNode = clamp(mix(mix(materialRoughness.mul(hMask.g.mul(0.55).add(0.72)), hMask.g.mul(0.28).add(0.3), hWear).add(hGrime.mul(0.34)).add(hScorch.mul(0.42)), float(0.36), hBare), 0.1, 1.0);
+  mat.metalnessNode = mix(mix(materialMetalness, float(0.95), hWear).mul(oneMinus(hScorch.mul(0.7))).mul(oneMinus(hGrime.mul(0.3))), float(0.95), hBare);
+  mat.clearcoatNode = float(baseCoat).mul(oneMinus(hWear)).mul(oneMinus(hGrime.mul(0.7))).mul(oneMinus(hScorch)).mul(oneMinus(hBare));
   mat.normalNode = safeHullNormal(tex.normal, tuv, 0.85);
   // Session 17 – heat glow as the overheating indicator: it starts dull red at the nozzle (a = 0) and creeps forward along the engine as
   // the heat rises; the local temperature fades towards the front, so the colour runs yellow-white → orange → dark red and only reaches the

@@ -15,7 +15,7 @@
     "far meshes",
     "far tris"
   ],
-  "measured": "Session 20 / Phase 3 + rework of the Quill Voltspire (closed cowls, caged window, glass ball cockpit); the ten old rows are unchanged",
+  "measured": "Session 20 / Phase 6: Lyss Halo-9 – ring wing built in arcs (Bruchteile ringA / ringB) with end plates; all other pods unchanged",
   "rows": [
     ["aurora",41,26806,41,42334,41,57170,30,14612,31,40576,3,444],
     ["brute",39,26126,39,41210,39,55462,28,16052,29,39452,3,492],
@@ -28,7 +28,7 @@
     ["elana",39,24158,39,37670,39,51878,28,12940,29,35912,3,456],
     ["odo",41,24638,41,39670,41,52638,30,14660,31,37912,3,492],
     ["cyclone",41,22854,41,35174,41,46578,32,12032,33,33416,3,648],
-    ["halo",39,23462,39,32538,39,45062,28,12724,29,30780,3,732],
+    ["halo",39,23958,39,32810,39,45094,28,13244,29,31052,3,732],
     ["manta",38,16254,38,21554,38,27042,27,8140,28,19796,3,748],
     ["volt",37,31130,39,44090,39,58782,25,18944,29,42332,3,508]
   ],

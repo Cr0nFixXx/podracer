@@ -32,6 +32,8 @@ export interface EngineGeo {
   fanMat?: MatKey; fanSpin?: number;
   /** the fan is a big open rotor: a Gegner pod shows it as its own turning mesh too instead of merging it into the static parts */
   openRotor?: boolean;
+  /** the same fan with a blade torn off (Bruchteil of a pod whose layout names this engine in `fanLoss`) */
+  fanLost?: THREE.BufferGeometry;
   flaps: FlapGeo[];
   /** animated nozzle petals (attribute aPet), see petalMaterial() */
   petals: THREE.BufferGeometry;
@@ -39,7 +41,8 @@ export interface EngineGeo {
   exhaustZ: number; pylon: THREE.Vector3; frontZ: number; top: number; R: number; L: number;
   /** where the energy binder couples, relative to the engine axis: x = sideways towards the partner engine, y up, z along the engine */
   binder: THREE.Vector3;
-  /** parts that can break off (Bruchteile): own geometry sets, never merged into `parts` */
+  /** parts that can break off (Bruchteile): own geometry sets, never merged into `parts` (the assembly adds them and remembers
+   *  where they are). An id ending in '-' / '+' sits on the engine's left / right flank and breaks only on the pod's outer flank. */
   breakParts: BreakPart[];
   /** where Tuning-Teile and Style-Teile attach */
   hard: HardPoints;
@@ -250,23 +253,25 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
       const hinge = new THREE.Vector3(Math.sin(c) * rf * R, Math.cos(c) * rf * R, Z(bodyEnd));
       const axis = new THREE.Vector3(Math.cos(c), -Math.sin(c), 0);
       const m = new THREE.Matrix4().makeTranslation(hinge.x, hinge.y, hinge.z).multiply(new THREE.Matrix4().makeRotationAxis(axis, -0.22)).multiply(new THREE.Matrix4().makeTranslation(-hinge.x, -hinge.y, -hinge.z));
-      pb.add('hull', g, m);
+      pb.brk('petals', () => pb.add('hull', g, m)); // Bruchteil: the petals tear off, their hinge blocks stay
       pb.add('steel', rbox(0.12 * R, 0.12 * R, 0.08 * L, 0.02), new THREE.Matrix4().makeTranslation(hinge.x * 1.02, hinge.y * 1.02, hinge.z));
     }
-    // radial cooling slats on top
-    for (let i = 0; i < 9; i++) pb.add('steel', rbox(0.035 * R, 0.32 * R, 0.4 * L, 0.01), M4.t((i - 4) * 0.11 * R, R * 1.08, Z(0.45)));
+    // radial cooling slats on top (Bruchteil)
+    pb.brk('slats', () => { for (let i = 0; i < 9; i++) pb.add('steel', rbox(0.035 * R, 0.32 * R, 0.4 * L, 0.01), M4.t((i - 4) * 0.11 * R, R * 1.08, Z(0.45))); });
   }
   if (style === 'ring') {
     const rr = 1.24 * R;
-    pb.add('hull', torus(rr, 0.11 * R, 12, seg), M4.t(0, 0, Z(0.95)), [0, 0, 3]);
-    pb.add('chrome', torus(rr - 0.11 * R, 0.025 * R, 6, seg), M4.t(0, 0, Z(0.95) + 0.06 * R));
-    for (let q = 0; q < 4; q++) { const a = Math.PI / 4 + q * Math.PI / 2; const mid = (rr + rf * R) / 2; pb.add('steel', rbox(0.08 * R, rr - rf * R + 0.1 * R, 0.1 * R, 0.02), M4.trs(Math.sin(a) * mid, Math.cos(a) * mid, Z(0.95), 0, 0, -a)); }
+    pb.brk('shroud', () => { // Bruchteil: the ring shroud with its four struts
+      pb.add('hull', torus(rr, 0.11 * R, 12, seg), M4.t(0, 0, Z(0.95)), [0, 0, 3]);
+      pb.add('chrome', torus(rr - 0.11 * R, 0.025 * R, 6, seg), M4.t(0, 0, Z(0.95) + 0.06 * R));
+      for (let q = 0; q < 4; q++) { const a = Math.PI / 4 + q * Math.PI / 2; const mid = (rr + rf * R) / 2; pb.add('steel', rbox(0.08 * R, rr - rf * R + 0.1 * R, 0.1 * R, 0.02), M4.trs(Math.sin(a) * mid, Math.cos(a) * mid, Z(0.95), 0, 0, -a)); }
+    });
   }
   if (style === 'blade') {
     for (const sd of [-1, 1]) {
       const g = extrude([[0, 0], [1.25 * R, -0.25 * L], [1.3 * R, -0.42 * L], [0.0, -0.6 * L]], 0.05 * R, 0.015);
       g.rotateX(-Math.PI / 2); if (sd < 0) g.scale(-1, 1, 1);
-      pb.add('hull', g, M4.t(sd * bodyR(0.6) * R * 0.9, 0, Z(0.8)), [0, 0, 3]);
+      pb.brk('blade' + (sd < 0 ? '-' : '+'), () => pb.add('hull', g, M4.t(sd * bodyR(0.6) * R * 0.9, 0, Z(0.8)), [0, 0, 3])); // Bruchteil on the outer flank
     }
   }
   if (style === 'needle') pb.add('chrome', torus(rf * 0.75 * R, 0.02 * R, 6, seg), M4.t(0, 0, Z(0.97)));
@@ -287,7 +292,7 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
     parts: pb.build(), fan, fanZ: faceZ + 0.06 * L * 0.5,
     flaps, petals, flameOuter: flameGeo(rn, L * 0.75, Math.max(12, Math.round(seg * 0.5))), flameCore: flameGeo(rn * 0.42, L * 0.38, 12), flameZ: Z(0.07) - 0.02,
     exhaustZ: Z(0) - 0.12 * L, pylon: new THREE.Vector3(0, py + 0.06, Z(0.58)), frontZ: Z(1.0), top: py, R, L,
-    binder: new THREE.Vector3(R * 0.97, R * 0.2, L * 0.12), breakParts: [],
+    binder: new THREE.Vector3(R * 0.97, R * 0.2, L * 0.12), breakParts: pb.buildBreaks(),
     hard: (() => { // (data only – the geometry above does not depend on it)
       const ext = engineExtent(spec), t3 = 0.3 / L;
       const skin3 = (t3 < 0.025 ? 0.74 + 0.06 * (t3 / 0.025) : t3 < 0.08 ? 0.8 + (bodyR(0.08) * 0.94 - 0.8) * ((t3 - 0.025) / 0.055) : bodyR(t3)) * R;

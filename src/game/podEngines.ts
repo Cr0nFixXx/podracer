@@ -97,6 +97,11 @@ function rotorEngine(spec: EngineSpec, seg: number): EngineGeo {
   fpb.add('steel', radial(() => blade(0.36 * R, Rh - 0.13, 0.46 * R, 0.05 * R, 0.95, 0.3, 3), Math.max(3, spec.blades)));
   fpb.add('steel', cyl(0.42 * R, 0.44 * R, 0.17, Math.max(12, Math.round(seg * 0.6))).rotateX(HALF));
   const fan = fpb.build().get('steel')!; fan.computeBoundingSphere();
+  // the same rotor with one blade torn off (Bruchteil "Rotorblatt")
+  const nBl = Math.max(3, spec.blades);
+  for (let i = 1; i < nBl; i++) fpb.add('steel', blade(0.36 * R, Rh - 0.13, 0.46 * R, 0.05 * R, 0.95, 0.3, 3), new THREE.Matrix4().makeRotationZ((i / nBl) * Math.PI * 2));
+  fpb.add('steel', cyl(0.42 * R, 0.44 * R, 0.17, Math.max(12, Math.round(seg * 0.6))).rotateX(HALF));
+  const fanLost = fpb.build().get('steel')!; fanLost.computeBoundingSphere();
 
   // guard hoop: a ring with an aerofoil section (secondary paint), light strip on the lip, warning band
   const zf = zR + 0.2, zb = zR - 0.52;
@@ -147,8 +152,8 @@ function rotorEngine(spec: EngineSpec, seg: number): EngineGeo {
   const flaps = [-1, 1].map(sd => sideFlap(0.05 * R, 0.6 * R, 0.2 * L, V(sd * (R + 0.075 * R), 0.05 * R, Z(0.28)), -sd));
   const nz = roundNozzle(pb, 0.66 * R, Z(0), L, seg, hi);
   return {
-    parts: pb.build(), fan, fanZ: zR, fanMat: 'steel', fanSpin: 0.36, openRotor: true, flaps, ...nz,
-    pylon, frontZ: Z(1.0) + 0.045 * L, top: py, R, L, binder: V(R * 0.97, R * 0.2, Z(0.45)), breakParts: [],
+    parts: pb.build(), fan, fanLost, fanZ: zR, fanMat: 'steel', fanSpin: 0.36, openRotor: true, flaps, ...nz,
+    pylon, frontZ: Z(1.0) + 0.045 * L, top: py, R, L, binder: V(R * 0.97, R * 0.2, Z(0.45)), breakParts: pb.buildBreaks(),
     hard: {
       nozzle: { z: Z(0), r0: 0.7 * R, r1: bodyR(0.3 / L) * R, open: 0.92 * R, tipZ: Z(0) - 0.085 * L },
       mouth: { z: zf + 0.07, r: Rh + th * 1.1, ri: Rh - th }, spikeZ: Z(1.0) + 0.045 * L,
@@ -182,21 +187,41 @@ function hoopEngine(spec: EngineSpec, seg: number): EngineGeo {
   const fan = radial(() => blade(0.21 * R, 0.83 * rf * R, (Math.PI * 2 * 0.52 * R / nb) * 1.25, 0.03 * R, 1.0, 0.38, 3), nb); fan.computeBoundingSphere();
   for (const tb of [0.14, 0.3, 0.74, 0.86]) pb.add('steel', torus(bodyR(tb) * R + 0.01, 0.028 * R + 0.006, 6, seg), M4.t(0, 0, Z(tb)));
 
-  // ring wing: aerofoil section swept round the core (secondary paint), light strips on the leading edge and round both skins
-  pb.add('hull', lathe(prof([[Rw, zTE, 1], [Rw + 0.03, zTE + 0.25 * c], [Rw + 0.05, zTE + 0.6 * c], [Rw + 0.045, zLE - 0.12 * c], [Rw, zLE],
-    [Rw - 0.045, zLE - 0.12 * c], [Rw - 0.05, zTE + 0.6 * c], [Rw - 0.03, zTE + 0.25 * c], [Rw, zTE]]), seg, 3));
-  pb.add('glow', torus(Rw, 0.02, 5, seg), M4.t(0, 0, zLE + 0.006));
-  pb.add('glow', torus(Rw + 0.054, 0.011, 4, seg), M4.t(0, 0, zc + 0.1 * c));
-  pb.add('glow', torus(Rw - 0.054, 0.011, 4, seg), M4.t(0, 0, zc + 0.1 * c));
-  pb.add('chrome', torus(Rw, 0.014, 4, seg), M4.t(0, 0, zTE - 0.004));
+  // ring wing: aerofoil section swept round the core (secondary paint), light strips on the leading edge and round both skins.
+  // Built in arcs (phi from the top towards +x): on each flank an upper and a lower arc are Bruchteile ("ringA", "ringB" – they break
+  // on the pod's outer flank only). They keep clear of the struts (±60°, 180°), the air brakes and the binder couplers (±90°).
+  const wingProf = prof([[Rw, zTE, 1], [Rw + 0.03, zTE + 0.25 * c], [Rw + 0.05, zTE + 0.6 * c], [Rw + 0.045, zLE - 0.12 * c], [Rw, zLE],
+    [Rw - 0.045, zLE - 0.12 * c], [Rw - 0.05, zTE + 0.6 * c], [Rw - 0.03, zTE + 0.25 * c], [Rw, zTE]]);
+  const strip = (r: number, z: number, t: number) => prof([[r + t, z], [r, z + t], [r - t, z], [r, z - t], [r + t, z]]); // diamond section of a light strip
+  const TAU = Math.PI * 2, onRing = (phi: number, r: number, z: number) => M4.trs(Math.sin(phi) * r, Math.cos(phi) * r, z, 0, 0, -phi);
+  const ringArc = (p0: number, p1: number) => {
+    const len = p1 - p0, n = Math.max(2, Math.round(seg * len / TAU)), inside = (a: number) => (((a - p0) % TAU) + TAU) % TAU < len;
+    pb.add('hull', lathe(wingProf, n, 3, p0, len));
+    pb.add('glow', lathe(strip(Rw, zLE + 0.006, 0.02), n, 0, p0, len));
+    pb.add('glow', lathe(strip(Rw + 0.054, zc + 0.1 * c, 0.011), n, 0, p0, len));
+    pb.add('glow', lathe(strip(Rw - 0.054, zc + 0.1 * c, 0.011), n, 0, p0, len));
+    pb.add('chrome', lathe(strip(Rw, zTE - 0.004, 0.014), n, 0, p0, len));
+    for (let q = 0; q < 4; q++) { const a = Math.PI / 4 + q * HALF; if (inside(a)) pb.add('dark', rbox(0.03, 0.2, 0.26, 0.008), onRing(a, Rw + 0.02, zTE - 0.05)); } // trim vanes on the trailing edge
+    if (hi) { // rivets on the outer skin; Ultra: on the inner skin too, and static wicks on the trailing edge
+      const nb = Math.round(seg * 0.9), bolt = (a: number, r: number) => pb.add('chrome', cyl(0.012, 0.012, 0.0084, 6), onRing(a, r + 0.003, zTE + 0.3 * c));
+      for (let i = 0; i < nb; i++) { const a = (i / nb) * TAU; if (!inside(a)) continue; bolt(a, Rw + 0.052); if (ultra) bolt(a, Rw - 0.052); }
+      if (ultra) for (let i = 0; i < 12; i++) { const a = 0.2 + (i / 12) * TAU; if (inside(a)) pb.add('dark', cyl(0.006, 0.006, 0.16, 4).rotateX(HALF), onRing(a, Rw, zTE - 0.1)); }
+    }
+  };
+  const A0 = 0.17, A1 = 0.96, B0 = 2.18, B1 = 2.97; // upper arc 10°–55°, lower arc 125°–170° from the top
+  ringArc(-A0, A0); ringArc(A1, B0); ringArc(-B0, -A1); ringArc(B1, TAU - B1); // top, both flanks, bottom
+  for (const sd of [-1, 1]) {
+    const f = sd < 0 ? '-' : '+';
+    pb.brk('ringA' + f, () => (sd > 0 ? ringArc(A0, A1) : ringArc(-A1, -A0)));
+    pb.brk('ringB' + f, () => (sd > 0 ? ringArc(B0, B1) : ringArc(-B1, -B0)));
+    for (const a of [A0, A1, B0, B1]) pb.add('dark', rbox(0.012, 0.09, 0.94 * c, 0.004), onRing(sd * a, Rw, zc)); // end plates (seen only once an arc is gone)
+  }
   { // three struts carry the ring (none on top: the control cable leaves there)
     const ri = R * 0.96, ro = Rw - 0.035;
     pb.add('steel', radial(() => rbox(0.055, ro - ri, 0.4 * c, 0.02).translate(0, (ri + ro) / 2, zc - 0.04 * c), 3, Math.PI / 3));
     pb.add('dark', radial(() => rbox(0.14, 0.12, 0.5 * c, 0.03).translate(0, ri + 0.03, zc - 0.04 * c), 3, Math.PI / 3));
     if (hi) pb.add('chrome', radial(() => rbox(0.1, 0.05, 0.34 * c, 0.012).translate(0, ro - 0.03, zc - 0.04 * c), 3, Math.PI / 3));
   }
-  // four small trim vanes on the trailing edge
-  pb.add('dark', radial(() => rbox(0.03, 0.2, 0.26, 0.008).translate(0, Rw + 0.02, zTE - 0.05), 4, Math.PI / 4));
 
   // copper line, belly repulsor, cable pylon behind the ring, sensor, binder couplers on the ring
   { const pp: THREE.Vector3[] = [];
@@ -210,12 +235,7 @@ function hoopEngine(spec: EngineSpec, seg: number): EngineGeo {
   couplers(pb, Rw + 0.03, 0, zB, 0.55);
   if (hi) {
     pb.add('chrome', boltRing(rf * 0.985 * R, Math.round(seg * 0.5), 0.02 * R, Z(1.0) - 0.01));
-    pb.add('chrome', boltRing(Rw + 0.052, Math.round(seg * 0.9), 0.012, zTE + 0.3 * c, true));
     for (const tb of [0.3, 0.74]) pb.add('chrome', boltRing(bodyR(tb) * R + 0.03, Math.round(seg * 0.45), 0.012, Z(tb), true));
-    if (ultra) {
-      pb.add('chrome', boltRing(Rw - 0.052, Math.round(seg * 0.9), 0.012, zTE + 0.3 * c, true));
-      pb.add('dark', radial(() => cyl(0.006, 0.006, 0.16, 4).rotateX(HALF).translate(0, Rw, zTE - 0.1), 12, 0.2)); // static wicks on the trailing edge
-    }
   }
 
   // air brakes: two plates on the outer flanks of the ring, hinged at their front edge (a dark hinge fairing carries each)
@@ -225,7 +245,7 @@ function hoopEngine(spec: EngineSpec, seg: number): EngineGeo {
   const nz = roundNozzle(pb, 0.74 * R, Z(0), L, seg, hi);
   return {
     parts: pb.build(), fan, fanZ: faceZ + 0.03 * L, flaps, ...nz,
-    pylon, frontZ: Z(1.0), top: py, R, L, binder: V(Rw + 0.07, 0, zB), breakParts: [],
+    pylon, frontZ: Z(1.0), top: py, R, L, binder: V(Rw + 0.07, 0, zB), breakParts: pb.buildBreaks(),
     hard: {
       nozzle: { z: Z(0), r0: 0.78 * R, r1: bodyR(0.3 / L) * R, open: 1.03 * R, tipZ: Z(0) - 0.085 * L },
       mouth: { z: Z(1.0), r: rf * 1.035 * R, ri: rf * 0.86 * R }, spikeZ: Z(1.0) + 0.16 * L,
@@ -305,9 +325,11 @@ function slabEngine(spec: EngineSpec, seg: number): EngineGeo {
   }
   // drooped winglets on both edges (secondary paint) with tip lights, side strakes
   for (const sd of [-1, 1]) {
-    pb.add('hull', rbox(0.62, 0.045, 0.3 * L, 0.015), M4.trs(sd * (W + 0.24), -0.14 * R - 0.06, Z(0.32), 0, 0, sd * -0.36), SEC);
-    pb.add('steel', rbox(0.07, 0.07, 0.3 * L + 0.1, 0.02), M4.t(sd * (W + 0.52), -0.14 * R - 0.165, Z(0.32)));
-    pb.add('glow', sphere(0.035, 6, 4), M4.t(sd * (W + 0.52), -0.14 * R - 0.165, Z(0.32) + 0.15 * L + 0.07));
+    pb.brk('winglet' + (sd < 0 ? '-' : '+'), () => { // Bruchteil on the outer flank
+      pb.add('hull', rbox(0.62, 0.045, 0.3 * L, 0.015), M4.trs(sd * (W + 0.24), -0.14 * R - 0.06, Z(0.32), 0, 0, sd * -0.36), SEC);
+      pb.add('steel', rbox(0.07, 0.07, 0.3 * L + 0.1, 0.02), M4.t(sd * (W + 0.52), -0.14 * R - 0.165, Z(0.32)));
+      pb.add('glow', sphere(0.035, 6, 4), M4.t(sd * (W + 0.52), -0.14 * R - 0.165, Z(0.32) + 0.15 * L + 0.07));
+    });
     pb.add('dark', rbox(0.05, 0.5 * R, 0.24 * L, 0.012), M4.t(sd * (W * 0.985), 0.02, Z(0.62)));
   }
   // belly: two repulsor strips; binder couplers on both edges
@@ -333,7 +355,7 @@ function slabEngine(spec: EngineSpec, seg: number): EngineGeo {
   const flaps = [-1, 1].map(sd => sideFlap(0.04, 0.6, 0.11 * L, V(sd * (finX + 0.058), finY + 0.42, Z(0.15)), -sd)); // split rudders: each opens outwards
   return {
     parts: pb.build(), fan, fanZ: zF + 0.06, flaps, petals, flameOuter, flameCore, flameZ: z0 - 0.05, exhaustZ: z0 - 0.12 * L,
-    pylon, frontZ: zF, top: py, R, L, binder: V(W + 0.05, 0, Z(0.6)), breakParts: [],
+    pylon, frontZ: zF, top: py, R, L, binder: V(W + 0.05, 0, Z(0.6)), breakParts: pb.buildBreaks(),
     hard: {
       nozzle: { z: z0, r0: hs + 0.06, r1: 0.9 * R, open: 1.5 * hs + 0.09, tipZ: z0 - 0.045 * L, slot: [ws, hs] },
       mouth: { z: zF, r: mh + 0.06, ri: mh, slot: [mw, mh] }, spikeZ: zF + 0.3,

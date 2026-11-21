@@ -68,7 +68,7 @@ export class Game {
   beams: ReturnType<typeof makeBeams> | null = null; private tmpE = new THREE.Euler();
   private prevNd = 1e9; private closing = 0; private flybyT = 0;
   loadMs: Record<string, number> = {};
-  debris = new DebrisPool(); dustAmt = 1;
+  debris = new DebrisPool(); /** sheet metal: Bruchteile and pieces of exploding pods */ scrap = new DebrisPool('plate'); dustAmt = 1;
   /** Session 14: 0..1 how far the player is under a roof (rain, splashes and lens drops fade out); weather-effects quality 0 / 0.5 / 1 */
   cover = 0; wxQ = 1; envDirty = false;
   private shadowTexel = 0;
@@ -178,7 +178,7 @@ export class Game {
     this.particles.initAmbient(theme.ambient, build.wind, Math.max(1, build.ambMax / 0.45));
     this.wxQ = [0, 0.5, 1][gfx.weatherFx ?? 2] ?? 1; setPodLodScale(gfx.podDetail ?? 1);
     this.weather = new WeatherFx(fx, this.particles, this.scene, theme.sunAz * Math.PI / 180 + 1.1, build.bolt); this.weather.quality = this.wxQ;
-    this.scene.add(this.particles.group); this.scene.add(this.debris.mesh);
+    this.scene.add(this.particles.group); this.scene.add(this.debris.mesh); this.scene.add(this.scrap.mesh);
 
     // pods (player = full hero detail; opponents = merged whole-pod + automatic 2-tier distance LOD!)
     this.loadMs.world = Math.round(performance.now() - tL0) - this.loadMs.init;
@@ -213,7 +213,9 @@ export class Game {
     this.updateVisuals(0.016);
     this.particles.seedWarmup(this.camera.position);
     for (const p of this.pods) if (!p.isPlayer) p.visual?.setDistance(10, true); // expose both near & far LOD once for compilation
+    this.debris.warm(true); this.scrap.warm(true); // (empty instance pools: only their pipelines get compiled)
     await this.post.warmup(r);
+    this.debris.warm(false); this.scrap.warm(false);
     this.particles.clear();
     for (const p of this.pods) if (!p.isPlayer) p.visual?.setDistance(p.pos.distanceTo(this.camera.position), false);
     if (this.disposed) return;
@@ -411,7 +413,7 @@ export class Game {
     }
     // deaths / finish
     for (const p of this.pods) {
-      if (p.dead > 0) { p.dead -= dt; if (p.dead <= 0) respawn(p, this.td); }
+      if (p.dead > 0) { p.dead -= dt; if (p.dead <= 0) { respawn(p, this.td); p.visual?.clearMarks?.(); } } // a respawned pod is patched up: parts back, hit marks gone
       if (!p.finished && this.state !== 'countdown') {
         const done = this.td.main.closed ? p.lap >= this.profile.race.laps : p.rel >= this.td.finishIdx - this.td.startIdx;
         if (done) {
@@ -448,7 +450,7 @@ export class Game {
     this.updateCamera(dt);
     this.updateVisuals(dt);
     this.updateLights();
-    this.particles.update(dt, this.camera.position, this.clock); this.debris.update(dt);
+    this.particles.update(dt, this.camera.position, this.clock); this.debris.update(dt); this.scrap.update(dt);
     this.world.update(this.clock, this.camera.position, this.pods);
     this.sky.uniforms.time.value = this.clock;
     this.weather.update(dt, this.clock, this.camera, this.state === 'countdown', v => this.audio.thunder(v), near => { if (near > 0.5) this.player.shake = Math.min(1, this.player.shake + (near - 0.5) * 0.9); });
@@ -556,12 +558,19 @@ export class Game {
             if (e.type === 'wall') this.world.flashField(e.x, e.y + 0.6, e.z, e.strength);
           }
           if (p.isPlayer || dist < 140) this.audio.hit(e.strength * (p.isPlayer ? 1 : 0.28));
+          if (p.isPlayer && e.strength > 5) v.hitMark?.(e.x, e.y, e.z, e.strength); // Treffermarke where the hit landed
         } else if (e.type === 'break') {
           if (e.ref) this.world.breakObstacle(e.ref);
           if (dist < 420) { this.tmpC.copy(this.dustBase).multiplyScalar(0.6); this.particles.debris(this.tmpV, p.vel, this.tmpC); this.debris.spawn(e.x, e.y, e.z, e.y, p.vel, this.tmpC, e.strength, 16); }
           if (p.isPlayer || dist < 130) this.audio.hit(34 * (p.isPlayer ? 1 : 0.4));
         } else if (e.type === 'land') { if (near) this.particles.dust(this.tmpV, p.vel, this.dustCol, 8); if (p.isPlayer) this.audio.hit(e.strength * 0.5); }
-        else if (e.type === 'explode') { if (dist < 480) this.particles.explosion(this.tmpV); if (p.isPlayer) { this.audio.boom(); this.flash = 0.8; this.showMsg('TRIEBWERK ZERSTÖRT!', 2.5); } else if (near) this.audio.hit(40); }
+        else if (e.type === 'explode') {
+          if (dist < 480) { // the pod flies apart in its own colours
+            this.particles.explosion(this.tmpV); const cols = p.isPlayer ? this.profile.custom[p.def.id].colors : p.def.colors;
+            this.scrap.spawn(e.x, e.y, e.z, p.groundY, p.vel, this.tmpC.set(cols[0]), 2.6, 9); this.scrap.spawn(e.x, e.y, e.z, p.groundY, p.vel, this.tmpC.set(cols[1]), 2.6, 7);
+          }
+          if (p.isPlayer) { this.audio.boom(); this.flash = 0.8; this.showMsg('TRIEBWERK ZERSTÖRT!', 2.5); } else if (near) this.audio.hit(40);
+        }
         else if (e.type === 'field') {
           if (near) {
             this.particles.shimmer(this.tmpV, this.tmpV2.set(e.nx, 0, e.nz), this.barrierGlow);
@@ -569,8 +578,12 @@ export class Game {
           }
           if (p.isPlayer) this.audio.fieldZap(e.strength);
         } else if (e.type === 'fall' && p.isPlayer) this.showMsg('ABSTURZ!', 2);
-        else if (e.type === 'part') { // a Bruchteil broke off: sparks, a hard knock, and the player is told which part
-          if (near) this.particles.sparks(this.tmpV, UP, p.vel, 14);
+        else if (e.type === 'part') { // a Bruchteil broke off: sparks where it sat, a hard knock, and the player is told which part
+          v.setParts(p.parts ?? 0); v.partWorld(e.part ?? 0, this.tmpV);
+          if (near) { // sparks and a few plates in the pod's second colour where the part sat
+            this.particles.sparks(this.tmpV, UP, p.vel, 14);
+            this.scrap.spawn(this.tmpV.x, this.tmpV.y, this.tmpV.z, p.groundY, p.vel, this.tmpC.set((p.isPlayer ? this.profile.custom[p.def.id].colors : p.def.colors)[1]), 0.9, 4);
+          }
           if (p.isPlayer) { this.audio.hit(48); this.audio.beep(196, 0.22, 'sawtooth', 0.16); p.shake = Math.min(1, p.shake + 0.35); this.showMsg(lostMessage(damageModel(p.def.id).parts[e.part ?? 0]), 2.2); }
           else if (dist < 120) this.audio.hit(18);
         }
@@ -587,6 +600,7 @@ export class Game {
       const eyL = p.engYL ?? 0, eyR = p.engYR ?? 0;
       v.setEngineMotion(eyL, eyR, 0, 0, 0); // engines lift as a whole – no extra tilt
       v.setCockpitSway?.(p.ckX ?? 0, p.ckY ?? 0, p.ckZ ?? 0);
+      v.setParts(p.parts ?? 0); // lost Bruchteile are gone from the model (all of them return on respawn)
       v.update(this.clock, p.input.throttle, p.boosting ? 1 : 0, p.airbraking ? 1 : 0, p.hpL / 100, p.hpR / 100, p.heat + (p.overT ?? 0) / 3 * 0.25); // overdrive pushes the glow past the limit (yellow-white)
 
       // Skip exhaust/dust particle spawning while stationary on countdown grid; keep rival trails super clean for visibility!
@@ -602,6 +616,7 @@ export class Game {
         const loc = v.exhaustLocal[i]; const lz = loc.z + bz;
         const eLift = loc.x < 0 ? eyL : eyR;
         this.tmpV3.set(p.pos.x + loc.x * cy + lz * sy, p.pos.y + (loc.y + eLift) * Math.cos(p.roll) + loc.x * Math.sin(p.roll) - lz * p.pitch, p.pos.z - loc.x * sy + lz * cy);
+        if (v.engineOut[i]) { if (p.isPlayer || dist < 160) this.particles.smoke(this.tmpV3, p.vel, 0.85, rivalVis); continue; } // a flamed-out engine only trails smoke
         this.particles.exhaust(this.tmpV3, back, p.vel, this.tmpC, p.input.throttle, p.boosting ? 1 : 0, emitScale);
         // close to the heat limit the engines spit sparks (more while overdriving)
         if (p.heat > 0.86 && (p.isPlayer || dist < 160) && this.particles.chance((p.heat - 0.86) * 4 + (p.overT ?? 0) * 0.5)) this.particles.sparks(this.tmpV3, back, p.vel, 3);

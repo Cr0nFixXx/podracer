@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, STAT_LABELS, THEMES, TRACKS, type StatKey } from '../game/data';
 import { effectiveStats, KIT_SLOTS, LIVERY_PATTERNS, MAX_OPPONENTS, PAINT_FINISHES, type PaintFinish, type PodKit, type Profile } from '../game/settings';
 import { buildTrack, type TrackData } from '../game/trackBuilder';
+import { damageModel } from '../game/podDamage';
 import { CAMERA_NAMES, fmt } from '../game/Game';
 import { Btn, Panel, Slider, StatBar } from './common';
 import PodPreview from './PodPreview';
@@ -198,6 +199,9 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
   const setTune = (k: StatKey, v: number) => setCustom({ ...custom, tuning: { ...custom.tuning, [k]: Math.max(0, Math.min(5, v)) } });
   const setKit = (k: keyof PodKit, v: number) => setCustom({ ...custom, kit: { fins: 0, intake: 0, nozzle: 0, canopy: 0, ...(custom.kit ?? {}), [k]: v } });
   const [tab, setTab] = useState<'lack' | 'teile'>('lack');
+  // Schadens-Vorschau: engine health of the preview pod (both sides) and the racer's Bruchteile per step
+  const [health, setHealth] = useState(100);
+  const breaks = useMemo(() => [50, 35, 20].map(step => ({ step, label: [...new Set(damageModel(sel).parts.filter(b => b.step === step).map(b => b.label))].join(' / ') })), [sel]);
   return (
     <div className="relative w-full h-full overflow-hidden">
       <Background dim={0.75} />
@@ -223,12 +227,23 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
           </Panel>
           <div className="flex flex-col gap-4 min-h-0">
             <div className="relative flex-1 min-h-[210px] border border-amber-500/20 bg-black/40 clip-corner overflow-hidden">
-              <PodPreview podId={sel} colors={custom.colors} pattern={custom.pattern} finish={custom.finish} kit={custom.kit} tune={custom.tuning} className="absolute inset-0" />
+              <PodPreview podId={sel} colors={custom.colors} pattern={custom.pattern} finish={custom.finish} kit={custom.kit} tune={custom.tuning} health={health} className="absolute inset-0" />
               <div className="absolute top-3 left-4 pointer-events-none">
                 <div className="font-display text-2xl text-amber-100">{pod.name}</div>
                 <div className="text-stone-300 text-xs max-w-md">{pod.desc}</div>
               </div>
               <div className="absolute bottom-2.5 right-3 text-[10px] uppercase tracking-widest text-stone-400">Ziehen · Mausrad Zoom</div>
+              {/* Schadens-Vorschau: what this racer loses at 50 / 35 / 20 % engine health */}
+              <div className="absolute bottom-2 left-3 w-[250px]" data-damage-preview>
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-stone-300">
+                  <span className="shrink-0">Schadens-Vorschau</span>
+                  <input type="range" min={0} max={100} step={5} value={100 - health} onChange={e => setHealth(100 - parseInt(e.target.value))} className="flex-1 min-w-0 accent-red-500" aria-label="Schadens-Vorschau" />
+                  <span className={`shrink-0 w-9 text-right tabular-nums ${health < 50 ? 'text-red-300' : 'text-stone-300'}`}>{health} %</span>
+                </div>
+                <div className="mt-0.5 text-[9px] leading-[1.35] text-stone-400">
+                  {breaks.map(b => <div key={b.step} className={health < b.step ? 'text-red-300' : ''}><span className="inline-block w-8 tabular-nums">{b.step} %</span>{b.label}</div>)}
+                </div>
+              </div>
             </div>
             <Panel title="Lackierung & Design">
               {/* two tabs in the same panel: paint (Lack) and Style-Teile (Teile) */}

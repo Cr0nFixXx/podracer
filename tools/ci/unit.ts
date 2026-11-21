@@ -1,12 +1,12 @@
 // Headless unit checks for pure game logic (part of `npm run check`). No framework: tiny test / expect helpers.
 // Env: ONLY=<substring> runs only the tests whose name contains it.
 import * as THREE from 'three';
-import { PILOTS, PODS, STAT_KEYS, TRACKS, type StatKey } from '../../src/game/data';
+import { PILOTS, PODS, STAT_KEYS, TRACKS, type PodDef, type StatKey } from '../../src/game/data';
 import { podLayout } from '../../src/game/podLayouts';
 import { cockpitGeo } from '../../src/game/podCockpits';
 import { engineExtent, engineGeo } from '../../src/game/podParts';
 import { podCollision, podEnvelope } from '../../src/game/podDesigns';
-import { assembleHero, assembleRival } from '../../src/game/podAssembly';
+import { assembleHero, assembleRival, segFor, visibleIndices, type BreakShow } from '../../src/game/podAssembly';
 import { pickRivals, rivalKit } from '../../src/game/roster';
 import { engineKit, tuneTiers, NO_KIT } from '../../src/game/podKitParts';
 import { ciRoster } from './roster';
@@ -322,6 +322,94 @@ test('podParams: a handling effect scales exactly its own number', () => {
   eq([b.turn, b.vmax], [a.turn * 0.9, a.vmax * 0.95]); eq([b.accel, b.grip, b.cool], [a.accel, a.grip, a.cool]);
 });
 
+// ------------------------------------------------------------------ Bruchteile on the model (Phase 6 / 7)
+const headOf = (p: PodDef) => (PILOTS.find(q => q.id === p.pilotId) ?? PILOTS[0]).head;
+/** something visible changes: triangles go, an engine flames out, a rotor loses a blade or an arc dies */
+const shows = (s: BreakShow | undefined) => !!s && s.ranges.length + s.engines.length + s.fans.length + s.arcs.length > 0;
+test('hiding parts: the visible index list skips exactly the hidden ranges', () => {
+  const full = Uint16Array.from([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]), out = new Uint16Array(12);
+  const ranges = [{ id: 'b', start: 9, count: 3 }, { id: 'a', start: 3, count: 3 }]; // (any order)
+  eq(visibleIndices(full, ranges, new Set(), out), 12); eq([...out], [...full]);
+  eq(visibleIndices(full, ranges, new Set(['a']), out), 9); eq([...out.slice(0, 9)], [0, 1, 2, 6, 7, 8, 9, 10, 11]);
+  eq(visibleIndices(full, ranges, new Set(['b']), out), 9); eq([...out.slice(0, 9)], [0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  eq(visibleIndices(full, ranges, new Set(['a', 'b']), out), 6); eq([...out.slice(0, 6)], [0, 1, 2, 6, 7, 8]);
+  eq(visibleIndices(full, ranges, new Set(['not-there']), out), 12);
+});
+test('Bruchteile: every part of every Schadensmodell has something to show on the player pod (all three detail levels)', () => {
+  for (const p of PODS) for (const q of [1, 2, 3]) {
+    const A = assembleHero(p, segFor(q, false), headOf(p));
+    for (const b of damageModel(p.id).parts) ok(shows(A.breaks.get(b.id)), `${p.id}, quality ${q}: Bruchteil "${b.id}" (${b.label}) shows nothing`);
+    A.owned.forEach(g => g.dispose());
+  }
+});
+test('Bruchteile: every part shows on a Gegner pod too (lite and Ultra build)', () => {
+  for (const p of PODS) for (const q of [2, 3]) {
+    const A = assembleRival(p, segFor(q, true), headOf(p), p.colors);
+    for (const b of damageModel(p.id).parts) ok(shows(A.breaks.get(b.id)), `${p.id}, Gegner quality ${q}: Bruchteil "${b.id}" (${b.label}) shows nothing`);
+    A.owned.forEach(g => g.dispose());
+  }
+});
+test('Bruchteile: hidden triangles stay inside their bucket, never overlap, and a left part lies left of the pod axis', () => {
+  for (const p of PODS) {
+    const A = assembleHero(p, segFor(2, false), headOf(p)), used = new Map<string, [number, number, string][]>();
+    for (const b of damageModel(p.id).parts) for (const r of A.breaks.get(b.id)!.ranges) {
+      const geo = r.where === 'cockpit' ? A.cockpit.get(r.key) : A.banks[r.where].buckets.get(r.key);
+      ok(geo && geo.index, `${p.id} ${b.id}: bucket ${r.where}/${r.key} missing or not indexed`);
+      ok(r.count > 0 && r.count % 3 === 0 && r.start % 3 === 0 && r.start + r.count <= geo!.index!.count, `${p.id} ${b.id}: range ${r.start}+${r.count} of ${geo!.index!.count}`);
+      const key = `${r.where}/${r.key}`, list = used.get(key) ?? []; used.set(key, list);
+      for (const [a, n, id] of list) ok(r.start >= a + n || r.start + r.count <= a, `${p.id}: ${b.id} overlaps ${id} in ${key}`);
+      list.push([r.start, r.count, b.id]);
+      if (b.side !== 0) { // mean x of its vertices (body space) is on its own side
+        const idx = geo!.index!, pos = geo!.attributes.position, ox = r.where === 'cockpit' ? 0 : A.banks[r.where].pivot.x; let sx = 0;
+        for (let i = r.start; i < r.start + r.count; i++) sx += pos.getX(idx.getX(i)) + ox;
+        ok(Math.sign(sx) === b.side, `${p.id} ${b.id}: mean x ${(sx / r.count).toFixed(2)} is on the wrong side`);
+      }
+    }
+    for (const [k, start] of A.pilotStart) { const list = used.get(`cockpit/${k}`) ?? []; for (const [a, n, id] of list) ok(a + n <= start, `${p.id}: Bruchteil ${id} lies behind the pilot's triangles in ${k}`); }
+    A.owned.forEach(g => g.dispose());
+  }
+});
+test('Bruchteile: flame-outs and dying arcs point at real engines and binders on the right side', () => {
+  for (const p of PODS) {
+    const A = assembleHero(p, segFor(2, false), headOf(p)), L = podLayout(p);
+    for (const b of damageModel(p.id).parts) {
+      const s = A.breaks.get(b.id)!;
+      for (const e of s.engines) { ok(L.engines[e], `${p.id} ${b.id}: no engine ${e}`); if (b.side !== 0) eq(Math.sign(L.engines[e].x), b.side, `${p.id} ${b.id}: engine ${e} side`); }
+      for (const a of s.arcs) ok(A.binders[a.binder] && a.count > 0 && a.start + a.count <= A.binders[a.binder].index!.count, `${p.id} ${b.id}: arc range`);
+    }
+    A.owned.forEach(g => g.dispose());
+  }
+});
+test('Bruchteile: an engine that flames out goes dark – its glowing parts (nozzle, light strips) are cut out with it', () => {
+  for (const [id, part] of [['gasvaro', 'engCL'], ['gasvaro', 'engBR'], ['teemo', 'engUL']] as const) {
+    const p = PODS.find(x => x.id === id)!;
+    const A = assembleHero(p, segFor(2, false), headOf(p)), R = assembleRival(p, segFor(2, true), headOf(p), p.colors);
+    for (const [who, s] of [['player', A.breaks.get(part)!], ['Gegner', R.breaks.get(part)!]] as const) {
+      eq(s.engines.length, 1, `${id} ${part} (${who}): engines`);
+      ok(s.ranges.some(r => r.key === 'glow' && r.count > 0), `${id} ${part} (${who}): no glow triangles to hide`);
+    }
+    ok(R.breaks.get(part)!.flames.length === 1, `${id} ${part}: the Gegner plume of that engine`);
+    A.owned.forEach(g => g.dispose()); R.owned.forEach(g => g.dispose());
+  }
+});
+test('Bruchteile: a part that falls off is big enough to see (at least 0.4 m across) and the racer keeps most of its body (under 45 % of the triangles)', () => {
+  for (const p of PODS) {
+    const A = assembleHero(p, segFor(2, false), headOf(p)); let all = 0, gone = 0;
+    for (const g of A.cockpit.values()) all += g.index!.count; for (const bk of A.banks) for (const g of bk.buckets.values()) all += g.index!.count;
+    for (const b of damageModel(p.id).parts) {
+      const s = A.breaks.get(b.id)!; if (!s.ranges.length) continue;
+      const box = new THREE.Box3(), v = new THREE.Vector3();
+      for (const r of s.ranges) {
+        const geo = (r.where === 'cockpit' ? A.cockpit.get(r.key) : A.banks[r.where].buckets.get(r.key))!, idx = geo.index!, pos = geo.attributes.position;
+        for (let i = r.start; i < r.start + r.count; i++) box.expandByPoint(v.fromBufferAttribute(pos, idx.getX(i)));
+        gone += r.count;
+      }
+      const size = box.getSize(v).length(); ok(size >= 0.4, `${p.id} ${b.id}: only ${size.toFixed(2)} m across`);
+    }
+    ok(gone / all < 0.45, `${p.id}: Bruchteile are ${(100 * gone / all).toFixed(1)} % of the pod`);
+    A.owned.forEach(g => g.dispose());
+  }
+});
 // ------------------------------------------------------------------ saved profile (localStorage)
 const store = new Map<string, string>();
 (globalThis as unknown as { localStorage: unknown }).localStorage = {

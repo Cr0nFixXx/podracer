@@ -37,7 +37,30 @@ function flipWinding(g: THREE.BufferGeometry) {
 /** Collects geometry per material key and merges every bucket into one geometry (one draw call). */
 export class PartBuilder {
   buckets = new Map<MatKey, THREE.BufferGeometry[]>();
+  /** Bruchteile: geometry added inside `brk(id, …)` goes into a set of its own (`buildBreaks`), never into `build()` */
+  private breaks = new Map<string, PartBuilder>();
+  private into: PartBuilder | null = null;
+  /** Everything `make` adds becomes part of the Bruchteil `id` (several calls with one id add up).
+   *  Engine builders: an id ending in '-' / '+' sits on the engine's left / right flank – it is a Bruchteil only on the pod's outer flank. */
+  brk(id: string, make: () => void) {
+    const was = this.into; let sub = this.breaks.get(id);
+    if (!sub) { sub = new PartBuilder(); this.breaks.set(id, sub); }
+    this.into = sub; try { make(); } finally { this.into = was; }
+    return this;
+  }
+  /** The Bruchteile collected by `brk`: one geometry set each, with the centre of its bounding box. Call once, like `build`. */
+  buildBreaks() {
+    const out: { id: string; parts: Map<MatKey, THREE.BufferGeometry>; center: THREE.Vector3 }[] = [];
+    for (const [id, sub] of this.breaks) {
+      const parts = sub.build(); if (!parts.size) continue;
+      const box = new THREE.Box3(); for (const g of parts.values()) box.union(g.boundingBox!);
+      out.push({ id, parts, center: box.getCenter(new THREE.Vector3()) });
+    }
+    this.breaks.clear();
+    return out;
+  }
   add(key: MatKey, g: THREE.BufferGeometry, m?: THREE.Matrix4, liv: [number, number, number] = [0, 0, 0]) {
+    if (this.into) { this.into.add(key, g, m, liv); return this; }
     const geo = ensureAttrs(g, liv);
     if (m) { geo.applyMatrix4(m); if (m.determinant() < 0) flipWinding(geo); }
     let list = this.buckets.get(key); if (!list) { list = []; this.buckets.set(key, list); }

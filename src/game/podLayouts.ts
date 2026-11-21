@@ -41,6 +41,11 @@ export interface PodLayout {
   extraCircles?: CollCircle[];
   /** widens the ground-clearance envelope of both engine sides: outermost |x| and lowest y of parts the engine formulas do not know */
   envelope?: { outerX?: number; minY?: number };
+  /** Bruchteile (ids of the racer's Schadensmodell, podDamage.ts) that are not a piece of geometry: engines that flame out,
+   *  engines whose fan loses a blade (`EngineGeo.fanLost`) – both indices into `engines` – and energy arcs that die (indices into
+   *  `binders`). Geometry Bruchteile are tagged where they are built: `pb.brk(id, …)` in the extras below, in the engine builders
+   *  and `part(k, id, …)` in the cockpit designs. */
+  flameOut?: Record<string, number[]>; fanLoss?: Record<string, number[]>; arcLoss?: Record<string, number[]>;
 }
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -53,6 +58,8 @@ const MAIN: BinderLink[] = [{ a: 0, b: 1 }];
 const raised = (y: number, up: number) => ({ y: y + up, keel: up });
 const SEC: [number, number, number] = [0, 0, 3]; // secondary paint
 const SIDES = [-1, 1];
+/** suffix of a paired Bruchteil id: left engine side (x < 0) / right */
+const LR = (sd: number) => (sd < 0 ? 'L' : 'R');
 /** thin plate in the YZ plane (points [z, y]), `t` thick */
 const plate = (pts: [number, number][], t: number) => { const g = extrude(pts, t, Math.min(0.012, t * 0.3)); g.rotateY(-Math.PI / 2); return g; };
 
@@ -64,15 +71,17 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) for (const s2 of SIDES) {
           const cx = sd * 2.5 + s2 * 1.5, tip = sd * 2.5 + s2 * 1.97;
-          pb.add('hull', rbox(0.95, 0.08, 8.2, 0.03), M4.trs(cx, -0.32, 4, 0, 0, s2 * -0.12), SEC);
-          pb.add('steel', rbox(0.06, 0.12, 8.3, 0.02), M4.trs(tip, -0.38, 4, 0, 0, s2 * -0.12));
-          // Session 20: tip pods with nav light, a row of vortex generators and two wing struts
-          pb.add('dark', lathe(prof([[0, -0.5], [0.07, -0.3], [0.08, 0.3], [0, 0.56]]), hi ? 10 : 6, 0), M4.t(tip, -0.34, 7.9));
-          pb.add('glow', sphere(0.05, 6, 4), M4.t(tip, -0.34, 8.47));
-          if (hi) {
-            for (let i = 0; i < 5; i++) pb.add('steel', rbox(0.016, 0.07, 0.2, 0.004), M4.trs(cx, -0.25, 1.4 + i * 1.3, 0, s2 * 0.3, s2 * -0.12));
-            for (const z of [1.6, 6.4]) pb.add('steel', tube([V(sd * 2.5 + s2 * 0.86, -0.72, z), V(cx, -0.38, z)], 0.035, 2, 5));
-          }
+          pb.brk((s2 === sd ? 'wing' : 'inner') + LR(sd), () => { // Bruchteile: the outer wing plate of an engine goes first, the inner one last
+            pb.add('hull', rbox(0.95, 0.08, 8.2, 0.03), M4.trs(cx, -0.32, 4, 0, 0, s2 * -0.12), SEC);
+            pb.add('steel', rbox(0.06, 0.12, 8.3, 0.02), M4.trs(tip, -0.38, 4, 0, 0, s2 * -0.12));
+            // Session 20: tip pods with nav light, a row of vortex generators and two wing struts
+            pb.add('dark', lathe(prof([[0, -0.5], [0.07, -0.3], [0.08, 0.3], [0, 0.56]]), hi ? 10 : 6, 0), M4.t(tip, -0.34, 7.9));
+            pb.add('glow', sphere(0.05, 6, 4), M4.t(tip, -0.34, 8.47));
+            if (hi) {
+              for (let i = 0; i < 5; i++) pb.add('steel', rbox(0.016, 0.07, 0.2, 0.004), M4.trs(cx, -0.25, 1.4 + i * 1.3, 0, s2 * 0.3, s2 * -0.12));
+              for (const z of [1.6, 6.4]) pb.add('steel', tube([V(sd * 2.5 + s2 * 0.86, -0.72, z), V(cx, -0.38, z)], 0.035, 2, 5));
+            }
+          });
         }
       },
       // the wing plates reach further out and lower than the turbines
@@ -87,15 +96,14 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
       engineExtras: (pb, _L, hi) => {
         // the big shark fin stays on the left engine only (Vrak's trademark)
         const fin = extrude([[0, 0], [2.2, 0], [2.7, 2.7], [1.6, 2.7]], 0.12, 0.03); fin.rotateY(Math.PI / 2);
-        pb.add('hull', fin, M4.t(-2.4, 1.45, 1.2), SEC);
-        pb.add('steel', rbox(0.3, 0.4, 1.6, 0.05), M4.t(-2.4, 1.6, 0.2));
+        pb.brk('fin', () => { pb.add('hull', fin, M4.t(-2.4, 1.45, 1.2), SEC); pb.add('steel', rbox(0.3, 0.4, 1.6, 0.05), M4.t(-2.4, 1.6, 0.2)); }); // Bruchteil
         for (const sd of SIDES) {
           // Session 20: four intake guard spikes and an armoured skid plate per engine, a stub fin on the right one
           for (const [ax, ay] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) pb.add('chrome', lathe(prof([[0.085, 0], [0.05, 0.35], [0, 0.9]]), hi ? 8 : 5, 0), M4.trs(sd * 2.4 + ax * 1.0, ay * 1.0, 5.25, ay * -0.16, ax * 0.16, 0));
           pb.add('dark', rbox(1.5, 0.07, 3.0, 0.025), M4.t(sd * 2.4, -1.6, 1.6));
           if (hi) for (const z of [0.4, 2.8]) pb.add('steel', rbox(1.56, 0.1, 0.12, 0.02), M4.t(sd * 2.4, -1.61, z));
         }
-        pb.add('hull', plate([[0, 0], [1.3, 0], [0.5, 0.8], [0.1, 0.84]], 0.08), M4.t(2.4, 1.46, 0.2), SEC);
+        pb.brk('stub', () => pb.add('hull', plate([[0, 0], [1.3, 0], [0.5, 0.8], [0.1, 0.84]], 0.08), M4.t(2.4, 1.46, 0.2), SEC)); // Bruchteil
       },
     };
   },
@@ -109,13 +117,16 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
           pb.add('steel', tube([V(sd * 3.4, 0.7, 3.4), V(sd * 2.95, 1.3, 3.7), V(sd * 2.5, 2.1, 4)], 0.07, 12, 8));
           // Session 20: a rear truss, a copper fuel manifold feeding all three engines and a spreader bar between the lower pair
           pb.add('steel', tube([V(sd * 1.6, 0.7, 1.2), V(sd * 2.5, 1.0, 1.7), V(sd * 3.4, 0.7, 1.2)], 0.06, hi ? 10 : 5, 6));
-          pb.add('copper', tube([V(sd * 1.6, 0.86, 0.5), V(sd * 2.5, 1.26, 0.9), V(sd * 2.5, 2.3, 1.5)], 0.05, hi ? 12 : 6, 6));
-          pb.add('copper', tube([V(sd * 3.4, 0.86, 0.5), V(sd * 2.9, 1.1, 0.75), V(sd * 2.5, 1.26, 0.9)], 0.05, hi ? 8 : 4, 6));
-          pb.add('dark', sphere(0.14, hi ? 10 : 6, hi ? 8 : 4), M4.t(sd * 2.5, 1.26, 0.9));
+          pb.brk('manifold' + LR(sd), () => { // Bruchteil
+            pb.add('copper', tube([V(sd * 1.6, 0.86, 0.5), V(sd * 2.5, 1.26, 0.9), V(sd * 2.5, 2.3, 1.5)], 0.05, hi ? 12 : 6, 6));
+            pb.add('copper', tube([V(sd * 3.4, 0.86, 0.5), V(sd * 2.9, 1.1, 0.75), V(sd * 2.5, 1.26, 0.9)], 0.05, hi ? 8 : 4, 6));
+            pb.add('dark', sphere(0.14, hi ? 10 : 6, hi ? 8 : 4), M4.t(sd * 2.5, 1.26, 0.9));
+            if (hi) for (const x of [1.6, 3.4]) pb.add('chrome', torus(0.09, 0.02, 5, 10), M4.trs(sd * x, 0.82, 0.5, Math.PI / 2, 0, 0));
+          });
           pb.add('steel', tube([V(sd * 1.6, -0.2, 5.0), V(sd * 3.4, -0.2, 5.0)], 0.05, 2, 6));
-          if (hi) for (const x of [1.6, 3.4]) pb.add('chrome', torus(0.09, 0.02, 5, 10), M4.trs(sd * x, 0.82, 0.5, Math.PI / 2, 0, 0));
         }
       },
+      flameOut: { engCL: [4], engCR: [5], engBL: [2], engBR: [3] }, // first the upper engine of a side goes out, then the outer one
     };
   },
   bomquad: () => {
@@ -123,7 +134,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
     const s = spec(7.6, 0.66, 'ring', 5, 12);
     return {
       engines: [{ spec: s, x: -2.3, y: -0.35, z: 3 }, { spec: s, x: 2.3, y: -0.35, z: 3 }, { spec: s, x: -2.3, y: 2.05, z: 3 }, { spec: s, x: 2.3, y: 2.05, z: 3 }],
-      cockpit: { style: 'saucer', hw: 1.0, len: 2.4, ...raised(0.2, 0.65), z: -6, pilot: 0.95, far: 'disc' }, binders: [{ a: 0, b: 3 }, { a: 2, b: 1 }], livery: 3,
+      cockpit: { style: 'saucer', hw: 1.0, len: 2.4, ...raised(0.2, 0.65), z: -6, pilot: 0.95, far: 'disc' }, binders: [{ a: 0, b: 3 }, { a: 2, b: 1 }], arcLoss: { arcL: [0], arcR: [1] }, livery: 3,
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           for (const z of [1.0, 4.8]) pb.add('steel', tube([V(sd * 2.3, 0.35, z), V(sd * 2.3, 1.35, z)], 0.08, 4, 6));
@@ -145,7 +156,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           // Session 20: swept canards behind each intake, a long outboard pitot and a ventral keel
-          for (const a of [1.05, -1.05]) pb.add('hull', plate([[0, 0], [0.9, 0], [0.1, 0.5], [-0.12, 0.5]], 0.035), M4.trs(sd * 1.7 + Math.sin(a) * 0.56, Math.cos(a) * 0.56, 5.3, 0, 0, -a), SEC);
+          pb.brk('canard' + LR(sd), () => { for (const a of [1.05, -1.05]) pb.add('hull', plate([[0, 0], [0.9, 0], [0.1, 0.5], [-0.12, 0.5]], 0.035), M4.trs(sd * 1.7 + Math.sin(a) * 0.56, Math.cos(a) * 0.56, 5.3, 0, 0, -a), SEC); }); // Bruchteil
           pb.add('chrome', tube([V(sd * 2.34, 0.06, 4.6), V(sd * 2.36, 0.06, 8.2)], 0.018, 2, 5));
           pb.add('dark', cyl(0.04, 0.04, 0.2, 6), M4.trs(sd * 2.3, 0.06, 4.7, 0, 0, Math.PI / 2));
           pb.add('hull', plate([[0, 0], [1.7, 0], [1.3, -0.16], [0.2, -0.16]], 0.03), M4.t(sd * 1.7, -0.6, 0.6), SEC);
@@ -162,8 +173,10 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
         for (const sd of SIDES) {
           // Session 20: twin feelers on every engine, landing skids underneath and a stripe band like the wasp body
           for (const a of SIDES) {
-            pb.add('dark', tube([V(sd * 1.7 + a * 0.2, 0.86, 4.6), V(sd * 1.7 + a * 0.42, 1.3, 5.3), V(sd * 1.7 + a * 0.56, 1.42, 6.1)], 0.018, hi ? 8 : 4, 4));
-            pb.add('glow', sphere(0.035, 6, 4), M4.t(sd * 1.7 + a * 0.56, 1.42, 6.1));
+            pb.brk('feeler' + LR(sd), () => { // Bruchteil
+              pb.add('dark', tube([V(sd * 1.7 + a * 0.2, 0.86, 4.6), V(sd * 1.7 + a * 0.42, 1.3, 5.3), V(sd * 1.7 + a * 0.56, 1.42, 6.1)], 0.018, hi ? 8 : 4, 4));
+              pb.add('glow', sphere(0.035, 6, 4), M4.t(sd * 1.7 + a * 0.56, 1.42, 6.1));
+            });
             pb.add('steel', tube([V(sd * 1.7 + a * 0.42, -0.86, 0.6), V(sd * 1.7 + a * 0.46, -1.0, 1.4), V(sd * 1.7 + a * 0.46, -1.0, 3.6), V(sd * 1.7 + a * 0.42, -0.86, 4.4)], 0.035, hi ? 10 : 5, 5));
           }
           if (hi) for (const z of [0.9, 1.4]) pb.add('hazard', torus(0.86, 0.035, 5, 20), M4.t(sd * 1.7, 0, z));
@@ -179,11 +192,14 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
         for (const sd of SIDES) {
           // Session 20: an external cooling loop over each engine, a coolant tank underneath and two radiator vanes at the rear
           const x = sd * 2.3;
-          pb.add('copper', tube([V(x, 1.02, 0.4), V(x + 0.34, 1.4, 1.1), V(x, 1.5, 1.9), V(x - 0.34, 1.4, 2.7), V(x, 1.5, 3.5), V(x + 0.34, 1.4, 4.3), V(x, 1.02, 5.0)], 0.055, hi ? 26 : 10, 6));
+          pb.brk('loop' + LR(sd), () => { // Bruchteil
+            pb.add('copper', tube([V(x, 1.02, 0.4), V(x + 0.34, 1.4, 1.1), V(x, 1.5, 1.9), V(x - 0.34, 1.4, 2.7), V(x, 1.5, 3.5), V(x + 0.34, 1.4, 4.3), V(x, 1.02, 5.0)], 0.055, hi ? 26 : 10, 6));
+            if (hi) for (const z of [1.1, 2.7, 4.3]) pb.add('dark', torus(0.075, 0.02, 5, 10), M4.trs(x + (z === 2.7 ? -0.34 : 0.34), 1.4, z, 0, 0, 0));
+          });
           pb.add('steel', cyl(0.17, 0.17, 2.2, hi ? 12 : 6).rotateX(Math.PI / 2), M4.t(x, -1.0, 3.2));
           for (const z of [2.2, 4.2]) pb.add('dark', sphere(0.17, hi ? 10 : 6, hi ? 6 : 3), M4.t(x, -1.0, z));
-          for (const a of SIDES) pb.add('hull', plate([[0, 0], [1.4, 0], [1.2, 0.5], [0.1, 0.42]], 0.035), M4.trs(x + a * 0.72, 0.72, -0.9, 0, 0, a * -0.75), SEC);
-          if (hi) { pb.add('glow', rbox(0.03, 0.03, 1.8, 0.008), M4.t(x, -1.18, 3.2)); for (const z of [1.1, 2.7, 4.3]) pb.add('dark', torus(0.075, 0.02, 5, 10), M4.trs(x + (z === 2.7 ? -0.34 : 0.34), 1.4, z, 0, 0, 0)); }
+          pb.brk('vane' + LR(sd), () => { for (const a of SIDES) pb.add('hull', plate([[0, 0], [1.4, 0], [1.2, 0.5], [0.1, 0.42]], 0.035), M4.trs(x + a * 0.72, 0.72, -0.9, 0, 0, a * -0.75), SEC); }); // Bruchteil
+          if (hi) pb.add('glow', rbox(0.03, 0.03, 1.8, 0.008), M4.t(x, -1.18, 3.2));
         }
       },
     };
@@ -198,12 +214,15 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
           pb.add('dark', rbox(0.3, 0.3, 3.6, 0.06), M4.trs(sd * 2.3, 0.55, 3.0, -0.31, 0, 0));
           pb.add('hazard', rbox(0.32, 0.06, 1.2, 0.02), M4.trs(sd * 2.3, 0.73, 3.0, -0.31, 0, 0));
           // Session 20: armour skirts outboard of the lower engines, a second girder and bumper horns on the upper ones
-          pb.add('steel', rbox(0.07, 1.5, 3.4, 0.025), M4.trs(sd * 3.6, -0.5, 0, 0, 0, sd * 0.08));
+          pb.brk('skirt' + LR(sd), () => { // Bruchteil
+            pb.add('steel', rbox(0.07, 1.5, 3.4, 0.025), M4.trs(sd * 3.6, -0.5, 0, 0, 0, sd * 0.08));
+            if (hi) for (let i = 0; i < 5; i++) pb.add('chrome', cyl(0.035, 0.035, 0.03, 6), M4.trs(sd * 3.645, -0.1, -1.4 + i * 0.7, 0, 0, Math.PI / 2));
+          });
           pb.add('dark', rbox(0.22, 0.22, 3.2, 0.05), M4.trs(sd * 2.3 + sd * 0.7, 0.2, 2.6, -0.31, 0, 0));
           for (const a of SIDES) pb.add('chrome', lathe(prof([[0.09, 0], [0.05, 0.3], [0, 0.7]]), hi ? 8 : 5, 0), M4.t(sd * 2.3 + a * 0.8, 1.45 + 0.8, 8.3));
-          if (hi) for (let i = 0; i < 5; i++) pb.add('chrome', cyl(0.035, 0.035, 0.03, 6), M4.trs(sd * 3.645, -0.1, -1.4 + i * 0.7, 0, 0, Math.PI / 2));
         }
       },
+      flameOut: { engUL: [2], engUR: [3] }, // the upper engine of a side goes out late
     };
   },
   elana: () => {
@@ -230,10 +249,12 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
         for (const sd of SIDES) {
           // Session 20: a ram hoop on three struts in front of every intake and a hazard band around the cowling
           const x = sd * 2.4;
-          pb.add('steel', torus(0.86, 0.07, 6, hi ? 20 : 10), M4.t(x, 0, 7.0));
-          for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.5; pb.add('steel', tube([V(x + Math.sin(a) * 1.22, Math.cos(a) * 1.22, 6.3), V(x + Math.sin(a) * 0.86, Math.cos(a) * 0.86, 7.0)], 0.045, 2, 5)); }
+          pb.brk('hoop' + LR(sd), () => { // Bruchteil
+            pb.add('steel', torus(0.86, 0.07, 6, hi ? 20 : 10), M4.t(x, 0, 7.0));
+            for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.5; pb.add('steel', tube([V(x + Math.sin(a) * 1.22, Math.cos(a) * 1.22, 6.3), V(x + Math.sin(a) * 0.86, Math.cos(a) * 0.86, 7.0)], 0.045, 2, 5)); }
+          });
           pb.add('hazard', torus(1.32, 0.05, 5, hi ? 24 : 12), M4.t(x, 0, 5.2));
-          pb.add('dark', rbox(1.2, 0.08, 2.6, 0.03), M4.t(x, -1.5, 2.4));
+          pb.brk('skid' + LR(sd), () => pb.add('dark', rbox(1.2, 0.08, 2.6, 0.03), M4.t(x, -1.5, 2.4))); // Bruchteil
         }
       },
     };
@@ -251,19 +272,20 @@ LAYOUTS.cyclone = () => { // Tarn Cyclone: two short fat engines, each driving a
   const s = spec(5.2, 1.25, 'rotor', 3, 5), ex = 2.7, ez = 3.2, R = s.R, Rh = 1.42 * R;
   return {
     engines: pair(s, ex, 0, ez), cockpit: { style: 'wedge', hw: 1.0, len: 3.0, y: 1.02, z: -5.4, pilot: 1.08, far: 'fin' }, binders: MAIN, livery: 3,
+    fanLoss: { bladeL: [0], bladeR: [1] },
     engineExtras: (pb, _L, hi) => {
       for (const sd of SIDES) {
         // a swept fin on top of each hoop and two landing skids under each body
-        pb.add('hull', plate([[ez + 2.08, Rh + 0.02], [ez + 1.5, Rh + 0.02], [ez + 1.26, Rh + 0.56], [ez + 1.5, Rh + 0.6]], 0.05), M4.t(sd * ex, 0, 0), SEC);
+        pb.brk('fin' + LR(sd), () => { // Bruchteil
+          pb.add('hull', plate([[ez + 2.08, Rh + 0.02], [ez + 1.5, Rh + 0.02], [ez + 1.26, Rh + 0.56], [ez + 1.5, Rh + 0.6]], 0.05), M4.t(sd * ex, 0, 0), SEC);
+          if (hi) pb.add('glow', sphere(0.035, 6, 4), M4.t(sd * ex, Rh + 0.6, ez + 1.42)); // marker light on the fin
+        });
         for (const o of [-0.5, 0.5]) {
           const x = sd * ex + o;
           rail(pb, [V(x, -R * 0.86, ez + 0.5), V(x, -R - 0.15, ez + 0.1), V(x, -R - 0.15, ez - 1.7), V(x, -R * 0.86, ez - 2.1)], 0.04);
           if (hi) for (const z of [ez - 0.2, ez - 1.4]) pb.add('steel', cyl(0.026, 0.026, 0.22, 5), M4.t(x, -R - 0.02, z));
         }
-        if (hi) { // brace from the spine to the top of the hoop, marker light on the fin
-          pb.add('steel', tube([V(sd * ex, R + 0.06, ez + 0.5), V(sd * ex, Rh - 0.02, ez + 1.52)], 0.03, 2, 5));
-          pb.add('glow', sphere(0.035, 6, 4), M4.t(sd * ex, Rh + 0.6, ez + 1.42));
-        }
+        if (hi) pb.add('steel', tube([V(sd * ex, R + 0.06, ez + 0.5), V(sd * ex, Rh - 0.02, ez + 1.52)], 0.03, 2, 5)); // brace from the spine to the top of the hoop
       }
     },
   };
@@ -308,6 +330,7 @@ LAYOUTS.volt = () => { // Quill Voltspire: two open truss cages round plasma coi
   return {
     engines: pair(s, ex, 0, ez), cockpit: { style: 'saucer', hw: 0.9, len: 2.2, y: 0.9, z: -5.4, pilot: 0.92, topY: 0.95, far: 'cage' },
     binders: [{ a: 0, b: 1, zOff: -CAGE_ARC_STEP }, { a: 0, b: 1 }, { a: 0, b: 1, zOff: CAGE_ARC_STEP }], livery: 5,
+    arcLoss: { arcA: [0], arcB: [2] }, // the rear arc dies first, then the front one – the middle one holds
     engineExtras: (pb, _L, hi) => {
       for (const sd of SIDES) {
         // a discharge mast on the front frame of each cage and two skid rails underneath
