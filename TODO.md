@@ -1,6 +1,15 @@
 # TODO
 
-## 0. Direkt aus Session 19
+## 0. Session 20 – Pod-Überholung (läuft; Phasen und Entscheidungen in `HANDOFF.md`)
+- [x] **Phase 0 – Setup + Sicherheitsnetz:** Node, Ausgangsmessung, Sichtprüfung im In-App-Browser, `podAssembly.ts`, Pod-Audit in `npm run check`, `CONTEXT.md`, ADR 0001/0002
+- [ ] **Phase 1 – Refactoring ohne Spieländerung:** Layout-Registry, `engineExtent`, `podCockpits.ts`, `applyDamage`, Profil v2
+- [ ] **Phase 2 – 10 neue Cockpits + Details + Cockpit-Innenansicht** (danach sichtet der Nutzer)
+- [ ] **Phase 3 – 4 neue Pods:** Cyclone, Halo, Manta, Voltspire (danach sichtet der Nutzer)
+- [ ] **Phase 4 – Tuning-Optik:** Tuning-Teile + Style-Teile, Hangar-Reiter „Lack | Teile"
+- [ ] **Phase 5–7 – Schadensmodelle:** Fahrverhalten, Optik Spieler, Optik Gegner
+- [ ] `tools/harness/pui.mjs:39` prüft noch die gelöschte „Neon-Spirale" → anpassen; `tools/harness/run.sh` läuft nur unter Linux
+
+## 1. Direkt aus Session 19
 - [ ] **Probefahrt + FPS-Messung:** Brücken-/Tunnel-Kreuzungen, futuristische Schleusen, verzweigte Höhlen, hohe Tunnel (Aquilaris/Ando Prime), feine Blitze
 - [ ] **Mehr HQ-Assets:** Schneekiefern mit Nadel-Karten, Kakteen/Farne mit Fototextur, Felsbrocken mit Displacement
 - [ ] **Weitere Foto-Texturen:** Schnee/Eis, Metallplatten, Lava-Kruste; Fotos optional in 1024 px

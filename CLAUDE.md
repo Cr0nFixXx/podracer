@@ -8,7 +8,16 @@
 - Spec don'ts: **no film grain, no excessive bloom / overexposure.**
 - **Sandbox persistence:** if `.git` or `src/assets/menu-bg.jpg` vanished after a reset, restore via `git clone --branch B https://github.com/Cr0nFixXx/podracer.git /tmp/rc && cp -r /tmp/rc/.git . && mkdir -p src/assets && cp -n /tmp/rc/src/assets/menu-bg.jpg src/assets/` (working tree stays, shows as modified vs. `B`).
 - **Commit with `npm run save -- "message"` after every finished task** (user request). It commits everything except `.archive` / `.archiv` and writes BOTH a direct `.git` copy (`.archive/git`) AND the proven base64 text archive (`.archive/podracer-git.tar.gz.b64.txt` + `.archiv/repo-sicherung/podracer-git.tar.gz.b64.txt` + restore scripts), then test-restores both. Never `git add -A` by hand, never git-ignore `.archive`, never push unless asked.
-- **Before finishing: `npm run check` must be green** (typecheck + 13-track node physics sim). Add npm scripts only with `npm pkg set scripts.<name>=…`.
+- **Git worktrees / local Windows checkout:** in a worktree `.git` is a pointer file – `npm run save` would back up only that pointer and replace the tracked backup text with a stub. There the user wants plain `git commit` (decision 2026-11-21: `.archive` and the git backup are not relevant on the local machine). Stage with `git add -A -- . ":(exclude).archive" ":(exclude).archiv/repo-sicherung"`.
+- **Before finishing: `npm run check` must be green** (typecheck + pod audit + 13-track node physics sim). Add npm scripts only with `npm pkg set scripts.<name>=…`.
+- **Words:** use the glossary in `CONTEXT.md` (Racer, Cockpit, Tuning-Teil, Style-Teil, Schadensmodell, Bruchteil, Gegner …). Hard-to-reverse decisions live in `docs/adr/`.
+
+## Session 20 rules (pod overhaul – phase table in `HANDOFF.md`)
+- **Pod geometry is assembled in `podAssembly.ts`** (material-free: engine banks, cockpit, cables, binders, far LOD, vertex-colour bake for Gegner). `podModel.ts` only adds materials, meshes and animation. `podAssembly.ts`, `podKit.ts`, `podParts.ts`, `podDesigns.ts` must stay free of `three/webgpu`, TSL and DOM imports – the node audit bundles them.
+- **Pod audit (`tools/ci/pods.ts`, first part of `npm run check`):** mesh + triangle counts of every build (player quality 1–3, Gegner near at quality 2 / 3, far LOD) must equal `tools/ci/pods-baseline.json`. Pods changed on purpose → `UPDATE=1 npm run check:pods`, paste the rows, write the reason into `HANDOFF.md`. `TOL` in the audit = how far the visible model may exceed `podCollision` / `podEnvelope`.
+- **A bucket that cannot be merged throws** (before: silently dropped). Every part that goes into one material bucket needs the same vertex attributes.
+- **Target hardware:** "Ultra" aims at a gaming PC (Core i9 + RTX 4090) – max detail there; lower presets must not get slower. The dev laptop cannot prove Ultra frame rate: report triangles + draw calls (ADR 0002).
+- **Looking at pods on Windows:** `.claude/launch.json` → `podracer-dev` (Vite) + `podracer-shots` (saves harness frames to `tools/harness/out/`). Harness page `/tools/harness/pods.dev.html`: `sheet('front' | 'rear' | 'side' | 'inside' | 'pod', { rival, quality, health, save })`, `show(idx, hp, quality, { rival, save })`, `statsAll()`.
 
 ## Session 19 rules
 - **Ökumenopolis (`city` / `neon`) is removed** (13 tracks across 8 planets; keep `cityRoad` texture for `aquilaris` and `malastare`; `loadProfile` falls back to `TRACKS[0].id` for unknown `trackId`).
@@ -86,7 +95,7 @@ React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto 
 - **Live graphics:** `Game.LIVE_GFX` lists what `applyLiveGfx` can change at runtime; `POST_KEYS` trigger a rebuild of `PostFX` (dispose old, warm up new). Anything baked into geometry/compiled materials stays restart-only – keep the two UI texts (pause menu, README) in sync with the list.
 - **Slide strength** is `sk` (player) / `sk × 0.45` (AI). Retune grip (`0.035`), return rate (`1.4`), slip limiter (`0.88` rad) together and rerun `npm run check`.
 - **Overheads** may carry `arch: { R, sy }` (checkpoint gates): ceiling = `sy·√((R−1.7)² − lat²)` above the road.
-- **Pod extras:** `numberPlate()` (shared atlas + material, added to the hero body / rival near-LOD group), boost flaps via `boostK` in the hero `update()`. `buildPodModel(…, isOpponent, num)`.
+- **Pod extras:** number plates were removed again in Session 16 (there is no `numberPlate()` and `buildPodModel` has no `num` parameter: `buildPodModel(def, colors, quality, texRes, isOpponent, opts)`); `boostK` in the hero `update()` now drives the nozzle petals.
 - **Dust:** `particles.trail` (dry) / `particles.spray` (wet) from both engine tails in `Game.updateVisuals`; `dustAmt` scales it per world. Keep the 24 m near-camera reduction for rivals.
 
 ## UI layout, controls, obstacles, cache (Session 14)
@@ -146,7 +155,8 @@ React 19 · Vite 7 · Tailwind 4 · three r187 **WebGPURenderer** (WebGPU, auto 
 - Start gate: add parts only through `put(mat, geo)` / `strut(...)` in `mkGate` (5 merged buckets).
 
 ## Testing
-- **`npm run check`** (≈ 25 s, node only): `tools/ci/sim.ts` – fails on NaN, deaths > 3, wall penetration > 0.6 m, ground clearance < 0.2 m, pod slower than 18 m/s. `DEBUG=1`, `TRACK=<id>`, `SECS=<n>`, `PITCH_AIR=1|0|-1` (jump experiment).
+- **Session 20 tests:** `npm run check:pods` (1 s; `POD=<id>`, `UPDATE=1`); harness `statsAll()` must match the audit numbers after any change to `podModel.ts` / `podAssembly.ts`; before/after sheets saved with `save:` are byte-identical when nothing visible changed.
+- **`npm run check`** (≈ 25 s, node only): `tools/ci/pods.ts` (pod audit, see Session 20 rules), then `tools/ci/sim.ts` – fails on NaN, deaths > 3, wall penetration > 0.6 m, ground clearance < 0.2 m, pod slower than 18 m/s. `DEBUG=1`, `TRACK=<id>`, `SECS=<n>`, `PITCH_AIR=1|0|-1` (jump experiment).
 - **Session 18 tests:** CI prints `layout:` per track; harness views `f` (first HQ tree close-up), `o` (widest open flat); `?nophoto` disables the photo detail for A/B shots.
 - **Session 17 tests:** CI prints a tunnel report per track + deck self-test; harness views `v` (inside first tunnel), `k` (above the first standard tunnel); pods harness item `3` = Quadra Lumber.
 - **Session 16 tests:** harness views `u` (first main tunnel), `w` (zero-G tube); pods harness `?boost`; `NOGRID=1 npm run check` = old start behaviour for A/B; `papp.mjs` fakes a gamepad and rebinds Boost.

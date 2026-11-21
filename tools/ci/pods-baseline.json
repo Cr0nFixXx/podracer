@@ -1,0 +1,17 @@
+{
+  "note": "Golden numbers of the REAL pod models: measured in the browser with tools/harness/pods.ts -> statsAll() (buildPodModel + scene traversal). tools/ci/pods.ts must reproduce them from src/game/podAssembly.ts. Regenerate deliberately when pods change on purpose.",
+  "columns": ["id", "heroQ1 meshes", "heroQ1 tris", "heroQ2 meshes", "heroQ2 tris", "heroQ3 meshes", "heroQ3 tris", "rivalQ2 near meshes", "rivalQ2 near tris", "rivalQ3 near meshes", "rivalQ3 near tris", "far meshes", "far tris"],
+  "measured": "2026-11-21, commit d7b9c4b (Session 19 state, before the pod overhaul)",
+  "rows": [
+    ["aurora", 40, 26132, 40, 39692, 40, 51068, 31, 22184, 31, 23824, 3, 544],
+    ["brute", 37, 26804, 37, 39888, 37, 50656, 28, 22976, 28, 24536, 3, 544],
+    ["gasvaro", 62, 49516, 62, 83388, 62, 106412, 29, 39328, 29, 43144, 3, 984],
+    ["bomquad", 49, 39800, 49, 65544, 49, 84664, 28, 31760, 28, 35136, 3, 764],
+    ["mavik", 37, 24092, 37, 35604, 37, 46692, 28, 20120, 28, 21776, 3, 544],
+    ["rattis", 38, 22720, 38, 34676, 38, 44196, 29, 19324, 29, 20596, 3, 544],
+    ["aldo", 37, 25044, 37, 39148, 37, 50508, 28, 21096, 28, 22736, 3, 544],
+    ["teemo", 50, 38028, 50, 61684, 50, 78308, 30, 30996, 30, 33700, 3, 764],
+    ["elana", 38, 24896, 38, 36496, 38, 47328, 29, 20924, 29, 22580, 3, 544],
+    ["odo", 40, 24580, 40, 37660, 40, 48044, 31, 20872, 31, 22352, 3, 544]
+  ]
+}

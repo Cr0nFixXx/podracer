@@ -1,7 +1,9 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-`npm run dev` → **Aquilaris-Küstenlauf** (19,5-m-Unterwassertunnel, 2 Skyway-Brücken, Flutschleuse) und **Frostspalt-Ring** (22,5-m-Gletschertunnel, verzweigte Eishöhle, Eisschleuse, Viadukt) Probe fahren; im **Hangar** die 6 Lackiermuster & 3 Finishes testen (≈ 6 Min.).
+1. **Pod-Überholung fortsetzen:** Phasentabelle im Abschnitt „Session 20" unten – die erste offene Phase ist dran. Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
+2. Vor jeder Änderung: `npm run check` (Typecheck + Pod-Audit + Sim) muss grün sein. Pods ansehen: `npm run dev` → `http://localhost:5173/tools/harness/pods.dev.html`.
+3. Weiterhin offen aus Session 19: `npm run dev` → **Aquilaris-Küstenlauf** (19,5-m-Unterwassertunnel, 2 Skyway-Brücken, Flutschleuse) und **Frostspalt-Ring** (22,5-m-Gletschertunnel, verzweigte Eishöhle, Eisschleuse, Viadukt) Probe fahren; im **Hangar** die 6 Lackiermuster & 3 Finishes testen (≈ 6 Min.).
 
 ## Git-Stand (wichtig)
 - Lokales Repo im Projekt-Root, Branch **`B`**, Remote `origin` = `https://github.com/Cr0nFixXx/podracer.git`. **Pushen:** `git push origin B`.
@@ -11,6 +13,69 @@
   2. `.archive/podracer-git.tar.gz.b64.txt` – vollständiges `.git` als Base64-Text (falls Binär-Packdateien beim Download gefiltert werden) + `wiederherstellen.sh` / `wiederherstellen.ps1` / `LIESMICH.txt`.
 - **Committen immer mit `npm run save -- "Nachricht"`** (`tools/save.sh`): committet alles außer `.archive`/`.archiv`, aktualisiert beide Sicherungen und führt Probe-Wiederherstellungen aus.
 - Commit-Autor ist der Platzhalter „Podracer Dev".
+- **Lokaler Windows-Rechner (Claude-Desktop, Git-Worktrees unter `.claude/worktrees/`):** dort ist `.git` nur eine Zeigerdatei – `npm run save` würde nur diesen Zeiger „sichern" und die versionierte Sicherungsdatei durch einen Stummel ersetzen. Entscheidung des Nutzers (2026-11-21): `.archive` und die Git-Sicherung sind in dieser Umgebung nicht relevant → dort einfache `git commit`s. Session 20 liegt auf dem Branch `claude/caveman-mode-fa82ce` (abgezweigt von `new_pods` = `origin/B`, Commit `d7b9c4b`).
+- Seit dem Commit `d7b9c4b` ist `.archiv/repo-sicherung/` versioniert: im Haupt-Checkout committet dadurch jedes `npm run save` eine Kopie des ganzen Repos ins Repo (Größe wächst je Sicherung etwa um den Faktor 2,3). Nicht angefasst – Entscheidung des Nutzers offen.
+
+## Stand: 2026-11-21 (Session 20, läuft) – Pod-Überholung: Cockpits, Details, 4 neue Pods, Tuning-Optik, Schadensmodelle
+
+### Auftrag und abgestimmte Entscheidungen
+1. **Umfang (nur Pods):** alle 10 Cockpits individuell neu, mehr Details, 4 neue Pods (Halo, Manta, Voltspire, Cyclone – eigene Entwürfe und Namen), Tuning mit sichtbaren Teilen, eigenes Schadensmodell je Racer.
+2. **Tuning:** die 7 Tuning-Werte werden als **Tuning-Teile** sichtbar, dazu frei wählbare **Style-Teile** (Finnen, Einlass, Düse, Kanzel). Alles frei, kein Shop, kein Ausblend-Schalter.
+3. **Schaden:** Optik + Fahrverhalten, mild (5–10 % je verlorenem Bruchteil, höchstens −15 % je Wert). Bruchteile brechen bei 50 / 35 / 20 % Triebwerkszustand und bleiben bis zum Respawn weg. Explosionsregel unverändert. **Treffermarken** statt echter Dellen.
+4. **Ziel-Hardware:** Gaming-PC des Nutzers (Core i9 + RTX 4090) → **maximale Details auf „Ultra"**, nahe Gegner auf Ultra mit vollen Details. Dieses Notebook (Latitude 5590, Intel UHD 620) ist nur Entwicklungsrechner und kann Ultra-Bildraten nicht belegen.
+5. **Sonstiges:** Kamera „Cockpit" zeigt künftig das eigene Cockpit von innen („Motorhaube" bleibt die freie Sicht) · max. 10 Gegner bleiben · alte Pods behalten Größe, Werte und Fahrverhalten · Begriffe in `CONTEXT.md`, Entscheidungen in `docs/adr/`.
+
+### Phasen
+| # | Inhalt | Stand |
+|---|---|---|
+| 0 | Setup + Sicherheitsnetz | ✅ erledigt |
+| 1 | Refactoring ohne Spieländerung: Layout-Registry (`podLayouts.ts`), `engineExtent`, `podCockpits.ts`, `applyDamage` + Wirkungs-Struct, Profil v2 | offen |
+| 2 | 10 neue Cockpits + Detailpass + Cockpit-Innenansicht → **Stopp: Nutzer sichtet** | offen |
+| 3 | 4 neue Pods (Cyclone → Halo → Manta → Voltspire), Hangar-Liste für 14, Gegner-Auslosung → **Stopp** | offen |
+| 4 | Tuning-Optik: `PodCustom.kit`, `podKitParts.ts`, Hangar-Reiter „Lack \| Teile" | offen |
+| 5 | Schaden – Fahrverhalten: `podDamage.ts`, Bruchteil-Maske, HUD-Lampen | offen |
+| 6 | Schaden – Optik Spieler: Bruchteile, Treffermarken, Trümmer, Hangar-Schadensvorschau | offen |
+| 7 | Schaden – Optik Gegner: `userData`-Ruß/Flammenleistung in den geteilten Materialien | offen |
+
+### Erledigt in Phase 0
+1. **Node.js 26.13.1** per winget installiert (war auf dem Rechner nicht vorhanden), `npm ci`. Bereits laufende Shells kennen den neuen PATH nicht → `C:\Program Files\nodejs` voranstellen.
+2. **Sichtprüfung unter Windows:** `.claude/launch.json` mit `podracer-dev` (Vite, Port 5173) und `podracer-shots` (`tools/harness/shot-server.mjs`, Port 5174, schreibt Bilder nach `tools/harness/out/`). Der Pod-Harness läuft ohne Bundle über Vite: `tools/harness/pods.dev.html`. WebGPU funktioniert im In-App-Browser.
+3. **Harness (`tools/harness/pods.ts`):** `show(idx, hp, quality, { rival, save })`, `sheet('pod' | 'front' | 'rear' | 'side' | 'inside', { rival, quality, health, save })` (ein Feld je Pod, passt sich der Pod-Anzahl an), `stats()` / `statsAll()` (Mesh- und Dreieckszahlen des echten Modells).
+4. **`src/game/podAssembly.ts` (neu):** materialfreie Montage eines Pods (Triebwerksbänke, Cockpit, Kabel, Binder, Fern-LOD, Vertex-Farben für Gegner). `podModel.ts` erzeugt daraus nur noch Meshes, Materialien und Animation. Ein nicht zusammenführbarer Bucket wirft jetzt einen Fehler (vorher: stillschweigend weggelassen).
+5. **Pod-Audit `tools/ci/pods.ts` (neu, Teil von `npm run check`, 1 s):** baut alle Pods ohne Browser und prüft Mesh-/Dreieckszahlen gegen `tools/ci/pods-baseline.json`, Attribute/NaN/Indexbereich sowie das Sichtmodell gegen Kollisions- und Bodenform.
+6. **Doku:** `CONTEXT.md` (Glossar), `docs/adr/0001-bruchteile-follow-health-steps.md`, `docs/adr/0002-ultra-targets-a-gaming-pc.md`.
+
+### Verifiziert (Phase 0)
+- `npm run check` vorher/nachher: Sim-Ausgabe **zeilengleich** (56 Zeilen, 13/13 Strecken, 0 Tode); Pod-Audit 10/10.
+- Browser (WebGPU): `statsAll()` nach dem Umbau identisch zu den Goldwerten; vier Vorher/Nachher-Bögen (Spieler/Gegner, ganz/Cockpit) **bytegleich**.
+- `npm run build` → `dist/index.html` (2,81 MB).
+
+### Messwerte vor der Überholung (Meshes / Dreiecke)
+| Pod | Spieler „Hoch" | Spieler „Ultra" | Gegner nah | Gegner fern |
+|---|---|---|---|---|
+| Aurora XR-7 | 40 / 39 692 | 40 / 51 068 | 31 / 22 184 | 3 / 544 |
+| Vrak Splitter-X | 37 / 39 888 | 37 / 50 656 | 28 / 22 976 | 3 / 544 |
+| Tenroc 6-Fach | 62 / 83 388 | 62 / 106 412 | 29 / 39 328 | 3 / 984 |
+| Quadra Lumber | 49 / 65 544 | 49 / 84 664 | 28 / 31 760 | 3 / 764 |
+| Hollo Needle | 37 / 35 604 | 37 / 46 692 | 28 / 20 120 | 3 / 544 |
+| Tyr Vespa | 38 / 34 676 | 38 / 44 196 | 29 / 19 324 | 3 / 544 |
+| Beerak Fireflare | 37 / 39 148 | 37 / 50 508 | 28 / 21 096 | 3 / 544 |
+| Pagali Ironclad | 50 / 61 684 | 50 / 78 308 | 30 / 30 996 | 3 / 764 |
+| Mak Starling | 38 / 36 496 | 38 / 47 328 | 29 / 20 924 | 3 / 544 |
+| Mandrel Ram | 40 / 37 660 | 40 / 48 044 | 31 / 20 872 | 3 / 544 |
+
+Sichtmodell gegen Physikform: breiter als die Kollisionsform höchstens 0,50 m (Tyr Vespa, Klingenflügel); kein Triebwerk hängt mehr als 0,02 m, kein Cockpit überhaupt unter der Bodenklemme.
+
+### Nicht verifiziert / offen
+- Bildrate – auf diesem Notebook nicht aussagekräftig; „Ultra" testet der Nutzer am Gaming-PC.
+- `tools/harness/pui.mjs:39` prüft noch die gelöschte Strecke „Neon-Spirale" (schlägt deshalb fehl) und braucht Puppeteer, das hier nicht installiert ist. Layout-Prüfung erfolgt vorerst im In-App-Browser.
+- `tools/harness/run.sh` setzt Linux-Pfade voraus (`/tmp`, `LD_LIBRARY_PATH`).
+
+### Befehle (neu)
+1. `npm run check:pods` – nur das Pod-Audit. `POD=<id>` prüft einen Pod, `UPDATE=1` gibt neue Baseline-Zeilen aus (bewusst übernehmen, wenn Pods absichtlich geändert wurden).
+2. Harness-Konsole: `await sheet('front', { quality: 3, save: 'name' })`, `await show(3, 0.3, 3, { rival: true })`, `statsAll()`.
+
+---
 
 ## Stand: 2026-11-20 (Session 19) – Bugfixes, Brücken/Unterführungen, futuristische Schleusen, verzweigte Höhlen, Pod-Aufwertung
 

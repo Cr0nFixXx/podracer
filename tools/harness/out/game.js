@@ -20870,11 +20870,11 @@ var init_three_core = __esm({
         }
         for (let i = 0; i < segments; i++) {
           for (let j = 0; j < points.length - 1; j++) {
-            const base = j + i * points.length;
-            const a = base;
-            const b = base + points.length;
-            const c = base + points.length + 1;
-            const d = base + 1;
+            const base2 = j + i * points.length;
+            const a = base2;
+            const b = base2 + points.length;
+            const c = base2 + points.length + 1;
+            const d = base2 + 1;
             indices.push(a, b, d);
             indices.push(c, d, b);
           }
@@ -33886,12 +33886,12 @@ function computeTexture(kind, palette, size, seed, emissiveColor) {
             const stripe = Math.floor(v * 16) % 2;
             const kerbA = kind === "ice" ? KERB_BLUE : kind === "cityRoad" ? [0.72, 0.1, 0.52] : kind === "lavaRoad" ? KERB_AMBER : KERB_RED;
             const kerbB = kind === "lavaRoad" ? [0.18, 0.15, 0.13] : KERB_WHITE;
-            const base = stripe ? kerbA : kerbB;
+            const base2 = stripe ? kerbA : kerbB;
             const blockSeam = 1 - sstep(0, 0.04, Math.min(v * 16 % 1, 1 - v * 16 % 1));
             const wear = (0.72 + N3.fbm(u, v, 32, 3) * 0.34) * (1 - blockSeam * 0.45);
             const ridge = Math.sin(v * 64 % 1 * Math.PI) * 0.16;
             const bevelK = 1 - sstep(0.026, 0.036, edge);
-            direct = [base[0] * wear, base[1] * wear, base[2] * wear];
+            direct = [base2[0] * wear, base2[1] * wear, base2[2] * wear];
             h = 0.52 + (0.24 + ridge - blockSeam * 0.18) * bevelK;
             r = 0.44 + grain * 0.18 + blockSeam * 0.25;
             if (kind === "cityRoad" && edge < 0.012) {
@@ -34123,8 +34123,8 @@ var init_texCore = __esm({
         const a = vals[perm[px0 + my0]], b = vals[perm[px1 + my0]], c = vals[perm[px0 + my1]], d = vals[perm[px1 + my1]];
         return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
       }
-      fbm(u, v, base, oct, gain2 = 0.5) {
-        let sum = 0, amp = 1, norm = 0, p = base;
+      fbm(u, v, base2, oct, gain2 = 0.5) {
+        let sum = 0, amp = 1, norm = 0, p = base2;
         for (let o = 0; o < oct; o++) {
           sum += this.noise(u * p, v * p, p) * amp;
           norm += amp;
@@ -34133,8 +34133,8 @@ var init_texCore = __esm({
         }
         return sum / norm;
       }
-      ridged(u, v, base, oct) {
-        let sum = 0, amp = 1, norm = 0, p = base;
+      ridged(u, v, base2, oct) {
+        let sum = 0, amp = 1, norm = 0, p = base2;
         for (let o = 0; o < oct; o++) {
           const n = 1 - Math.abs(this.noise(u * p, v * p, p) * 2 - 1);
           sum += n * n * amp;
@@ -35152,8 +35152,8 @@ var init_audio = __esm({
         const o = this.ctx.createOscillator();
         const g2 = this.ctx.createGain();
         o.type = themeId === "crystal" ? "sine" : "triangle";
-        const base = themeId === "desert" || themeId === "mesa" || themeId === "lava" ? 1750 : themeId === "jungle" ? 2100 : themeId === "crystal" ? 2600 : 1550;
-        const pitch = base * (0.9 + Math.random() * 0.22);
+        const base2 = themeId === "desert" || themeId === "mesa" || themeId === "lava" ? 1750 : themeId === "jungle" ? 2100 : themeId === "crystal" ? 2600 : 1550;
+        const pitch = base2 * (0.9 + Math.random() * 0.22);
         const dur = themeId === "jungle" ? 0.26 : 0.42;
         o.frequency.setValueAtTime(pitch, t);
         if (themeId === "jungle") {
@@ -50250,21 +50250,21 @@ function getPreviousMatrix(object, index = 0) {
   return matrix;
 }
 var velocity = /* @__PURE__ */ nodeImmutable(VelocityNode);
-var blendBurn = /* @__PURE__ */ Fn(([base, blend2]) => {
-  return min(1, base.oneMinus().div(blend2)).oneMinus();
+var blendBurn = /* @__PURE__ */ Fn(([base2, blend2]) => {
+  return min(1, base2.oneMinus().div(blend2)).oneMinus();
 }, { base: "vec3", blend: "vec3", return: "vec3" });
-var blendDodge = /* @__PURE__ */ Fn(([base, blend2]) => {
-  return min(base.div(blend2.oneMinus()), 1);
+var blendDodge = /* @__PURE__ */ Fn(([base2, blend2]) => {
+  return min(base2.div(blend2.oneMinus()), 1);
 }, { base: "vec3", blend: "vec3", return: "vec3" });
-var blendScreen = /* @__PURE__ */ Fn(([base, blend2]) => {
-  return base.oneMinus().mul(blend2.oneMinus()).oneMinus();
+var blendScreen = /* @__PURE__ */ Fn(([base2, blend2]) => {
+  return base2.oneMinus().mul(blend2.oneMinus()).oneMinus();
 }, { base: "vec3", blend: "vec3", return: "vec3" });
-var blendOverlay = /* @__PURE__ */ Fn(([base, blend2]) => {
-  return mix(base.mul(2).mul(blend2), base.oneMinus().mul(2).mul(blend2.oneMinus()).oneMinus(), step(0.5, base));
+var blendOverlay = /* @__PURE__ */ Fn(([base2, blend2]) => {
+  return mix(base2.mul(2).mul(blend2), base2.oneMinus().mul(2).mul(blend2.oneMinus()).oneMinus(), step(0.5, base2));
 }, { base: "vec3", blend: "vec3", return: "vec3" });
-var blendColor = /* @__PURE__ */ Fn(([base, blend2]) => {
-  const outAlpha = blend2.a.add(base.a.mul(blend2.a.oneMinus()));
-  return vec4(blend2.rgb.mul(blend2.a).add(base.rgb.mul(base.a).mul(blend2.a.oneMinus())).div(outAlpha), outAlpha);
+var blendColor = /* @__PURE__ */ Fn(([base2, blend2]) => {
+  const outAlpha = blend2.a.add(base2.a.mul(blend2.a.oneMinus()));
+  return vec4(blend2.rgb.mul(blend2.a).add(base2.rgb.mul(base2.a).mul(blend2.a.oneMinus())).div(outAlpha), outAlpha);
 }, { base: "vec4", blend: "vec4", return: "vec4" });
 var workingLuminanceCoefficients = /* @__PURE__ */ Fn(() => vec3(ColorManagement.getLuminanceCoefficients(new Vector3()))).once()().toVar("workingLuminanceCoefficients");
 var grayscale = /* @__PURE__ */ Fn(([color9, luminanceCoefficients = workingLuminanceCoefficients]) => {
@@ -86836,52 +86836,52 @@ function overcast(a, t, tint, mul2) {
 var lumS = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 var lin = (v) => v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
 var lumL = (c) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
-function resolveOne(base, tod, key) {
-  const th = { ...base };
-  const clim = CLIMATE[base.id];
+function resolveOne(base2, tod, key) {
+  const th = { ...base2 };
+  const clim = CLIMATE[base2.id];
   let night = 0;
   if (tod === "day") {
-    th.sunElev = Math.max(base.sunElev, 50);
-    th.sunColor = mixHex(base.sunColor, "#fff6e6", 0.6);
-    th.skyTop = mixHex(base.skyTop, "#3f86d8", 0.5);
-    th.skyHorizon = mixHex(base.skyHorizon, "#dcecf8", 0.45);
-    th.fogColor = mixHex(base.fogColor, "#cfdde8", 0.35);
-    th.sunIntensity = Math.min(4.4, base.sunIntensity * 1.12);
-    th.hemiSky = mixHex(base.hemiSky, "#cfe2ff", 0.4);
+    th.sunElev = Math.max(base2.sunElev, 50);
+    th.sunColor = mixHex(base2.sunColor, "#fff6e6", 0.6);
+    th.skyTop = mixHex(base2.skyTop, "#3f86d8", 0.5);
+    th.skyHorizon = mixHex(base2.skyHorizon, "#dcecf8", 0.45);
+    th.fogColor = mixHex(base2.fogColor, "#cfdde8", 0.35);
+    th.sunIntensity = Math.min(4.4, base2.sunIntensity * 1.12);
+    th.hemiSky = mixHex(base2.hemiSky, "#cfe2ff", 0.4);
   } else if (tod === "dawn") {
     th.sunElev = 7;
-    th.sunAz = base.sunAz - 40;
+    th.sunAz = base2.sunAz - 40;
     th.sunColor = "#ffc9a0";
-    th.skyTop = mixHex(base.skyTop, "#5a7fc0", 0.55);
-    th.skyHorizon = mixHex(base.skyHorizon, "#ffb38a", 0.7);
-    th.fogColor = mixHex(base.fogColor, "#e8b8a0", 0.55);
-    th.fogDensity = base.fogDensity * 1.25;
-    th.sunIntensity = base.sunIntensity * 0.72;
-    th.hemiSky = mixHex(base.hemiSky, "#c8b8d8", 0.5);
+    th.skyTop = mixHex(base2.skyTop, "#5a7fc0", 0.55);
+    th.skyHorizon = mixHex(base2.skyHorizon, "#ffb38a", 0.7);
+    th.fogColor = mixHex(base2.fogColor, "#e8b8a0", 0.55);
+    th.fogDensity = base2.fogDensity * 1.25;
+    th.sunIntensity = base2.sunIntensity * 0.72;
+    th.hemiSky = mixHex(base2.hemiSky, "#c8b8d8", 0.5);
   } else if (tod === "dusk") {
     th.sunElev = 4.5;
-    th.sunAz = base.sunAz + 70;
+    th.sunAz = base2.sunAz + 70;
     th.sunColor = "#ff9a5a";
-    th.skyTop = mixHex(base.skyTop, "#2a2550", 0.7);
-    th.skyHorizon = mixHex(base.skyHorizon, "#ff7a3a", 0.75);
-    th.fogColor = mixHex(base.fogColor, "#b06a5a", 0.55);
-    th.sunIntensity = base.sunIntensity * 0.6;
-    th.hemiSky = mixHex(base.hemiSky, "#7a6aa0", 0.55);
-    th.hemiGround = mixHex(base.hemiGround, "#2a2028", 0.5);
-    th.exposure = base.exposure * 1.05;
+    th.skyTop = mixHex(base2.skyTop, "#2a2550", 0.7);
+    th.skyHorizon = mixHex(base2.skyHorizon, "#ff7a3a", 0.75);
+    th.fogColor = mixHex(base2.fogColor, "#b06a5a", 0.55);
+    th.sunIntensity = base2.sunIntensity * 0.6;
+    th.hemiSky = mixHex(base2.hemiSky, "#7a6aa0", 0.55);
+    th.hemiGround = mixHex(base2.hemiGround, "#2a2028", 0.5);
+    th.exposure = base2.exposure * 1.05;
   } else if (tod === "night") {
     night = 1;
     th.sunElev = 34;
-    th.sunAz = base.sunAz - 110;
+    th.sunAz = base2.sunAz - 110;
     th.sunColor = "#a9c4ff";
     th.sunIntensity = 1.15;
-    th.skyTop = mixHex(base.skyTop, "#01030c", 0.9);
-    th.skyHorizon = mixHex(base.skyHorizon, "#0d1a36", 0.85);
-    th.fogColor = mixHex(base.fogColor, "#0a1226", 0.85);
-    th.hemiSky = mixHex(base.hemiSky, "#4a5f9a", 0.75);
-    th.hemiGround = mixHex(base.hemiGround, "#0c1018", 0.8);
-    th.exposure = base.exposure * 1.15;
-    th.clouds = base.clouds * 0.6;
+    th.skyTop = mixHex(base2.skyTop, "#01030c", 0.9);
+    th.skyHorizon = mixHex(base2.skyHorizon, "#0d1a36", 0.85);
+    th.fogColor = mixHex(base2.fogColor, "#0a1226", 0.85);
+    th.hemiSky = mixHex(base2.hemiSky, "#4a5f9a", 0.75);
+    th.hemiGround = mixHex(base2.hemiGround, "#0c1018", 0.8);
+    th.exposure = base2.exposure * 1.15;
+    th.clouds = base2.clouds * 0.6;
     th.stars = 1;
   }
   const [wx, k] = !clim ? ["clear", 1] : key === "auto" ? clim.auto : key;
@@ -86952,17 +86952,17 @@ function resolveOne(base, tod, key) {
       fx.amb = 0.45 + 0.55 * k;
       break;
     case "dust": {
-      const ash = base.id === "lava";
+      const ash = base2.id === "lava";
       th.clouds *= 1 - 0.4 * k;
       th.fogDensity *= 1 + 1.8 * k;
       th.sunIntensity *= 1 - 0.25 * k;
       th.sunColor = mixHex(th.sunColor, ash ? "#ff7a40" : "#ffc890", 0.4 * k);
-      th.fogColor = mixHex(th.fogColor, ash ? "#2a1c18" : mixHex(base.palette.ground[1], th.fogColor, night ? 0.8 : 0.25), 0.6 * k);
+      th.fogColor = mixHex(th.fogColor, ash ? "#2a1c18" : mixHex(base2.palette.ground[1], th.fogColor, night ? 0.8 : 0.25), 0.6 * k);
       th.skyTop = mixHex(th.skyTop, th.fogColor, 0.45 * k);
       th.skyHorizon = mixHex(th.skyHorizon, th.fogColor, 0.6 * k);
       th.ambient = ash ? "embers" : "dust";
       fx.gust = "dust";
-      fx.gustColor = ash ? "#3a302c" : mixHex(base.palette.ground[2], th.fogColor, night ? 0.75 : 0.3);
+      fx.gustColor = ash ? "#3a302c" : mixHex(base2.palette.ground[2], th.fogColor, night ? 0.75 : 0.3);
       fx.gustAmt = k;
       fx.wind = Math.min(1, 1 * k);
       fx.flare = 0.5;
@@ -87056,8 +87056,8 @@ function wxTrack(c, wx) {
   return { keys: [{ t: 0, v: wx === "auto" ? "auto" : [wx, 1] }] };
 }
 var EnvTimeline = class {
-  constructor(base, tod, wx, ambient) {
-    this.base = base;
+  constructor(base2, tod, wx, ambient) {
+    this.base = base2;
     this.tod = tod;
     this.wx = wx;
     this.ambient = ambient;
@@ -87111,19 +87111,19 @@ var EnvTimeline = class {
     return o;
   }
 };
-function resolveEnvironment(base, todIn = "auto", wxIn = "auto") {
-  const [tod, wx] = sanitizeEnv(base.id, todIn, wxIn);
-  const clim = CLIMATE[base.id];
+function resolveEnvironment(base2, todIn = "auto", wxIn = "auto") {
+  const [tod, wx] = sanitizeEnv(base2.id, todIn, wxIn);
+  const clim = CLIMATE[base2.id];
   const tTr = TOD_TRACKS[tod] ?? { keys: [{ t: 0, v: tod }] };
   const wTr = clim ? wxTrack(clim, wx) : { keys: [{ t: 0, v: "auto" }] };
   const states = [];
-  for (const a of tTr.keys) for (const b of wTr.keys) states.push(resolveOne(base, a.v, b.v));
+  for (const a of tTr.keys) for (const b of wTr.keys) states.push(resolveOne(base2, a.v, b.v));
   const sev = (s) => Math.max(s.fx.rain * 0.9, s.fx.lightning, s.fx.gustAmt * 0.8);
   const worst = states.reduce((m, s) => sev(s) > sev(m) ? s : m, states[0]);
   const bright = states.reduce((m, s) => lumL(rgb(s.theme.skyHorizon)) > lumL(rgb(m.theme.skyHorizon)) ? s : m, states[0]);
   const ambient = worst.theme.ambient;
   const max11 = (f) => states.reduce((m, s) => Math.max(m, f(s)), 0);
-  const timeline = new EnvTimeline(base, tTr, wTr, ambient);
+  const timeline = new EnvTimeline(base2, tTr, wTr, ambient);
   const build = {
     rainRoad: max11((s) => s.fx.rain) > 0.05,
     maxRain: max11((s) => s.fx.rain),
@@ -87141,7 +87141,7 @@ function resolveEnvironment(base, todIn = "auto", wxIn = "auto") {
   if (build.stars) theme.stars = start.theme.stars ?? 0;
   else delete theme.stars;
   const fx = { ...start.fx, tod, gust: worst.fx.gust, gustColor: worst.fx.gustColor, gustAmt: s0.gustAmt, amb: s0.amb };
-  return { theme, fx, build, timeline, label: envLabel(base.id, tod, wx) };
+  return { theme, fx, build, timeline, label: envLabel(base2.id, tod, wx) };
 }
 
 // src/game/materials.ts
@@ -87733,11 +87733,11 @@ function hashStr(s) {
 var TRACK_SCALE = 1.3;
 function controlPoints(def) {
   const raw = !!globalThis.NO_EXPAND, sc = raw ? 1 : TRACK_SCALE;
-  const base = def.pts.map(([x, z, y, w]) => ({ x: x * 100 * sc, z: z * 100 * sc, y, w: w * WIDTH_SCALE }));
-  const n = base.length;
-  if (raw) return { pts: base, map: base.map((_p2, i) => i) };
+  const base2 = def.pts.map(([x, z, y, w]) => ({ x: x * 100 * sc, z: z * 100 * sc, y, w: w * WIDTH_SCALE }));
+  const n = base2.length;
+  if (raw) return { pts: base2, map: base2.map((_p2, i) => i) };
   const closed = def.type === "circuit", segN = closed ? n : n - 1, rnd = mulberry32(hashStr(def.id + "|expand"));
-  const P = (i) => base[(i % n + n) % n];
+  const P = (i) => base2[(i % n + n) % n];
   const segLen = (i) => Math.hypot(P(i + 1).x - P(i).x, P(i + 1).z - P(i).z);
   const dSeg = (px2, pz2, a, b) => {
     const vx = b.x - a.x, vz = b.z - a.z, t = Math.max(0, Math.min(1, ((px2 - a.x) * vx + (pz2 - a.z) * vz) / (vx * vx + vz * vz || 1)));
@@ -87782,9 +87782,9 @@ function controlPoints(def) {
   let sign3 = rnd() < 0.5 ? 1 : -1;
   for (let i = 0; i < n; i++) {
     map.push(out.length);
-    out.push(base[i]);
+    out.push(base2[i]);
     if (i >= segN) continue;
-    const a = base[i], b = P(i + 1), len = segLen(i);
+    const a = base2[i], b = P(i + 1), len = segLen(i);
     if (i === 0 || i === segN - 1 || len < 330 || crossSeg.has(i)) continue;
     const k = len > 640 ? 2 : 1, dx = (b.x - a.x) / len, dz = (b.z - a.z) / len;
     for (let j = 1; j <= k; j++) {
@@ -89676,8 +89676,8 @@ function sections(style, hw, len, perSpan) {
   return out;
 }
 function pilotParts(pb, s, hip, species = "Mensch") {
-  const base = new Matrix4().compose(hip, new Quaternion(), V(s, s, s));
-  const at = (m) => base.clone().multiply(m);
+  const base2 = new Matrix4().compose(hip, new Quaternion(), V(s, s, s));
+  const at = (m) => base2.clone().multiply(m);
   const torso = lathe(prof([[0, 0], [0.16, 0, 1], [0.19, 0.12], [0.21, 0.32], [0.19, 0.44], [0.12, 0.52], [0.06, 0.56], [0, 0.57]]), 18, 0);
   torso.rotateX(-Math.PI / 2);
   torso.scale(1.15, 1, 0.82);
@@ -89696,7 +89696,7 @@ function pilotParts(pb, s, hip, species = "Mensch") {
   } else if (species === "Xantori" || species === "Aleeni") {
     pb.add("skin", sphere(0.112, 16, 12), at(M4.trs(head.x, head.y, head.z, -0.25, 0, 0, 0.9, 1.15, 1.25)));
     pb.add("suit", rbox(0.045, 0.14, 0.24, 0.018), at(M4.trs(head.x, head.y + 0.11, head.z - 0.06, -0.35, 0, 0)));
-    for (const sd of [-1, 1]) pb.add("skin", tube([V(head.x + sd * 0.08, head.y + 0.02, head.z - 0.06), V(head.x + sd * 0.11, head.y - 0.1, head.z - 0.18), V(head.x + sd * 0.09, head.y - 0.24, head.z - 0.22)], 0.032, 8, 7), base);
+    for (const sd of [-1, 1]) pb.add("skin", tube([V(head.x + sd * 0.08, head.y + 0.02, head.z - 0.06), V(head.x + sd * 0.11, head.y - 0.1, head.z - 0.18), V(head.x + sd * 0.09, head.y - 0.24, head.z - 0.22)], 0.032, 8, 7), base2);
     pb.add("visor", sphere(0.118, 16, 8, 0, Math.PI, Math.PI * 0.25, Math.PI * 0.32), at(M4.trs(head.x, head.y + 0.02, head.z + 0.02, 0, 0, 0, 1.02, 0.9, 1.05)));
   } else if (species === "Gurrani" || species === "Kraveen" || species === "Erriton") {
     pb.add("suit", sphere(0.138, 18, 14), at(M4.trs(head.x, head.y + 0.015, head.z, 0, 0, 0, 0.98, 1.06, 1.22)));
@@ -89723,7 +89723,7 @@ function pilotParts(pb, s, hip, species = "Mensch") {
   for (const sd of [-1, 1]) {
     const sh = V(sd * 0.22, 0.46, 0.09), el = V(sd * 0.3, 0.27, 0.3), hd = V(sd * 0.21, 0.31, 0.5);
     pb.add("suit", sphere(0.085, 12, 10), at(M4.t(sh.x, sh.y, sh.z)));
-    pb.add("suit", tube([sh, el, hd], 0.055, 14, 10), base);
+    pb.add("suit", tube([sh, el, hd], 0.055, 14, 10), base2);
     pb.add("leather", sphere(0.062, 12, 10), at(M4.trs(hd.x, hd.y, hd.z + 0.02, 0, 0, 0, 1, 0.9, 1.2)));
     hands.push(hd.clone().multiplyScalar(s).add(hip));
   }
@@ -89770,8 +89770,8 @@ function cockpitGeo(L, seg, species = "Mensch") {
   pb.add("chrome", torus(0.24 * c.pilot, 0.022, 7, 18, Math.PI), M4.t(0, hipY + 0.78 * c.pilot, hipZ - 0.34));
   pb.add("glow", torus(0.055, 6e-3, 5, 16), M4.t(0, rimY + 0.11, zB - 0.34 * (zB - zA)));
   for (const hd of pil.hands) {
-    const base = V(hd.x, floorY + 0.05, hd.z + 0.1);
-    pb.add("steel", tube([base, V(hd.x, (base.y + hd.y) / 2, hd.z + 0.08), V(hd.x, hd.y - 0.07, hd.z)], 0.022, 8, 6));
+    const base2 = V(hd.x, floorY + 0.05, hd.z + 0.1);
+    pb.add("steel", tube([base2, V(hd.x, (base2.y + hd.y) / 2, hd.z + 0.08), V(hd.x, hd.y - 0.07, hd.z)], 0.022, 8, 6));
     pb.add("rubber", cyl(0.032, 0.032, 0.12, 10), M4.t(hd.x, hd.y - 0.06, hd.z));
     pb.add("glow", sphere(0.018, 8, 6), M4.t(hd.x, hd.y + 0.01, hd.z + 0.03));
   }
@@ -91807,7 +91807,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
     const geo = new DodecahedronGeometry(1, 0);
     const mats = [];
     const cols = [];
-    const base = new Color(theme.palette.wall[1]);
+    const base2 = new Color(theme.palette.wall[1]);
     const count = Math.floor(N3 * 0.9 * det2);
     for (let c = 0; c < count; c++) {
       const s = S[Math.floor(rng2() * N3)];
@@ -91819,7 +91819,7 @@ function addProps(td, theme, group, gfx, heightAt, disp, rng2, clear, dOff = 0) 
       if (!clear(x, z, sz, 0)) continue;
       const gy = heightAt(x, z);
       mats.push(new Matrix4().compose(new Vector3(x, gy + sz * 0.28, z), new Quaternion().setFromEuler(new Euler(rng2() * 3, rng2() * 3, rng2() * 3)), new Vector3(sz, sz * 0.58, sz * (0.7 + rng2() * 0.6))));
-      cols.push(base.clone().multiplyScalar(0.62 + rng2() * 0.68));
+      cols.push(base2.clone().multiplyScalar(0.62 + rng2() * 0.68));
     }
     const sm = new MeshStandardMaterial({ roughness: 0.9, flatShading: true });
     disp.push(sm);
@@ -92237,17 +92237,17 @@ function addSciFi(td, theme, group, disp, heightAt = () => -40, dOff = 0) {
             continue;
           }
           if (prev >= 0 && i % 2 === 1 && s.ramp === 0 && i < nP - 1) continue;
-          const base = pos.length / 3;
+          const base2 = pos.length / 3;
           for (const w of [-0.24, 0.24]) {
             const lat = sd * (s.hw - 1.05 + w);
             pos.push(s.x + s.rx * lat, surfY2(s, lat) + 0.055 + dOff, s.z + s.rz * lat);
             uvs.push(w > 0 ? 1 : 0, i * 2);
           }
           if (prev >= 0) {
-            if (sd > 0) ind.push(prev, base, prev + 1, prev + 1, base, base + 1);
-            else ind.push(prev, prev + 1, base, prev + 1, base + 1, base);
+            if (sd > 0) ind.push(prev, base2, prev + 1, prev + 1, base2, base2 + 1);
+            else ind.push(prev, prev + 1, base2, prev + 1, base2 + 1, base2);
           }
-          prev = base;
+          prev = base2;
         }
       }
     }
@@ -92329,17 +92329,17 @@ function addSciFi(td, theme, group, disp, heightAt = () => -40, dOff = 0) {
           runLen = 0;
           continue;
         }
-        const lat = sd * ((sd > 0 ? s.wallR : s.wallL) + 4.3), cx = s.x + s.rx * lat, cz = s.z + s.rz * lat, cy = edgeY(s, sd) + 1.1, base = pos.length / 3;
+        const lat = sd * ((sd > 0 ? s.wallR : s.wallL) + 4.3), cx = s.x + s.rx * lat, cz = s.z + s.rz * lat, cy = edgeY(s, sd) + 1.1, base2 = pos.length / 3;
         for (let a = 0; a < SEG2; a++) {
           const an = a / SEG2 * Math.PI * 2, c = Math.cos(an) * R, d = Math.sin(an) * R;
           pos.push(cx + s.rx * c, cy + d, cz + s.rz * c);
         }
         if (prev >= 0) for (let a = 0; a < SEG2; a++) {
           const b = (a + 1) % SEG2;
-          if (sd > 0) ind.push(prev + a, prev + b, base + a, prev + b, base + b, base + a);
-          else ind.push(prev + a, base + a, prev + b, prev + b, base + a, base + b);
+          if (sd > 0) ind.push(prev + a, prev + b, base2 + a, prev + b, base2 + b, base2 + a);
+          else ind.push(prev + a, base2 + a, prev + b, prev + b, base2 + a, base2 + b);
         }
-        prev = base;
+        prev = base2;
         runLen++;
         if (runLen % 4 === 1) {
           qRd.setFromAxisAngle(up, Math.atan2(s.tx, s.tz));
@@ -93041,8 +93041,8 @@ function stepPod(p, td, dt, time12, gripMul, frozen) {
       }
     }
     if (floorL > -1e8) {
-      const base = p.pos.y + yA + Math.min(env.engL.x * sinR + env.engL.minY, env.engL.outerX * sinR + env.engL.minY * cosRa) - Math.abs(sinR) * 0.15;
-      const pen = Math.max(fLF + MIN_ROAD_CLEAR - (base - env.engL.frontZ * sinP), fLB + MIN_ROAD_CLEAR - (base - env.engL.backZ * sinP));
+      const base2 = p.pos.y + yA + Math.min(env.engL.x * sinR + env.engL.minY, env.engL.outerX * sinR + env.engL.minY * cosRa) - Math.abs(sinR) * 0.15;
+      const pen = Math.max(fLF + MIN_ROAD_CLEAR - (base2 - env.engL.frontZ * sinP), fLB + MIN_ROAD_CLEAR - (base2 - env.engL.backZ * sinP));
       if (pen > 0) {
         const lift = Math.min(pen, Math.max(0, 1.95 - yA));
         yA += lift;
@@ -93056,8 +93056,8 @@ function stepPod(p, td, dt, time12, gripMul, frozen) {
       }
     }
     if (floorR > -1e8) {
-      const base = p.pos.y + yB + Math.min(env.engR.x * sinR + env.engR.minY, env.engR.outerX * sinR + env.engR.minY * cosRa) - Math.abs(sinR) * 0.15;
-      const pen = Math.max(fRF + MIN_ROAD_CLEAR - (base - env.engR.frontZ * sinP), fRB + MIN_ROAD_CLEAR - (base - env.engR.backZ * sinP));
+      const base2 = p.pos.y + yB + Math.min(env.engR.x * sinR + env.engR.minY, env.engR.outerX * sinR + env.engR.minY * cosRa) - Math.abs(sinR) * 0.15;
+      const pen = Math.max(fRF + MIN_ROAD_CLEAR - (base2 - env.engR.frontZ * sinP), fRB + MIN_ROAD_CLEAR - (base2 - env.engR.backZ * sinP));
       if (pen > 0) {
         const lift = Math.min(pen, Math.max(0, 1.95 - yB));
         yB += lift;
@@ -93951,11 +93951,11 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
         const wall = side > 0 ? s.wallR : s.wallL;
         if (on) {
           const lat = side * (wall + 0.06);
-          const base = surf(s, side * s.hw) + 0.02;
+          const base2 = surf(s, side * s.hw) + 0.02;
           const ix = -side * s.rx, iz = -side * s.rz;
           for (const hgt of [0.58, 1.12]) for (let k = 0; k < RING; k++) {
             const [px2, py2] = ring[k];
-            rp.push(s.x + s.rx * lat + ix * px2, base + hgt + py2, s.z + s.rz * lat + iz * px2);
+            rp.push(s.x + s.rx * lat + ix * px2, base2 + hgt + py2, s.z + s.rz * lat + iz * px2);
             ru.push(along / 8, k / (RING - 1));
           }
           if (prev) for (let r = 0; r < 2; r++) {
@@ -93963,7 +93963,7 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
             for (let k = 0; k < RING - 1; k++) ri.push(a0 + k, b0 + k, a0 + k + 1, a0 + k + 1, b0 + k, b0 + k + 1);
           }
           rv += RING * 2;
-          const topY = base + 1.29;
+          const topY = base2 + 1.29;
           gp.push(s.x + s.rx * lat + ix * 0.04, topY, s.z + s.rz * lat + iz * 0.04, s.x + s.rx * lat - ix * 0.04, topY, s.z + s.rz * lat - iz * 0.04);
           gu.push(along, 0, along, 1);
           if (prev) gi.push(gv - 2, gv - 1, gv, gv - 1, gv + 1, gv);
@@ -93977,8 +93977,8 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
             const pl = side * (wall + 0.2);
             const px2 = s.x + s.rx * pl, pz2 = s.z + s.rz * pl;
             const qPost = new Quaternion().setFromAxisAngle(UP3, Math.atan2(s.tx, s.tz) + (side < 0 ? Math.PI : 0));
-            posts.push(M3(px2, base, pz2, qPost));
-            if (postCount++ % 4 === 0) caps.push(M3(px2, base + 1.48, pz2, yawQ(s)));
+            posts.push(M3(px2, base2, pz2, qPost));
+            if (postCount++ % 4 === 0) caps.push(M3(px2, base2 + 1.48, pz2, yawQ(s)));
           }
         }
         prev = on;
@@ -94234,9 +94234,9 @@ function addTrackDetail(td, theme, group, disp, rng2, rockMat, o) {
       if (s.gap !== pv.gap) for (const sd of [-1, 1]) {
         const e = s.gap ? pv : s;
         const lat = sd * (e.hw + 1.2);
-        const base = e.y + e.ramp - sd * e.hw * e.bank;
-        masts.push(M3(e.x + e.rx * lat, base - 2.5, e.z + e.rz * lat, yawQ(e), 1, 15.4, 1));
-        mastLamps.push(M3(e.x + e.rx * lat, base + 5.2, e.z + e.rz * lat, yawQ(e)));
+        const base2 = e.y + e.ramp - sd * e.hw * e.bank;
+        masts.push(M3(e.x + e.rx * lat, base2 - 2.5, e.z + e.rz * lat, yawQ(e), 1, 15.4, 1));
+        mastLamps.push(M3(e.x + e.rx * lat, base2 + 5.2, e.z + e.rz * lat, yawQ(e)));
       }
     }
     inst(new BoxGeometry(1, 1, 1), trussMat, cols, false);
@@ -94831,10 +94831,10 @@ function jungleTreeGeometry(seed, quality, lod = false) {
   const lobes = [];
   const nBough = 4;
   for (let k = 0; k < nBough; k++) {
-    const a = k / nBough * TAU + r() * 0.7, len = 3.4 + r() * 2.2, rise = 1.6 + r() * 2.2, base = bend(0.74 + r() * 0.2);
-    const end = [top[0] + Math.cos(a) * len, base[1] + rise + 1.2, top[2] + Math.sin(a) * len];
-    const mid = [lerp2(base[0], end[0], 0.5), lerp2(base[1], end[1], 0.5) + 0.7, lerp2(base[2], end[2], 0.5)];
-    parts.push(paint(barkUV(smooth(tube2([base, [lerp2(base[0], mid[0], 0.5), lerp2(base[1], mid[1], 0.5) + 0.25, lerp2(base[2], mid[2], 0.5)], mid, end], [0.34, 0.27, 0.2, 0.09], lod ? 3 : 5)), 2.4), bark));
+    const a = k / nBough * TAU + r() * 0.7, len = 3.4 + r() * 2.2, rise = 1.6 + r() * 2.2, base2 = bend(0.74 + r() * 0.2);
+    const end = [top[0] + Math.cos(a) * len, base2[1] + rise + 1.2, top[2] + Math.sin(a) * len];
+    const mid = [lerp2(base2[0], end[0], 0.5), lerp2(base2[1], end[1], 0.5) + 0.7, lerp2(base2[2], end[2], 0.5)];
+    parts.push(paint(barkUV(smooth(tube2([base2, [lerp2(base2[0], mid[0], 0.5), lerp2(base2[1], mid[1], 0.5) + 0.25, lerp2(base2[2], mid[2], 0.5)], mid, end], [0.34, 0.27, 0.2, 0.09], lod ? 3 : 5)), 2.4), bark));
     lobes.push({ c: [end[0], end[1] + 0.7, end[2]], r: 2.9 + r() * 1.3 });
     if (quality >= 2 || quality === 1 && k % 2 === 0) {
       const c2 = [lerp2(mid[0], end[0], 0.2) + (r() - 0.5) * 2, mid[1] + 1.5 + r(), lerp2(mid[2], end[2], 0.2) + (r() - 0.5) * 2];
@@ -96259,13 +96259,13 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
     prisonTower: () => {
       const p = spot(280, 1200, 46);
       if (!p) return;
-      const base = field.avgY - 160, h = 265 + rng2() * 125;
-      put(M3.tower, new BoxGeometry(46, h, 46), TRS(p.x, base + h / 2, p.z, p.yaw));
-      put(M3.metal, new TorusGeometry(42, 3.2, 8, 32).rotateX(Math.PI / 2), TRS(p.x, base + h * 0.62, p.z));
-      put(M3.metal, new TorusGeometry(34, 2.4, 8, 32).rotateX(Math.PI / 2), TRS(p.x, base + h * 0.84, p.z));
-      put(M3.cyan, new TorusGeometry(42.5, 0.6, 6, 32).rotateX(Math.PI / 2), TRS(p.x, base + h * 0.62, p.z));
-      put(M3.metal, new CylinderGeometry(0.8, 1.8, 34, 8), TRS(p.x, base + h + 17, p.z));
-      put(M3.glow, new SphereGeometry(3.2, 12, 8), TRS(p.x, base + h + 35, p.z));
+      const base2 = field.avgY - 160, h = 265 + rng2() * 125;
+      put(M3.tower, new BoxGeometry(46, h, 46), TRS(p.x, base2 + h / 2, p.z, p.yaw));
+      put(M3.metal, new TorusGeometry(42, 3.2, 8, 32).rotateX(Math.PI / 2), TRS(p.x, base2 + h * 0.62, p.z));
+      put(M3.metal, new TorusGeometry(34, 2.4, 8, 32).rotateX(Math.PI / 2), TRS(p.x, base2 + h * 0.84, p.z));
+      put(M3.cyan, new TorusGeometry(42.5, 0.6, 6, 32).rotateX(Math.PI / 2), TRS(p.x, base2 + h * 0.62, p.z));
+      put(M3.metal, new CylinderGeometry(0.8, 1.8, 34, 8), TRS(p.x, base2 + h + 17, p.z));
+      put(M3.glow, new SphereGeometry(3.2, 12, 8), TRS(p.x, base2 + h + 35, p.z));
     },
     giantTree: () => {
       const p = spot(260, 1100, 82);
@@ -96392,15 +96392,15 @@ function addLandmarks(td, theme, group, disp, field, rng2, rock, emitters, smoke
     lighthouse: () => {
       const p = spot(260, 800, 34);
       if (!p) return;
-      const base = Math.max(p.y, field.avgY - 26);
-      put(M3.rock, deform(new IcosahedronGeometry(15, 2), 3.2, 0.1, 5), TRS(p.x, base - 5.5, p.z, 0, 0, 0, 1, 0.62));
+      const base2 = Math.max(p.y, field.avgY - 26);
+      put(M3.rock, deform(new IcosahedronGeometry(15, 2), 3.2, 0.1, 5), TRS(p.x, base2 - 5.5, p.z, 0, 0, 0, 1, 0.62));
       for (let b = 0; b < 5; b++) {
         const r0 = 3.8 - (b + 1) * 0.24, r1 = 3.8 - b * 0.24;
-        put(b % 2 ? M3.red : M3.white, new CylinderGeometry(r0, r1, 7, 18), TRS(p.x, base + 3.5 + b * 7, p.z));
+        put(b % 2 ? M3.red : M3.white, new CylinderGeometry(r0, r1, 7, 18), TRS(p.x, base2 + 3.5 + b * 7, p.z));
       }
-      put(M3.dark, new CylinderGeometry(3.4, 3.2, 1.3, 18), TRS(p.x, base + 35.6, p.z));
-      put(M3.glow, new CylinderGeometry(2.1, 2.1, 3.4, 14), TRS(p.x, base + 37.8, p.z));
-      put(M3.red, new ConeGeometry(2.6, 3.2, 16), TRS(p.x, base + 41, p.z));
+      put(M3.dark, new CylinderGeometry(3.4, 3.2, 1.3, 18), TRS(p.x, base2 + 35.6, p.z));
+      put(M3.glow, new CylinderGeometry(2.1, 2.1, 3.4, 14), TRS(p.x, base2 + 37.8, p.z));
+      put(M3.red, new ConeGeometry(2.6, 3.2, 16), TRS(p.x, base2 + 41, p.z));
     }
   };
   const id = theme.id;
@@ -96517,7 +96517,7 @@ function bushImpostor(w, h, baseCol, topCol) {
     return [baseCol[0] + (topCol[0] - baseCol[0]) * f, baseCol[1] + (topCol[1] - baseCol[1]) * f, baseCol[2] + (topCol[2] - baseCol[2]) * f];
   }, false);
 }
-function blades(n, h, w, lean, seed, base, tip, spread = 0.18) {
+function blades(n, h, w, lean, seed, base2, tip, spread = 0.18) {
   const pos = [];
   for (let b = 0; b < n; b++) {
     const a = h27(b, seed) * Math.PI * 2, r = Math.sqrt(h27(b + 7, seed)) * spread;
@@ -96537,10 +96537,10 @@ function blades(n, h, w, lean, seed, base, tip, spread = 0.18) {
   g2.computeVertexNormals();
   return part(g2, null, (_x2, y) => {
     const f = Math.min(1, y / h);
-    return [base[0] + (tip[0] - base[0]) * f, base[1] + (tip[1] - base[1]) * f, base[2] + (tip[2] - base[2]) * f];
+    return [base2[0] + (tip[0] - base2[0]) * f, base2[1] + (tip[1] - base2[1]) * f, base2[2] + (tip[2] - base2[2]) * f];
   }, true);
 }
-function fern(seed, base, tip) {
+function fern(seed, base2, tip) {
   const list = [];
   const fr = 9;
   for (let k = 0; k < fr; k++) {
@@ -96562,10 +96562,10 @@ function fern(seed, base, tip) {
   }
   return part(merge3(list), null, (x, _y2, z) => {
     const f = Math.min(1, Math.hypot(x, z) / 1.15);
-    return [base[0] + (tip[0] - base[0]) * f, base[1] + (tip[1] - base[1]) * f, base[2] + (tip[2] - base[2]) * f];
+    return [base2[0] + (tip[0] - base2[0]) * f, base2[1] + (tip[1] - base2[1]) * f, base2[2] + (tip[2] - base2[2]) * f];
   }, true);
 }
-function agave(seed, base, tip) {
+function agave(seed, base2, tip) {
   const list = [];
   for (let k = 0; k < 11; k++) {
     const ring = k < 5 ? 0 : 1;
@@ -96576,7 +96576,7 @@ function agave(seed, base, tip) {
     g2.translate(0, L / 2, 0);
     list.push(part(g2, M(0, 0.04, 0, 0, a, tilt), (_x2, y) => {
       const f = Math.min(1, y / 0.8);
-      return [base[0] + (tip[0] - base[0]) * f, base[1] + (tip[1] - base[1]) * f, base[2] + (tip[2] - base[2]) * f];
+      return [base2[0] + (tip[0] - base2[0]) * f, base2[1] + (tip[1] - base2[1]) * f, base2[2] + (tip[2] - base2[2]) * f];
     }));
   }
   return merge3(list);
@@ -99412,6 +99412,9 @@ function makeSky(theme, forEnv = false) {
 // src/game/podModel.ts
 init_three_module();
 
+// src/game/podAssembly.ts
+init_three_module();
+
 // src/game/podParts.ts
 init_three_module();
 var cache3 = /* @__PURE__ */ new Map();
@@ -99651,6 +99654,413 @@ function engineGeo(spec2, seg) {
   return out;
 }
 
+// src/game/podAssembly.ts
+var BINDER_PTS = 18;
+function segFor(quality, isOpponent) {
+  return isOpponent ? quality >= 3 ? 18 : 14 : quality >= 3 ? 40 : quality === 2 ? 28 : 20;
+}
+function push(lists, k, g2) {
+  let l = lists.get(k);
+  if (!l) {
+    l = [];
+    lists.set(k, l);
+  }
+  l.push(g2);
+}
+function mergeAll(lists, owned, where, each) {
+  const out = /* @__PURE__ */ new Map();
+  for (const [k, list] of lists) {
+    const mg = mergeGeometries(list, false);
+    list.forEach((x) => x.dispose());
+    if (!mg) throw new Error(`pod assembly: bucket "${k}" of ${where} could not be merged (parts with different vertex attributes)`);
+    each?.(k, mg);
+    mg.computeBoundingSphere();
+    out.set(k, mg);
+    owned.push(mg);
+  }
+  return out;
+}
+function buildFlexCables(L, seg, anchors) {
+  const cp = new Vector3(0, L.cockpit.y, L.cockpit.z);
+  const up = new Vector3(0, 1, 0);
+  const list = [];
+  const tagFlex = (g2, isR, pA, pB) => {
+    const p = g2.attributes.position;
+    const n = p.count;
+    const liv = new Float32Array(n * 3);
+    const dz = pA.z - pB.z || 1;
+    for (let i = 0; i < n; i++) {
+      const w = Math.max(0, Math.min(1, (p.getZ(i) - pB.z) / dz));
+      liv[i * 3] = isR;
+      liv[i * 3 + 1] = w;
+      liv[i * 3 + 2] = 0;
+    }
+    g2.setAttribute("aLiv", new BufferAttribute(liv, 3));
+    if (!g2.attributes.normal) g2.computeVertexNormals();
+    if (!g2.attributes.uv) g2.setAttribute("uv", new BufferAttribute(new Float32Array(n * 2), 2));
+    list.push(g2);
+  };
+  for (const em of L.engines) {
+    const eg = engineGeo(em.spec, seg);
+    const isR = em.x >= 0 ? 1 : 0;
+    const a = eg.pylon.clone().add(new Vector3(em.x, em.y, em.z));
+    const b = anchors[isR].clone().add(cp);
+    const rearZ = eg.exhaustZ + 0.12 * eg.L, topY = Math.max(eg.top, eg.R) + 0.14;
+    const v1 = new Vector3(em.x, em.y + topY + 0.1, em.z + rearZ - 0.3);
+    const v2 = new Vector3(em.x, em.y + topY, em.z + rearZ + (eg.pylon.z - rearZ) * 0.5);
+    const dist = v1.distanceTo(b);
+    const sag = 0.3 + dist * 0.03;
+    for (const [r, off, s, rad] of [[0.055, 0, 1, 6], [0.024, 0.12, 1.18, 4]]) {
+      const pts = [];
+      const ox = off * (isR ? -1 : 1);
+      for (let i = 0; i <= 8; i++) {
+        const t = i / 8;
+        const p = b.clone().lerp(v1, t);
+        p.y -= sag * s * 4 * t * (1 - t) * (1 - 0.35 * t);
+        p.x += ox * Math.sin(t * Math.PI * 0.5);
+        pts.push(p);
+      }
+      pts.push(v1.clone().lerp(v2, 0.5).add(new Vector3(ox, 0, 0)), v2.clone().add(new Vector3(ox, 0, 0)), a.clone().add(new Vector3(ox * 0.5, 0.03, 0)));
+      tagFlex(tube(pts, r, Math.max(16, Math.round(seg * 0.8)), rad), isR, v1, b);
+    }
+    for (const [p, q] of [[a, v2], [b, v1]]) {
+      const dir = q.clone().sub(p).normalize();
+      const fg = cyl(0.085, 0.07, 0.24, 7);
+      fg.applyMatrix4(new Matrix4().compose(p.clone().addScaledVector(dir, 0.12), new Quaternion().setFromUnitVectors(up, dir), new Vector3(1, 1, 1)));
+      tagFlex(fg, isR, v1, b);
+    }
+    for (const sp of [v1, v2]) {
+      const cl = torus(0.085, 0.022, 5, 8);
+      cl.rotateY(Math.PI / 2);
+      cl.translate(sp.x, sp.y - 0.02, sp.z);
+      tagFlex(cl, isR, v1, b);
+    }
+  }
+  const mg = mergeGeometries(list, false);
+  list.forEach((x) => x.dispose());
+  mg.computeBoundingSphere();
+  mg.boundingSphere.radius += 1.2;
+  return mg;
+}
+function bakeHullVertexColors(g2, c1Hex, c2Hex, livery) {
+  const c1 = new Color(c1Hex), c2 = new Color(c2Hex);
+  const liv = g2.attributes.aLiv;
+  const n = g2.attributes.position.count;
+  const col = new Float32Array(n * 3);
+  const band = (x, cc, w) => Math.abs(x - cc) < w ? 1 : 0;
+  const fr = (x) => x - Math.floor(x);
+  const lv = (livery % 6 + 6) % 6;
+  for (let i = 0; i < n; i++) {
+    let m = 0;
+    if (liv) {
+      const c = liv.getX(i), a = liv.getY(i), z = liv.getZ(i);
+      const cd = Math.min(c, 1 - c);
+      if (z > 2.5) m = 1;
+      else if (z >= 0.5 && z < 1.5) {
+        if (lv === 0) m = Math.max(band(cd, 0, 0.06), band(a, 0.8, 0.035));
+        else if (lv === 1) m = Math.max(band(cd, 0.055, 0.02), band(cd, 0, 0.014), a >= 0.86 ? 1 : 0);
+        else if (lv === 2) m = a >= 0.14 && cd < 0.12 + Math.abs(fr(a * 5) - 0.5) * 0.16 ? 1 : 0;
+        else if (lv === 3) m = Math.max(band(a, 0.25, 0.042), band(a, 0.7, 0.042), a >= 0.3 && a <= 0.65 ? band(Math.abs(cd - 0.25), 0, 0.03) : 0);
+        else if (lv === 4) {
+          const ch = fr(a * 3.5 - cd * 1.8);
+          m = a >= 0.12 && a <= 0.9 && ch > 0.6 && ch < 0.88 || a >= 0.91 ? 1 : 0;
+        } else {
+          const chk = a >= 0.56 && a <= 0.86 && fr(cd * 8) >= 0.5 !== fr(a * 9) >= 0.5 ? 1 : 0;
+          m = Math.max(chk, band(cd, 0, 0.045));
+        }
+      } else if (z >= 1.5) {
+        const ck0 = Math.max(band(Math.abs(cd - 0.25 + (a - 0.5) * 0.12), 0, a * 0.02 + 0.035), a >= 0.9 ? 1 : 0);
+        m = lv === 4 ? Math.max(ck0, band(fr(a * 3 - cd * 1.5), 0.5, 0.16)) : lv === 5 ? Math.max(ck0, band(cd, 0.035, 0.016), band(cd, 0.085, 0.01)) : lv >= 2 ? Math.max(ck0, band(cd, 0, 0.05)) : ck0;
+      }
+    }
+    col[i * 3] = c1.r + (c2.r - c1.r) * m;
+    col[i * 3 + 1] = c1.g + (c2.g - c1.g) * m;
+    col[i * 3 + 2] = c1.b + (c2.b - c1.b) * m;
+  }
+  g2.setAttribute("color", new BufferAttribute(col, 3));
+  return g2;
+}
+function bakeSolidColor(g2, col) {
+  const n = g2.attributes.position.count;
+  const a = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    a[i * 3] = col.r;
+    a[i * 3 + 1] = col.g;
+    a[i * 3 + 2] = col.b;
+  }
+  g2.setAttribute("color", new BufferAttribute(a, 3));
+  return g2;
+}
+function makeBinderGeo(a, b, vertCol) {
+  const pos = new Float32Array(BINDER_PTS * 4 * 3), uv11 = new Float32Array(BINDER_PTS * 4 * 2);
+  const idx = [];
+  const w = 0.4;
+  const tmp3 = new Vector3();
+  for (let i = 0; i < BINDER_PTS; i++) {
+    const f = i / (BINDER_PTS - 1);
+    tmp3.copy(a).lerp(b, f);
+    for (let k = 0; k < 4; k++) {
+      uv11[(i * 4 + k) * 2] = f;
+      uv11[(i * 4 + k) * 2 + 1] = k % 2 === 0 ? 1 : 0;
+    }
+    const o = i * 12;
+    pos[o] = tmp3.x;
+    pos[o + 1] = tmp3.y + w;
+    pos[o + 2] = tmp3.z;
+    pos[o + 3] = tmp3.x;
+    pos[o + 4] = tmp3.y - w;
+    pos[o + 5] = tmp3.z;
+    pos[o + 6] = tmp3.x;
+    pos[o + 7] = tmp3.y;
+    pos[o + 8] = tmp3.z + w;
+    pos[o + 9] = tmp3.x;
+    pos[o + 10] = tmp3.y;
+    pos[o + 11] = tmp3.z - w;
+    if (i < BINDER_PTS - 1) for (const off of [0, 2]) {
+      const p = i * 4 + off, q = p + 4;
+      idx.push(p, p + 1, q, p + 1, q + 1, q);
+    }
+  }
+  const geo = new BufferGeometry();
+  geo.setAttribute("position", new BufferAttribute(pos, 3));
+  geo.setAttribute("uv", new BufferAttribute(uv11, 2));
+  geo.setIndex(idx);
+  if (vertCol) bakeSolidColor(geo, vertCol);
+  geo.computeBoundingSphere();
+  geo.boundingSphere.radius += 1.4;
+  return geo;
+}
+var oppFarCache = /* @__PURE__ */ new Map();
+function buildOpponentFarGeo(def, L) {
+  const hit = oppFarCache.get(def.id);
+  if (hit) return hit;
+  const pb = new PartBuilder();
+  const cp = new Vector3(0, L.cockpit.y, L.cockpit.z);
+  for (const em of L.engines) {
+    const { L: len, R } = em.spec;
+    pb.add("hull", lathe(prof([[R * 0.72, -len * 0.5, 1], [R, -len * 0.35], [R, len * 0.42], [R * 0.88, len * 0.5, 1]]), 9, 1), M4.t(em.x, em.y, em.z));
+    pb.add("dark", new CircleGeometry(R * 0.84, 9), M4.t(em.x, em.y, em.z + len * 0.49));
+    pb.add("glow", new ConeGeometry(R * 0.46, len * 0.55, 7, 1, true).rotateX(-Math.PI / 2), M4.t(em.x, em.y, em.z - len * 0.75));
+    const a = new Vector3(em.x, em.y + R, em.z), b = cp.clone();
+    pb.add("dark", tube([a, a.clone().lerp(b, 0.5).add(new Vector3(0, -0.4, 0)), b], 0.055, 5, 4));
+  }
+  const c = L.cockpit;
+  pb.add("hull", rbox(c.hw * 1.7, c.hw * 0.82, c.len, 0.14, 1), M4.t(0, c.y, c.z), [0, 0.5, 2]);
+  pb.add("dark", rbox(c.hw * 0.9, c.hw * 0.45, c.len * 0.42, 0.05, 1), M4.t(0, c.y + c.hw * 0.42, c.z));
+  if (L.binder) {
+    const A = L.engines[L.binder[0]], B2 = L.engines[L.binder[1]];
+    pb.add("glow", rbox(Math.abs(B2.x - A.x), 0.18, 0.18, 0.02), M4.t((A.x + B2.x) * 0.5, (A.y + B2.y) * 0.5 + 0.2, (A.z + B2.z) * 0.5));
+  }
+  const built = pb.build();
+  const out = { hull: built.get("hull"), dark: built.get("dark"), glow: built.get("glow") };
+  oppFarCache.set(def.id, out);
+  return out;
+}
+function base(def, seg, species) {
+  const L = podLayout(def);
+  const exhaustLocal = [];
+  let frontZ = -Infinity, topY = 0, sumY = 0;
+  for (const em of L.engines) {
+    const eg = engineGeo(em.spec, seg);
+    exhaustLocal.push(new Vector3(em.x, em.y, em.z + eg.exhaustZ));
+    frontZ = Math.max(frontZ, em.z + eg.frontZ);
+    topY = Math.max(topY, em.y + eg.R);
+    sumY += em.y;
+  }
+  const ck = cockpitGeo(L, seg, species);
+  const eye = new Vector3(0, L.cockpit.y, L.cockpit.z).add(ck.info.head).add(new Vector3(0, 0.24, 0.32));
+  const hood = new Vector3(0, sumY / Math.max(1, L.engines.length) + topY * 0.35 + 0.35, frontZ - 1.2);
+  const extraPB = new PartBuilder();
+  L.extras?.(extraPB, L);
+  const extraParts = extraPB.build();
+  const b = { layout: L, bodyZ: -L.cockpit.z * 0.25, exhaustLocal, eye, hood };
+  return { b, ck, extraParts };
+}
+var sideOf = (x) => x < 0 ? -1 : 1;
+var binderList = (L) => L.binders ?? (L.binder ? [L.binder] : []);
+function assembleHero(def, seg, species) {
+  const { b, ck, extraParts } = base(def, seg, species);
+  const L = b.layout;
+  const owned = [];
+  const attachExtraToEngines = def.id === "aurora" || def.id === "brute" || def.id === "gasvaro" || def.id === "bomquad" || def.id === "teemo";
+  const banks = [];
+  for (const side of [-1, 1]) {
+    const mounts = L.engines.map((em, index) => ({ em, index })).filter((m) => sideOf(m.em.x) === side);
+    if (!mounts.length) continue;
+    const piv = new Vector3();
+    for (const { em } of mounts) {
+      piv.x += em.x;
+      piv.y += em.y;
+      piv.z += em.z;
+    }
+    piv.divideScalar(mounts.length);
+    const lists2 = /* @__PURE__ */ new Map();
+    const engines = [];
+    for (const { em, index } of mounts) {
+      const off = new Vector3(em.x - piv.x, em.y - piv.y, em.z - piv.z);
+      const eg = engineGeo(em.spec, seg);
+      const emM = M4.t(off.x, off.y, off.z);
+      for (const [k, g2] of eg.parts) {
+        const gc = g2.clone();
+        gc.applyMatrix4(emM);
+        push(lists2, k, gc);
+      }
+      engines.push({ index, off, geo: eg });
+    }
+    if (attachExtraToEngines) {
+      const shift = M4.t(-piv.x, -piv.y, -piv.z);
+      for (const [k, eg] of extraParts) {
+        const idx = eg.index.array;
+        const pos = eg.attributes.position;
+        const keep = [];
+        for (let t = 0; t < idx.length; t += 3) {
+          const cx = (pos.getX(idx[t]) + pos.getX(idx[t + 1]) + pos.getX(idx[t + 2])) / 3;
+          if (sideOf(cx) === side) keep.push(idx[t], idx[t + 1], idx[t + 2]);
+        }
+        if (keep.length) {
+          const sub2 = eg.clone();
+          sub2.setIndex(keep);
+          sub2.applyMatrix4(shift);
+          push(lists2, k, sub2);
+        }
+      }
+    }
+    banks.push({ side, pivot: piv, engines, buckets: mergeAll(lists2, owned, `${def.id} engine bank ${side}`) });
+  }
+  const lists = /* @__PURE__ */ new Map();
+  const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
+  for (const [k, g2] of ck.parts) {
+    const gc = g2.clone();
+    gc.applyMatrix4(ckM);
+    push(lists, k, gc);
+  }
+  for (const [k, g2] of extraParts) {
+    if (!attachExtraToEngines) push(lists, k, g2);
+    else g2.dispose();
+  }
+  const cockpit = mergeAll(lists, owned, `${def.id} cockpit`);
+  const cables = buildFlexCables(L, seg, ck.info.anchors);
+  owned.push(cables);
+  const binders = [];
+  for (const [ia, ib] of binderList(L)) {
+    let A = L.engines[ia], B2 = L.engines[ib];
+    if (A.x > B2.x) {
+      const t = A;
+      A = B2;
+      B2 = t;
+    }
+    const ea = engineGeo(A.spec, seg), eb = engineGeo(B2.spec, seg);
+    const g2 = makeBinderGeo(new Vector3(A.x + ea.R * 0.97, A.y + ea.R * 0.2, A.z + ea.L * 0.12), new Vector3(B2.x - eb.R * 0.97, B2.y + eb.R * 0.2, B2.z + eb.L * 0.12));
+    binders.push(g2);
+    owned.push(g2);
+  }
+  return { ...b, banks, cockpit, cables, binders, owned };
+}
+function assembleRival(def, seg, species, colors, pattern) {
+  const { b, ck, extraParts } = base(def, seg, species);
+  const L = b.layout;
+  const owned = [];
+  const liv = pattern !== void 0 && pattern >= 0 ? pattern : L.livery;
+  const glowCol = new Color(colors[2]), glowBoost = glowCol.clone().multiplyScalar(1.2);
+  const bake = (k, mg) => {
+    if (k === "hull") bakeHullVertexColors(mg, colors[0], colors[1], liv);
+    else if (k === "glow") bakeSolidColor(mg, glowBoost);
+  };
+  const pushC = (lists2, k, g2, m) => {
+    const c = g2.clone();
+    if (m) c.applyMatrix4(m);
+    push(lists2, k, c);
+  };
+  const banks = [];
+  for (const side of [-1, 1]) {
+    const sideMs = L.engines.filter((e) => sideOf(e.x) === side);
+    const piv = new Vector3();
+    for (const em of sideMs) {
+      piv.x += em.x;
+      piv.y += em.y;
+      piv.z += em.z;
+    }
+    if (sideMs.length) piv.divideScalar(sideMs.length);
+    const lists2 = /* @__PURE__ */ new Map();
+    const fls = [];
+    const pts = [];
+    for (const em of sideMs) {
+      const ox = em.x - piv.x, oy = em.y - piv.y, oz = em.z - piv.z;
+      const eg = engineGeo(em.spec, seg);
+      const emM = M4.t(ox, oy, oz);
+      for (const [k, g2] of eg.parts) pushC(lists2, k, g2, emM);
+      pushC(lists2, "dark", eg.fan, M4.t(ox, oy, oz + eg.fanZ));
+      for (const f of eg.flaps) pushC(lists2, "hull", f.geo, M4.t(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z));
+      const fo = eg.flameOuter.clone();
+      fo.applyMatrix4(M4.t(ox, oy, oz + eg.flameZ));
+      fls.push(fo);
+      pts.push(eg.petals.clone().translate(ox, oy, oz));
+    }
+    const buckets = mergeAll(lists2, owned, `${def.id} rival bank ${side}`, bake);
+    let petals = null, flames = null;
+    if (pts.length) {
+      petals = mergeGeometries(pts, false);
+      pts.forEach((x) => x.dispose());
+      owned.push(petals);
+    }
+    if (fls.length) {
+      flames = mergeGeometries(fls, false);
+      fls.forEach((x) => x.dispose());
+      bakeSolidColor(flames, glowCol);
+      flames.computeBoundingSphere();
+      owned.push(flames);
+    }
+    banks.push({ side, pivot: piv, buckets, petals, flames });
+  }
+  const lists = /* @__PURE__ */ new Map();
+  const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
+  for (const [k, g2] of ck.parts) pushC(lists, k, g2, ckM);
+  for (const [k, g2] of extraParts) {
+    pushC(lists, k, g2);
+    g2.dispose();
+  }
+  const cp = new Vector3(0, L.cockpit.y, L.cockpit.z);
+  const cabPB = new PartBuilder();
+  for (const em of L.engines) {
+    const eg = engineGeo(em.spec, seg);
+    const a = eg.pylon.clone().add(new Vector3(em.x, em.y, em.z));
+    const anc = ck.info.anchors[em.x < 0 ? 0 : 1].clone().add(cp);
+    const mid = a.clone().lerp(anc, 0.5);
+    mid.y -= 0.55;
+    cabPB.add("dark", tube([anc, mid, a], 0.055, 8, 5));
+  }
+  for (const [k, g2] of cabPB.build()) {
+    pushC(lists, k, g2);
+    g2.dispose();
+  }
+  const cockpit = mergeAll(lists, owned, `${def.id} rival cockpit`, bake);
+  const binders = [];
+  let spanX = 4.6;
+  for (const [ia, ib] of binderList(L)) {
+    let A = L.engines[ia], B2 = L.engines[ib];
+    if (A.x > B2.x) {
+      const t = A;
+      A = B2;
+      B2 = t;
+    }
+    const ea = engineGeo(A.spec, seg), eb = engineGeo(B2.spec, seg);
+    const dyh = (B2.y + eb.R * 0.2 - (A.y + ea.R * 0.2)) * 0.5;
+    const pa = new Vector3(A.x + ea.R * 0.97, -dyh, A.z + ea.L * 0.12);
+    const pb = new Vector3(B2.x - eb.R * 0.97, dyh, B2.z + eb.L * 0.12);
+    spanX = Math.max(1.5, Math.abs(pb.x - pa.x));
+    const baseY = (A.y + ea.R * 0.2 + B2.y + eb.R * 0.2) * 0.5;
+    const bg = makeBinderGeo(pa, pb, glowCol);
+    owned.push(bg);
+    binders.push({ geo: bg, baseY });
+  }
+  const far0 = buildOpponentFarGeo(def, L);
+  const hull = bakeHullVertexColors(far0.hull.clone(), colors[0], colors[1], liv);
+  owned.push(hull);
+  const glow = bakeSolidColor(far0.glow.clone(), glowBoost);
+  owned.push(glow);
+  return { ...b, banks, cockpit, binders, spanX, far: { hull, dark: far0.dark, glow }, owned };
+}
+
 // src/game/podTextures.ts
 init_three_module();
 function mulberry2(a) {
@@ -99692,8 +100102,8 @@ var TNoise = class {
     const a = w(ix, iy), b = w(ix + 1, iy), c = w(ix, iy + 1), d = w(ix + 1, iy + 1);
     return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
   }
-  fbm(u, v, base, oct) {
-    let s = 0, a = 1, nn = 0, p = base;
+  fbm(u, v, base2, oct) {
+    let s = 0, a = 1, nn = 0, p = base2;
     for (let o = 0; o < oct; o++) {
       s += this.n(u, v, p) * a;
       nn += a;
@@ -99839,12 +100249,12 @@ function hullTextures(size = 1024) {
     H.stroke();
   };
   for (const p of panels) {
-    const base = 150 + (rnd() - 0.5) * 36;
+    const base2 = 150 + (rnd() - 0.5) * 36;
     const x = p.x + seam / 2, y = p.y + seam / 2, w = p.w - seam, h = p.h - seam;
-    H.fillStyle = gray(base - 14);
+    H.fillStyle = gray(base2 - 14);
     rrect(H, x, y, w, h, 3 * k);
     H.fill();
-    H.fillStyle = gray(base);
+    H.fillStyle = gray(base2);
     rrect(H, x + 3 * k, y + 3 * k, w - 6 * k, h - 6 * k, 3 * k);
     H.fill();
     const big = w > 90 * k && h > 70 * k;
@@ -99866,7 +100276,7 @@ function hullTextures(size = 1024) {
       H.lineWidth = 2.4 * k;
       rrect(H, hx, hy, hw, hh, 6 * k);
       H.stroke();
-      H.fillStyle = gray(base + 10);
+      H.fillStyle = gray(base2 + 10);
       rrect(H, hx + 2 * k, hy + 2 * k, hw - 4 * k, hh - 4 * k, 5 * k);
       H.fill();
       for (const [sx, sy] of [[hx + 8 * k, hy + 8 * k], [hx + hw - 8 * k, hy + 8 * k], [hx + 8 * k, hy + hh - 8 * k], [hx + hw - 8 * k, hy + hh - 8 * k]]) screw(sx, sy, 2.6 * k);
@@ -99949,7 +100359,7 @@ function hullTextures(size = 1024) {
       }
     } else if (r < 0.76 && w > 50 * k) {
       const dx = x + w * 0.1, dy = y + h * 0.1, dw = w * 0.8, dh = h * 0.8;
-      H.fillStyle = gray(base + 26);
+      H.fillStyle = gray(base2 + 26);
       rrect(H, dx, dy, dw, dh, 5 * k);
       H.fill();
       for (let t = dx + 6 * k; t < dx + dw - 4 * k; t += 11 * k) {
@@ -100577,186 +100987,9 @@ function petalMaterial() {
 // src/game/podModel.ts
 var SHADOW_KEYS = /* @__PURE__ */ new Set(["hull", "steel", "dark", "chrome", "carbon"]);
 var OPP_SHADOW_KEYS = /* @__PURE__ */ new Set(["hull", "steel", "dark"]);
-var BINDER_PTS = 18;
 var podLodScale = 1;
 function setPodLodScale(v) {
   podLodScale = Math.max(0.3, Math.min(4, v));
-}
-function buildFlexCables(L, seg, anchors) {
-  const cp = new Vector3(0, L.cockpit.y, L.cockpit.z);
-  const up = new Vector3(0, 1, 0);
-  const list = [];
-  const tagFlex = (g2, isR, pA, pB) => {
-    const p = g2.attributes.position;
-    const n = p.count;
-    const liv = new Float32Array(n * 3);
-    const dz = pA.z - pB.z || 1;
-    for (let i = 0; i < n; i++) {
-      const w = Math.max(0, Math.min(1, (p.getZ(i) - pB.z) / dz));
-      liv[i * 3] = isR;
-      liv[i * 3 + 1] = w;
-      liv[i * 3 + 2] = 0;
-    }
-    g2.setAttribute("aLiv", new BufferAttribute(liv, 3));
-    if (!g2.attributes.normal) g2.computeVertexNormals();
-    if (!g2.attributes.uv) g2.setAttribute("uv", new BufferAttribute(new Float32Array(n * 2), 2));
-    list.push(g2);
-  };
-  for (const em of L.engines) {
-    const eg = engineGeo(em.spec, seg);
-    const isR = em.x >= 0 ? 1 : 0;
-    const a = eg.pylon.clone().add(new Vector3(em.x, em.y, em.z));
-    const b = anchors[isR].clone().add(cp);
-    const rearZ = eg.exhaustZ + 0.12 * eg.L, topY = Math.max(eg.top, eg.R) + 0.14;
-    const v1 = new Vector3(em.x, em.y + topY + 0.1, em.z + rearZ - 0.3);
-    const v2 = new Vector3(em.x, em.y + topY, em.z + rearZ + (eg.pylon.z - rearZ) * 0.5);
-    const dist = v1.distanceTo(b);
-    const sag = 0.3 + dist * 0.03;
-    for (const [r, off, s, rad] of [[0.055, 0, 1, 6], [0.024, 0.12, 1.18, 4]]) {
-      const pts = [];
-      const ox = off * (isR ? -1 : 1);
-      for (let i = 0; i <= 8; i++) {
-        const t = i / 8;
-        const p = b.clone().lerp(v1, t);
-        p.y -= sag * s * 4 * t * (1 - t) * (1 - 0.35 * t);
-        p.x += ox * Math.sin(t * Math.PI * 0.5);
-        pts.push(p);
-      }
-      pts.push(v1.clone().lerp(v2, 0.5).add(new Vector3(ox, 0, 0)), v2.clone().add(new Vector3(ox, 0, 0)), a.clone().add(new Vector3(ox * 0.5, 0.03, 0)));
-      tagFlex(tube(pts, r, Math.max(16, Math.round(seg * 0.8)), rad), isR, v1, b);
-    }
-    for (const [p, q] of [[a, v2], [b, v1]]) {
-      const dir = q.clone().sub(p).normalize();
-      const fg = cyl(0.085, 0.07, 0.24, 7);
-      fg.applyMatrix4(new Matrix4().compose(p.clone().addScaledVector(dir, 0.12), new Quaternion().setFromUnitVectors(up, dir), new Vector3(1, 1, 1)));
-      tagFlex(fg, isR, v1, b);
-    }
-    for (const sp of [v1, v2]) {
-      const cl = torus(0.085, 0.022, 5, 8);
-      cl.rotateY(Math.PI / 2);
-      cl.translate(sp.x, sp.y - 0.02, sp.z);
-      tagFlex(cl, isR, v1, b);
-    }
-  }
-  const mg = mergeGeometries(list, false);
-  list.forEach((x) => x.dispose());
-  mg.computeBoundingSphere();
-  mg.boundingSphere.radius += 1.2;
-  return mg;
-}
-function bakeHullVertexColors(g2, c1Hex, c2Hex, livery) {
-  const c1 = new Color(c1Hex), c2 = new Color(c2Hex);
-  const liv = g2.attributes.aLiv;
-  const n = g2.attributes.position.count;
-  const col = new Float32Array(n * 3);
-  const band = (x, cc, w) => Math.abs(x - cc) < w ? 1 : 0;
-  const fr = (x) => x - Math.floor(x);
-  const lv = (livery % 6 + 6) % 6;
-  for (let i = 0; i < n; i++) {
-    let m = 0;
-    if (liv) {
-      const c = liv.getX(i), a = liv.getY(i), z = liv.getZ(i);
-      const cd = Math.min(c, 1 - c);
-      if (z > 2.5) m = 1;
-      else if (z >= 0.5 && z < 1.5) {
-        if (lv === 0) m = Math.max(band(cd, 0, 0.06), band(a, 0.8, 0.035));
-        else if (lv === 1) m = Math.max(band(cd, 0.055, 0.02), band(cd, 0, 0.014), a >= 0.86 ? 1 : 0);
-        else if (lv === 2) m = a >= 0.14 && cd < 0.12 + Math.abs(fr(a * 5) - 0.5) * 0.16 ? 1 : 0;
-        else if (lv === 3) m = Math.max(band(a, 0.25, 0.042), band(a, 0.7, 0.042), a >= 0.3 && a <= 0.65 ? band(Math.abs(cd - 0.25), 0, 0.03) : 0);
-        else if (lv === 4) {
-          const ch = fr(a * 3.5 - cd * 1.8);
-          m = a >= 0.12 && a <= 0.9 && ch > 0.6 && ch < 0.88 || a >= 0.91 ? 1 : 0;
-        } else {
-          const chk = a >= 0.56 && a <= 0.86 && fr(cd * 8) >= 0.5 !== fr(a * 9) >= 0.5 ? 1 : 0;
-          m = Math.max(chk, band(cd, 0, 0.045));
-        }
-      } else if (z >= 1.5) {
-        const ck0 = Math.max(band(Math.abs(cd - 0.25 + (a - 0.5) * 0.12), 0, a * 0.02 + 0.035), a >= 0.9 ? 1 : 0);
-        m = lv === 4 ? Math.max(ck0, band(fr(a * 3 - cd * 1.5), 0.5, 0.16)) : lv === 5 ? Math.max(ck0, band(cd, 0.035, 0.016), band(cd, 0.085, 0.01)) : lv >= 2 ? Math.max(ck0, band(cd, 0, 0.05)) : ck0;
-      }
-    }
-    col[i * 3] = c1.r + (c2.r - c1.r) * m;
-    col[i * 3 + 1] = c1.g + (c2.g - c1.g) * m;
-    col[i * 3 + 2] = c1.b + (c2.b - c1.b) * m;
-  }
-  g2.setAttribute("color", new BufferAttribute(col, 3));
-  return g2;
-}
-function bakeSolidColor(g2, col) {
-  const n = g2.attributes.position.count;
-  const a = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) {
-    a[i * 3] = col.r;
-    a[i * 3 + 1] = col.g;
-    a[i * 3 + 2] = col.b;
-  }
-  g2.setAttribute("color", new BufferAttribute(a, 3));
-  return g2;
-}
-function makeBinderGeo(a, b, vertCol) {
-  const pos = new Float32Array(BINDER_PTS * 4 * 3), uv11 = new Float32Array(BINDER_PTS * 4 * 2);
-  const idx = [];
-  const w = 0.4;
-  const tmp3 = new Vector3();
-  for (let i = 0; i < BINDER_PTS; i++) {
-    const f = i / (BINDER_PTS - 1);
-    tmp3.copy(a).lerp(b, f);
-    for (let k = 0; k < 4; k++) {
-      uv11[(i * 4 + k) * 2] = f;
-      uv11[(i * 4 + k) * 2 + 1] = k % 2 === 0 ? 1 : 0;
-    }
-    const o = i * 12;
-    pos[o] = tmp3.x;
-    pos[o + 1] = tmp3.y + w;
-    pos[o + 2] = tmp3.z;
-    pos[o + 3] = tmp3.x;
-    pos[o + 4] = tmp3.y - w;
-    pos[o + 5] = tmp3.z;
-    pos[o + 6] = tmp3.x;
-    pos[o + 7] = tmp3.y;
-    pos[o + 8] = tmp3.z + w;
-    pos[o + 9] = tmp3.x;
-    pos[o + 10] = tmp3.y;
-    pos[o + 11] = tmp3.z - w;
-    if (i < BINDER_PTS - 1) for (const off of [0, 2]) {
-      const p = i * 4 + off, q = p + 4;
-      idx.push(p, p + 1, q, p + 1, q + 1, q);
-    }
-  }
-  const geo = new BufferGeometry();
-  geo.setAttribute("position", new BufferAttribute(pos, 3));
-  geo.setAttribute("uv", new BufferAttribute(uv11, 2));
-  geo.setIndex(idx);
-  if (vertCol) bakeSolidColor(geo, vertCol);
-  geo.computeBoundingSphere();
-  geo.boundingSphere.radius += 1.4;
-  return geo;
-}
-var oppFarCache = /* @__PURE__ */ new Map();
-function buildOpponentFarGeo(def, L) {
-  const hit = oppFarCache.get(def.id);
-  if (hit) return hit;
-  const pb = new PartBuilder();
-  const cp = new Vector3(0, L.cockpit.y, L.cockpit.z);
-  for (const em of L.engines) {
-    const { L: len, R } = em.spec;
-    pb.add("hull", lathe(prof([[R * 0.72, -len * 0.5, 1], [R, -len * 0.35], [R, len * 0.42], [R * 0.88, len * 0.5, 1]]), 9, 1), M4.t(em.x, em.y, em.z));
-    pb.add("dark", new CircleGeometry(R * 0.84, 9), M4.t(em.x, em.y, em.z + len * 0.49));
-    pb.add("glow", new ConeGeometry(R * 0.46, len * 0.55, 7, 1, true).rotateX(-Math.PI / 2), M4.t(em.x, em.y, em.z - len * 0.75));
-    const a = new Vector3(em.x, em.y + R, em.z), b = cp.clone();
-    pb.add("dark", tube([a, a.clone().lerp(b, 0.5).add(new Vector3(0, -0.4, 0)), b], 0.055, 5, 4));
-  }
-  const c = L.cockpit;
-  pb.add("hull", rbox(c.hw * 1.7, c.hw * 0.82, c.len, 0.14, 1), M4.t(0, c.y, c.z), [0, 0.5, 2]);
-  pb.add("dark", rbox(c.hw * 0.9, c.hw * 0.45, c.len * 0.42, 0.05, 1), M4.t(0, c.y + c.hw * 0.42, c.z));
-  if (L.binder) {
-    const A = L.engines[L.binder[0]], B2 = L.engines[L.binder[1]];
-    pb.add("glow", rbox(Math.abs(B2.x - A.x), 0.18, 0.18, 0.02), M4.t((A.x + B2.x) * 0.5, (A.y + B2.y) * 0.5 + 0.2, (A.z + B2.z) * 0.5));
-  }
-  const built = pb.build();
-  const out = { hull: built.get("hull"), dark: built.get("dark"), glow: built.get("glow") };
-  oppFarCache.set(def.id, out);
-  return out;
 }
 var sharedOppGlow = null;
 var sharedOppFarHull = null;
@@ -100767,10 +101000,8 @@ function getOppFarHull() {
   return sharedOppFarHull ?? (sharedOppFarHull = new MeshStandardMaterial({ vertexColors: true, metalness: 0.48, roughness: 0.34 }));
 }
 function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = false, opts) {
-  const seg = isOpponent ? quality >= 3 ? 18 : 14 : quality >= 3 ? 40 : quality === 2 ? 28 : 20;
+  const seg = segFor(quality, isOpponent);
   const texSize = texRes >= 2048 && !isOpponent ? 2048 : 1024;
-  const L = podLayout(def);
-  const liv = opts?.pattern !== void 0 && opts.pattern >= 0 ? opts.pattern : L.livery;
   const fin = opts?.finish ?? 0;
   const shared = sharedPodMaterials(texSize);
   const glowCol = new Color(colors[2]);
@@ -100779,42 +101010,19 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
   const group = new Group();
   const body = new Group();
   group.add(body);
-  body.position.z = -L.cockpit.z * 0.25;
-  const exhaustLocal = [];
-  let frontZ = -Infinity, topY = 0, sumY = 0;
-  for (const em of L.engines) {
-    const eg = engineGeo(em.spec, seg);
-    exhaustLocal.push(new Vector3(em.x, em.y, em.z + eg.exhaustZ));
-    frontZ = Math.max(frontZ, em.z + eg.frontZ);
-    topY = Math.max(topY, em.y + eg.R);
-    sumY += em.y;
-  }
-  const ckBuilt = cockpitGeo(L, seg, pilot.species);
-  const eye = new Vector3(0, L.cockpit.y, L.cockpit.z).add(ckBuilt.info.head).add(new Vector3(0, 0.24, 0.32));
-  const hood = new Vector3(0, sumY / Math.max(1, L.engines.length) + topY * 0.35 + 0.35, frontZ - 1.2);
-  const extraPB = new PartBuilder();
-  L.extras?.(extraPB, L);
-  const extraParts = extraPB.build();
   if (isOpponent) {
+    const A2 = assembleRival(def, seg, pilot.species, colors, opts?.pattern);
+    body.position.z = A2.bodyZ;
     const oppHull = sharedOpponentHullMaterial(1024);
     const oppFlame = sharedOpponentFlameMaterial();
     const oppBinder = sharedOpponentBinderMaterial();
     const oppGlow = getOppGlow();
-    const glowBoost = glowCol.clone().multiplyScalar(1.2);
-    const ownedGeos = [];
     const shadowMeshes = [];
     const engines2 = [];
     const nearGrp = new Group();
     body.add(nearGrp);
-    const addBucket = (buckets, parent) => {
-      for (const [k, list] of buckets) {
-        const mg = mergeGeometries(list, false);
-        list.forEach((x) => x.dispose());
-        if (!mg) continue;
-        if (k === "hull") bakeHullVertexColors(mg, colors[0], colors[1], liv);
-        else if (k === "glow") bakeSolidColor(mg, glowBoost);
-        mg.computeBoundingSphere();
-        ownedGeos.push(mg);
+    const addBuckets = (buckets, parent) => {
+      for (const [k, mg] of buckets) {
         const mat = k === "hull" ? oppHull : k === "glow" ? oppGlow : k === "suit" ? suit : shared[k];
         if (!mat) continue;
         const m = new Mesh(mg, mat);
@@ -100827,129 +101035,46 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
         parent.add(m);
       }
     };
-    const pushB = (b, k, g2, m) => {
-      const c = g2.clone();
-      if (m) c.applyMatrix4(m);
-      let l = b.get(k);
-      if (!l) {
-        l = [];
-        b.set(k, l);
-      }
-      l.push(c);
-    };
-    let spanX = 4.6;
     const oppPetals = [];
     let oppOpen = 0;
     const oppPivots = [];
-    for (const side of [-1, 1]) {
-      const sideMs = L.engines.filter((e) => (e.x < 0 ? -1 : 1) === side);
-      const piv = new Vector3();
-      for (const em of sideMs) {
-        piv.x += em.x;
-        piv.y += em.y;
-        piv.z += em.z;
-      }
-      if (sideMs.length) piv.divideScalar(sideMs.length);
-      oppPivots.push(piv);
+    for (const bank of A2.banks) {
+      oppPivots.push(bank.pivot);
       const grp = new Group();
-      grp.position.copy(piv);
+      grp.position.copy(bank.pivot);
       nearGrp.add(grp);
       engines2.push(grp);
-      const b = /* @__PURE__ */ new Map();
-      const fls = [];
-      const pts = [];
-      for (const em of sideMs) {
-        const ox = em.x - piv.x, oy = em.y - piv.y, oz = em.z - piv.z;
-        const eg = engineGeo(em.spec, seg);
-        const emM = M4.t(ox, oy, oz);
-        for (const [k, g2] of eg.parts) pushB(b, k, g2, emM);
-        pushB(b, "dark", eg.fan, M4.t(ox, oy, oz + eg.fanZ));
-        for (const f of eg.flaps) pushB(b, "hull", f.geo, M4.t(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z));
-        const fo = eg.flameOuter.clone();
-        fo.applyMatrix4(M4.t(ox, oy, oz + eg.flameZ));
-        fls.push(fo);
-        pts.push(eg.petals.clone().translate(ox, oy, oz));
-      }
-      addBucket(b, grp);
-      if (pts.length) {
-        const pg = mergeGeometries(pts, false);
-        pts.forEach((x) => x.dispose());
-        ownedGeos.push(pg);
-        const pm = new Mesh(pg, petalMaterial());
+      addBuckets(bank.buckets, grp);
+      if (bank.petals) {
+        const pm = new Mesh(bank.petals, petalMaterial());
         pm.userData.open = 0;
         grp.add(pm);
         oppPetals.push(pm);
       }
-      if (fls.length) {
-        const fg = mergeGeometries(fls, false);
-        fls.forEach((x) => x.dispose());
-        bakeSolidColor(fg, glowCol);
-        fg.computeBoundingSphere();
-        ownedGeos.push(fg);
-        const fm = new Mesh(fg, oppFlame);
+      if (bank.flames) {
+        const fm = new Mesh(bank.flames, oppFlame);
         fm.renderOrder = 2;
         grp.add(fm);
       }
     }
-    {
-      const b = /* @__PURE__ */ new Map();
-      const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
-      for (const [k, g2] of ckBuilt.parts) pushB(b, k, g2, ckM);
-      for (const [k, g2] of extraParts) {
-        pushB(b, k, g2);
-        g2.dispose();
-      }
-      const cp = new Vector3(0, L.cockpit.y, L.cockpit.z);
-      const cabPB = new PartBuilder();
-      for (const em of L.engines) {
-        const eg = engineGeo(em.spec, seg);
-        const a = eg.pylon.clone().add(new Vector3(em.x, em.y, em.z));
-        const anc = ckBuilt.info.anchors[em.x < 0 ? 0 : 1].clone().add(cp);
-        const mid = a.clone().lerp(anc, 0.5);
-        mid.y -= 0.55;
-        cabPB.add("dark", tube([anc, mid, a], 0.055, 8, 5));
-      }
-      for (const [k, g2] of cabPB.build()) {
-        pushB(b, k, g2);
-        g2.dispose();
-      }
-      addBucket(b, nearGrp);
-    }
+    addBuckets(A2.cockpit, nearGrp);
+    const spanX = A2.spanX;
     const binderMeshes = [];
-    for (const [ia, ib] of L.binders ?? (L.binder ? [L.binder] : [])) {
-      let A = L.engines[ia], B2 = L.engines[ib];
-      if (A.x > B2.x) {
-        const t = A;
-        A = B2;
-        B2 = t;
-      }
-      const ea = engineGeo(A.spec, seg), eb = engineGeo(B2.spec, seg);
-      const dyh = (B2.y + eb.R * 0.2 - (A.y + ea.R * 0.2)) * 0.5;
-      const pa = new Vector3(A.x + ea.R * 0.97, -dyh, A.z + ea.L * 0.12);
-      const pb = new Vector3(B2.x - eb.R * 0.97, dyh, B2.z + eb.L * 0.12);
-      spanX = Math.max(1.5, Math.abs(pb.x - pa.x));
-      const baseY = (A.y + ea.R * 0.2 + B2.y + eb.R * 0.2) * 0.5;
-      const bg = makeBinderGeo(pa, pb, glowCol);
-      ownedGeos.push(bg);
-      const bm = new Mesh(bg, oppBinder);
-      bm.position.y = baseY;
+    for (const b of A2.binders) {
+      const bm = new Mesh(b.geo, oppBinder);
+      bm.position.y = b.baseY;
       bm.renderOrder = 3;
       nearGrp.add(bm);
-      binderMeshes.push({ m: bm, y: baseY });
+      binderMeshes.push({ m: bm, y: b.baseY });
     }
     const farGrp = new Group();
     farGrp.visible = false;
     body.add(farGrp);
-    const far = buildOpponentFarGeo(def, L);
-    const fhGeo = bakeHullVertexColors(far.hull.clone(), colors[0], colors[1], liv);
-    ownedGeos.push(fhGeo);
-    const fgGeo = bakeSolidColor(far.glow.clone(), glowBoost);
-    ownedGeos.push(fgGeo);
-    const fhM = new Mesh(fhGeo, getOppFarHull());
+    const fhM = new Mesh(A2.far.hull, getOppFarHull());
     fhM.receiveShadow = true;
     farGrp.add(fhM);
-    farGrp.add(new Mesh(far.dark, shared.dark));
-    farGrp.add(new Mesh(fgGeo, oppGlow));
+    farGrp.add(new Mesh(A2.far.dark, shared.dark));
+    farGrp.add(new Mesh(A2.far.glow, oppGlow));
     const setDistance = (d, forceAll = false) => {
       if (forceAll) {
         nearGrp.visible = true;
@@ -100985,10 +101110,13 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       for (let i = 0; i < oppPetals.length; i++) oppPetals[i].userData.open = o;
     };
     const dispose2 = () => {
-      ownedGeos.forEach((g2) => g2.dispose());
+      A2.owned.forEach((g2) => g2.dispose());
     };
-    return { group, body, engines: engines2, exhaustLocal, eye, hood, update: update2, setEngineMotion: setEngineMotion2, setDistance, dispose: dispose2 };
+    return { group, body, engines: engines2, exhaustLocal: A2.exhaustLocal, eye: A2.eye, hood: A2.hood, update: update2, setEngineMotion: setEngineMotion2, setDistance, dispose: dispose2 };
   }
+  const A = assembleHero(def, seg, pilot.species);
+  body.position.z = A.bodyZ;
+  const liv = opts?.pattern !== void 0 && opts.pattern >= 0 ? opts.pattern : A.layout.livery;
   const hullL = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
   const hullR = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
   const hullC = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
@@ -101013,54 +101141,30 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       parent.add(m);
     }
   };
-  const attachExtraToEngines = def.id === "aurora" || def.id === "brute" || def.id === "gasvaro" || def.id === "bomquad" || def.id === "teemo";
   const engines = [];
   const fans = [];
   const flaps = [];
   const petals = [];
   const flames = [];
-  const sideGeos = [];
   const hc = new Color(), hot = new Color("#ff5a1a");
   const heroPivots = [];
-  for (const side of [-1, 1]) {
-    const sideMounts = L.engines.filter((e) => (e.x < 0 ? -1 : 1) === side);
-    if (!sideMounts.length) continue;
-    const piv = new Vector3();
-    for (const em of sideMounts) {
-      piv.x += em.x;
-      piv.y += em.y;
-      piv.z += em.z;
-    }
-    piv.divideScalar(sideMounts.length);
-    heroPivots.push(piv);
+  for (const bank of A.banks) {
+    const side = bank.side;
+    heroPivots.push(bank.pivot);
     const engGrp = new Group();
-    engGrp.position.copy(piv);
+    engGrp.position.copy(bank.pivot);
     body.add(engGrp);
     engines.push(engGrp);
     const hull = side < 0 ? hullL : hullR;
-    const buckets = /* @__PURE__ */ new Map();
-    for (const em of sideMounts) {
-      const ox = em.x - piv.x, oy = em.y - piv.y, oz = em.z - piv.z;
-      const eg = engineGeo(em.spec, seg);
-      const emM = M4.t(ox, oy, oz);
-      for (const [k, g2] of eg.parts) {
-        const gc = g2.clone();
-        gc.applyMatrix4(emM);
-        let l = buckets.get(k);
-        if (!l) {
-          l = [];
-          buckets.set(k, l);
-        }
-        l.push(gc);
-      }
+    for (const { off, geo: eg } of bank.engines) {
       const fan = new Mesh(eg.fan, shared.dark);
-      fan.position.set(ox, oy, oz + eg.fanZ);
+      fan.position.set(off.x, off.y, off.z + eg.fanZ);
       fan.castShadow = false;
       engGrp.add(fan);
       fans.push(fan);
       {
         const pm = new Mesh(eg.petals, petalMaterial());
-        pm.position.set(ox, oy, oz);
+        pm.position.copy(off);
         pm.userData.open = 0;
         pm.castShadow = false;
         engGrp.add(pm);
@@ -101068,7 +101172,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       }
       for (const f of eg.flaps) {
         const m = new Mesh(f.geo, hull);
-        m.position.set(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z);
+        m.position.set(off.x + f.pivot.x, off.y + f.pivot.y, off.z + f.pivot.z);
         m.castShadow = false;
         m.receiveShadow = true;
         engGrp.add(m);
@@ -101076,107 +101180,27 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       }
       for (const core of [false, true]) {
         const m = new Mesh(core ? eg.flameCore : eg.flameOuter, side < 0 ? core ? coreL : flameL : core ? coreR : flameR);
-        m.position.set(ox, oy, oz + eg.flameZ);
+        m.position.set(off.x, off.y, off.z + eg.flameZ);
         m.renderOrder = 2;
         engGrp.add(m);
         flames.push({ m, side });
       }
     }
-    if (attachExtraToEngines) {
-      const shift = M4.t(-piv.x, -piv.y, -piv.z);
-      for (const [k, eg] of extraParts) {
-        const idx = eg.index.array;
-        const pos = eg.attributes.position;
-        const keep = [];
-        for (let t = 0; t < idx.length; t += 3) {
-          const cx = (pos.getX(idx[t]) + pos.getX(idx[t + 1]) + pos.getX(idx[t + 2])) / 3;
-          if ((cx < 0 ? -1 : 1) === side) keep.push(idx[t], idx[t + 1], idx[t + 2]);
-        }
-        if (keep.length) {
-          const sub2 = eg.clone();
-          sub2.setIndex(keep);
-          sub2.applyMatrix4(shift);
-          let l = buckets.get(k);
-          if (!l) {
-            l = [];
-            buckets.set(k, l);
-          }
-          l.push(sub2);
-        }
-      }
-    }
-    const mergedSide = /* @__PURE__ */ new Map();
-    for (const [k, list] of buckets) {
-      const mg = mergeGeometries(list, false);
-      list.forEach((x) => x.dispose());
-      if (mg) {
-        mg.computeBoundingSphere();
-        mergedSide.set(k, mg);
-        sideGeos.push(mg);
-      }
-    }
-    addMeshes(mergedSide, engGrp, hull);
+    addMeshes(bank.buckets, engGrp, hull);
   }
-  {
-    const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
-    const buckets = /* @__PURE__ */ new Map();
-    for (const [k, g2] of ckBuilt.parts) {
-      const gc = g2.clone();
-      gc.applyMatrix4(ckM);
-      let l = buckets.get(k);
-      if (!l) {
-        l = [];
-        buckets.set(k, l);
-      }
-      l.push(gc);
-    }
-    for (const [k, g2] of extraParts) {
-      if (!attachExtraToEngines) {
-        let l = buckets.get(k);
-        if (!l) {
-          l = [];
-          buckets.set(k, l);
-        }
-        l.push(g2);
-      } else g2.dispose();
-    }
-    const mergedBody = /* @__PURE__ */ new Map();
-    for (const [k, list] of buckets) {
-      const mg = mergeGeometries(list, false);
-      list.forEach((x) => x.dispose());
-      if (mg) {
-        mg.computeBoundingSphere();
-        mergedBody.set(k, mg);
-        sideGeos.push(mg);
-      }
-    }
-    body.add(ckGrp);
-    addMeshes(mergedBody, ckGrp, hullC);
-    const cabGeo = buildFlexCables(L, seg, ckBuilt.info.anchors);
-    sideGeos.push(cabGeo);
-    const cabMesh = new Mesh(cabGeo, cabMat);
-    cabMesh.castShadow = false;
-    cabMesh.receiveShadow = true;
-    body.add(cabMesh);
-  }
-  const binderGeos = [];
+  body.add(ckGrp);
+  addMeshes(A.cockpit, ckGrp, hullC);
+  const cabMesh = new Mesh(A.cables, cabMat);
+  cabMesh.castShadow = false;
+  cabMesh.receiveShadow = true;
+  body.add(cabMesh);
   let binderU = null;
   const binderSwap = false;
-  const BL = L.binders ?? (L.binder ? [L.binder] : []);
-  if (BL.length) {
+  if (A.binders.length) {
     const bMat = binderMaterial(glowCol);
     own.push(bMat);
     binderU = bMat.userData.u;
-    for (const [ia, ib] of BL) {
-      let A = L.engines[ia], B2 = L.engines[ib];
-      if (A.x > B2.x) {
-        const t = A;
-        A = B2;
-        B2 = t;
-      }
-      const ea = engineGeo(A.spec, seg), eb = engineGeo(B2.spec, seg);
-      const g2 = makeBinderGeo(new Vector3(A.x + ea.R * 0.97, A.y + ea.R * 0.2, A.z + ea.L * 0.12), new Vector3(B2.x - eb.R * 0.97, B2.y + eb.R * 0.2, B2.z + eb.L * 0.12));
-      binderGeos.push(g2);
+    for (const g2 of A.binders) {
       const bm = new Mesh(g2, bMat);
       bm.renderOrder = 3;
       body.add(bm);
@@ -101255,10 +101279,9 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
   };
   const dispose = () => {
     own.forEach((m) => m.dispose());
-    sideGeos.forEach((g2) => g2.dispose());
-    binderGeos.forEach((g2) => g2.dispose());
+    A.owned.forEach((g2) => g2.dispose());
   };
-  return { group, body, engines, exhaustLocal, eye, hood, update, setEngineMotion, setDistance: () => {
+  return { group, body, engines, exhaustLocal: A.exhaustLocal, eye: A.eye, hood: A.hood, update, setEngineMotion, setDistance: () => {
   }, setCockpitSway, setCockpitVisible, dispose };
 }
 
@@ -101963,8 +101986,8 @@ var SampleGGXVNDF = Fn(([V2, ax, ay, r1, r2]) => {
 var D_GTR = Fn(([roughness3, NoH, k]) => {
   const a2 = roughness3.mul(roughness3).toVar();
   const NoH2 = NoH.mul(NoH).toVar();
-  const base = NoH2.mul(a2.sub(float(1))).add(float(1)).toVar();
-  return a2.div(PI.mul(pow(base, k))).toVar();
+  const base2 = NoH2.mul(a2.sub(float(1))).add(float(1)).toVar();
+  return a2.div(PI.mul(pow(base2, k))).toVar();
 }, { roughness: "float", NoH: "float", k: "float", return: "float" });
 var SmithG = Fn(([NDotX, alpha]) => {
   const a2 = alpha.mul(alpha).toVar();
@@ -103838,26 +103861,26 @@ var PostFX = class {
         const wob = vec210(sin14(uvv.y.mul(240).add(u.time.mul(31))).add(sin14(uvv.y.mul(97).sub(u.time.mul(17)))), sin14(uvv.x.mul(210).sub(u.time.mul(26))));
         uvS = clamp14(uvS.add(wob.mul(amt).mul(68e-5)), vec210(1e-3), vec210(0.999));
       }
-      const base = vec315(src.sample(uvS).level(0).rgb).toVar();
+      const base2 = vec315(src.sample(uvS).level(0).rgb).toVar();
       if (motion) {
         const bs = u.speed.mul(smoothstep14(0.2, 0.65, r)).mul(0.028);
         If3(bs.greaterThan(15e-4), () => {
-          const acc = vec315(base).toVar();
+          const acc = vec315(base2).toVar();
           Loop3(4, ({ i }) => {
             const f = float11(i).add(1).mul(0.25);
             acc.addAssign(src.sample(clamp14(c.mul(oneMinus14(bs.mul(f))).add(0.5), vec210(1e-3), vec210(0.999))).level(0).rgb);
           });
-          base.assign(acc.mul(0.2));
+          base2.assign(acc.mul(0.2));
         });
       }
-      let g2 = base;
+      let g2 = base2;
       if (cineOn) {
         const ca = u.speed.mul(3e-3).add(u.damage.mul(5e-3)).mul(smoothstep14(0.22, 0.78, r));
-        const caCol = vec315(base).toVar();
+        const caCol = vec315(base2).toVar();
         If3(ca.greaterThan(5e-4), () => {
           const uvR = clamp14(uvv.sub(c.mul(ca).mul(1.6)), vec210(1e-3), vec210(0.999));
           const uvB = clamp14(uvv.add(c.mul(ca).mul(1.6)), vec210(1e-3), vec210(0.999));
-          caCol.assign(vec315(mix12(base.r, src.sample(uvR).level(0).r, 0.7), base.g, mix12(base.b, src.sample(uvB).level(0).b, 0.7)));
+          caCol.assign(vec315(mix12(base2.r, src.sample(uvR).level(0).r, 0.7), base2.g, mix12(base2.b, src.sample(uvB).level(0).b, 0.7)));
         });
         g2 = caCol;
         const l = luminance2(g2);

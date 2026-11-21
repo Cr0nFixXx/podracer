@@ -155,9 +155,13 @@ Neue Änderungen sichern: `npm run save -- "Beschreibung"` (committet und erneue
 
 ## Für Entwickler: Prüfbefehle
 
-1. `npm run check` – Typecheck + Physik-Simulation aller 14 Strecken (11 Pods, 45 s, ca. 25 s Laufzeit, kein Browser nötig).
-2. `npm run check:gpu` – lädt Strecken im Headless-Chrome mit WebGPU und meldet jeden Shader-/Konsolenfehler (braucht Puppeteer, siehe `HANDOFF.md`).
-3. `npm run build` – erzeugt `dist/index.html`.
+1. `npm run check` – Typecheck + Pod-Audit + Physik-Simulation aller 13 Strecken (11 Pods, 45 s, ca. 25 s Laufzeit, kein Browser nötig).
+2. `npm run check:pods` – nur das Pod-Audit (1 s): baut jeden Pod ohne Browser, vergleicht Mesh- und Dreieckszahlen mit `tools/ci/pods-baseline.json` und prüft das Sichtmodell gegen die Kollisionsform.
+3. `npm run check:gpu` – lädt Strecken im Headless-Chrome mit WebGPU und meldet jeden Shader-/Konsolenfehler (braucht Puppeteer, siehe `HANDOFF.md`).
+4. `npm run build` – erzeugt `dist/index.html`.
+5. Pods ansehen: `npm run dev`, dann `http://localhost:5173/tools/harness/pods.dev.html` öffnen und in der Browser-Konsole z. B. `await sheet('front')` oder `await show(0)` aufrufen (Befehle im Kopf von `tools/harness/pods.ts`).
+
+Begriffe des Projekts stehen in `CONTEXT.md`, grundlegende Entscheidungen in `docs/adr/`.
 
 ## Bildnachweis
 

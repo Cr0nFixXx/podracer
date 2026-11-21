@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "podracer-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "5173", "--strictPort"],
+      "port": 5173
+    },
+    {
+      "name": "podracer-shots",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tools/harness/shot-server.mjs"],
+      "port": 5174
+    }
+  ]
+}
