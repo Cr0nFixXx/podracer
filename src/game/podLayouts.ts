@@ -17,9 +17,12 @@ export interface PodLayout {
   engines: EngineMount[];
   cockpit: {
     style: CockpitStyle; hw: number; len: number; y: number; z: number; pilot: number;
+    /** ground clamp only: physics treats the cockpit as reaching this far (m) below the visible tub. Set for the raised
+     *  Session 19 pods (see `raised`); a new pod leaves it out – its clamp is the tub's real floor. */
+    keel?: number;
     /** cockpit design id (podCockpits.ts → DESIGNS); default = the pod's own id */
     design?: string;
-    /** highest solid point above the cockpit origin (strobe light); default 1.75 m above the ground-clamp floor */
+    /** highest solid point above the cockpit origin (strobe light); default 1.75 m above the floor of the visible tub */
     topY?: number;
     /** cockpit camera: fixed enlargement of the cockpit about the pilot's eye (default: computed from the nearest part in view) */
     viewScale?: number;
@@ -43,6 +46,10 @@ const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const spec = (L: number, R: number, style: EngineSpec['style'], bands: number, blades: number, spike = true, fins = 0): EngineSpec => ({ L, R, style, bands, blades, spike, fins });
 const pair = (s: EngineSpec, sp: number, y: number, z: number): EngineMount[] => [{ spec: s, x: -sp, y, z }, { spec: s, x: sp, y, z }];
 const MAIN: BinderLink[] = [{ a: 0, b: 1 }];
+/** Session 20 (user request): a Session 19 pod carries its cockpit `up` metres higher than it was built at height `y` – the tub rides
+ *  above the engine line and the pilot looks over the engines. The same amount goes into `keel`: the ground clamp stays where it was,
+ *  so the pod drives exactly as before (decision "old pods: look only"; `tools/ci/pods-shapes.json` does not move). */
+const raised = (y: number, up: number) => ({ y: y + up, keel: up });
 const SEC: [number, number, number] = [0, 0, 3]; // secondary paint
 const SIDES = [-1, 1];
 /** thin plate in the YZ plane (points [z, y]), `t` thick */
@@ -52,7 +59,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   aurora: () => {
     const s = spec(9, 1.15, 'turbine', 6, 18);
     return {
-      engines: pair(s, 2.5, 0, 4), cockpit: { style: 'pod', hw: 0.95, len: 3.4, y: 0.1, z: -6, pilot: 1 }, binders: MAIN, livery: 0,
+      engines: pair(s, 2.5, 0, 4), cockpit: { style: 'pod', hw: 0.95, len: 3.4, ...raised(0.1, 0.9), z: -6, pilot: 1 }, binders: MAIN, livery: 0,
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) for (const s2 of SIDES) {
           const cx = sd * 2.5 + s2 * 1.5, tip = sd * 2.5 + s2 * 1.97;
@@ -75,7 +82,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   brute: () => {
     const s = spec(8, 1.5, 'split', 7, 20, false);
     return {
-      engines: pair(s, 2.4, 0, 2), cockpit: { style: 'wedge', hw: 1.1, len: 3.0, y: 0.25, z: -9, pilot: 1.05, far: 'cage' }, binders: MAIN, livery: 2,
+      engines: pair(s, 2.4, 0, 2), cockpit: { style: 'wedge', hw: 1.1, len: 3.0, ...raised(0.25, 1.0), z: -9, pilot: 1.05, far: 'cage' }, binders: MAIN, livery: 2,
       engineExtras: (pb, _L, hi) => {
         // the big shark fin stays on the left engine only (Vrak's trademark)
         const fin = extrude([[0, 0], [2.2, 0], [2.7, 2.7], [1.6, 2.7]], 0.12, 0.03); fin.rotateY(Math.PI / 2);
@@ -94,7 +101,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   gasvaro: () => {
     const s = spec(6, 0.8, 'quad', 4, 12);
     return {
-      engines: [...pair(s, 1.6, 0, 3), ...pair(s, 3.4, 0, 3), ...pair(s, 2.5, 1.55, 4)], cockpit: { style: 'long', hw: 0.75, len: 3.6, y: 0, z: -7, pilot: 0.95 }, binders: MAIN, livery: 1,
+      engines: [...pair(s, 1.6, 0, 3), ...pair(s, 3.4, 0, 3), ...pair(s, 2.5, 1.55, 4)], cockpit: { style: 'long', hw: 0.75, len: 3.6, ...raised(0, 0.8), z: -7, pilot: 0.95 }, binders: MAIN, livery: 1,
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           pb.add('steel', tube([V(sd * 1.6, 0.7, 3.4), V(sd * 2.05, 1.3, 3.7), V(sd * 2.5, 2.1, 4)], 0.07, 12, 8));
@@ -115,7 +122,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
     const s = spec(7.6, 0.66, 'ring', 5, 12);
     return {
       engines: [{ spec: s, x: -2.3, y: -0.35, z: 3 }, { spec: s, x: 2.3, y: -0.35, z: 3 }, { spec: s, x: -2.3, y: 2.05, z: 3 }, { spec: s, x: 2.3, y: 2.05, z: 3 }],
-      cockpit: { style: 'saucer', hw: 1.0, len: 2.4, y: 0.2, z: -6, pilot: 0.95, far: 'disc' }, binders: [{ a: 0, b: 3 }, { a: 2, b: 1 }], livery: 3,
+      cockpit: { style: 'saucer', hw: 1.0, len: 2.4, ...raised(0.2, 0.65), z: -6, pilot: 0.95, far: 'disc' }, binders: [{ a: 0, b: 3 }, { a: 2, b: 1 }], livery: 3,
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           for (const z of [1.0, 4.8]) pb.add('steel', tube([V(sd * 2.3, 0.35, z), V(sd * 2.3, 1.35, z)], 0.08, 4, 6));
@@ -133,7 +140,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   mavik: () => {
     const s = spec(8, 0.62, 'needle', 6, 10);
     return {
-      engines: pair(s, 1.7, 0, 3), cockpit: { style: 'pod', hw: 0.72, len: 2.5, y: -0.05, z: -5.5, pilot: 0.92, far: 'fin' }, binders: MAIN, livery: 1,
+      engines: pair(s, 1.7, 0, 3), cockpit: { style: 'pod', hw: 0.72, len: 2.5, ...raised(-0.05, 0.8), z: -5.5, pilot: 0.92, far: 'fin' }, binders: MAIN, livery: 1,
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           // Session 20: swept canards behind each intake, a long outboard pitot and a ventral keel
@@ -149,7 +156,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   rattis: () => {
     const s = spec(6, 0.85, 'blade', 4, 14);
     return {
-      engines: pair(s, 1.7, 0, 2.5), cockpit: { style: 'wedge', hw: 0.78, len: 2.6, y: -0.1, z: -3.2, pilot: 0.92, viewScale: 1.9 }, binders: MAIN, livery: 2,
+      engines: pair(s, 1.7, 0, 2.5), cockpit: { style: 'wedge', hw: 0.78, len: 2.6, ...raised(-0.1, 0.85), z: -3.2, pilot: 0.92, viewScale: 1.9 }, binders: MAIN, livery: 2,
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           // Session 20: twin feelers on every engine, landing skids underneath and a stripe band like the wasp body
@@ -166,7 +173,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   aldo: () => {
     const s = spec(9, 1.0, 'long', 7, 16, true, 6);
     return {
-      engines: pair(s, 2.3, 0, 3.5), cockpit: { style: 'long', hw: 0.85, len: 3.2, y: 0, z: -6, pilot: 1 }, binders: MAIN, livery: 0,
+      engines: pair(s, 2.3, 0, 3.5), cockpit: { style: 'long', hw: 0.85, len: 3.2, ...raised(0, 0.9), z: -6, pilot: 1 }, binders: MAIN, livery: 0,
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           // Session 20: an external cooling loop over each engine, a coolant tank underneath and two radiator vanes at the rear
@@ -184,7 +191,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
     const s = spec(5, 1.25, 'heavy', 4, 20, true);
     return {
       engines: [{ spec: s, x: -2.3, y: -0.4, z: 0 }, { spec: s, x: 2.3, y: -0.4, z: 0 }, { spec: s, x: -2.3, y: 1.45, z: 6 }, { spec: s, x: 2.3, y: 1.45, z: 6 }],
-      cockpit: { style: 'saucer', hw: 0.82, len: 2.2, y: 0.35, z: -5.5, pilot: 0.95, far: 'disc' }, binders: MAIN, livery: 3,
+      cockpit: { style: 'saucer', hw: 0.82, len: 2.2, ...raised(0.35, 0.6), z: -5.5, pilot: 0.95, far: 'disc' }, binders: MAIN, livery: 3,
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           pb.add('dark', rbox(0.3, 0.3, 3.6, 0.06), M4.trs(sd * 2.3, 0.55, 3.0, -0.31, 0, 0));
@@ -201,7 +208,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   elana: () => {
     const s = spec(8.5, 0.78, 'needle', 6, 12);
     return {
-      engines: pair(s, 2, 0, 3), cockpit: { style: 'long', hw: 0.8, len: 3.3, y: 0, z: -6, pilot: 0.95, topY: 1.42, far: 'fin' }, binders: MAIN, livery: 1, // (dorsal fin = part of the cockpit design)
+      engines: pair(s, 2, 0, 3), cockpit: { style: 'long', hw: 0.8, len: 3.3, ...raised(0, 0.8), z: -6, pilot: 0.95, topY: 1.42, far: 'fin' }, binders: MAIN, livery: 1, // (dorsal fin = part of the cockpit design)
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           // Session 20: three tail feathers fanned around each nozzle and a slim winglet like the cockpit's
@@ -217,7 +224,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   odo: () => { // ram
     const s = spec(7, 1.3, 'heavy', 5, 16, false);
     return {
-      engines: pair(s, 2.4, 0, 3), cockpit: { style: 'wedge', hw: 1.0, len: 2.8, y: 0, z: -5.5, pilot: 1, far: 'cage' }, binders: MAIN, livery: 2, // (ram prow = part of the cockpit design)
+      engines: pair(s, 2.4, 0, 3), cockpit: { style: 'wedge', hw: 1.0, len: 2.8, ...raised(0, 1.05), z: -5.5, pilot: 1, far: 'cage' }, binders: MAIN, livery: 2, // (ram prow = part of the cockpit design)
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           // Session 20: a ram hoop on three struts in front of every intake and a hazard band around the cowling

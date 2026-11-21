@@ -28,7 +28,7 @@ export function podCollision(def: PodDef) {
 export interface PodEnvelope {
   engL: EnvSide;
   engR: EnvSide;
-  cockpit: { z: number; minY: number; /** highest solid point (strobe light) */ topY: number };
+  cockpit: { z: number; /** ground-clamp floor (visible tub floor minus the layout's `keel`) */ minY: number; /** highest solid point (strobe light) */ topY: number };
   /** overall length from the cockpit tail to the foremost engine front (camera framing) */
   length: number;
 }
@@ -54,11 +54,12 @@ export function podEnvelope(def: PodDef): PodEnvelope {
     if (L.envelope?.minY !== undefined) minY = Math.min(minY, L.envelope.minY);
     return { x: sx / Math.max(1, ms.length), outerX: sign * outerX, frontZ, backZ, minY, axisY: ms.length ? axisY : 0 };
   };
-  const ck = L.cockpit; const ckMinY = ck.y - ck.hw * 0.68 - 0.14;
+  const ck = L.cockpit; const floorY = ck.y - ck.hw * 0.68 - 0.14; // lowest point of the visible tub
   const engL = sideEnv(-1), engR = sideEnv(1);
   const out: PodEnvelope = {
     engL, engR,
-    cockpit: { z: ck.z + bz, minY: ckMinY, topY: ck.topY !== undefined ? ck.y + ck.topY : ckMinY + 1.75 },
+    // the ground clamp may reach deeper than the tub (`keel`: raised cockpits keep their old clamp); the strobe sits on the visible cockpit
+    cockpit: { z: ck.z + bz, minY: floorY - (ck.keel ?? 0), topY: ck.topY !== undefined ? ck.y + ck.topY : floorY + 1.75 },
     length: Math.max(engL.frontZ, engR.frontZ) - (ck.z + bz - ck.len * 0.5),
   };
   envCache.set(def.id, out);

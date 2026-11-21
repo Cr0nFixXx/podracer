@@ -4,7 +4,7 @@ var __export = (target, all2) => {
     __defProp(target, name, { get: all2[name], enumerable: true });
 };
 
-// node_modules/three/build/three.core.js
+// ../../node_modules/three/build/three.core.js
 var REVISION = "187";
 var CullFaceNone = 0;
 var CullFaceBack = 1;
@@ -20772,7 +20772,7 @@ if (typeof window !== "undefined") {
   }
 }
 
-// node_modules/three/build/three.tsl.js
+// ../../node_modules/three/build/three.tsl.js
 var three_tsl_exports = {};
 __export(three_tsl_exports, {
   AONode: () => AONode,
@@ -41533,7 +41533,7 @@ var Three_TSL = /* @__PURE__ */ Object.freeze({
   xor
 });
 
-// node_modules/three/build/three.webgpu.js
+// ../../node_modules/three/build/three.webgpu.js
 var _defaultValues$d = /* @__PURE__ */ new LineBasicMaterial();
 var LineBasicNodeMaterial = class extends NodeMaterial {
   static get type() {
@@ -70464,7 +70464,7 @@ LightProbe.registerNode(LightProbeNode);
 IESSpotLight.registerNode(IESSpotLightNode);
 ProjectorLight.registerNode(ProjectorLightNode);
 
-// src/game/data.ts
+// ../../src/game/data.ts
 var PILOTS = [
   { id: "kai", name: "Kai Varrin", species: "Mensch", head: "goggles", skin: "#b98c68", skill: 0.9, aggression: 0.4, color: "#4aa3ff" },
   { id: "zeb", name: "Zebulox Vrak", species: "Dugkin", head: "snout", skin: "#b5673a", skill: 0.95, aggression: 0.95, color: "#ff9a2e" },
@@ -70781,7 +70781,7 @@ var THEMES = {
   }
 };
 
-// node_modules/three/build/three.module.js
+// ../../node_modules/three/build/three.module.js
 var alphahash_fragment = "#ifdef USE_ALPHAHASH\n	if ( diffuseColor.a < getAlphaHashThreshold( vPosition ) ) discard;\n#endif";
 var alphahash_pars_fragment = "#ifdef USE_ALPHAHASH\n	const float ALPHA_HASH_SCALE = 0.05;\n	float hash2D( vec2 value ) {\n		return fract( 1.0e4 * sin( 17.0 * value.x + 0.1 * value.y ) * ( 0.1 + abs( sin( 13.0 * value.y + value.x ) ) ) );\n	}\n	float hash3D( vec3 value ) {\n		return hash2D( vec2( hash2D( value.xy ), value.z ) );\n	}\n	float getAlphaHashThreshold( vec3 position ) {\n		float maxDeriv = max(\n			length( dFdx( position.xyz ) ),\n			length( dFdy( position.xyz ) )\n		);\n		float pixScale = 1.0 / ( ALPHA_HASH_SCALE * maxDeriv );\n		vec2 pixScales = vec2(\n			exp2( floor( log2( pixScale ) ) ),\n			exp2( ceil( log2( pixScale ) ) )\n		);\n		vec2 alpha = vec2(\n			hash3D( floor( pixScales.x * position.xyz ) ),\n			hash3D( floor( pixScales.y * position.xyz ) )\n		);\n		float lerpFactor = fract( log2( pixScale ) );\n		float x = ( 1.0 - lerpFactor ) * alpha.x + lerpFactor * alpha.y;\n		float a = min( lerpFactor, 1.0 - lerpFactor );\n		vec3 cases = vec3(\n			x * x / ( 2.0 * a * ( 1.0 - a ) ),\n			( x - 0.5 * a ) / ( 1.0 - a ),\n			1.0 - ( ( 1.0 - x ) * ( 1.0 - x ) / ( 2.0 * a * ( 1.0 - a ) ) )\n		);\n		float threshold = ( x < ( 1.0 - a ) )\n			? ( ( x < a ) ? cases.x : cases.y )\n			: cases.z;\n		return clamp( threshold , 1.0e-6, 1.0 );\n	}\n#endif";
 var alphamap_fragment = "#ifdef USE_ALPHAMAP\n	diffuseColor.a *= texture2D( alphaMap, vAlphaMapUv ).g;\n#endif";
@@ -72077,7 +72077,7 @@ var DATA2 = new Uint16Array([
   1183
 ]);
 
-// node_modules/three/examples/jsm/utils/BufferGeometryUtils.js
+// ../../node_modules/three/examples/jsm/utils/BufferGeometryUtils.js
 function mergeGeometries(geometries, useGroups = false) {
   const isIndexed = geometries[0].index !== null;
   const attributesUsed = new Set(Object.keys(geometries[0].attributes));
@@ -72238,7 +72238,7 @@ function mergeAttributes(attributes) {
   return result;
 }
 
-// node_modules/three/examples/jsm/geometries/RoundedBoxGeometry.js
+// ../../node_modules/three/examples/jsm/geometries/RoundedBoxGeometry.js
 var _tempNormal = new Vector3();
 function getUv(faceDirVector, normal2, uvAxis, projectionAxis, radius, sideLength) {
   const totArcLength = 2 * Math.PI * radius / 4;
@@ -72359,7 +72359,7 @@ var RoundedBoxGeometry = class _RoundedBoxGeometry extends BoxGeometry {
   }
 };
 
-// src/game/podKit.ts
+// ../../src/game/podKit.ts
 var TILE = 2.4;
 var V3 = Vector3;
 function ensureAttrs(g, liv) {
@@ -72725,7 +72725,7 @@ function boltRing(R, count2, r2, z, radialOut = false) {
   }, count2, Math.PI / count2);
 }
 
-// src/game/podParts.ts
+// ../../src/game/podParts.ts
 function engineExtent(spec2) {
   const { R, L, style } = spec2;
   return {
@@ -73004,7 +73004,7 @@ function engineGeo(spec2, seg) {
   return out;
 }
 
-// src/game/podCockpits.ts
+// ../../src/game/podCockpits.ts
 var LAMP_VERTS = 12;
 var V = (x, y, z) => new Vector3(x, y, z);
 var HALF = Math.PI / 2;
@@ -73564,11 +73564,12 @@ function cockpitGeo(L, seg, head = "goggles", detail = 1) {
   return out;
 }
 
-// src/game/podLayouts.ts
+// ../../src/game/podLayouts.ts
 var V2 = (x, y, z) => new Vector3(x, y, z);
 var spec = (L, R, style, bands, blades, spike = true, fins = 0) => ({ L, R, style, bands, blades, spike, fins });
 var pair = (s, sp, y, z) => [{ spec: s, x: -sp, y, z }, { spec: s, x: sp, y, z }];
 var MAIN = [{ a: 0, b: 1 }];
+var raised = (y, up) => ({ y: y + up, keel: up });
 var SEC2 = [0, 0, 3];
 var SIDES = [-1, 1];
 var plate = (pts, t) => {
@@ -73581,7 +73582,7 @@ var LAYOUTS = {
     const s = spec(9, 1.15, "turbine", 6, 18);
     return {
       engines: pair(s, 2.5, 0, 4),
-      cockpit: { style: "pod", hw: 0.95, len: 3.4, y: 0.1, z: -6, pilot: 1 },
+      cockpit: { style: "pod", hw: 0.95, len: 3.4, ...raised(0.1, 0.9), z: -6, pilot: 1 },
       binders: MAIN,
       livery: 0,
       engineExtras: (pb, _L, hi) => {
@@ -73606,7 +73607,7 @@ var LAYOUTS = {
     const s = spec(8, 1.5, "split", 7, 20, false);
     return {
       engines: pair(s, 2.4, 0, 2),
-      cockpit: { style: "wedge", hw: 1.1, len: 3, y: 0.25, z: -9, pilot: 1.05, far: "cage" },
+      cockpit: { style: "wedge", hw: 1.1, len: 3, ...raised(0.25, 1), z: -9, pilot: 1.05, far: "cage" },
       binders: MAIN,
       livery: 2,
       engineExtras: (pb, _L, hi) => {
@@ -73627,7 +73628,7 @@ var LAYOUTS = {
     const s = spec(6, 0.8, "quad", 4, 12);
     return {
       engines: [...pair(s, 1.6, 0, 3), ...pair(s, 3.4, 0, 3), ...pair(s, 2.5, 1.55, 4)],
-      cockpit: { style: "long", hw: 0.75, len: 3.6, y: 0, z: -7, pilot: 0.95 },
+      cockpit: { style: "long", hw: 0.75, len: 3.6, ...raised(0, 0.8), z: -7, pilot: 0.95 },
       binders: MAIN,
       livery: 1,
       engineExtras: (pb, _L, hi) => {
@@ -73648,7 +73649,7 @@ var LAYOUTS = {
     const s = spec(7.6, 0.66, "ring", 5, 12);
     return {
       engines: [{ spec: s, x: -2.3, y: -0.35, z: 3 }, { spec: s, x: 2.3, y: -0.35, z: 3 }, { spec: s, x: -2.3, y: 2.05, z: 3 }, { spec: s, x: 2.3, y: 2.05, z: 3 }],
-      cockpit: { style: "saucer", hw: 1, len: 2.4, y: 0.2, z: -6, pilot: 0.95, far: "disc" },
+      cockpit: { style: "saucer", hw: 1, len: 2.4, ...raised(0.2, 0.65), z: -6, pilot: 0.95, far: "disc" },
       binders: [{ a: 0, b: 3 }, { a: 2, b: 1 }],
       livery: 3,
       engineExtras: (pb, _L, hi) => {
@@ -73668,7 +73669,7 @@ var LAYOUTS = {
     const s = spec(8, 0.62, "needle", 6, 10);
     return {
       engines: pair(s, 1.7, 0, 3),
-      cockpit: { style: "pod", hw: 0.72, len: 2.5, y: -0.05, z: -5.5, pilot: 0.92, far: "fin" },
+      cockpit: { style: "pod", hw: 0.72, len: 2.5, ...raised(-0.05, 0.8), z: -5.5, pilot: 0.92, far: "fin" },
       binders: MAIN,
       livery: 1,
       engineExtras: (pb, _L, hi) => {
@@ -73686,7 +73687,7 @@ var LAYOUTS = {
     const s = spec(6, 0.85, "blade", 4, 14);
     return {
       engines: pair(s, 1.7, 0, 2.5),
-      cockpit: { style: "wedge", hw: 0.78, len: 2.6, y: -0.1, z: -3.2, pilot: 0.92, viewScale: 1.9 },
+      cockpit: { style: "wedge", hw: 0.78, len: 2.6, ...raised(-0.1, 0.85), z: -3.2, pilot: 0.92, viewScale: 1.9 },
       binders: MAIN,
       livery: 2,
       engineExtras: (pb, _L, hi) => {
@@ -73705,7 +73706,7 @@ var LAYOUTS = {
     const s = spec(9, 1, "long", 7, 16, true, 6);
     return {
       engines: pair(s, 2.3, 0, 3.5),
-      cockpit: { style: "long", hw: 0.85, len: 3.2, y: 0, z: -6, pilot: 1 },
+      cockpit: { style: "long", hw: 0.85, len: 3.2, ...raised(0, 0.9), z: -6, pilot: 1 },
       binders: MAIN,
       livery: 0,
       engineExtras: (pb, _L, hi) => {
@@ -73727,7 +73728,7 @@ var LAYOUTS = {
     const s = spec(5, 1.25, "heavy", 4, 20, true);
     return {
       engines: [{ spec: s, x: -2.3, y: -0.4, z: 0 }, { spec: s, x: 2.3, y: -0.4, z: 0 }, { spec: s, x: -2.3, y: 1.45, z: 6 }, { spec: s, x: 2.3, y: 1.45, z: 6 }],
-      cockpit: { style: "saucer", hw: 0.82, len: 2.2, y: 0.35, z: -5.5, pilot: 0.95, far: "disc" },
+      cockpit: { style: "saucer", hw: 0.82, len: 2.2, ...raised(0.35, 0.6), z: -5.5, pilot: 0.95, far: "disc" },
       binders: MAIN,
       livery: 3,
       engineExtras: (pb, _L, hi) => {
@@ -73746,7 +73747,7 @@ var LAYOUTS = {
     const s = spec(8.5, 0.78, "needle", 6, 12);
     return {
       engines: pair(s, 2, 0, 3),
-      cockpit: { style: "long", hw: 0.8, len: 3.3, y: 0, z: -6, pilot: 0.95, topY: 1.42, far: "fin" },
+      cockpit: { style: "long", hw: 0.8, len: 3.3, ...raised(0, 0.8), z: -6, pilot: 0.95, topY: 1.42, far: "fin" },
       binders: MAIN,
       livery: 1,
       // (dorsal fin = part of the cockpit design)
@@ -73767,7 +73768,7 @@ var LAYOUTS = {
     const s = spec(7, 1.3, "heavy", 5, 16, false);
     return {
       engines: pair(s, 2.4, 0, 3),
-      cockpit: { style: "wedge", hw: 1, len: 2.8, y: 0, z: -5.5, pilot: 1, far: "cage" },
+      cockpit: { style: "wedge", hw: 1, len: 2.8, ...raised(0, 1.05), z: -5.5, pilot: 1, far: "cage" },
       binders: MAIN,
       livery: 2,
       // (ram prow = part of the cockpit design)
@@ -73794,7 +73795,7 @@ function podLayout(def) {
   return L;
 }
 
-// src/game/podAssembly.ts
+// ../../src/game/podAssembly.ts
 var BINDER_PTS = 18;
 function segFor(quality, isOpponent) {
   return isOpponent ? quality >= 3 ? 28 : 14 : quality >= 3 ? 40 : quality === 2 ? 28 : 20;
@@ -74242,7 +74243,7 @@ function assembleRival(def, seg, head, colors, pattern) {
   return { ...b, banks, cockpit, binders, spanX, far: { hull, dark: far0.dark, glow }, owned };
 }
 
-// src/game/podTextures.ts
+// ../../src/game/podTextures.ts
 function mulberry(a) {
   return () => {
     a |= 0;
@@ -74860,7 +74861,7 @@ function carbonTexture() {
   return carbonCache;
 }
 
-// src/game/podMaterials.ts
+// ../../src/game/podMaterials.ts
 var TSL = three_tsl_exports;
 var {
   userData: userDataN,
@@ -75174,7 +75175,7 @@ function petalMaterial() {
   return m;
 }
 
-// src/game/podModel.ts
+// ../../src/game/podModel.ts
 var SHADOW_KEYS = /* @__PURE__ */ new Set(["hull", "steel", "dark", "chrome", "carbon"]);
 var OPP_SHADOW_KEYS = /* @__PURE__ */ new Set(["hull", "steel", "dark"]);
 var podLodScale = 1;
@@ -75515,7 +75516,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
   }, setCockpitSway, setCockpitView, eyeWorld, dispose };
 }
 
-// src/game/texCore.ts
+// ../../src/game/texCore.ts
 var TileNoise = class {
   perm = new Uint8Array(512);
   vals = new Float32Array(256);
@@ -75616,10 +75617,10 @@ var TileNoise = class {
   }
 };
 
-// src/game/texStore.ts
+// ../../src/game/texStore.ts
 var MAX_BYTES = 420 * 1024 * 1024;
 
-// src/game/textures.ts
+// ../../src/game/textures.ts
 function toTex(data, size, srgb, aniso) {
   const t = new DataTexture(data, size, size, RGBAFormat);
   t.wrapS = t.wrapT = RepeatWrapping;
@@ -75649,7 +75650,7 @@ function macroTexture() {
   return macroTex;
 }
 
-// src/game/sky.ts
+// ../../src/game/sky.ts
 var TSL2 = three_tsl_exports;
 var { atan: atan2, cameraProjectionMatrix: cameraProjectionMatrix2, cross: cross3, dot: dot3, exp: exp3, float: float3, floor: floor2, fract: fract3, length: length3, max: max3, mix: mix3, modelViewMatrix: modelViewMatrix2, normalize: normalize4, oneMinus: oneMinus3, positionLocal: positionLocal3, pow: pow6, sin: sin3, smoothstep: smoothstep4, step: step3, texture: texture3, uniform: uniform3, vec2: vec23, vec3: vec33, vec4: vec42 } = TSL2;
 var ssInv2 = (a, b, x) => oneMinus3(smoothstep4(b, a, x));
@@ -75749,7 +75750,7 @@ function makeSky(theme, forEnv = false) {
   return { mesh, uniforms };
 }
 
-// tools/harness/pods.ts
+// pods.ts
 var W = 1280;
 var H = 720;
 var FORCE_WEBGL = location.search.includes("webgl");
@@ -75853,10 +75854,10 @@ win.show = async (idx, dmg = 1, quality = 3, o = {}) => {
   return `${BACKEND} ${def.id}${o.rival ? " (rival)" : ""} tris=${r.info.render.triangles} calls=${r.info.render.drawCalls ?? r.info.render.calls}${saved}`;
 };
 async function sheet(view, o = {}) {
-  const n = PODS.length, cols = n <= 10 ? 5 : Math.ceil(n / 3), rows = Math.ceil(n / cols);
+  const n = PODS.length, cols = view === "profile" ? 2 : n <= 10 ? 5 : Math.ceil(n / 3), rows = Math.ceil(n / cols);
   const w = W / cols, h = H / rows;
   cam.aspect = w / h;
-  cam.fov = view === "inside" ? 79 : 40;
+  cam.fov = view === "inside" ? 79 : view === "chase" ? 75 : 40;
   cam.near = view === "inside" ? 0.8 : 0.1;
   cam.updateProjectionMatrix();
   r.setScissorTest(true);
@@ -75885,6 +75886,15 @@ async function sheet(view, o = {}) {
       const e = pod.eyeWorld ? pod.eyeWorld(new Vector3()) : pod.body.localToWorld(pod.eye.clone());
       cam.position.copy(e);
       cam.lookAt(e.x, e.y - 3.2, e.z + 60);
+    } else if (view === "chase") {
+      cam.position.set(0, 4.5, -13.5);
+      cam.lookAt(0, 1.6, 16);
+    } else if (view === "profile") {
+      const box = new Box3().setFromObject(pod.group), c = box.getCenter(new Vector3()), sz = box.getSize(new Vector3());
+      const vHalf = MathUtils.degToRad(cam.fov / 2), hHalf = Math.atan(Math.tan(vHalf) * cam.aspect);
+      const d = Math.max(sz.z * 0.5 / Math.tan(hHalf), (sz.y * 0.5 + 0.5) / Math.tan(vHalf)) * 1.06 + sz.x * 0.5;
+      cam.position.set(c.x + d, c.y, c.z);
+      cam.lookAt(c);
     } else {
       const dir = view === "front" ? new Vector3(0.55, 0.42, 0.72) : view === "rear" ? new Vector3(-0.6, 0.45, -0.66) : new Vector3(1, 0.16, 0.05);
       cam.position.copy(ck).add(dir.normalize().multiplyScalar(2.6 / Math.sin(half) * 0.8));

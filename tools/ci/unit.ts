@@ -3,6 +3,8 @@
 import { PODS, STAT_KEYS, type StatKey } from '../../src/game/data';
 import { podLayout } from '../../src/game/podLayouts';
 import { cockpitGeo } from '../../src/game/podCockpits';
+import { engineExtent } from '../../src/game/podParts';
+import { podEnvelope } from '../../src/game/podDesigns';
 import { applyDamage, podParams, FX_NONE, type PodState } from '../../src/game/physics';
 import { loadProfile, saveProfile } from '../../src/game/settings';
 
@@ -50,6 +52,24 @@ test('cockpits: the lite build for Gegner is much lighter than the full one', ()
     const sum = (ck: ReturnType<typeof cockpitGeo>) => [...ck.parts.values(), ...ck.pilot.values()].reduce((s, g) => s + triCount(g), 0);
     const lite = sum(cockpitGeo(podLayout(p), 14, 'goggles', 0)), full = sum(cockpitGeo(podLayout(p), 28, 'goggles', 1));
     ok(lite < 4600, `${p.id}: lite cockpit has ${lite} triangles (limit 4600)`); ok(lite < full * 0.5, `${p.id}: lite ${lite} is not under half of full ${full}`);
+  }
+});
+
+// ------------------------------------------------------------------ cockpit height (user request at the Phase 2 stop: "cockpits further up")
+test('cockpit height: every cockpit rides above the engine line and its pilot looks over the lower engines', () => {
+  for (const p of PODS) {
+    const L = podLayout(p), c = L.cockpit; const eyeY = c.y + cockpitGeo(L, 28, 'goggles', 1).info.eye.y;
+    const axis = Math.min(...L.engines.map(e => e.y));                                                       // axis of the lower engines
+    const top = Math.max(...L.engines.filter(e => e.y === axis).map(e => e.y + engineExtent(e.spec).top));     // … and their top edge
+    const floor = c.y - c.hw * 0.68 - 0.14;                                                                    // lowest point of the visible tub
+    ok(floor >= axis, `${p.id}: cockpit floor ${floor.toFixed(2)} m hangs below the lower engine axis ${axis.toFixed(2)} m`);
+    ok(eyeY >= top + 0.25, `${p.id}: eye ${eyeY.toFixed(2)} m is not 0.25 m above the lower engines' top ${top.toFixed(2)} m`);
+  }
+});
+test('cockpit height: the strobe light stays on the visible cockpit, above the pilot', () => {
+  for (const p of PODS) {
+    const L = podLayout(p); const eyeY = L.cockpit.y + cockpitGeo(L, 28, 'goggles', 1).info.eye.y, topY = podEnvelope(p).cockpit.topY;
+    ok(topY > eyeY + 0.2, `${p.id}: strobe at ${topY.toFixed(2)} m, eye at ${eyeY.toFixed(2)} m`);
   }
 });
 

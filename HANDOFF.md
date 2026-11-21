@@ -1,7 +1,7 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-1. **Pod-Überholung fortsetzen:** Phasentabelle im Abschnitt „Session 20" unten – die erste offene Phase ist dran. **Stand: Phase 2 fertig, der Nutzer sichtet die 10 neuen Cockpits (Bilder `tools/harness/out/p2_*.jpg`); erst nach seinem „weiter" beginnt Phase 3 (4 neue Pods).** Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
+1. **Pod-Überholung fortsetzen:** Phasentabelle im Abschnitt „Session 20" unten – die erste offene Phase ist dran. **Stand: Phase 2 fertig, dazu die erste Nachbesserung aus der Sichtung („Cockpits weiter oben", siehe unten). Der Nutzer sichtet weiter (Bilder `tools/harness/out/p2_*.jpg`, Vorher/Nachher `p2_hoeher_*.jpg`); erst nach seinem „weiter" beginnt Phase 3 (4 neue Pods).** Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
 2. Vor jeder Änderung: `npm run check` (Typecheck + Pod-Audit + Sim) muss grün sein. Pods ansehen: `npm run dev` → `http://localhost:5173/tools/harness/pods.dev.html`.
 3. Weiterhin offen aus Session 19: `npm run dev` → **Aquilaris-Küstenlauf** (19,5-m-Unterwassertunnel, 2 Skyway-Brücken, Flutschleuse) und **Frostspalt-Ring** (22,5-m-Gletschertunnel, verzweigte Eishöhle, Eisschleuse, Viadukt) Probe fahren; im **Hangar** die 6 Lackiermuster & 3 Finishes testen (≈ 6 Min.).
 
@@ -30,7 +30,7 @@
 |---|---|---|
 | 0 | Setup + Sicherheitsnetz | ✅ erledigt |
 | 1 | Refactoring ohne Spieländerung: Layout-Registry (`podLayouts.ts`), `engineExtent`, `podCockpits.ts`, `applyDamage` + Wirkungs-Struct, Profil v2 | ✅ erledigt |
-| 2 | 10 neue Cockpits + Detailpass + Cockpit-Innenansicht → **Stopp: Nutzer sichtet** | ✅ erledigt – **wartet auf Sichtung durch den Nutzer** |
+| 2 | 10 neue Cockpits + Detailpass + Cockpit-Innenansicht → **Stopp: Nutzer sichtet** | ✅ erledigt, Nachbesserung „Cockpits weiter oben" eingearbeitet – **wartet auf das „weiter" des Nutzers** |
 | 3 | 4 neue Pods (Cyclone → Halo → Manta → Voltspire), Hangar-Liste für 14, Gegner-Auslosung → **Stopp** | offen |
 | 4 | Tuning-Optik: `PodCustom.kit`, `podKitParts.ts`, Hangar-Reiter „Lack \| Teile" | offen |
 | 5 | Schaden – Fahrverhalten: `podDamage.ts`, Bruchteil-Maske, HUD-Lampen | offen |
@@ -73,7 +73,16 @@
 5. **Detailstufen:** Gegner unter „Ultra" mit leichtem Cockpit/Piloten; auf „Ultra" 28 statt 18 Segmente und volle Details. Fern-LOD mit Cockpit-Grundform und allen Blitzen.
 6. **Piloten:** `PilotDef.skin` + `skinMaterial`, Kragenring, Schulterpolster, Brustgerät.
 
+### Nachbesserung aus der Sichtung: Cockpits weiter oben (Nutzerwunsch 2026-11-21, „positionier die cockpit weiter oben")
+1. **Was:** alle 10 Cockpits sitzen 0,6–1,05 m höher. Vorher hing die Gondel auf Höhe der Triebwerksachse (mitten im Abgasstrahl, Triebwerke verdeckten in der Cockpit-Kamera den Horizont). Jetzt gilt für jeden Pod: **Wannenboden nicht unter der Achse der unteren Triebwerke, Augpunkt mindestens 0,25 m über deren Oberkante** (Unit-Prüfung „cockpit height").
+2. **Wie (`podLayouts.ts`):** `...raised(y, up)` im Cockpit-Eintrag = sichtbare Höhe `y + up` **und** `keel: up`. `keel` wirkt nur auf die Bodenklemme (`podEnvelope().cockpit.minY` = Wannenboden − `keel`): die Physik rechnet weiter mit der alten Höhe → **Fahrverhalten, `pods-shapes.json` und Sim-Tabelle unverändert** (Entscheidung „alte Pods: nur Optik"). Kabel, Augpunkt, Warnblitz (`topY`), Fern-LOD und Gegner folgen der sichtbaren Höhe von selbst. Neue Pods (Phase 3) lassen `keel` weg.
+3. **Anhebung je Pod (m):** Aurora 0,90 · Splitter-X 1,00 · Tenroc 0,80 · Quadra 0,65 · Needle 0,80 · Vespa 0,85 · Fireflare 0,90 · Ironclad 0,60 · Starling 0,80 · Ram 1,05. Mehr oder weniger: nur die zweite Zahl in `raised(…)` ändern (die Unit-Prüfung nennt die Untergrenze).
+4. **Harness:** zwei neue Bogen-Ansichten – `sheet('chase')` (Verfolgerkamera des Spiels) und `sheet('profile')` (ganzer Pod exakt von der Seite, je Pod eine flache Zelle).
+5. **Gesichtet:** Vorher/Nachher `p2_hoeher_profil.jpg`, `p2_hoeher_innen.jpg`, `p2_hoeher_verfolger.jpg` (alle 10, Spieler; Gegner in `p2c_profile_gegner.jpg`); echtes Rennen Boonta (Fireflare) Verfolger + Cockpit + **90°-Rolle**, Dschungel im **Gewitter** (Aurora) Cockpit + Verfolger, Hangar-Vorschau – alles ohne neue Konsolenfehler.
+6. **Erkenntnisse zur Testmethode (verdeckter Browser-Bereich):** (a) die Schleife nie mit einem künstlichen Zeitstempel weit vor der echten Uhr stehen lassen – der nächste echte Frame bekommt sonst ein **negatives `dt`** (`Game.loop` begrenzt nur nach oben; im Browser sind rAF-Zeitstempel monoton, deshalb kein Spielfehler); nach dem Takten `g.lastT = performance.now()` setzen. (b) **nicht pauschal alle `requestAnimationFrame`-Handles abbrechen:** three.js zählt seine Frames in einer eigenen rAF-Schleife (`nodeFrame`); ohne sie bleiben die Kamera-Uniforms stehen und das Bild friert ein. (c) `canvas.toBlob` liefert bei getakteten Frames ein altes Bild – Screenshot-Werkzeug des Browsers benutzen. (d) Den eigenen Pod lenkt die KI: `g.readInput = () => { p.ai = {…}; aiInputs(p, g.td, g.pods, g.raceTime, null); p.ai = null; }` (`aiInputs` per `await import('/src/game/physics.ts')`).
+
 ### Verifiziert (Phase 2)
+- Nach der Nachbesserung: `npm run check` grün – 23/23 Unit-Prüfungen, Pod-Audit 10/10 (Mesh-/Dreieckszahlen und Physikformen unverändert), **Sim-Tabelle zeilengleich** zum Stand vor der Anhebung; `npm run build` ok (2,84 MB).
 - `npm run check`: 21/21 Unit-Prüfungen (u. a. „kein Cockpit doppelt", „Pilot ist eigener Teilesatz", „drei Lampen", „leichtes Cockpit < 4 600 Dreiecke"), Pod-Audit 10/10 inkl. Budgets, **Physikformen unverändert, Sim-Ausgabe zeilengleich zur Ausgangslage** (alte Pods fahren exakt wie vorher).
 - Browser (WebGPU): `statsAll()` = Audit-Zahlen; Bögen `tools/harness/out/p2_{front,rear,side,inside,pod,front_gegner}.jpg` gesichtet; echtes Rennen mit Kamera „Cockpit" (Fireflare, Boonta) per Hand getaktet: 0 Fehler, Bild `p2_race_cockpit.jpg`.
 
@@ -93,8 +102,9 @@
 
 ### Nicht verifiziert (Phase 2)
 - **Bildrate auf „Ultra"** (Gegner jetzt 33–84 Tsd. Dreiecke je nahem Pod) – bitte am Gaming-PC prüfen.
-- Innenansicht bei Regen/Staub (Partikel können vor Cockpit-Teilen erscheinen, siehe ADR 0003), bei 90°-Rolle und in Tunneln nicht gesichtet.
-- Innenansicht aller 10 Pods nur im Harness (Standbild), im Rennen nur Fireflare.
+- Innenansicht **in Tunneln** nicht gesichtet (Regen/Gewitter und 90°-Rolle inzwischen gesichtet, siehe Nachbesserung; Regenstreifen und Linsentropfen liegen sichtbar über dem Bild, das Armaturenbrett bleibt lesbar).
+- Innenansicht aller 10 Pods nur im Harness (Standbild), im Rennen nur Fireflare und Aurora.
+- Ob die **Höhe der Cockpits** dem Nutzer so passt (Geschmack) – er entscheidet anhand der Vorher/Nachher-Bilder.
 
 ### Messwerte vor der Überholung (Meshes / Dreiecke)
 | Pod | Spieler „Hoch" | Spieler „Ultra" | Gegner nah | Gegner fern |
@@ -119,7 +129,7 @@ Sichtmodell gegen Physikform: breiter als die Kollisionsform höchstens 0,50 m (
 
 ### Befehle (neu)
 1. `npm run check:pods` – nur das Pod-Audit. `POD=<id>` prüft einen Pod, `UPDATE=1` gibt neue Baseline-Zeilen aus (bewusst übernehmen, wenn Pods absichtlich geändert wurden).
-2. Harness-Konsole: `await sheet('front', { quality: 3, save: 'name' })`, `await show(3, 0.3, 3, { rival: true })`, `statsAll()`.
+2. Harness-Konsole: `await sheet('front', { quality: 3, save: 'name' })`, `await show(3, 0.3, 3, { rival: true })`, `statsAll()`. Bogen-Ansichten: `pod`, `front`, `rear`, `side`, `inside`, `chase` (Verfolgerkamera), `profile` (Seitenriss).
 
 ---
 

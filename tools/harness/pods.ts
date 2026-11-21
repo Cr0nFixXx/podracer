@@ -1,6 +1,7 @@
 // Pod harness. Dev: `npm run dev` → http://localhost:5173/tools/harness/pods.dev.html   (bundle: see tools/harness/run.sh)
 //   await show(idx, health = 1, quality = 3, { rival?, save? })   4 views of one pod (¾, front, engine close-up, behind the pilot)
 //   await grid({ rival?, boost?, quality?, save? })               all pods on one sheet (auto layout for any roster size)
+//   await sheet(view, { rival?, quality?, health?, save? })       one cell per pod: 'pod' | 'front' | 'rear' | 'side' | 'inside' | 'chase' | 'profile'
 //   stats(idx, quality = 2, rival = false) / statsAll()           mesh + triangle counts of the real model (golden numbers for tools/ci/pods.ts)
 // `save: 'name'` posts the frame as JPEG to tools/harness/shot-server.mjs → tools/harness/out/name.jpg. Query: ?webgl forces WebGL2.
 import * as THREE from 'three/webgpu';
@@ -63,11 +64,12 @@ win.show = async (idx: number, dmg = 1, quality = 3, o: ShowOpts = {}) => {
   return `${BACKEND} ${def.id}${o.rival ? ' (rival)' : ''} tris=${r.info.render.triangles} calls=${r.info.render.drawCalls ?? r.info.render.calls}${saved}`;
 };
 
-/** One cell per pod. `view`: 'pod' whole pod ¾ · 'front' / 'rear' / 'side' cockpit close-ups · 'inside' from the pilot's eye. */
-type SheetView = 'pod' | 'front' | 'rear' | 'side' | 'inside';
+/** One cell per pod. `view`: 'pod' whole pod ¾ · 'front' / 'rear' / 'side' cockpit close-ups · 'inside' from the pilot's eye ·
+ *  'chase' the game's default camera behind the pod · 'profile' whole pod exactly from the side (cockpit height against the engines). */
+type SheetView = 'pod' | 'front' | 'rear' | 'side' | 'inside' | 'chase' | 'profile';
 async function sheet(view: SheetView, o: ShowOpts & { health?: number } = {}) {
-  const n = PODS.length, cols = n <= 10 ? 5 : Math.ceil(n / 3), rows = Math.ceil(n / cols); const w = W / cols, h = H / rows; cam.aspect = w / h;
-  cam.fov = view === 'inside' ? 79 : 40; cam.near = view === 'inside' ? 0.8 : 0.1; cam.updateProjectionMatrix(); r.setScissorTest(true);
+  const n = PODS.length, cols = view === 'profile' ? 2 : n <= 10 ? 5 : Math.ceil(n / 3), rows = Math.ceil(n / cols); const w = W / cols, h = H / rows; cam.aspect = w / h; // profile: long flat cells
+  cam.fov = view === 'inside' ? 79 : view === 'chase' ? 75 : 40; cam.near = view === 'inside' ? 0.8 : 0.1; cam.updateProjectionMatrix(); r.setScissorTest(true);
   const boost = o.boost ?? location.search.includes('boost'), hp = o.health ?? 1;
   const half = Math.min(THREE.MathUtils.degToRad(cam.fov / 2), Math.atan(Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * cam.aspect)); // tighter of the vertical / horizontal half angle
   let tris = 0;
@@ -82,6 +84,13 @@ async function sheet(view: SheetView, o: ShowOpts & { health?: number } = {}) {
       pod.setCockpitView?.(true); pod.group.updateMatrixWorld(true);
       const e = pod.eyeWorld ? pod.eyeWorld(new THREE.Vector3()) : pod.body.localToWorld(pod.eye.clone());
       cam.position.copy(e); cam.lookAt(e.x, e.y - 3.2, e.z + 60);
+    } else if (view === 'chase') { // Game.updateCamera, mode 0 at rest: 13.5 m behind and 4.5 m above the pod origin
+      cam.position.set(0, 4.5, -13.5); cam.lookAt(0, 1.6, 16);
+    } else if (view === 'profile') {
+      const box = new THREE.Box3().setFromObject(pod.group), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+      const vHalf = THREE.MathUtils.degToRad(cam.fov / 2), hHalf = Math.atan(Math.tan(vHalf) * cam.aspect);
+      const d = Math.max(sz.z * 0.5 / Math.tan(hHalf), (sz.y * 0.5 + 0.5) / Math.tan(vHalf)) * 1.06 + sz.x * 0.5; // fit length and height
+      cam.position.set(c.x + d, c.y, c.z); cam.lookAt(c);
     } else {
       const dir = view === 'front' ? new THREE.Vector3(0.55, 0.42, 0.72) : view === 'rear' ? new THREE.Vector3(-0.6, 0.45, -0.66) : new THREE.Vector3(1, 0.16, 0.05);
       cam.position.copy(ck).add(dir.normalize().multiplyScalar(2.6 / Math.sin(half) * 0.8)); cam.lookAt(ck);

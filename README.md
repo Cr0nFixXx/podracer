@@ -28,7 +28,7 @@ npm run build    # erzeugt dist/index.html (alles inline, offline lauffähig)
 | Ansicht wechseln | `C` | Y |
 | Pause | `Esc` / `P` | Start |
 
-In der Ansicht „Cockpit" (`C`) sitzt man im Pod und sieht das eigene Cockpit von innen: Armaturenbrett mit drei Warnlampen (Boost, Hitze, Schaden), Scheibenrahmen und die Hände des Piloten – bei jedem Racer anders. Die freie Sicht über die Triebwerke bietet weiterhin die Ansicht „Motorhaube".
+In der Ansicht „Cockpit" (`C`) sitzt man im Pod und sieht das eigene Cockpit von innen: Armaturenbrett mit drei Warnlampen (Boost, Hitze, Schaden), Scheibenrahmen und die Hände des Piloten – bei jedem Racer anders. Die Cockpits hängen über der Triebwerkslinie: man schaut über die Triebwerke hinweg auf die Strecke. Die freie Sicht ganz ohne Cockpit bietet weiterhin die Ansicht „Motorhaube".
 
 **Gamepad ändern:** Einstellungen → Steuerung → Abschnitt „Gamepad": Aktion anklicken, dann Taste drücken oder Stick bewegen. „Standard" stellt die Belegung aus der Tabelle wieder her.
 
