@@ -27,7 +27,7 @@ const cam = new THREE.PerspectiveCamera(40, (W / 2) / (H / 2), 0.1, 3000);
 const win = window as unknown as Record<string, unknown>;
 let pod: PodVisual | null = null;
 
-interface ShowOpts { rival?: boolean; save?: string; boost?: boolean; quality?: number }
+interface ShowOpts { rival?: boolean; save?: string; boost?: boolean; quality?: number; /** rival only: show the far LOD (> 48 m) */ far?: boolean }
 /** Must run in the same task as the last render call: the canvas keeps its picture only until the frame is presented. */
 async function saveFrame(name?: string) {
   if (!name) return '';
@@ -36,10 +36,10 @@ async function saveFrame(name?: string) {
   try { const rs = await fetch('http://127.0.0.1:5174/save?name=' + encodeURIComponent(name), { method: 'POST', body: blob }); return ' | saved ' + (await rs.text()); }
   catch (e) { return ' | save FAILED (' + (e as Error).message + ' – start tools/harness/shot-server.mjs)'; }
 }
-function build(idx: number, quality: number, rival: boolean) {
+function build(idx: number, quality: number, rival: boolean, far = false) {
   const def = PODS[idx];
   const p = buildPodModel(def, def.colors, quality, 1024, rival, rival ? { pattern: (idx + 1) % 6 } : undefined);
-  if (rival) p.setDistance(10);
+  if (rival) p.setDistance(far ? 100 : 10);
   return p;
 }
 
@@ -75,7 +75,7 @@ async function sheet(view: SheetView, o: ShowOpts & { health?: number } = {}) {
   let tris = 0;
   for (let i = 0; i < n; i++) {
     if (pod) { scene.remove(pod.group); pod.dispose(); }
-    pod = build(i, o.quality ?? 2, !!o.rival); scene.add(pod.group); pod.update(2, 1, boost ? 1 : 0, 0, hp, hp, hp < 1 ? 0.9 : 0.2); pod.group.updateMatrixWorld(true);
+    pod = build(i, o.quality ?? 2, !!o.rival, !!o.far); scene.add(pod.group); pod.update(2, 1, boost ? 1 : 0, 0, hp, hp, hp < 1 ? 0.9 : 0.2); pod.group.updateMatrixWorld(true);
     const Lc = podLayout(PODS[i]).cockpit; const ck = pod.body.localToWorld(new THREE.Vector3(0, Lc.y + 0.12, Lc.z)); // cockpit centre
     if (view === 'pod') {
       const sph = new THREE.Box3().setFromObject(pod.group).getBoundingSphere(new THREE.Sphere()); const d = sph.radius / Math.sin(half) * 0.92;

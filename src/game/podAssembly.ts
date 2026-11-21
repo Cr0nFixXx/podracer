@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { PilotHead, PodDef } from './data';
-import { M4, PartBuilder, cyl, lathe, prof, rbox, tube, torus } from './podKit';
+import { M4, PartBuilder, cyl, lathe, prof, rbox, tube, torus, type MatKey } from './podKit';
 import { engineExtent, engineGeo, type EngineGeo } from './podParts';
 import { cockpitGeo, type CockpitDetail } from './podCockpits';
 import { podLayout, type Extras, type PodLayout } from './podLayouts';
@@ -155,10 +155,18 @@ function buildOpponentFarGeo(def: PodDef, L: PodLayout) {
   const pb = new PartBuilder();
   const cp = new THREE.Vector3(0, L.cockpit.y, L.cockpit.z);
   for (const em of L.engines) {
-    const { L: len, R } = em.spec;
-    pb.add('hull', lathe(prof([[R * 0.72, -len * 0.5, 1], [R, -len * 0.35], [R, len * 0.42], [R * 0.88, len * 0.5, 1]]), 9, 1), M4.t(em.x, em.y, em.z));
-    pb.add('dark', new THREE.CircleGeometry(R * 0.84, 9), M4.t(em.x, em.y, em.z + len * 0.49));
-    pb.add('glow', new THREE.ConeGeometry(R * 0.46, len * 0.55, 7, 1, true).rotateX(-Math.PI / 2), M4.t(em.x, em.y, em.z - len * 0.75));
+    const { L: len, R, style } = em.spec, ext = engineExtent(em.spec);
+    if (style === 'slab') { // flat plate with a wide flat flame
+      pb.add('hull', rbox(ext.side * 1.8, R * 2, len, 0.12, 1), M4.t(em.x, em.y, em.z), [0, 0.5, 1]);
+      pb.add('dark', rbox(ext.side * 1.5, R * 1.2, 0.1, 0.02), M4.t(em.x, em.y, em.z + len * 0.5));
+      pb.add('glow', new THREE.ConeGeometry(R * 0.6, len * 0.5, 6, 1, true).rotateX(-Math.PI / 2), M4.trs(em.x, em.y, em.z - len * 0.74, 0, 0, 0, ext.side * 1.3 / R, 1, 1));
+    } else {
+      pb.add('hull', lathe(prof([[R * 0.72, -len * 0.5, 1], [R, -len * 0.35], [R, len * 0.42], [R * 0.88, len * 0.5, 1]]), 9, 1), M4.t(em.x, em.y, em.z));
+      pb.add('dark', new THREE.CircleGeometry(R * 0.84, 9), M4.t(em.x, em.y, em.z + len * 0.49));
+      pb.add('glow', new THREE.ConeGeometry(R * 0.46, len * 0.55, 7, 1, true).rotateX(-Math.PI / 2), M4.t(em.x, em.y, em.z - len * 0.75));
+      // the ring that makes a rotor / ring-wing pod readable from afar (secondary paint)
+      if (style === 'rotor' || style === 'hoop') pb.add('hull', torus(ext.side - 0.1, 0.08, 4, 12), M4.t(em.x, em.y, em.z + len * (style === 'rotor' ? 0.36 : 0.06)), [0, 0, 3]);
+    }
     const a = new THREE.Vector3(em.x, em.y + R, em.z), b = cp.clone();
     pb.add('dark', tube([a, a.clone().lerp(b, 0.5).add(new THREE.Vector3(0, -0.4, 0)), b], 0.055, 5, 4));
   }
@@ -172,6 +180,7 @@ function buildOpponentFarGeo(def: PodDef, L: PodLayout) {
     pb.add('dark', rbox(c.hw * 0.9, c.hw * 0.45, c.len * 0.42, 0.05, 1), M4.t(0, c.y + c.hw * 0.42, c.z));
     if (c.far === 'fin') pb.add('hull', new THREE.BoxGeometry(0.06, 1.0, 0.9), M4.trs(0, c.y + c.hw * 0.4 + 0.5, c.z - c.len * 0.3, 0.35, 0, 0), [0, 0, 3]);
     if (c.far === 'cage') pb.add('dark', torus(c.hw * 0.8, 0.05, 4, 6, Math.PI), M4.t(0, c.y + c.hw * 0.4, c.z));
+    if (c.far === 'ring') pb.add('hull', torus(1, 0.05, 4, 12), M4.trs(0, c.y + c.hw * 0.1, c.z, Math.PI / 2, 0, 0, c.hw * 1.25, c.len * 0.56, 1), [0, 0, 3]);
   }
   for (const link of L.binders) { // every energy binder as a thin glowing bar (the X of the Quadra Lumber shows as an X)
     const A = L.engines[link.a], B = L.engines[link.b], z = link.zOff ?? 0;
@@ -225,6 +234,19 @@ function addSideExtras(lists: Lists, extras: Map<string, THREE.BufferGeometry>, 
     }
     if (keep.length) { const sub = eg.clone(); sub.setIndex(keep); sub.applyMatrix4(shift); push(lists, k, sub); }
   }
+}
+/** Binders grouped by the engine pair they couple: parallel arcs between the same two engines become one mesh (one draw). */
+function binderGroups(L: PodLayout) {
+  const groups = new Map<string, PodLayout['binders']>();
+  for (const link of L.binders) { const key = `${Math.min(link.a, link.b)}|${Math.max(link.a, link.b)}`; const g = groups.get(key); if (g) g.push(link); else groups.set(key, [link]); }
+  return [...groups.values()];
+}
+function mergeBinders(list: THREE.BufferGeometry[]) {
+  if (list.length === 1) return list[0];
+  const mg = mergeGeometries(list, false); list.forEach(g => g.dispose());
+  if (!mg) throw new Error('pod assembly: energy binders of one engine pair could not be merged');
+  mg.computeBoundingSphere(); mg.boundingSphere!.radius += 1.4;
+  return mg;
 }
 /** Both ends of an energy binder in body space, left-hand engine first (the player binder material lifts end A with uLift.x). */
 function binderEnds(L: PodLayout, seg: number, link: { a: number; b: number; zOff?: number }) {
@@ -305,16 +327,22 @@ export function assembleHero(def: PodDef, seg: number, head: PilotHead): HeroAss
   if (ck.lamps) { lamps = ck.lamps.clone(); lamps.applyMatrix4(ckM); lamps.computeBoundingSphere(); owned.push(lamps); }
   const cables = buildFlexCables(L, seg, ck.info.anchors); owned.push(cables);
   const binders: THREE.BufferGeometry[] = [];
-  for (const link of L.binders) { // one mesh per binder (X on the Quadra Lumber)
-    const e = binderEnds(L, seg, link);
-    const g = makeBinderGeo(new THREE.Vector3(e.ax, e.ay, e.az), new THREE.Vector3(e.bx, e.by, e.bz));
+  for (const group of binderGroups(L)) { // one mesh per engine pair (two for the X of the Quadra Lumber, one for the three arcs of the Voltspire)
+    const g = mergeBinders(group.map(link => { const e = binderEnds(L, seg, link); return makeBinderGeo(new THREE.Vector3(e.ax, e.ay, e.az), new THREE.Vector3(e.bx, e.by, e.bz)); }));
     binders.push(g); owned.push(g);
   }
   return { ...b, banks, cockpit, pilotStart, lamps, lampCount: ck.lampCount, viewScale, cables, binders, owned };
 }
 
 // ------------------------------------------------------------------ rival pod (shared pipelines: paint + glow are baked into vertex colours)
-export interface RivalBank { side: -1 | 1; pivot: THREE.Vector3; /** merged engines of this side incl. fans + flaps (static) */ buckets: Map<string, THREE.BufferGeometry>; petals: THREE.BufferGeometry | null; flames: THREE.BufferGeometry | null }
+/** A big open rotor of a Gegner pod: its own mesh so that it can turn (`pos` relative to the bank pivot). */
+export interface RivalRotor { geo: THREE.BufferGeometry; pos: THREE.Vector3; mat: MatKey; spin: number }
+export interface RivalBank {
+  side: -1 | 1; pivot: THREE.Vector3;
+  /** merged engines of this side incl. enclosed fans + flaps (static) */ buckets: Map<string, THREE.BufferGeometry>;
+  petals: THREE.BufferGeometry | null; flames: THREE.BufferGeometry | null;
+  /** open rotors (EngineGeo.openRotor) stay separate – empty for every enclosed fan */ rotors: RivalRotor[];
+}
 export interface RivalAssembly extends Base {
   /** always two entries: left, right */
   banks: RivalBank[];
@@ -343,12 +371,13 @@ export function assembleRival(def: PodDef, seg: number, head: PilotHead, colors:
     const piv = new THREE.Vector3();
     for (const em of sideMs) { piv.x += em.x; piv.y += em.y; piv.z += em.z; }
     if (sideMs.length) piv.divideScalar(sideMs.length);
-    const lists: Lists = new Map(); const fls: THREE.BufferGeometry[] = []; const pts: THREE.BufferGeometry[] = [];
+    const lists: Lists = new Map(); const fls: THREE.BufferGeometry[] = []; const pts: THREE.BufferGeometry[] = []; const rotors: RivalRotor[] = [];
     for (const em of sideMs) {
       const ox = em.x - piv.x, oy = em.y - piv.y, oz = em.z - piv.z;
       const eg = engineGeo(em.spec, seg); const emM = M4.t(ox, oy, oz);
       for (const [k, g] of eg.parts) pushC(lists, k, g, emM);
-      pushC(lists, 'dark', eg.fan, M4.t(ox, oy, oz + eg.fanZ));
+      if (eg.openRotor) rotors.push({ geo: eg.fan, pos: new THREE.Vector3(ox, oy, oz + eg.fanZ), mat: eg.fanMat ?? 'dark', spin: eg.fanSpin ?? 1 });
+      else pushC(lists, eg.fanMat ?? 'dark', eg.fan, M4.t(ox, oy, oz + eg.fanZ));
       for (const f of eg.flaps) pushC(lists, 'hull', f.geo, M4.t(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z));
       const fo = eg.flameOuter.clone(); fo.applyMatrix4(M4.t(ox, oy, oz + eg.flameZ)); fls.push(fo);
       pts.push(eg.petals.clone().translate(ox, oy, oz));
@@ -358,7 +387,7 @@ export function assembleRival(def: PodDef, seg: number, head: PilotHead, colors:
     let petals: THREE.BufferGeometry | null = null, flames: THREE.BufferGeometry | null = null;
     if (pts.length) { petals = mergeGeometries(pts, false)!; pts.forEach(x => x.dispose()); owned.push(petals); }
     if (fls.length) { flames = mergeGeometries(fls, false)!; fls.forEach(x => x.dispose()); bakeSolidColor(flames, glowCol); flames.computeBoundingSphere(); owned.push(flames); }
-    banks.push({ side, pivot: piv, buckets, petals, flames });
+    banks.push({ side, pivot: piv, buckets, petals, flames, rotors });
   }
   // Cockpit + cables + extras
   const lists: Lists = new Map();
@@ -381,15 +410,18 @@ export function assembleRival(def: PodDef, seg: number, head: PilotHead, colors:
   const cockpit = mergeAll(lists, owned, `${def.id} rival cockpit`, bake);
 
   const binders: { geo: THREE.BufferGeometry; baseY: number }[] = []; let spanX = 4.6;
-  for (const link of L.binders) {
-    const e = binderEnds(L, seg, link);
-    const dyh = (e.by - e.ay) * 0.5; // diagonal binders: the two ends sit at different heights around the mesh origin
-    const pa = new THREE.Vector3(e.ax, -dyh, e.az);
-    const pb = new THREE.Vector3(e.bx, dyh, e.bz);
-    spanX = Math.max(1.5, Math.abs(pb.x - pa.x));
-    const baseY = (e.A.y + e.ea.binder.y + e.B.y + e.eb.binder.y) * 0.5;
-    const bg = makeBinderGeo(pa, pb, glowCol); owned.push(bg);
-    binders.push({ geo: bg, baseY });
+  for (const group of binderGroups(L)) { // one mesh per engine pair
+    let baseY = 0;
+    const bg = mergeBinders(group.map(link => {
+      const e = binderEnds(L, seg, link);
+      const dyh = (e.by - e.ay) * 0.5; // diagonal binders: the two ends sit at different heights around the mesh origin
+      const pa = new THREE.Vector3(e.ax, -dyh, e.az);
+      const pb = new THREE.Vector3(e.bx, dyh, e.bz);
+      spanX = Math.max(1.5, Math.abs(pb.x - pa.x));
+      baseY = (e.A.y + e.ea.binder.y + e.B.y + e.eb.binder.y) * 0.5;
+      return makeBinderGeo(pa, pb, glowCol);
+    }));
+    owned.push(bg); binders.push({ geo: bg, baseY });
   }
 
   // Far LOD (> 48 m): 3 shared-material draws

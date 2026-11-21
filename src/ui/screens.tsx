@@ -207,12 +207,14 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
         </div>
         <div className="grid grid-cols-[230px_1fr_320px] gap-4 flex-1 min-h-0">
           <Panel title="Podracer">
-            <div className="flex flex-col gap-1.5">
+            {/* one line per racer: 14 rows fit the panel without scrolling (pod name left, pilot right) */}
+            <div className="flex flex-col gap-1">
               {PODS.map(p => (
-                <button key={p.id} onClick={() => setSel(p.id)} className={`text-left px-3 py-1 border transition flex items-center gap-3 ${p.id === sel ? 'border-amber-300 bg-amber-400/15' : 'border-stone-800 bg-black/30 hover:border-amber-500/50'}`}>
-                  <span className="w-3 h-3 rounded-full" style={{ background: profile.custom[p.id].colors[0], boxShadow: `0 0 8px ${p.colors[2]}` }} />
-                  <span className="flex-1"><span className="block font-display text-sm text-amber-100">{p.name}</span><span className="block text-[10px] text-stone-400">{PILOTS.find(x => x.id === p.pilotId)!.name}</span></span>
-                  {profile.podId === p.id && <span className="text-amber-300 text-xs">●</span>}
+                <button key={p.id} onClick={() => setSel(p.id)} className={`text-left px-2.5 py-[5px] border transition flex items-center gap-2 ${p.id === sel ? 'border-amber-300 bg-amber-400/15' : 'border-stone-800 bg-black/30 hover:border-amber-500/50'}`}>
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: profile.custom[p.id].colors[0], boxShadow: `0 0 8px ${p.colors[2]}` }} />
+                  <span className="font-display text-[13px] leading-4 text-amber-100 whitespace-nowrap">{p.name}</span>
+                  <span className="flex-1 text-right text-[9px] leading-4 text-stone-400 whitespace-nowrap overflow-hidden text-ellipsis">{PILOTS.find(x => x.id === p.pilotId)!.name.split(' ')[0]}</span>
+                  {profile.podId === p.id && <span className="text-amber-300 text-[10px] leading-4">●</span>}
                 </button>
               ))}
             </div>

@@ -101,7 +101,7 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 
 ## Inhalte
 
-**10 Podracer** (alle freigeschaltet, Tuning, 6 Lackiermuster, 3 Lackfinishes, 8 Vorlagen, individuelle Piloten-Spezies) · **13 Strecken: 7 Rundkurse, 6 Sprints** auf Tatooine, Ando Prime, Vulkanwelt, Dschungelmond, Aquilaris, Oovo IV, Kristallschluchten und Malastare · bis zu 10 Gegner mit vorausschauender Korridor-KI und Düsen-Hitzeflimmern, 4 Schwierigkeitsstufen · 6 Kameras.
+**14 Podracer** (alle freigeschaltet, Tuning, 6 Lackiermuster, 3 Lackfinishes, 8 Vorlagen, individuelle Piloten-Spezies) · **13 Strecken: 7 Rundkurse, 6 Sprints** auf Tatooine, Ando Prime, Vulkanwelt, Dschungelmond, Aquilaris, Oovo IV, Kristallschluchten und Malastare · bis zu 10 Gegner (für jedes Rennen neu aus den 13 anderen Pods ausgelost) mit vorausschauender Korridor-KI und Düsen-Hitzeflimmern, 4 Schwierigkeitsstufen · 6 Kameras.
 
 ## Landschaft & Atmosphäre
 
@@ -109,6 +109,11 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 - **Bedienoberfläche:** alle Menüs haben dieselbe Schriftgröße und wachsen mit dem Fenster (Bezugsgröße 1180 × 720); keine Scrollbalken. In der Streckenwahl filtert ein Auswahlfeld nach Planet; die Karte markiert Brücken und Höhlenabzweige.
 - **Schnellere Folgestarts:** berechnete Texturen werden im Browser gespeichert (IndexedDB); ab dem zweiten Start einer Welt entfällt die Berechnung. `?nocache` an der Adresse schaltet das ab.
 - **Eigene Cockpits (neu):** jeder Racer hat ein unverwechselbares Cockpit – Renn-Tropfen mit Kreisel-Stabilisator (Aurora XR-7), gepanzerter Kriegsschlitten mit Überrollkäfig und Stoßzähnen (Vrak Splitter-X), Spindel mit Kuppel und sechsarmigem Kabelverteiler (Tenroc 6-Fach), fliegende Untertasse (Quadra Lumber), Wurfpfeil mit liegendem Piloten (Hollo Needle), Wespen-Scooter mit Lenker und Stachel (Tyr Vespa), Kühler-Cockpit mit Kiemen und Tanks (Beerak Fireflare), Panzerturm mit offener Luke (Pagali Ironclad), Vogel mit Schwingen und Rückenfinne (Mak Starling), Planierraupe mit Rammbug (Mandrel Ram). Dazu mehr Triebwerksdetails, eigene Anbauteile je Pod und Piloten mit eigener Hautfarbe.
+- **Vier neue Pods (neu, eigene Entwürfe):**
+  1. **Tarn Cyclone** (Brask Tarn, Ursk) – zwei kurze, dicke Triebwerke mit offenen Riesenrotoren in Schutzringen; die Rotoren drehen sich auch bei Gegnern. Stärke: Traktion und Beschleunigung.
+  2. **Lyss Halo-9** (Sira Lyss, Nerai) – schlanke Kerntriebwerke in großen Ringflügeln mit Lichtbändern, der Energieblitz springt von Ring zu Ring. Stärke: Wendigkeit und Luftbremse.
+  3. **Dorn Manta** (Havo Dorn, Brakkan) – flache Triebwerksplatten mit Briefschlitz-Einlass, Schlitzdüsen und Doppelleitwerk, dessen Ruder als Luftbremse aufspreizen. Stärke: Höchstgeschwindigkeit.
+  4. **Quill Voltspire** (Ixo Quill, Synth-Droide) – offene Gitterkäfige um Plasmaspulen mit drehendem Kupferanker, gekoppelt über drei Energiebögen. Stärke: Beschleunigung und Kühlung, dafür empfindlich.
 - **Hangar & Podracer:** 6 Lackiermuster (Klassik, Streifen, Flammen, Rennringe, Chevron, Rallye), 3 Finishes (Klarlack, Metallic, Matt) und 8 Vorlagen neben freier Farbwahl; individuelle Piloten-Spezies, seitengetrennte lose Schadensklappen und Hitzeflimmern auch hinter Gegner-Pods.
 - **Größere Strecken:** alle 13 Kurse sind 7–16 km lang, mit S-Kurven, zwei weiten offenen Flächen je Strecke (bis über 100 m breit) und hohen Tunneln (19,5–22,5 m).
 - **Verzweigte Höhlensysteme (neu):** auf Vulkanwelt (5 Kammern, 2 Gabelungen), Ando Prime, Kristallschluchten und Dschungelmond – bis 38 m hohe, verbreiterte Kammern mit Höhlenboden, Lichtschächten, Felssäulen, Leuchtadern und wieder zusammenführenden Seitenröhren.
@@ -156,7 +161,7 @@ Neue Änderungen sichern: `npm run save -- "Beschreibung"` (committet und erneue
 
 ## Für Entwickler: Prüfbefehle
 
-1. `npm run check` – Typecheck + Unit-Prüfungen (`tools/ci/unit.ts`) + Pod-Audit + Physik-Simulation aller 13 Strecken (11 Pods, 45 s, ca. 30 s Laufzeit, kein Browser nötig).
+1. `npm run check` – Typecheck + Unit-Prüfungen (`tools/ci/unit.ts`) + Pod-Audit + Physik-Simulation aller 13 Strecken (11 Pods, 45 s, ca. 30 s Laufzeit, kein Browser nötig). Das Startfeld wandert je Strecke um drei Pods weiter, damit alle 14 gefahren werden; `ROSTER_OLD=1` fährt das alte Feld der ersten zehn Pods (Vergleich mit früheren Tabellen).
 2. `npm run check:pods` – nur das Pod-Audit (1 s): baut jeden Pod ohne Browser, vergleicht Mesh- und Dreieckszahlen mit `tools/ci/pods-baseline.json` und prüft das Sichtmodell gegen die Kollisionsform.
 3. `npm run check:gpu` – lädt Strecken im Headless-Chrome mit WebGPU und meldet jeden Shader-/Konsolenfehler (braucht Puppeteer, siehe `HANDOFF.md`).
 4. `npm run build` – erzeugt `dist/index.html`.

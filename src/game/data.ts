@@ -12,7 +12,9 @@ export const STAT_LABELS: Record<StatKey, string> = {
   repair: 'Reparatur',
 };
 
-export type EngineStyle = 'turbine' | 'long' | 'split' | 'heavy' | 'needle' | 'quad' | 'ring' | 'blade';
+/** The first eight styles are variants of the round turbine builder (podParts.ts); the Session 20 pods have builders of their own
+ *  (podEngines.ts): `rotor` open propfan in a guard hoop · `hoop` slim core in a ring wing · `slab` flat plate · `cage` open truss. */
+export type EngineStyle = 'turbine' | 'long' | 'split' | 'heavy' | 'needle' | 'quad' | 'ring' | 'blade' | 'rotor' | 'hoop' | 'slab' | 'cage';
 
 export interface PodDef {
   id: string;
@@ -24,7 +26,7 @@ export interface PodDef {
 }
 
 /** head / helmet variant of the pilot figure (podCockpits.ts → pilotParts) */
-export type PilotHead = 'goggles' | 'snout' | 'crest' | 'aero' | 'dome';
+export type PilotHead = 'goggles' | 'snout' | 'crest' | 'aero' | 'dome' | 'maul' | 'veil' | 'horn' | 'optic';
 
 export interface PilotDef {
   id: string;
@@ -50,6 +52,11 @@ export const PILOTS: PilotDef[] = [
   { id: 'ela', name: 'Elana Mak', species: 'Mensch', head: 'goggles', skin: '#b98c68', skill: 0.78, aggression: 0.35, color: '#ff5ad1' },
   { id: 'ody', name: 'Odo Mandrel', species: 'Erriton', head: 'aero', skin: '#8f9a8a', skill: 0.6, aggression: 0.55, color: '#9fff5a' },
   { id: 'cle', name: 'Clegg Halden', species: 'Mensch', head: 'goggles', skin: '#b98c68', skill: 0.68, aggression: 0.45, color: '#ffd27a' },
+  // Session 20: the pilots of the four new pods
+  { id: 'bra', name: 'Brask Tarn', species: 'Ursk', head: 'maul', skin: '#7b5a3c', skill: 0.72, aggression: 0.65, color: '#c8743a' },
+  { id: 'sir', name: 'Sira Lyss', species: 'Nerai', head: 'veil', skin: '#8fc9cf', skill: 0.88, aggression: 0.3, color: '#7af0e0' },
+  { id: 'hav', name: 'Havo Dorn', species: 'Brakkan', head: 'horn', skin: '#8a7361', skill: 0.8, aggression: 0.85, color: '#d1a43a' },
+  { id: 'ixo', name: 'Ixo Quill', species: 'Synth', head: 'optic', skin: '#9aa3ad', skill: 0.82, aggression: 0.5, color: '#8f7bd6' },
 ];
 
 export const PODS: PodDef[] = [
@@ -102,6 +109,27 @@ export const PODS: PodDef[] = [
     id: 'odo', name: 'Mandrel Ram', pilotId: 'ody', desc: 'Rammbock mit Turbinen – aggressive Rennen.',
     stats: { topSpeed: 0.78, accel: 0.6, turn: 0.55, traction: 0.6, airbrake: 0.5, cooling: 0.75, repair: 0.85 },
     colors: ['#4c7a1e', '#2b2b2b', '#b4ff5a'],
+  },
+  // ---- Session 20: four new pods (keep the ten above first – the old CI grid and saved profiles count on their order) ----
+  {
+    id: 'cyclone', name: 'Tarn Cyclone', pilotId: 'bra', desc: 'Zwei offene Riesenrotoren in Schutzringen – saugt sich förmlich an der Piste fest.',
+    stats: { topSpeed: 0.64, accel: 0.88, turn: 0.7, traction: 0.92, airbrake: 0.72, cooling: 0.62, repair: 0.6 },
+    colors: ['#b08d57', '#3b4032', '#ffc94a'],
+  },
+  {
+    id: 'halo', name: 'Lyss Halo-9', pilotId: 'sir', desc: 'Schlanke Kerntriebwerke in großen Ringflügeln – tanzt durch jede Kurve und steht auf der Bremse.',
+    stats: { topSpeed: 0.68, accel: 0.68, turn: 0.9, traction: 0.74, airbrake: 0.9, cooling: 0.66, repair: 0.55 },
+    colors: ['#cfeee6', '#1c3558', '#9bfff0'],
+  },
+  {
+    id: 'manta', name: 'Dorn Manta', pilotId: 'hav', desc: 'Flache Triebwerksplatten mit Schlitzdüsen – auf der Geraden kaum zu halten, in Kurven träge.',
+    stats: { topSpeed: 0.97, accel: 0.72, turn: 0.42, traction: 0.58, airbrake: 0.55, cooling: 0.6, repair: 0.55 },
+    colors: ['#26282e', '#c99a2e', '#ff5f2e'],
+  },
+  {
+    id: 'volt', name: 'Quill Voltspire', pilotId: 'ixo', desc: 'Offene Gitterkäfige mit Plasmaspulen und drei Energiebögen – reißt aus dem Stand davon, verträgt aber wenig.',
+    stats: { topSpeed: 0.74, accel: 0.92, turn: 0.66, traction: 0.62, airbrake: 0.6, cooling: 0.9, repair: 0.4 },
+    colors: ['#34407a', '#c7ccd4', '#b79bff'],
   },
 ];
 

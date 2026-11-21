@@ -1,13 +1,19 @@
 import * as THREE from 'three';
 import type { EngineStyle } from './data';
-import { PartBuilder, M4, blade, boltRing, cyl, extrude, lathe, prof, radial, rbox, sphere, torus, tube, type MatKey } from './podKit';
+import { PartBuilder, M4, blade, boltRing, cyl, extrude, flameGeo, lathe, prof, radial, rbox, sphere, torus, tube, type MatKey } from './podKit';
+import { OWN_ENGINES, OWN_EXTENTS } from './podEngines';
 
 /** Parametric podracer engine. Geometry is merged per material and cached per spec. */
 export interface EngineSpec { L: number; R: number; style: EngineStyle; bands: number; blades: number; spike: boolean; fins: number; }
 export interface FlapGeo { geo: THREE.BufferGeometry; pivot: THREE.Vector3; sign: number; }
 export interface EngineGeo {
   parts: Map<MatKey, THREE.BufferGeometry>;
+  /** the turning part: turbine fan, open rotor or armature (its own mesh on the player pod) */
   fan: THREE.BufferGeometry; fanZ: number;
+  /** material of the fan (default 'dark') and how fast it turns compared with a turbine fan (default 1) */
+  fanMat?: MatKey; fanSpin?: number;
+  /** the fan is a big open rotor: a Gegner pod shows it as its own turning mesh too instead of merging it into the static parts */
+  openRotor?: boolean;
   flaps: FlapGeo[];
   /** animated nozzle petals (attribute aPet), see petalMaterial() */
   petals: THREE.BufferGeometry;
@@ -31,6 +37,7 @@ export interface EngineExtent {
 }
 export function engineExtent(spec: EngineSpec): EngineExtent {
   const { R, L, style } = spec;
+  const own = OWN_EXTENTS[style]; if (own) return own(spec); // Session 20 styles (podEngines.ts)
   return {
     coll: R * 1.05 + (style === 'blade' ? 0.45 : 0) + (style === 'ring' ? 0.3 : 0),
     bottom: R * (style === 'ring' ? 1.36 : 1.12) + 0.1,
@@ -42,16 +49,12 @@ export function engineExtent(spec: EngineSpec): EngineExtent {
 
 const cache = new Map<string, EngineGeo>();
 
-function flameGeo(rn: number, len: number, seg: number) {
-  const pts: [number, number, 0][] = [];
-  for (let i = 0; i <= 12; i++) { const t = 1 - i / 12; const r = rn * Math.pow(1 - t, 0.55) * (1 + 0.18 * Math.sin(Math.PI * t)) + 0.01; pts.push([r, -t * len, 0]); }
-  return lathe(prof(pts), seg, 0);
-}
-
 export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
   const key = `${spec.L}|${spec.R}|${spec.style}|${spec.bands}|${spec.blades}|${spec.spike}|${spec.fins}|${seg}`;
   const hit = cache.get(key); if (hit) return hit;
   const { L, R, style } = spec;
+  const own = OWN_ENGINES[style]; // Session 20 styles have builders of their own (podEngines.ts)
+  if (own) { const made = own(spec, seg); cache.set(key, made); return made; }
   const pb = new PartBuilder();
   const Z = (t: number) => -L / 2 + t * L;
   const segS = Math.max(10, Math.round(seg * 0.5));

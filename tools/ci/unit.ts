@@ -1,10 +1,13 @@
 // Headless unit checks for pure game logic (part of `npm run check`). No framework: tiny test / expect helpers.
 // Env: ONLY=<substring> runs only the tests whose name contains it.
-import { PODS, STAT_KEYS, type StatKey } from '../../src/game/data';
+import { PILOTS, PODS, STAT_KEYS, type StatKey } from '../../src/game/data';
 import { podLayout } from '../../src/game/podLayouts';
 import { cockpitGeo } from '../../src/game/podCockpits';
 import { engineExtent } from '../../src/game/podParts';
-import { podEnvelope } from '../../src/game/podDesigns';
+import { podCollision, podEnvelope } from '../../src/game/podDesigns';
+import { assembleHero, assembleRival } from '../../src/game/podAssembly';
+import { pickRivals } from '../../src/game/roster';
+import { ciRoster } from './roster';
 import { applyDamage, podParams, FX_NONE, type PodState } from '../../src/game/physics';
 import { loadProfile, saveProfile } from '../../src/game/settings';
 
@@ -71,6 +74,69 @@ test('cockpit height: the strobe light stays on the visible cockpit, above the p
     const L = podLayout(p); const eyeY = L.cockpit.y + cockpitGeo(L, 28, 'goggles', 1).info.eye.y, topY = podEnvelope(p).cockpit.topY;
     ok(topY > eyeY + 0.2, `${p.id}: strobe at ${topY.toFixed(2)} m, eye at ${eyeY.toFixed(2)} m`);
   }
+});
+
+// ------------------------------------------------------------------ Session 20 / Phase 3: four new racers
+const NEW_PODS = ['cyclone', 'halo', 'manta', 'volt'];
+const podById = (id: string) => { const p = PODS.find(x => x.id === id); if (!p) throw new Error(`pod "${id}" is not in PODS`); return p; };
+test('new racers: Cyclone, Halo, Manta and Voltspire are in the roster, each with a pilot of its own', () => {
+  for (const id of NEW_PODS) {
+    const p = podById(id);
+    ok(PILOTS.some(x => x.id === p.pilotId), `${id}: pilot "${p.pilotId}" is not in PILOTS`);
+    eq(PODS.filter(x => x.pilotId === p.pilotId).length, 1, `${id}: pods sharing its pilot`);
+  }
+  eq(PODS.length, 14, 'pods');
+});
+test('new racers: nothing hangs lower than 1.9 m under the pod origin or reaches further out than 4.6 m', () => {
+  for (const id of NEW_PODS) {
+    const p = podById(id), env = podEnvelope(p), low = Math.min(env.engL.minY, env.engR.minY, env.cockpit.minY);
+    const wide = Math.max(Math.abs(env.engL.outerX), Math.abs(env.engR.outerX), podCollision(p).halfW);
+    ok(low >= -1.9, `${id}: lowest point ${low.toFixed(2)} m`); ok(wide <= 4.6, `${id}: half width ${wide.toFixed(2)} m`);
+  }
+});
+test('new racers: ring wings and rotor hoops stay within 1.85 m of the engine axis', () => {
+  for (const id of ['cyclone', 'halo']) for (const e of podLayout(podById(id)).engines) { const x = engineExtent(e.spec), r = Math.max(x.side, x.bottom); ok(r <= 1.85 + 1e-9, `${id}: ${r.toFixed(3)} m`); }
+});
+test('new racers: the ground clamp is the real cockpit floor (no keel)', () => { for (const id of NEW_PODS) ok(!podLayout(podById(id)).cockpit.keel, id); });
+test('Cyclone: the big rotors turn on Gegner pods too (one own mesh per engine, not merged into the static parts)', () => {
+  const p = podById('cyclone'), a = assembleRival(p, 14, 'maul', p.colors);
+  for (const b of a.banks) eq(b.rotors.length, 1, `rotors of bank ${b.side}`);
+  for (const b of assembleRival(PODS[0], 14, 'goggles', PODS[0].colors).banks) eq(b.rotors.length, 0, `${PODS[0].id} (enclosed fan) rotors`);
+});
+test('Voltspire: its three arcs are one binder mesh and stay 2.5 m behind the engine fronts (free view from the hood camera)', () => {
+  const p = podById('volt'), L = podLayout(p); eq(L.binders.length, 3, 'arcs in the layout');
+  const h = assembleHero(p, 28, 'optic'); eq(h.binders.length, 1, 'binder meshes of the player pod');
+  eq(assembleRival(p, 14, 'optic', p.colors).binders.length, 1, 'binder meshes of a Gegner');
+  const front = Math.min(...L.engines.map(e => e.z + engineExtent(e.spec).halfL)); h.binders[0].computeBoundingBox();
+  const maxZ = h.binders[0].boundingBox!.max.z - 0.4; // the ribbon is 0.4 m wide around its centre line
+  ok(maxZ <= front - 2.5 + 1e-6, `foremost arc at z = ${maxZ.toFixed(2)}, engine front at ${front.toFixed(2)}`);
+});
+test('Quadra Lumber keeps its X: binders between different engine pairs stay separate meshes', () => {
+  const p = podById('bomquad'); eq(assembleHero(p, 28, 'dome').binders.length, 2); eq(assembleRival(p, 14, 'dome', p.colors).binders.length, 2);
+});
+
+// ------------------------------------------------------------------ who races: Gegner draw (game) and the CI grid
+/** deterministic random source for the draw */
+const lcg = (seed: number) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+test('Gegner draw: different pods, never the player\'s own, as many as asked for', () => {
+  for (const n of [0, 1, 7, 10]) {
+    const r = pickRivals('halo', n, lcg(7)); eq(r.length, n, `${n} Gegner`);
+    eq(new Set(r.map(p => p.id)).size, n, 'different pods'); ok(!r.some(p => p.id === 'halo'), 'the player\'s pod was drawn');
+  }
+  eq(pickRivals('aurora', 99, lcg(1)).length, PODS.length - 1, 'more asked for than there are pods');
+});
+test('Gegner draw: every other pod gets its turn, the order changes from race to race', () => {
+  const seen = new Set<string>(), first = new Set<string>();
+  for (let s = 1; s <= 40; s++) { const r = pickRivals('aurora', 10, lcg(s * 977)); r.forEach(p => seen.add(p.id)); first.add(r[0].id); }
+  eq(seen.size, PODS.length - 1, 'pods ever drawn'); ok(first.size >= 5, `only ${first.size} different pods ever on the first Gegner slot`);
+});
+test('CI grid: 11 different pods per track, and every pod is driven on some track', () => {
+  const driven = new Set<string>();
+  for (let t = 0; t < 13; t++) { const r = ciRoster(t); eq(r.length, 11, `track ${t}`); eq(new Set(r.map(p => p.id)).size, 11, `track ${t}: different pods`); r.forEach(p => driven.add(p.id)); }
+  eq(driven.size, PODS.length, 'pods driven');
+});
+test('CI grid: the old grid (first ten pods + the first again) is still available for A/B runs', () => {
+  eq(ciRoster(5, true).map(p => p.id), [...PODS.slice(0, 10), PODS[0]].map(p => p.id));
 });
 
 // ------------------------------------------------------------------ damage plumbing

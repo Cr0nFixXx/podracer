@@ -1,7 +1,7 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-1. **Pod-Überholung fortsetzen:** Phasentabelle im Abschnitt „Session 20" unten – die erste offene Phase ist dran. **Stand: Phase 2 fertig, dazu die erste Nachbesserung aus der Sichtung („Cockpits weiter oben", siehe unten). Der Nutzer sichtet weiter (Bilder `tools/harness/out/p2_*.jpg`, Vorher/Nachher `p2_hoeher_*.jpg`); erst nach seinem „weiter" beginnt Phase 3 (4 neue Pods).** Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
+1. **Pod-Überholung fortsetzen:** Phasentabelle im Abschnitt „Session 20" unten – die erste offene Phase ist dran. **Stand: Phase 3 fertig (4 neue Pods: Tarn Cyclone, Lyss Halo-9, Dorn Manta, Quill Voltspire). Vereinbarter Stopp: der Nutzer sichtet die neuen Pods (Bilder `tools/harness/out/p3_*.jpg`) und testet „Ultra" am Gaming-PC; erst nach seinem „weiter" beginnt Phase 4 (Tuning-Optik).** Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
 2. Vor jeder Änderung: `npm run check` (Typecheck + Pod-Audit + Sim) muss grün sein. Pods ansehen: `npm run dev` → `http://localhost:5173/tools/harness/pods.dev.html`.
 3. Weiterhin offen aus Session 19: `npm run dev` → **Aquilaris-Küstenlauf** (19,5-m-Unterwassertunnel, 2 Skyway-Brücken, Flutschleuse) und **Frostspalt-Ring** (22,5-m-Gletschertunnel, verzweigte Eishöhle, Eisschleuse, Viadukt) Probe fahren; im **Hangar** die 6 Lackiermuster & 3 Finishes testen (≈ 6 Min.).
 
@@ -30,8 +30,8 @@
 |---|---|---|
 | 0 | Setup + Sicherheitsnetz | ✅ erledigt |
 | 1 | Refactoring ohne Spieländerung: Layout-Registry (`podLayouts.ts`), `engineExtent`, `podCockpits.ts`, `applyDamage` + Wirkungs-Struct, Profil v2 | ✅ erledigt |
-| 2 | 10 neue Cockpits + Detailpass + Cockpit-Innenansicht → **Stopp: Nutzer sichtet** | ✅ erledigt, Nachbesserung „Cockpits weiter oben" eingearbeitet – **wartet auf das „weiter" des Nutzers** |
-| 3 | 4 neue Pods (Cyclone → Halo → Manta → Voltspire), Hangar-Liste für 14, Gegner-Auslosung → **Stopp** | offen |
+| 2 | 10 neue Cockpits + Detailpass + Cockpit-Innenansicht → **Stopp: Nutzer sichtet** | ✅ erledigt, Nachbesserung „Cockpits weiter oben" eingearbeitet, vom Nutzer freigegeben („Go Phase 3") |
+| 3 | 4 neue Pods (Cyclone → Halo → Manta → Voltspire), Hangar-Liste für 14, Gegner-Auslosung → **Stopp** | ✅ erledigt – **wartet auf Sichtung durch den Nutzer** |
 | 4 | Tuning-Optik: `PodCustom.kit`, `podKitParts.ts`, Hangar-Reiter „Lack \| Teile" | offen |
 | 5 | Schaden – Fahrverhalten: `podDamage.ts`, Bruchteil-Maske, HUD-Lampen | offen |
 | 6 | Schaden – Optik Spieler: Bruchteile, Treffermarken, Trümmer, Hangar-Schadensvorschau | offen |
@@ -106,6 +106,43 @@
 - Innenansicht aller 10 Pods nur im Harness (Standbild), im Rennen nur Fireflare und Aurora.
 - Ob die **Höhe der Cockpits** dem Nutzer so passt (Geschmack) – er entscheidet anhand der Vorher/Nachher-Bilder.
 
+### Erledigt in Phase 3 (vier neue Pods)
+1. **Neue Triebwerks-Bauer in `src/game/podEngines.ts`** (eigene Datei, der runde Turbinen-Bauer in `podParts.ts` blieb unangetastet → die zehn alten Pods können sich nicht verschieben). Vier Stile mit demselben `EngineGeo`-Vertrag, eingehängt über `OWN_ENGINES` / `OWN_EXTENTS`:
+   - `rotor` (Tarn Cyclone): kurzer dicker Rumpf, offener 5-Blatt-Rotor (eigenes drehendes Mesh, `fanMat: 'steel'`, `fanSpin: 0.36`, `openRotor`), Schutzring mit Profilquerschnitt auf vier Streben, Auspuffstutzen.
+   - `hoop` (Lyss Halo-9): schlanker Kern mit Einlass + Fan, Ringflügel (Radius 3,4 × Kernradius) mit Lichtbändern auf drei Streben, Luftbremsen und Blitz-Koppler sitzen am Ring.
+   - `slab` (Dorn Manta): geloftete flache Platte, Briefschlitz-Einlass mit kleiner Stauturbine, Schlitzdüse mit eigenen Lippenklappen (`slotPetals`) und flach skalierter Flamme, Doppelleitwerk – die Ruder sind die Luftbremsen.
+   - `cage` (Quill Voltspire): Gitterkäfig (5 Spanten, 6 Längsholme, Diagonalen), Plasmaspule mit Kupferwicklungen und Trommeln, drehender Kupferanker (`fanMat: 'copper'`), drei Elektroden je Flanke.
+2. **`EngineGeo` erweitert:** `fanMat`, `fanSpin`, `openRotor`. Gegner zeigen offene Rotoren als eigenes drehendes Mesh (`RivalBank.rotors`, geteiltes Material – keine neue Pipeline); geschlossene Fans bleiben in den statischen Teilen.
+3. **Energieblitze je Triebwerkspaar zusammengefasst** (`binderGroups` / `mergeBinders` in `podAssembly.ts`): die drei Bögen der Voltspire sind ein Mesh (Spieler und Gegner), das X der Quadra Lumber bleibt zwei Meshes (verschiedene Paare) – deren Zahlen sind unverändert.
+4. **Layouts, Cockpits, Piloten:** vier Einträge in `LAYOUTS` (ohne `keel`: ehrliche Bodenklemme), vier Entwürfe in `DESIGNS` (`cyclone`, `halo`, `manta`, `volt`), vier Kopfvarianten (`maul`, `veil`, `horn`, `optic`), vier Piloten und Pods in `data.ts`. Namen und Entwürfe sind eigene (keine Film- oder Spielvorlagen).
+5. **Fern-LOD:** Sonderformen je Stil (Ring um `rotor` / `hoop`, flache Kiste für `slab`), neue Cockpit-Marke `far: 'ring'`.
+6. **Wer fährt:** `src/game/roster.ts → pickRivals` lost die Gegner für jedes Rennen neu aus den 13 anderen Pods (höchstens 10, nie doppelt). `tools/ci/roster.ts → ciRoster`: das CI-Feld (11 Pods) wandert je Strecke um drei Pods weiter; `ROSTER_OLD=1` fährt das alte Feld.
+7. **Hangar:** Pod-Liste einzeilig (Pod-Name links, Vorname des Piloten rechts) – 14 Zeilen passen ohne Verkleinerung.
+8. **Nebenbei behoben:** Stachel der Tyr Vespa war von innen nach außen gewickelt (Drehprofil lief Richtung −z); Harness-Bögen können das Fern-Modell zeigen (`far: true`).
+
+### Verifiziert (Phase 3)
+- `npm run check` grün: 34/34 Unit-Prüfungen (neu u. a. „vier neue Racer mit eigenem Piloten", „Grenzen 1,9 m / 4,6 m / 1,85 m", „keine `keel`", „Cyclone-Rotoren drehen bei Gegnern", „drei Bögen = ein Mesh, 2,5 m hinter der Front", „Quadra behält ihr X", „Gegner-Auslosung", „CI-Feld"), Pod-Audit 14/14, Sim 13/13 (0 Ausfälle, kein NaN, Bodenfreiheit ≥ 0,67 m).
+- **`ROSTER_OLD=1`: Sim-Tabelle zeilengleich zu Phase 2** → die zehn alten Pods fahren exakt wie vorher. Mesh-/Dreieckszahlen und Physikformen der zehn alten Pods unverändert (nur vier Zeilen dazu).
+- Langlauf `SECS=120` mit dem neuen Feld: alle 13 Strecken „ok".
+- Browser (WebGPU): `show()` aller vier Pods (Spieler + Gegner), Bögen `inside`, `profile`, `chase`, `front`, `pod` (Spieler, Gegner, Fern-Modell) für alle 14; Hangar bei 1280 × 720: 14 Zeilen à 28 px, `data-fit-shrunk = 0`, kein Scrollbalken; zwei echte Rennen per Hand getaktet – Boonta mit dem Cyclone (Gegner u. a. Voltspire), Aquilaris im Regen mit der Voltspire (Gegner u. a. Manta, Halo, Cyclone), jeweils Verfolger + Cockpit-Kamera, keine neuen Konsolenfehler.
+
+### Messwerte Phase 3 (Meshes / Dreiecke)
+| Pod | Spieler „Niedrig" | Spieler „Hoch" | Spieler „Ultra" | Gegner nah (unter Ultra) | Gegner nah (Ultra) | fern |
+|---|---|---|---|---|---|---|
+| Tarn Cyclone | 41 / 22 854 | 41 / 35 174 | 41 / 46 578 | 32 / 12 032 | 33 / 33 416 | 3 / 648 |
+| Lyss Halo-9 | 39 / 23 462 | 39 / 32 538 | 39 / 45 062 | 28 / 12 724 | 29 / 30 780 | 3 / 732 |
+| Dorn Manta | 38 / 16 254 | 38 / 21 554 | 38 / 27 042 | 27 / 8 140 | 28 / 19 796 | 3 / 748 |
+| Quill Voltspire | 36 / 26 748 | 36 / 37 232 | 36 / 50 192 | 24 / 16 334 | 26 / 35 474 | 3 / 508 |
+
+Budgets für neue Pods: Spieler „Hoch" ≤ 70 Tsd., Gegner nah ≤ 26 Tsd., Ultra ≤ 250 Tsd. / 100 Tsd., fern ≤ 1,1 Tsd. – alle weit darunter.
+
+### Nicht verifiziert (Phase 3)
+- **Bildrate auf „Ultra"** mit den neuen Pods – am Gaming-PC prüfen.
+- Balance der vier neuen Pods (Werte in `data.ts`) nur über die KI-Sim, nicht von Hand gefahren.
+- Cockpit-Kamera der Manta und des Halo nur im Harness (Standbild), im Rennen Cyclone und Voltspire.
+- Der im Plan genannte „Schatten-Stellvertreter" für dünne Teile wurde nicht gebaut (es gab ihn auch in Phase 2 nicht): dünne Teile werfen Schatten wie bisher nach Material. Bei flimmernden Käfig-Schatten nachziehen.
+- Langlauf `SECS=120` einzeln mit dem **alten** Feld: Malastare und Crystal melden je einen „downward teleport" nach dem Zieleinlauf – betrifft nur alte Pods und unveränderte Physik, also schon vor Phase 3 vorhanden; im Standardlauf (45 s) tritt es nicht auf.
+
 ### Messwerte vor der Überholung (Meshes / Dreiecke)
 | Pod | Spieler „Hoch" | Spieler „Ultra" | Gegner nah | Gegner fern |
 |---|---|---|---|---|
@@ -129,7 +166,8 @@ Sichtmodell gegen Physikform: breiter als die Kollisionsform höchstens 0,50 m (
 
 ### Befehle (neu)
 1. `npm run check:pods` – nur das Pod-Audit. `POD=<id>` prüft einen Pod, `UPDATE=1` gibt neue Baseline-Zeilen aus (bewusst übernehmen, wenn Pods absichtlich geändert wurden).
-2. Harness-Konsole: `await sheet('front', { quality: 3, save: 'name' })`, `await show(3, 0.3, 3, { rival: true })`, `statsAll()`. Bogen-Ansichten: `pod`, `front`, `rear`, `side`, `inside`, `chase` (Verfolgerkamera), `profile` (Seitenriss).
+2. Harness-Konsole: `await sheet('front', { quality: 3, save: 'name' })`, `await show(3, 0.3, 3, { rival: true })`, `statsAll()`. Bogen-Ansichten: `pod`, `front`, `rear`, `side`, `inside`, `chase` (Verfolgerkamera), `profile` (Seitenriss); `{ rival: true, far: true }` zeigt das Fern-Modell. Pod-Indizes der neuen: 10 Cyclone, 11 Halo, 12 Manta, 13 Voltspire.
+3. `ROSTER_OLD=1 node tools/ci/out/sim.mjs` (nach `npm run check`) – Sim mit dem alten Startfeld; die Tabelle muss der von Phase 2 gleichen.
 
 ---
 

@@ -90,6 +90,7 @@ function rival(def: PodDef, quality: number) {
   for (const b of a.banks) {
     for (const [k, g] of b.buckets) near.add(g, `${w} bank ${b.side} ${k}`, k === 'hull' || k === 'glow' ? [...BUCKET, 'color'] : BUCKET, b.pivot);
     if (b.petals) near.add(b.petals, `${w} petals`, ['position', 'normal', 'aPet'], b.pivot);
+    for (const r of b.rotors) near.add(r.geo, `${w} rotor`, BUCKET, V(b.pivot, r.pos));
     if (b.flames) near.add(b.flames, `${w} flames`, ['position', 'aLiv', 'color'], b.pivot, false);
   }
   for (const [k, g] of a.cockpit) near.add(g, `${w} cockpit ${k}`, k === 'hull' || k === 'glow' ? [...BUCKET, 'color'] : BUCKET);

@@ -3,7 +3,8 @@
 import * as THREE from 'three';
 import type { PodDef } from './data';
 import type { EngineSpec } from './podParts';
-import { PartBuilder, M4, cyl, extrude, lathe, prof, rbox, sphere, torus, tube } from './podKit';
+import { CAGE_ARC_STEP } from './podEngines';
+import { type PartBuilder, M4, cyl, extrude, lathe, prof, rbox, sphere, torus, tube } from './podKit';
 
 export type CockpitStyle = 'pod' | 'wedge' | 'saucer' | 'long';
 export interface EngineMount { spec: EngineSpec; x: number; y: number; z: number; }
@@ -26,8 +27,8 @@ export interface PodLayout {
     topY?: number;
     /** cockpit camera: fixed enlargement of the cockpit about the pilot's eye (default: computed from the nearest part in view) */
     viewScale?: number;
-    /** silhouette cue of the far LOD (> 48 m): plain box, flat disc, box with a tall fin, box with a roll cage */
-    far?: 'box' | 'disc' | 'fin' | 'cage';
+    /** silhouette cue of the far LOD (> 48 m): plain box, flat disc, box with a tall fin, box with a roll cage, box inside a flat ring */
+    far?: 'box' | 'disc' | 'fin' | 'cage' | 'ring';
   };
   /** energy binders; the first one is the pod's main coupling */
   binders: BinderLink[];
@@ -237,6 +238,86 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
       },
     };
   },
+};
+
+/** Skid rail through `pts`, made of straight tubes (a spline through the same points would dip below the lowest ones). */
+const rail = (pb: PartBuilder, pts: THREE.Vector3[], r: number) => {
+  for (let i = 0; i < pts.length - 1; i++) pb.add('steel', tube([pts[i], pts[i + 1]], r, 1, 5));
+  for (let i = 1; i < pts.length - 1; i++) pb.add('steel', sphere(r * 1.03, 6, 4), M4.t(pts[i].x, pts[i].y, pts[i].z));
+};
+
+// ---- Session 20 / Phase 3: four new pods. Their cockpits sit at their real height (no `keel`): the ground clamp is the tub floor.
+LAYOUTS.cyclone = () => { // Tarn Cyclone: two short fat engines, each driving a big open rotor inside a guard hoop
+  const s = spec(5.2, 1.25, 'rotor', 3, 5), ex = 2.7, ez = 3.2, R = s.R, Rh = 1.42 * R;
+  return {
+    engines: pair(s, ex, 0, ez), cockpit: { style: 'wedge', hw: 1.0, len: 3.0, y: 1.02, z: -5.4, pilot: 1.08, far: 'fin' }, binders: MAIN, livery: 3,
+    engineExtras: (pb, _L, hi) => {
+      for (const sd of SIDES) {
+        // a swept fin on top of each hoop and two landing skids under each body
+        pb.add('hull', plate([[ez + 2.08, Rh + 0.02], [ez + 1.5, Rh + 0.02], [ez + 1.26, Rh + 0.56], [ez + 1.5, Rh + 0.6]], 0.05), M4.t(sd * ex, 0, 0), SEC);
+        for (const o of [-0.5, 0.5]) {
+          const x = sd * ex + o;
+          rail(pb, [V(x, -R * 0.86, ez + 0.5), V(x, -R - 0.15, ez + 0.1), V(x, -R - 0.15, ez - 1.7), V(x, -R * 0.86, ez - 2.1)], 0.04);
+          if (hi) for (const z of [ez - 0.2, ez - 1.4]) pb.add('steel', cyl(0.026, 0.026, 0.22, 5), M4.t(x, -R - 0.02, z));
+        }
+        if (hi) { // brace from the spine to the top of the hoop, marker light on the fin
+          pb.add('steel', tube([V(sd * ex, R + 0.06, ez + 0.5), V(sd * ex, Rh - 0.02, ez + 1.52)], 0.03, 2, 5));
+          pb.add('glow', sphere(0.035, 6, 4), M4.t(sd * ex, Rh + 0.6, ez + 1.42));
+        }
+      }
+    },
+  };
+};
+
+LAYOUTS.halo = () => { // Lyss Halo-9: two slim cores, each inside a big ring wing; the energy binder jumps from ring to ring
+  const s = spec(7.5, 0.5, 'hoop', 4, 10), ex = 2.75, ez = 3, Rw = 3.4 * s.R;
+  return {
+    engines: pair(s, ex, 0, ez), cockpit: { style: 'pod', hw: 0.8, len: 2.6, y: 0.8, z: -5.2, pilot: 0.95, far: 'ring' }, binders: MAIN, livery: 1,
+    engineExtras: (pb, _L, hi) => {
+      for (const sd of SIDES) {
+        // a slim tail sting behind each core and a keel vane under each ring
+        pb.add('chrome', lathe(prof([[0, -1.5], [0.05, -0.5], [0.07, 0]]), hi ? 10 : 6, 0), M4.t(sd * ex, 0.43, ez - 3.1));
+        pb.add('hull', plate([[ez + 1.1, -Rw + 0.04], [ez + 0.3, -Rw + 0.04], [ez + 0.16, -Rw - 0.08], [ez + 0.7, -Rw - 0.085]], 0.04), M4.t(sd * ex, 0, 0), SEC);
+        if (hi) { // navigation lights on the outer edge of each ring, top and bottom
+          for (const a of [0.9, 2.24]) pb.add('glow', sphere(0.032, 6, 4), M4.t(sd * (ex + Math.sin(a) * (Rw + 0.06)), Math.cos(a) * (Rw + 0.06), ez + 0.45));
+        }
+      }
+    },
+  };
+};
+
+LAYOUTS.manta = () => { // Dorn Manta: two flat engine slabs with slot nozzles, twin fins and drooped winglets
+  const s = spec(8.6, 0.5, 'slab', 3, 9), ex = 2.5, ez = 3.4, W = 3 * s.R;
+  return {
+    engines: pair(s, ex, 0, ez), cockpit: { style: 'wedge', hw: 1.05, len: 3.4, y: 0.92, z: -6.2, pilot: 1, far: 'box' }, binders: MAIN, livery: 4,
+    engineExtras: (pb, _L, hi) => {
+      for (const sd of SIDES) {
+        // a pitot boom on the outer front corner of each slab and a chin splitter under each intake
+        pb.add('chrome', lathe(prof([[0.03, 0], [0.018, 0.9], [0, 1.25]]), hi ? 8 : 5, 0), M4.t(sd * (ex + 0.66 * W), 0.02, ez + 4.2));
+        pb.add('dark', rbox(1.5 * W, 0.04, 0.5, 0.012), M4.t(sd * ex, -0.285, ez + 4.3));
+        if (hi) { // heat shields over the slot nozzles (secondary paint)
+          pb.add('hull', rbox(1.5 * W, 0.03, 0.5, 0.008), M4.trs(sd * ex, 0.4, ez - 4.44, -0.12, 0, 0), SEC);
+          pb.add('glow', rbox(1.4 * W, 0.016, 0.02, 0.004), M4.t(sd * ex, 0.37, ez - 4.68));
+        }
+      }
+    },
+  };
+};
+LAYOUTS.volt = () => { // Quill Voltspire: two open truss cages round plasma coils, coupled by three arcs
+  const s = spec(7, 0.95, 'cage', 5, 6), ex = 2.35, ez = 3, R = s.R;
+  return {
+    engines: pair(s, ex, 0, ez), cockpit: { style: 'saucer', hw: 0.9, len: 2.2, y: 0.9, z: -5.4, pilot: 0.92, topY: 0.95, far: 'cage' },
+    binders: [{ a: 0, b: 1, zOff: -CAGE_ARC_STEP }, { a: 0, b: 1 }, { a: 0, b: 1, zOff: CAGE_ARC_STEP }], livery: 5,
+    engineExtras: (pb, _L, hi) => {
+      for (const sd of SIDES) {
+        // a discharge mast on the front frame of each cage and two skid rails underneath
+        pb.add('chrome', cyl(0.012, 0.03, 1.1, 6), M4.t(sd * ex, R + 0.6, ez + 2.8));
+        pb.add('glow', sphere(0.04, 6, 4), M4.t(sd * ex, R + 1.17, ez + 2.8));
+        if (hi) for (const h of [0.42, 0.74]) pb.add('dark', torus(0.085 - h * 0.04, 0.014, 5, 10), M4.trs(sd * ex, R + h, ez + 2.8, Math.PI / 2, 0, 0));
+        for (const o of [-0.42, 0.42]) rail(pb, [V(sd * ex + o, -R * 0.84, ez + 2.4), V(sd * ex + o, -R - 0.14, ez + 1.9), V(sd * ex + o, -R - 0.14, ez - 1.9), V(sd * ex + o, -R * 0.84, ez - 2.4)], 0.035);
+      }
+    },
+  };
 };
 
 /** Layout of a pod. Every pod id needs its own entry – an unknown id is a bug (it used to build the Mandrel Ram silently). */

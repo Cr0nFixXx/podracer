@@ -83,11 +83,13 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
 
     // Articulated Left & Right engine groups pivoted at each bank's true 3D centroid!
     const oppPetals: THREE.Mesh[] = []; let oppOpen = 0;
+    const oppRotors: { m: THREE.Mesh; spin: number }[] = []; // open rotors turn on Gegner pods too (shared material, own mesh)
     const oppPivots: THREE.Vector3[] = [];
     for (const bank of A.banks) {
       oppPivots.push(bank.pivot);
       const grp = new THREE.Group(); grp.position.copy(bank.pivot); nearGrp.add(grp); engines.push(grp);
       addBuckets(bank.buckets, grp);
+      for (const r of bank.rotors) { const rm = new THREE.Mesh(r.geo, shared[r.mat] ?? shared.dark); rm.position.copy(r.pos); rm.castShadow = false; rm.receiveShadow = true; grp.add(rm); oppRotors.push({ m: rm, spin: r.spin }); }
       if (bank.petals) { const pm = new THREE.Mesh(bank.petals, petalMaterial()); pm.userData.open = 0; grp.add(pm); oppPetals.push(pm); }
       if (bank.flames) { const fm = new THREE.Mesh(bank.flames, oppFlame); fm.renderOrder = 2; grp.add(fm); }
     }
@@ -121,6 +123,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     const update = (t: number, throttle = 0, boost = 0) => { // rivals: nozzle petals open with boost (shared material, per-mesh userData)
       podSharedTime.value = t; oppOpen += (boost - oppOpen) * 0.14;
       const o = 0.1 * throttle + 0.9 * oppOpen; for (let i = 0; i < oppPetals.length; i++) oppPetals[i].userData.open = o;
+      if (oppRotors.length && nearGrp.visible) { const ang = t * (16 + throttle * 42); for (let i = 0; i < oppRotors.length; i++) oppRotors[i].m.rotation.z = ang * oppRotors[i].spin + i * 0.7; }
     };
     const dispose = () => { A.owned.forEach(g => g.dispose()); };
     return { group, body, engines, exhaustLocal: A.exhaustLocal, eye: A.eye, hood: A.hood, update, setEngineMotion, setDistance, dispose };
@@ -166,7 +169,8 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     const engGrp = new THREE.Group(); engGrp.position.copy(bank.pivot); body.add(engGrp); engines.push(engGrp);
     const hull = side < 0 ? hullL : hullR;
     for (const { off, geo: eg } of bank.engines) {
-      const fan = new THREE.Mesh(eg.fan, shared.dark); fan.position.set(off.x, off.y, off.z + eg.fanZ); fan.castShadow = false; engGrp.add(fan); fans.push(fan);
+      const fan = new THREE.Mesh(eg.fan, shared[eg.fanMat ?? 'dark'] ?? shared.dark); fan.position.set(off.x, off.y, off.z + eg.fanZ);
+      fan.castShadow = !!eg.openRotor; fan.receiveShadow = !!eg.openRotor; fan.userData.spin = eg.fanSpin ?? 1; engGrp.add(fan); fans.push(fan); // a big open rotor throws a shadow, an enclosed fan does not
       { const pm = new THREE.Mesh(eg.petals, petalMaterial()); pm.position.copy(off); pm.userData.open = 0; pm.castShadow = false; engGrp.add(pm); petals.push(pm); }
       for (const f of eg.flaps) { const m = new THREE.Mesh(f.geo, hull); m.position.set(off.x + f.pivot.x, off.y + f.pivot.y, off.z + f.pivot.z); m.castShadow = false; m.receiveShadow = true; engGrp.add(m); flaps.push({ m, sign: f.sign, side }); }
       for (const core of [false, true]) {
@@ -234,7 +238,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     }
     glow.color.copy(hc).multiplyScalar(1.1 + boost * 0.3);
     const fanAng = t * (16 + throttle * 42);
-    for (let i = 0; i < fans.length; i++) fans[i].rotation.z = fanAng + i * 0.7;
+    for (let i = 0; i < fans.length; i++) fans[i].rotation.z = fanAng * (fans[i].userData.spin as number) + i * 0.7;
     // Session 13: on a badly damaged pod the air-brake flaps rattle loose in the airstream
     // (dmgL / dmgR are HEALTH fractions: 1 = intact – the first version read them as damage and rattled on every healthy pod)
     // Per-engine battle damage: below 55 % HP on an engine, THAT engine's cowling flaps bend ajar, twist & shudder in the airstream!

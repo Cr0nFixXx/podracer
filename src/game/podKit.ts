@@ -284,6 +284,13 @@ export function radial(make: () => THREE.BufferGeometry, n: number, phase = 0) {
   const m = mergeGeometries(list, false)!; list.forEach(g => g.dispose()); return m;
 }
 
+/** Exhaust flame: a tapering body of revolution from the nozzle (z = 0, radius `rn`) backwards over `len`. */
+export function flameGeo(rn: number, len: number, seg: number) {
+  const pts: [number, number, 0][] = [];
+  for (let i = 0; i <= 12; i++) { const t = 1 - i / 12; const r = rn * Math.pow(1 - t, 0.55) * (1 + 0.18 * Math.sin(Math.PI * t)) + 0.01; pts.push([r, -t * len, 0]); }
+  return lathe(prof(pts), seg, 0);
+}
+
 /** Ring of bolt heads facing +Z (or outward when `radialOut`). */
 export function boltRing(R: number, count: number, r: number, z: number, radialOut = false) {
   return radial(() => {

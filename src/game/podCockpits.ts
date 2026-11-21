@@ -132,6 +132,41 @@ function pilot(k: Kit, hip: THREE.Vector3, lean = 0, reach?: [THREE.Vector3, THR
     pp.add('dark', rbox(0.24, 0.065, 0.09, 0.016), at(M4.t(head.x, head.y + 0.025, head.z + 0.11)));
     pp.add('glow', rbox(0.2, 0.026, 0.02, 0.005), at(M4.t(head.x, head.y + 0.025, head.z + 0.156)));
     if (!lite) for (const sd of [-1, 1]) pp.add('steel', cyl(0.008, 0.012, 0.16, 6), at(M4.trs(head.x + sd * 0.13, head.y + 0.11, head.z - 0.02, -0.3, 0, sd * -0.2)));
+  } else if (kind === 'maul') { // Ursk: broad furry head, round ears, short muzzle, leather cap, small goggles
+    pp.add('skin', sphere(0.135, hs, hr), at(M4.trs(head.x, head.y, head.z, 0, 0, 0, 1.1, 1, 1.05)));
+    pp.add('skin', sphere(0.07, lite ? 6 : 10, lite ? 4 : 8), at(M4.trs(head.x, head.y - 0.04, head.z + 0.115, 0, 0, 0, 1, 0.8, 1)));
+    pp.add('dark', sphere(0.022, 6, 4), at(M4.t(head.x, head.y - 0.025, head.z + 0.185)));
+    pp.add('leather', sphere(0.142, hs, lite ? 5 : 10, 0, Math.PI * 2, 0, Math.PI * 0.42), at(M4.trs(head.x, head.y + 0.005, head.z - 0.01, -0.3, 0, 0, 1.1, 1.02, 1.08)));
+    for (const sd of [-1, 1]) {
+      pp.add('skin', sphere(0.045, lite ? 6 : 8, lite ? 4 : 6), at(M4.trs(head.x + sd * 0.11, head.y + 0.105, head.z - 0.01, 0, 0, 0, 1, 1, 0.5)));
+      pp.add('visor', sphere(0.034, lite ? 6 : 10, lite ? 4 : 8, 0, Math.PI * 2, 0, HALF), at(M4.trs(head.x + sd * 0.056, head.y + 0.04, head.z + 0.122, HALF, 0, 0, 1, 0.5, 1)));
+      if (!lite) pp.add('chrome', torus(0.036, 0.008, 5, 12), at(M4.t(head.x + sd * 0.056, head.y + 0.04, head.z + 0.128)));
+    }
+  } else if (kind === 'veil') { // Nerai: tall slender skull, glassy sail crest, dark eye band, two long trailing tendrils, neck ring
+    pp.add('skin', sphere(0.108, hs, hr), at(M4.trs(head.x, head.y + 0.02, head.z, -0.15, 0, 0, 0.86, 1.28, 1.05)));
+    pp.add('visor', sphere(0.112, hs, lite ? 4 : 8, 0, Math.PI, Math.PI * 0.32, Math.PI * 0.2), at(M4.trs(head.x, head.y + 0.03, head.z + 0.012, 0, 0, 0, 0.9, 1.1, 1.08)));
+    pp.add('glass', fin([[-0.02, 0], [0.16, 0], [0.02, 0.24], [-0.2, 0.2]], 0.012), at(M4.t(head.x, head.y + 0.12, head.z - 0.04)));
+    for (const sd of [-1, 1]) pp.add('skin', tube([V(head.x + sd * 0.07, head.y + 0.06, head.z - 0.07), V(head.x + sd * 0.1, head.y - 0.08, head.z - 0.2), V(head.x + sd * 0.07, head.y - 0.3, head.z - 0.26)], 0.02, lite ? 4 : 8, lite ? 4 : 6), base);
+    if (!lite) pp.add('chrome', torus(0.085, 0.01, 5, 16), at(M4.trs(head.x, head.y - 0.1, head.z, HALF, 0, 0)));
+  } else if (kind === 'horn') { // Brakkan: broad skull, bony brow plate, two forward-curving horns, steel jaw guard, small glowing eyes
+    pp.add('skin', sphere(0.125, hs, hr), at(M4.trs(head.x, head.y, head.z, 0, 0, 0, 1.16, 0.96, 1.08)));
+    pp.add('leather', rbox(0.24, 0.05, 0.14, 0.02), at(M4.trs(head.x, head.y + 0.085, head.z + 0.06, 0.25, 0, 0)));
+    pp.add('steel', sphere(0.118, hs, lite ? 4 : 8, 0, Math.PI, Math.PI * 0.56, Math.PI * 0.3), at(M4.trs(head.x, head.y - 0.005, head.z + 0.015, 0, 0, 0, 1.14, 1, 1.12)));
+    for (const sd of [-1, 1]) {
+      pp.add('leather', tube([V(head.x + sd * 0.11, head.y + 0.06, head.z - 0.01), V(head.x + sd * 0.21, head.y + 0.1, head.z + 0.02), V(head.x + sd * 0.25, head.y + 0.2, head.z + 0.1)], 0.028, lite ? 4 : 8, lite ? 5 : 7), base);
+      if (!lite) pp.add('leather', lathe(prof([[0.028, 0], [0, 0.09]]), 7, 0), at(M4.trs(head.x + sd * 0.25, head.y + 0.2, head.z + 0.1, -0.9, sd * 0.3, 0)));
+      pp.add('glow', sphere(0.02, 6, 4), at(M4.t(head.x + sd * 0.05, head.y + 0.035, head.z + 0.125)));
+    }
+  } else if (kind === 'optic') { // Synth droid: drum-shaped sensor head, one big glowing lens, twin antennas, copper neck gimbal
+    pp.add('steel', cyl(0.105, 0.115, 0.2, lite ? 8 : 16), at(M4.t(head.x, head.y + 0.005, head.z)));
+    pp.add('dark', sphere(0.106, hs, lite ? 4 : 8, 0, Math.PI * 2, 0, HALF), at(M4.trs(head.x, head.y + 0.1, head.z, 0, 0, 0, 1, 0.5, 1)));
+    pp.add('dark', cyl(0.062, 0.07, 0.05, lite ? 8 : 14), at(M4.trs(head.x, head.y + 0.02, head.z + 0.105, HALF, 0, 0)));
+    pp.add('glow', sphere(0.046, lite ? 6 : 12, lite ? 4 : 8), at(M4.trs(head.x, head.y + 0.02, head.z + 0.125, 0, 0, 0, 1, 1, 0.5)));
+    if (!lite) {
+      pp.add('chrome', torus(0.064, 0.01, 5, 14), at(M4.t(head.x, head.y + 0.02, head.z + 0.132)));
+      for (const sd of [-1, 1]) pp.add('steel', cyl(0.006, 0.01, 0.2, 5), at(M4.trs(head.x + sd * 0.11, head.y + 0.16, head.z - 0.03, -0.25, 0, sd * -0.3)));
+      pp.add('copper', torus(0.07, 0.016, 5, 14), at(M4.trs(head.x, head.y - 0.11, head.z, HALF, 0, 0)));
+    }
   } else { // 'goggles': classic flight helmet with chrome rim and twin racing goggles
     pp.add('skin', sphere(0.112, hs, hr), at(M4.trs(head.x, head.y - 0.015, head.z + 0.02, 0, 0, 0, 0.95, 1.05, 1)));
     pp.add('leather', sphere(0.13, hs, lite ? 5 : 12, 0, Math.PI * 2, 0, Math.PI * 0.64), at(M4.trs(head.x, head.y + 0.012, head.z - 0.015, -0.25, 0, 0, 1, 1.05, 1.1)));
@@ -327,7 +362,7 @@ const rattis: Design = (k) => {
   dash(k, V(0, hb.y - 0.06, hb.z + 0.16), 0.26, 2, 0, -1.1); // small binnacle between the bars
   windscreen(k, 'fly', V(0, hb.y - 0.12, hb.z + 0.02), 0.34, 0.42, 0.36);
   // stinger tail (Bruchteil) and two small vanes
-  part(k, 'stinger', V(0, 0, -0.5 * len - 0.3), g => { g.add('chrome', lathe(prof([[0.07, 0], [0.045, -0.25], [0, -0.72]]), k.hi ? 12 : 6, 0), M4.t(0, 0, -0.5 * len + 0.04)); g.add('dark', torus(0.07, 0.02, 5, k.hi ? 12 : 6), M4.t(0, 0, -0.5 * len + 0.02)); });
+  part(k, 'stinger', V(0, 0, -0.5 * len - 0.3), g => { g.add('chrome', lathe(prof([[0, -0.72], [0.045, -0.25], [0.07, 0]]), k.hi ? 12 : 6, 0), M4.t(0, 0, -0.5 * len + 0.04)); /* profile runs towards +z: outward faces */ g.add('dark', torus(0.07, 0.02, 5, k.hi ? 12 : 6), M4.t(0, 0, -0.5 * len + 0.02)); });
   for (const sd of [-1, 1]) pb.add('hull', fin([[0, 0], [0.5, 0], [0.16, 0.34]], 0.03), M4.trs(sd * 0.2 * hw, 0.1 * hw, -0.47 * len, 0, 0, sd * -1.0), SEC);
   belly(k, 0.6 * hw, len * 0.5, -0.44 * hw - 0.02, 0.05 * len);
   if (k.hi) { pb.add('glow', sphere(0.05, 8, 6), M4.t(0, 0.04, 0.5 * len + 0.02)); for (const sd of [-1, 1]) pb.add('glow', sphere(0.03, 6, 4), M4.t(sd * 0.2 * hw, 0.05, -0.46 * len)); }
@@ -524,7 +559,123 @@ const odo: Design = (k) => {
   return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T) };
 };
 
-const DESIGNS: Record<string, Design> = { aurora, mavik, rattis, elana, gasvaro, brute, bomquad, aldo, teemo, odo };
+// ------------------------------------------------------------------ Session 20 / Phase 3: the four new pods
+/** Tarn Cyclone – rotorcraft tub: sturdy open tub with a blunt glazed nose, roll hoop with beacon, twin tail booms with tailplane and fins, skids. */
+const cyclone: Design = (k) => {
+  const { hw, len, pb } = k;
+  const T = shell(k, [[-0.5, 0.62, 0.36, 0.4, 3.6, 0], [-0.42, 0.9, 0.42, 0.5, 3.6, 0], [-0.3, 1, 0.4, 0.56, 3.6, 0.5], [-0.1, 1, 0.36, 0.57, 3.6, 0.6], [0.08, 0.96, 0.36, 0.55, 3.4, 0.5], [0.22, 0.86, 0.42, 0.5, 3, 0], [0.38, 0.62, 0.36, 0.4, 2.6, 0], [0.5, 0.3, 0.2, 0.22, 2.3, 0]]);
+  seat(k, T.hip); const P = pilot(k, T.hip); levers(k, P.hands, T.floorY);
+  dash(k, V(0, T.rimY - 0.05, T.zB - 0.14), Math.min(T.wMax * 1.25, 1.4), 4, 1);
+  windscreen(k, 'dome', V(0, T.rimY - 0.02, T.zB - 0.4 * (T.zB - T.zA)), T.wMax * 0.8, 0.4, 0.62);
+  // roll hoop behind the pilot with a beacon on top
+  const hz = T.hip.z - 0.46, hy = T.rimY + 0.82 * k.s;
+  pb.add('steel', tube([V(-T.wMax * 0.9, T.rimY - 0.04, hz), V(-T.wMax * 0.66, hy, hz), V(0, hy + 0.07, hz), V(T.wMax * 0.66, hy, hz), V(T.wMax * 0.9, T.rimY - 0.04, hz)], 0.045, k.hi ? 18 : 6, 6));
+  if (k.hi) { pb.add('dark', cyl(0.05, 0.06, 0.08, 8), M4.t(0, hy + 0.13, hz)); pb.add('glow', sphere(0.045, 8, 6), M4.t(0, hy + 0.2, hz)); }
+  // twin tail booms carrying a tailplane with two fins (Bruchteil: its loss costs turn)
+  const bz0 = -len * 0.4, bz1 = -len * 0.5 - 1.3, by = 0.1 * hw;
+  for (const sd of [-1, 1]) {
+    pb.add('steel', tube([V(sd * hw * 0.6, by, bz0), V(sd * hw * 0.68, by + 0.16, (bz0 + bz1) / 2), V(sd * hw * 0.68, by + 0.24, bz1)], 0.06, k.hi ? 10 : 4, 6));
+    if (k.hi) pb.add('steel', tube([V(sd * hw * 0.66, by + 0.12, (bz0 + bz1) / 2 + 0.1), V(sd * hw * 0.4, T.rimY, -len * 0.47)], 0.025, 2, 5)); // brace
+  }
+  part(k, 'tail', V(0, by + 0.3, bz1), g => {
+    g.add('hull', rbox(hw * 1.72, 0.05, 0.44, 0.015), M4.t(0, by + 0.26, bz1 - 0.05), SEC);
+    for (const sd of [-1, 1]) g.add('hull', fin([[0, 0], [0.52, 0], [0.3, 0.54], [0.06, 0.58]], 0.04), M4.t(sd * hw * 0.68, by + 0.27, bz1 - 0.3), SEC);
+    if (k.hi) for (const sd of [-1, 1]) g.add('glow', sphere(0.03, 6, 4), M4.t(sd * hw * 0.68, by + 0.86, bz1 - 0.2));
+  });
+  // landing skids under the tub
+  for (const sd of [-1, 1]) {
+    pb.add('steel', tube([V(sd * hw * 0.62, -T.hBm - 0.02, len * 0.34), V(sd * hw * 0.66, -T.hBm - 0.09, len * 0.24), V(sd * hw * 0.66, -T.hBm - 0.09, -len * 0.3), V(sd * hw * 0.62, -T.hBm - 0.03, -len * 0.38)], 0.032, k.hi ? 12 : 5, 5));
+    if (k.hi) for (const z of [0.16, -0.2]) pb.add('steel', cyl(0.022, 0.022, 0.14, 5), M4.t(sd * hw * 0.64, -T.hBm - 0.02, len * z));
+  }
+  belly(k, T.wMax * 0.9, len * 0.44, -T.hBm - 0.03, -0.02 * len);
+  if (k.hi) for (const sd of [-1, 1]) pb.add('glow', rbox(0.16, 0.05, 0.03, 0.01), M4.t(sd * hw * 0.34, 0.02, len * 0.49)); // nose lamps
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T) };
+};
+
+/** Lyss Halo-9 – glass drop in a gimbal: slim boat hull under a long bubble canopy, a flat ring round the hull like the ring wings,
+ *  a chrome arch over the canopy, tail sting. */
+const halo: Design = (k) => {
+  const { hw, len, pb } = k;
+  const T = shell(k, [[-0.5, 0.04, 0.04, 0.04, 2.2, 0], [-0.4, 0.4, 0.2, 0.3, 2.3, 0], [-0.26, 0.78, 0.22, 0.48, 2.4, 0.62], [-0.08, 0.94, 0.2, 0.54, 2.5, 0.7], [0.1, 0.9, 0.2, 0.52, 2.5, 0.66], [0.26, 0.66, 0.22, 0.42, 2.4, 0], [0.4, 0.34, 0.18, 0.26, 2.2, 0], [0.5, 0.05, 0.05, 0.05, 2, 0]]);
+  const lean = 0.22; seat(k, T.hip, lean); const P = pilot(k, T.hip, lean); levers(k, P.hands, T.floorY);
+  dash(k, V(0, T.rimY - 0.04, T.zB - 0.14), Math.min(T.wMax * 1.2, 1.0), 2, 2);
+  windscreen(k, 'bubble', V(0, T.rimY - 0.03, (T.zA + T.zB) * 0.5 - 0.04), T.wMax * 0.94, 0.8 * k.s, (T.zB - T.zA) * 0.57);
+  // gimbal: a flat ring round the hull (secondary paint, light strip like the ring wings) on four stub struts
+  const ax = hw * 1.26, az = len * 0.57, ry = T.rimY - 0.02, n = k.hi ? 40 : 14;
+  const ring = (r: number, y: number) => M4.trs(0, y, 0, HALF, 0, 0, ax * r, az * r, 1);
+  pb.add('hull', torus(1, 0.036, 6, n), ring(1, ry), SEC);
+  pb.add('glow', torus(1, 0.011, 4, n), ring(1, ry + 0.04));
+  for (const sd of [-1, 1]) { pb.add('steel', rbox(ax - T.wMax + 0.1, 0.05, 0.14, 0.015), M4.t(sd * (ax + T.wMax) / 2, ry, 0)); pb.add('steel', rbox(0.1, 0.05, 0.2, 0.015), M4.t(0, ry, sd * (az - 0.08))); }
+  // chrome arch over the canopy (Bruchteil: its loss costs turn)
+  part(k, 'arch', V(0, ry + 1, T.hip.z), g => {
+    g.add('chrome', torus(1, 0.03, 6, k.hi ? 28 : 10, Math.PI), M4.trs(0, ry, T.hip.z - 0.08, 0, 0, 0, ax, 1.06 * k.s + 0.1, 1));
+    if (k.hi) g.add('glow', sphere(0.035, 8, 6), M4.t(0, ry + 1.06 * k.s + 0.14, T.hip.z - 0.08));
+  });
+  // tail sting and two small stabiliser vanes
+  pb.add('chrome', lathe(prof([[0, -0.6], [0.03, -0.2], [0.05, 0]]), k.hi ? 10 : 6, 0), M4.t(0, 0, -len * 0.5 + 0.03));
+  for (const sd of [-1, 1]) pb.add('hull', fin([[0, 0], [0.4, 0], [0.12, 0.3]], 0.03), M4.trs(sd * 0.06, 0.04, -len * 0.47, 0, 0, sd * -0.9), SEC);
+  belly(k, T.wMax * 0.8, len * 0.42, -T.hBm - 0.03, 0);
+  const a = 0.62; // the cables meet the ring left and right of the nose
+  return { head: P.head, eye: P.eye, anchors: anchors(k, [V(-Math.sin(a) * ax, ry + 0.07, Math.cos(a) * az), V(Math.sin(a) * ax, ry + 0.07, Math.cos(a) * az)]) };
+};
+
+/** Dorn Manta – low arrow sled: flat arrowhead hull, reclined pilot behind a wrap screen, delta wing plates, twin fins, slot lights at the stern. */
+const manta: Design = (k) => {
+  const { hw, len, pb } = k;
+  const T = shell(k, [[-0.5, 0.86, 0.2, 0.3, 3.4, 0], [-0.42, 1, 0.26, 0.4, 3.4, 0], [-0.26, 0.98, 0.26, 0.46, 3.2, 0.56], [-0.06, 0.86, 0.24, 0.48, 3, 0.62], [0.12, 0.66, 0.24, 0.44, 2.8, 0.5], [0.26, 0.46, 0.26, 0.36, 2.6, 0], [0.4, 0.24, 0.16, 0.22, 2.4, 0], [0.5, 0.04, 0.04, 0.05, 2, 0]]);
+  const hip = V(0, T.floorY * 0.42, T.hip.z - 0.08), lean = 0.42;
+  seat(k, hip, lean); const P = pilot(k, hip, lean); levers(k, P.hands, T.floorY);
+  dash(k, V(0, T.rimY - 0.04, T.zB - 0.12), Math.min(T.wMax * 1.1, 1.3), 4, 1, -0.8);
+  windscreen(k, 'wrap', V(0, T.rimY - 0.2, T.zB - 0.36 * (T.zB - T.zA)), T.wMax * 0.9, 0.66, 0.86);
+  // delta wing plates from the nose to the stern tips (Bruchteile: grip)
+  for (const sd of [-1, 1]) part(k, sd < 0 ? 'wingL' : 'wingR', V(sd * hw * 1.1, 0, -0.2 * len), g => {
+    const w = extrude([[0, 0], [0.62 * hw, 0.74 * len], [0.7 * hw, 0.9 * len], [0, 0.82 * len]], 0.04, 0.012); w.rotateX(-HALF); // x = outwards, shape +y = backwards
+    const m = M4.trs(sd * hw * 0.5, -0.06, 0.4 * len, 0, 0, sd * -0.07); if (sd < 0) m.multiply(M4.mirrorX());
+    g.add('hull', w, m, SEC);
+    if (k.hi) g.add('glow', sphere(0.03, 6, 4), M4.t(sd * hw * 1.18, -0.11, -0.47 * len));
+  });
+  // twin fins like the engines' (Bruchteile: turn)
+  for (const sd of [-1, 1]) part(k, sd < 0 ? 'finL' : 'finR', V(sd * hw * 0.62, 0.4, -0.4 * len), g => g.add('hull', fin([[0, 0], [0.74, 0], [0.2, 0.52], [0.02, 0.55]], 0.04), M4.t(sd * hw * 0.62, 0.2 * hw, -0.5 * len + 0.02), SEC));
+  // slot lights across the stern, chrome arrow tip, headrest fairing
+  pb.add('dark', rbox(hw * 1.5, 0.1, 0.05, 0.015), M4.t(0, 0, -len * 0.5 - 0.01));
+  pb.add('glow', rbox(hw * 1.36, 0.04, 0.03, 0.008), M4.t(0, 0, -len * 0.5 - 0.03));
+  pb.add('chrome', lathe(prof([[0.04, 0], [0.026, 0.2], [0, 0.5]]), k.hi ? 10 : 6, 0), M4.t(0, 0, len * 0.5 - 0.03));
+  pb.add('hull', loft([{ z: -0.5, w: 0.03, hT: 0.02, hB: 0.02 }, { z: -0.3, w: 0.2, hT: 0.2, hB: 0.06 }, { z: 0, w: 0.24, hT: 0.26, hB: 0.06 }, { z: 0.2, w: 0.06, hT: 0.05, hB: 0.03 }], k.hi ? 12 : 6, 3), M4.t(0, T.rimY + 0.02, T.zA + 0.34));
+  belly(k, T.wMax * 0.9, len * 0.5, -T.hBm - 0.03, -0.08 * len);
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T) };
+};
+
+/** Quill Voltspire – cage ball: floor pan and seat inside a ball of hoops (two of them frame the view like A-pillars), a console on a
+ *  stalk and a tall discharge mast on top. */
+const volt: Design = (k) => {
+  const { hw, pb } = k; const r = hw * 0.86, cy = 0.06, n = k.hi ? 36 : 12, tr = 0.028, yaw = 0.72;
+  const pan = lathe(prof([[0, -0.62 * hw], [0.5 * hw, -0.62 * hw, 1], [0.7 * hw, -0.52 * hw], [0.8 * hw, -0.34 * hw, 1], [0.74 * hw, -0.34 * hw, 1], [0.66 * hw, -0.48 * hw], [0, -0.52 * hw]]), n, 2); pan.rotateX(-HALF);
+  pb.add('hull', pan);
+  const hoop = (m: THREE.Matrix4) => pb.add('steel', torus(r, tr, 6, n), m);
+  hoop(M4.trs(0, cy, 0, HALF, 0, 0));                                          // equator
+  hoop(M4.t(0, cy, 0));                                                         // over the pilot from side to side
+  for (const sd of [-1, 1]) hoop(M4.trs(0, cy, 0, 0, HALF + sd * yaw, 0));      // two diagonal hoops: pillars left and right of the view
+  for (const [dy, mat] of [[0.72, 'steel'], [-0.6, 'dark']] as const) pb.add(mat, torus(r * Math.sqrt(1 - dy * dy), tr * 0.8, 5, n), M4.trs(0, cy + dy * r, 0, HALF, 0, 0));
+  if (k.hi) for (const a of [yaw, -yaw, HALF, -HALF, Math.PI - yaw, yaw - Math.PI]) pb.add('copper', sphere(0.05, 8, 6), M4.t(Math.sin(a) * r, cy, Math.cos(a) * r)); // joints on the equator
+  const hip = V(0, -0.3 * hw, -0.1);
+  seat(k, hip); const P = pilot(k, hip); levers(k, P.hands, -0.5 * hw);
+  // console on a stalk
+  dash(k, V(0, cy + 0.01, r * 0.68), 0.46, 2, 1, -1.05);
+  pb.add('steel', tube([V(0, -0.5 * hw, r * 0.36), V(0, cy - 0.2, r * 0.6), V(0, cy - 0.03, r * 0.68)], 0.03, 6, 6));
+  // discharge mast (Bruchteil) on the top joint
+  pb.add('dark', cyl(0.07, 0.09, 0.08, 10), M4.t(0, cy + r + 0.02, 0));
+  part(k, 'mast', V(0, cy + r + 0.7, 0), g => {
+    g.add('chrome', cyl(0.012, 0.028, 1.3, 6), M4.t(0, cy + r + 0.68, 0));
+    for (let i = 0; i < 3; i++) g.add('dark', torus(0.07 - i * 0.015, 0.014, 5, k.hi ? 12 : 6), M4.trs(0, cy + r + 0.32 + i * 0.3, 0, HALF, 0, 0));
+    g.add('glow', sphere(0.04, 8, 6), M4.t(0, cy + r + 1.35, 0));
+  });
+  // light ring and repulsor studs under the pan
+  pb.add('glow', torus(0.42 * hw, 0.022, 5, n), M4.trs(0, -0.64 * hw, 0, HALF, 0, 0));
+  for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2; pb.add('dark', sphere(0.1, k.hi ? 10 : 6, k.hi ? 5 : 3, 0, Math.PI * 2, HALF, HALF), M4.t(Math.sin(a) * 0.3 * hw, -0.62 * hw, Math.cos(a) * 0.3 * hw)); }
+  return { head: P.head, eye: P.eye, anchors: anchors(k, [V(-Math.sin(yaw) * r, cy + 0.07, Math.cos(yaw) * r), V(Math.sin(yaw) * r, cy + 0.07, Math.cos(yaw) * r)]) };
+};
+
+const DESIGNS: Record<string, Design> = { aurora, mavik, rattis, elana, gasvaro, brute, bomquad, aldo, teemo, odo, cyclone, halo, manta, volt };
 
 function lampGeo(at: THREE.Vector3[], n: THREE.Vector3) {
   const q = new THREE.Quaternion().setFromUnitVectors(V(0, 0, 1), n.clone().normalize());

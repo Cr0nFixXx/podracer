@@ -11,6 +11,7 @@ import { WeatherFx } from './weather';
 import { CSMShadowNode } from 'three/examples/jsm/csm/CSMShadowNode.js';
 import { DIFFICULTIES, PILOTS, PODS, THEMES, TRACKS } from './data';
 import { effectiveStats, MAX_OPPONENTS, type Profile, type GfxSettings } from './settings';
+import { pickRivals } from './roster';
 import { buildTrack, type TrackData } from './trackBuilder';
 import { buildWorld, type World, worldTextureSpecs } from './world';
 import { makeSky, sunDirection } from './sky';
@@ -239,10 +240,9 @@ export class Game {
   createPods() {
     const prof = this.profile; const diff = DIFFICULTIES[prof.race.difficulty];
     const playerDef = PODS.find(p => p.id === prof.podId) ?? PODS[0];
-    const others = PODS.filter(p => p.id !== playerDef.id);
     const n = Math.min(MAX_OPPONENTS, prof.race.opponents);
     const list = [{ def: playerDef, isPlayer: true }];
-    for (let i = 0; i < n; i++) list.push({ def: others[i % others.length], isPlayer: false });
+    for (const def of pickRivals(playerDef.id, n)) list.push({ def, isPlayer: false }); // Session 20: drawn afresh for every race from all other pods
     const playerGrid = Math.min(n, Math.floor(n * 0.6));
     const order = list.slice(1); order.splice(playerGrid, 0, list[0]);
     const S = this.td.main.samples; const N = this.td.N;
@@ -253,7 +253,7 @@ export class Game {
       const s = S[idx]; const lat = (col - 1) * s.hw * 0.55;
       const pilot = PILOTS.find(p => p.id === e.def.pilotId) ?? PILOTS[0];
       const custom = e.isPlayer ? prof.custom[e.def.id] : undefined;
-      const colors = custom ? custom.colors : (g > 10 ? [e.def.colors[1], e.def.colors[0], e.def.colors[2]] as [string, string, string] : e.def.colors);
+      const colors = custom ? custom.colors : e.def.colors;
       const geo = this.profile.gfx.geometry;
       const podOpts = e.isPlayer ? { pattern: custom?.pattern, finish: custom?.finish } : { pattern: (g + 1) % 6 };
       const vis = buildPodModel(e.def, colors, geo, this.profile.gfx.texRes, !e.isPlayer, podOpts);

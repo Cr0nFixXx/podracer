@@ -1,8 +1,10 @@
 // Headless CI check (no browser, no GPU): `npm run check`
-// 14 tracks × 11 AI pods × SECS seconds of real physics (stepPod + aiInputs + hazards). Pod 0 additionally stress-tests the
+// 13 tracks × 11 AI pods × SECS seconds of real physics (stepPod + aiInputs + hazards). The grid moves on by three pods per track
+// (tools/ci/roster.ts), so all 14 pods get driven; ROSTER_OLD=1 runs the Session 19 grid. Pod 0 additionally stress-tests the
 // manual controls (90° roll, lift/dive, handbrake slide). Fails (exit 1) on NaN, wall tunnelling, ground clipping, mass deaths or stuck pods.
 import * as THREE from 'three';
-import { DIFFICULTIES, PILOTS, PODS, TRACKS } from '../../src/game/data';
+import { DIFFICULTIES, PILOTS, TRACKS } from '../../src/game/data';
+import { ciRoster } from './roster';
 import { buildTrack, roadSurfaceAt } from '../../src/game/trackBuilder';
 import { aiInputs, applyDamage, collidePods, podParams, respawn, stepPod, HOVER, type PodState } from '../../src/game/physics';
 import { effectiveStats } from '../../src/game/settings';
@@ -20,8 +22,9 @@ for (const def of TRACKS) {
   if (ONLY && def.id !== ONLY) continue;
   const td = buildTrack(def); const S = td.main.samples, N = td.N;
   const pods: PodState[] = [];
+  const roster = ciRoster(TRACKS.indexOf(def), !!process.env.ROSTER_OLD); // ROSTER_OLD=1: the Session 19 grid (A/B against the old table)
   for (let g = 0; g < 11; g++) {
-    const pd = PODS[g % PODS.length]; const row = Math.floor(g / 3), col = g % 3;
+    const pd = roster[g]; const row = Math.floor(g / 3), col = g % 3;
     let idx = td.startIdx - 6 - row * 13; idx = td.main.closed ? ((idx % N) + N) % N : Math.max(0, idx);
     const s = S[idx], lat = (col - 1) * s.hw * 0.55, eLat = Math.min(1, Math.abs(lat) / s.hw), gY = s.y - lat * s.bank + (1 - eLat * eLat) * 0.2 + 0.08;
     const pilot = PILOTS.find(p => p.id === pd.pilotId) ?? PILOTS[0], skill = diff.skill * (0.7 + 0.3 * pilot.skill);

@@ -51,6 +51,18 @@ Leitidee: **Jeder Racer ist an seinem Cockpit erkennbar – auch als Silhouette.
 | Mak Starling | Vogel | Schnabel, gepfeilte Schwingen, lange Rückenfinne, gespreizte Heck-Bremsklappen |
 | Mandrel Ram | Planierraupe | V-Rammbug mit Warnstreifen und Räumgitter, Hydraulikstempel, Käfig |
 
+**Die vier neuen Racer (Phase 3)** – jeder hat eine Triebwerksform, die es vorher nicht gab, und wiederholt sie im Cockpit:
+
+| Racer | Triebwerke | Cockpit | Farben |
+|---|---|---|---|
+| Tarn Cyclone | kurzer, dicker Rumpf mit offenem 5-Blatt-Rotor in einem Schutzring (Lichtband, Warnstreifen), Auspuffstutzen wie ein Sternmotor | robuste Wanne mit Überrollbügel und Rundumleuchte, Doppel-Leitwerksträger, Kufen | Sand, Oliv, Bernstein |
+| Lyss Halo-9 | schlanker Kern in einem großen Ringflügel mit Lichtbändern; Blitz springt von Ring zu Ring | Glastropfen in einem flachen Ring mit Lichtband, Chrombogen darüber | Eisweiß, Nachtblau, Türkis |
+| Dorn Manta | flache Platte: Briefschlitz-Einlass mit Stauturbine, Schlitzdüse mit flacher Flamme, Rückenwulst, Doppelleitwerk, abgesenkte Flügelspitzen | flacher Pfeilschlitten, liegender Pilot, Deltaflächen, Doppelleitwerk | Schwarz, Gold, Glutrot |
+| Quill Voltspire | offener Gitterkäfig um eine Plasmaspule (Kupferwicklungen, Kondensatortrommeln), drehender Kupferanker, drei Elektroden je Flanke | Käfigkugel aus Reifen mit Konsole am Stiel und hohem Entladungsmast | Indigo, Silber, Violett |
+
+- **Erkennbarkeit aus der Ferne:** das Fern-Modell zeigt die Sonderform (Ring um Rotor- und Ringflügel-Triebwerke, flache Kiste beim Manta, Ring ums Halo-Cockpit).
+- **Sichtachsen:** kein Bauteil in der Blickmitte der Cockpit-Kamera – die Käfigkugel hat ihre vorderen Reifen links und rechts wie A-Säulen; die drei Bögen der Voltspire liegen mindestens 2,5 m hinter der Triebwerksfront (freie Sicht von der Motorhaube).
+- **Grenzen neuer Pods:** tiefster Punkt höchstens 1,9 m unter dem Pod-Ursprung, halbe Breite höchstens 4,6 m, Ringe höchstens 1,85 m Radius.
 - **Cockpit-Höhe:** die Gondel reitet **über der Triebwerkslinie** – Wannenboden nie unter der Achse der unteren Triebwerke, Augpunkt mindestens 0,25 m über deren Oberkante. So hängt kein Cockpit im Abgasstrahl, die Kabel laufen flach nach vorn statt steil nach oben, und der Pilot blickt über die Triebwerke hinweg auf die Strecke. Bei Vier- und Sechsfach-Pods sitzt das Cockpit auf Höhe der Lücke zwischen unterer und oberer Reihe (Blick durch die Mitte).
 - **Innenansicht (Kamera „Cockpit"):** man sitzt im Pod. Die Triebwerke liegen unter dem Horizont; beim Lenken steigt das kurvenäußere Triebwerk kurz ins Bild. Unteres Bilddrittel = Armaturenbrett (Rundinstrumente mit Zeiger, Balkenanzeigen, drei Warnlampen Boost · Hitze · Schaden), darüber Scheibenrahmen bzw. Käfig, voraus Triebwerke, Kabel und Blitz. Kopf und Rumpf des Piloten sind ausgeblendet, Unterarme und Hände an den Hebeln bleiben. Der Blick auf die Strecke bleibt frei: nichts Massives auf Augenhöhe (Panzerblenden lassen einen Sehschlitz). Die freie Sicht ohne Cockpit ist die Kamera „Motorhaube".
 - **Triebwerke:** Einspritzring an der Düse, Verteilerkästen mit Statuslicht, Leitbleche an den Flanken, Griffbügel, Bremsklappen-Stempel; dazu je Pod ein eigener Anbausatz (Flügel-Endkappen, Ansaugdorne, Kühlschleifen, Rammringe, Schwanzfedern …).
