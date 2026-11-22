@@ -3,6 +3,7 @@
 //   node papp.mjs <abs path to dist/index.html> <abs out prefix> ['{"race":{"trackId":"frost","timeOfDay":"night"}}']
 import puppeteer from 'puppeteer';
 const [,, dist, out, profJson = '{}'] = process.argv;
+const PROFILE_KEY = 'podracer-profile-v2'; // the key the game saves under (src/game/settings.ts `KEY`)
 const extra = JSON.parse(profJson);
 const prof = { ...extra, gfx: { backend: 'webgl', renderScale: 0.5, shadows: 1, texRes: 512, particles: 0.6, detail: 0.6, ...(extra.gfx ?? {}) }, race: { opponents: 5, ...(extra.race ?? {}) } };
 const b = await puppeteer.launch({ headless: 'new', protocolTimeout: 900000, args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--allow-file-access-from-files', '--autoplay-policy=no-user-gesture-required'] });
@@ -11,7 +12,7 @@ const open = async () => {
   const p = await b.newPage(); await p.setViewport({ width: 1280, height: 720 });
   p.on('pageerror', e => { errs++; console.log('[pageerror]', e.message.slice(0, 300)); });
   p.on('console', m => { if (m.text().startsWith('[load]')) console.log(m.text()); if (m.type() === 'error' && !/fonts\.g|GPU stall|ERR_/.test(m.text())) { errs++; console.log('[console]', m.text().slice(0, 300)); } });
-  await p.evaluateOnNewDocument(pr => { try { localStorage.setItem('podracer-profile-v1', JSON.stringify(pr)); } catch { /* */ } }, prof);
+  await p.evaluateOnNewDocument((key, pr) => { try { localStorage.setItem(key, JSON.stringify(pr)); } catch { /* */ } }, PROFILE_KEY, prof);
   await p.goto('file://' + dist + (process.env.QUERY ?? '')); return p;
 };
 const click = (p, text) => p.evaluate(t => { const el = [...document.querySelectorAll('button')].find(x => x.textContent.includes(t)); if (!el) throw new Error('button not found: ' + t); el.click(); }, text);
@@ -65,8 +66,9 @@ await has(p, 'Rolle nach links');
 await p.evaluate(() => document.querySelector('[data-action="rollLeft"]').click());
 await has(p, 'Taste drücken', 5000); await p.keyboard.press('KeyQ'); await sleep(300);
 const bound = await p.evaluate(() => document.querySelector('[data-action="rollLeft"] kbd').textContent);
-const stored = await p.evaluate(() => JSON.parse(localStorage.getItem('podracer-profile-v1')).keys?.rollLeft);
-console.log('rebind rollLeft →', bound, '| stored:', JSON.stringify(stored));
+const stored = await p.evaluate(key => JSON.parse(localStorage.getItem(key) ?? '{}').keys?.rollLeft, PROFILE_KEY);
+const saved = Array.isArray(stored) && stored.includes('KeyQ'); // the new binding must be in the saved profile, not only on screen
+console.log('rebind rollLeft →', bound, '| stored:', JSON.stringify(stored), saved ? 'ok' : 'FAIL'); if (!saved) errs++;
 await p.evaluate(() => document.querySelector('[data-action="rollLeft"]').scrollIntoView({ block: 'center' })); await sleep(200);
 await p.screenshot({ path: out + '_keys.png' });
 // gamepad mapping: fake pad, bind "Boost" to button 10 (L3)

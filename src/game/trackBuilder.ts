@@ -17,7 +17,7 @@ export const TUNNEL_N = 3;
 /** lateral shoulder between the road edge and the tunnel wall foot (tunnel half width Wd = hw + TUNNEL_SHOULDER + caveW) */
 export const TUNNEL_SHOULDER = 3.4;
 /** vault height factor 0..1 at the lateral fraction l = |lat| / Wd */
-export function tunnelProfile(l: number) { const a = Math.min(1, Math.abs(l)); return Math.pow(1 - Math.pow(a, TUNNEL_N), 1 / TUNNEL_N); }
+export function tunnelProfile(l: number) { const a = Math.min(1, Math.abs(l)); return TUNNEL_N === 3 ? Math.cbrt(1 - a * a * a) : Math.pow(1 - Math.pow(a, TUNNEL_N), 1 / TUNNEL_N); } // (n = 3 without `pow`: asked for every hull corner near a vault)
 /** cross-section point for the parameter angle 0..π (0 = right wall foot, π/2 = crown, π = left wall foot): [x / W, y / H] */
 export function tunnelArc(ang: number): [number, number] { const c = Math.cos(ang), sn = Math.sin(ang), e = 2 / TUNNEL_N; return [Math.sign(c) * Math.pow(Math.abs(c), e), Math.pow(Math.max(0, sn), e)]; }
 /** Height of the tunnel shell above the road surface point below it (0 outside tunnels) – lat measured from the centreline of `s`. */

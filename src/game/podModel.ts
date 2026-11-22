@@ -5,6 +5,7 @@ import { damageModel } from './podDamage';
 import { tuneTiers, type KitSpec } from './podKitParts';
 import type { StatKey } from './data';
 import { LAMP_VERTS } from './podCockpits';
+import { COCKPIT_SWAY } from './podDesigns';
 import {
   binderMaterial, cableFlexMaterial, flameMaterial, hullMaterial, podSharedTime,
   sharedOpponentBinderMaterial, sharedOpponentFlameMaterial, sharedOpponentHullMaterial,
@@ -296,7 +297,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
       if (rg.length) hiders.push(new Hider(bm, rg));
     });
   }
-  const setCockpitSway = (x: number, y: number, z: number) => { ckGrp.position.set(x, y, z); ckGrp.rotation.z = -x * 0.14; ckGrp.rotation.x = z * 0.07; cabCk.value.set(x, y, z); };
+  const setCockpitSway = (x: number, y: number, z: number) => { ckGrp.position.set(x, y, z); ckGrp.rotation.z = -x * COCKPIT_SWAY.roll; ckGrp.rotation.x = z * COCKPIT_SWAY.pitch; cabCk.value.set(x, y, z); };
   let inside = false;
   const setCockpitView = (on: boolean) => {
     if (on === inside) return; inside = on;

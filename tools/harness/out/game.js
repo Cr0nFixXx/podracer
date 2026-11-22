@@ -87924,7 +87924,7 @@ var TUNNEL_N = 3;
 var TUNNEL_SHOULDER = 3.4;
 function tunnelProfile(l) {
   const a = Math.min(1, Math.abs(l));
-  return Math.pow(1 - Math.pow(a, TUNNEL_N), 1 / TUNNEL_N);
+  return TUNNEL_N === 3 ? Math.cbrt(1 - a * a * a) : Math.pow(1 - Math.pow(a, TUNNEL_N), 1 / TUNNEL_N);
 }
 function tunnelArc(ang) {
   const c = Math.cos(ang), sn = Math.sin(ang), e = 2 / TUNNEL_N;
@@ -91150,6 +91150,83 @@ function podLayout(def) {
   return L;
 }
 
+// ../../src/game/podHulls.json
+var podHulls_default = {
+  note: "The hull round every pod model, measured on the meshes by the pod audit (tools/ci/pods.ts, tools/ci/hull.ts) - do not edit by hand, measure again with: HULL=write npm run check:pods. Body space in metres (x right, y up, z forward). Per pod three parts: L = left engine side, R = right engine side, ck = cockpit. A part is a row of slabs across the pod (boundaries at multiples of 3 m); a slab is [x from, x to, lowest y, then the upper outline of its side view from back to front as z, y pairs]. Largest outfit: the factory pod with any Style-Teile and Tuning-Teile mounted. Read by src/game/podDesigns.ts (podEnvelope().hull).",
+  pods: {
+    aurora: {
+      L: [[-4.55, -3, -1.19, -1.9, -0.29, -1.82, 1.12, 0.35, 1.94, 0.86, 1.97, 8.47, 1.15, 8.6, 0.87, 8.69, 0.43], [-3, -0.45, -1.3, -1.9, 1.33, 0.35, 1.94, 5.12, 2.49, 5.85, 2.46, 12, 0.05]],
+      R: [[0.45, 3, -1.3, -1.9, 1.33, 0.35, 1.94, 5.12, 2.49, 5.85, 2.46, 12, 0.05], [3, 4.55, -1.19, -1.9, -0.29, -1.82, 1.12, 0.35, 1.94, 0.86, 1.97, 8.47, 1.15, 8.6, 0.87, 8.69, 0.42]],
+      ck: [[-1.3, 0, 0.36, -8.33, 1.19, -8.32, 1.26, -8.29, 1.32, -8.12, 1.47, -6.7, 1.68, -5.6, 1.68, -4.97, 1.45, -4.17, 1.07], [0, 1.3, 0.36, -8.35, 1.19, -8.3, 1.32, -8.12, 1.47, -6.7, 1.68, -5.59, 1.68, -3.98, 1.03]]
+    },
+    brute: {
+      L: [[-4.2, -3, -1.76, -3.31, -0.44, -3.24, 1.43, -1.28, 2.23, -0.77, 2.26, 5.84, 1.79, 6.02, 1.71, 6.24, 0.59], [-3, -0.6, -1.8, -3.31, 1.68, -1.54, 4.21, -0.38, 4.21, 6.05, 1.76, 7.16, 0.05], [1.25, 1.66, -1.66, 0.1, -1.53, 5.23, 1.12, 6.13, 1.18], [3.15, 3.55, -1.66, 0.1, -1.53, 5.23, 1.12, 6.13, 1.18]],
+      R: [[-3.55, -3.15, -1.66, 0.1, -1.53, 5.23, 1.12, 6.13, 1.18], [-1.66, -1.25, -1.66, 0.1, -1.53, 5.23, 1.12, 6.13, 1.18], [0.6, 3, -1.8, -3.31, 1.68, -1.28, 2.23, 3.04, 2.84, 6.05, 1.76, 7.16, 0.05], [3, 4.2, -1.76, -3.31, -0.44, -3.24, 1.43, -1.28, 2.23, -0.77, 2.26, 5.84, 1.79, 6.02, 1.71, 6.13, 1.18, 6.24, 0.58]],
+      ck: [[-1.11, 0, 0.67, -10.5, 1.66, -10.47, 1.95, -9.96, 2.55, -9.55, 2.55, -6.65, 1.47], [0, 1.11, 0.67, -10.5, 1.66, -10.47, 1.95, -9.96, 2.56, -9.55, 2.55, -6.65, 1.47]]
+    },
+    gasvaro: {
+      L: [[-4.49, -3, -0.93, -1.15, 0.97, -0.06, 2.28, 1.46, 3.06, 1.97, 3.08, 6.98, 2.29, 8.72, 0.05], [-3, -0.51, -0.93, -1.15, 0.97, -0.14, 2.52, 1.46, 3.06, 4.87, 3.46, 5.31, 3.42, 9.72, 1.6], [1.54, 2.98, -0.25, 1.15, 0.76, 1.69, 1.09, 3.95, 2.17, 4.05, 2.15, 5.06, -0.17], [3, 3.46, -0.25, 1.15, 0.76, 1.42, 0.93, 3.68, 1.32, 5.06, -0.17]],
+      R: [[-3.46, -3, -0.25, 1.15, 0.76, 1.42, 0.93, 3.68, 1.32, 5.06, -0.17], [-2.98, -1.54, -0.25, 1.15, 0.76, 1.69, 1.09, 3.95, 2.17, 4.05, 2.15, 5.06, -0.17], [0.51, 3, -0.93, -1.15, 0.97, -0.14, 2.52, 1.46, 3.06, 4.87, 3.46, 5.31, 3.42, 9.72, 1.6], [3, 4.49, -0.93, -1.15, 0.97, -0.06, 2.28, 1.46, 3.06, 1.97, 3.08, 6.98, 2.29, 8.72, 0.05]],
+      ck: [[-0.81, 0, 0.33, -8.81, 0.87, -8.49, 1.36, -7.99, 1.55, -7.51, 1.61, -4.32, 1.49], [0, 0.81, 0.33, -8.81, 0.87, -8.49, 1.36, -7.99, 1.55, -7.51, 1.61, -4.32, 1.49]]
+    },
+    bomquad: {
+      L: [[-3.2, -3, -0.88, -2.08, 1.89, -2, 2.2, -0.13, 3.26, 0.38, 3.28, 6.19, 2.69, 6.46, 2.6, 6.5, 2.46], [-3, -1.08, -1.25, -2.08, 2.88, -0.13, 3.26, 4, 3.59, 4.6, 3.54, 9.94, 2.08], [1.08, 2.37, -0.35, 0.92, 1.39, 3.92, 2.34, 3.98, 2.32, 4.89, 1.39]],
+      R: [[-2.37, -1.08, -0.35, 0.92, 1.39, 3.92, 2.34, 3.98, 2.32, 4.89, 1.39], [1.08, 3, -1.25, -2.08, 2.88, -0.13, 3.26, 4, 3.59, 4.6, 3.54, 9.94, 2.08], [3, 3.2, -0.88, -2.08, 1.89, -2, 2.2, -0.13, 3.26, 0.38, 3.28, 6.19, 2.69, 6.46, 2.6, 6.5, 2.46]],
+      ck: [[-1.29, 0, 0.21, -7.14, 1.18, -6.53, 1.74, -5.81, 1.69, -4.86, 1.18], [0, 1.29, 0.21, -7.14, 1.18, -6.19, 1.69, -5.99, 1.73, -5.81, 1.69, -4.86, 1.18]]
+    },
+    mavik: {
+      L: [[-2.64, -0.76, -0.77, -2.31, 0.79, -0.28, 1.2, 4.04, 1.46, 4.67, 1.42, 10.24, 0.05], [1.67, 2.4, -0.77, 0.58, -0.56, 4.67, 0.13, 8.27, 0.09]],
+      R: [[-2.4, -1.67, -0.77, 0.58, -0.56, 4.67, 0.13, 8.27, 0.09], [0.76, 2.64, -0.77, -2.31, 0.79, -0.28, 1.2, 4.04, 1.46, 4.67, 1.42, 10.24, 0.05]],
+      ck: [[-0.75, 0, 0.28, -6.75, 0.86, -6.57, 1.98, -6.22, 1.95, -3.13, 0.8], [0, 0.75, 0.28, -6.75, 0.86, -6.57, 1.98, -6.22, 1.95, -3.13, 0.8]]
+    },
+    rattis: {
+      L: [[-3.55, -3.48, -0.04, 5.79, 0.07, 6.83, 0.07], [-2.9, -0.5, -1.07, -1.64, 1.02, -0.04, 1.52, 3.37, 1.92, 3.81, 1.88, 6.13, 1.48, 8.22, 0.05], [0.08, 2.6, -1.07, 0.59, -0.82, 0.86, 0.91, 1.4, 0.93, 6.83, 0.07]],
+      R: [[-2.6, -0.08, -1.07, 0.59, -0.82, 0.86, 0.91, 1.4, 0.93, 6.83, 0.07], [0.5, 2.9, -1.07, -1.64, 1.02, -0.04, 1.52, 3.37, 1.92, 3.81, 1.88, 6.13, 1.48, 8.22, 0.05], [3.48, 3.55, -0.04, 5.79, 0.07, 6.83, 0.07]],
+      ck: [[-0.47, 0, 0.32, -4.72, 0.83, -2.96, 1.76, -2.73, 1.74, -2.48, 1.57, -1.83, 0.85], [0, 0.47, 0.32, -5.18, 0.78, -2.96, 1.76, -2.73, 1.74, -2.48, 1.57, -1.84, 0.85]]
+    },
+    aldo: {
+      L: [[-3.64, -3, -1.04, -2.4, -0.25, -2.32, 0.78, -0.15, 1.73, 0.36, 1.76, 7.95, 0.91, 8.17, 0.38], [-3, -0.96, -1.2, -2.4, 1.17, -0.15, 1.73, 4.62, 2.29, 5.35, 2.26, 11.5, 0.05], [2.13, 2.47, -1.2, 2.03, -0.97, 2.09, -0.79, 4.31, -0.79, 4.37, -0.97]],
+      R: [[-2.47, -2.13, -1.2, 2.03, -0.97, 2.09, -0.79, 4.31, -0.79, 4.37, -0.97], [0.96, 3, -1.2, -2.4, 1.17, -0.15, 1.73, 4.62, 2.29, 5.35, 2.26, 11.5, 0.05], [3, 3.64, -1.04, -2.4, -0.25, -2.32, 0.78, -0.15, 1.73, 0.36, 1.76, 7.95, 0.91, 8.17, 0.37]],
+      ck: [[-1.08, 0, 0.38, -7.66, 1.45, -7.2, 1.64, -6.47, 1.66, -4.3, 0.97], [0, 1.08, 0.38, -7.66, 1.45, -7.2, 1.64, -6.47, 1.66, -4.11, 0.93]]
+    },
+    teemo: {
+      L: [[-3.82, -3, -1.69, -3.56, -0.72, -3.48, 0.7, -2.17, 1.56, 3.83, 3.41, 4.34, 3.44, 8.43, 2.49, 9.01, 2.28], [-3, -0.78, -1.82, -3.56, 1.03, -2.17, 1.56, 3.83, 3.41, 6.79, 3.99, 7.13, 3.96, 10.96, 1.5], [1.41, 2.95, -0.38, 1.05, -0.2, 1.29, 0.2, 2.41, 0.61, 8.3, 2.37, 9.01, 2.28], [3, 3.2, -0.38, 1.05, -0.2, 1.06, -0.16, 8.3, 2.37, 9.01, 2.28]],
+      R: [[-3.2, -3, -0.38, 1.05, -0.2, 1.06, -0.16, 8.3, 2.37, 9.01, 2.28], [-2.95, -1.41, -0.38, 1.05, -0.2, 1.29, 0.2, 2.41, 0.61, 8.3, 2.37, 9.01, 2.28], [0.78, 3, -1.82, -3.56, 1.03, -2.17, 1.56, 3.83, 3.41, 6.79, 3.99, 7.13, 3.96, 10.96, 1.5], [3, 3.82, -1.69, -3.56, -0.72, -3.48, 0.7, -2.17, 1.56, 3.83, 3.41, 4.34, 3.44, 8.43, 2.49, 9.01, 2.28]],
+      ck: [[-0.89, 0, 0.46, -6.71, 0.83, -6.35, 2.12, -6.29, 2.16, -4.49, 1.25, -4.29, 0.83], [0, 0.89, 0.46, -6.73, 0.83, -6.36, 2.14, -6.29, 2.16, -4.49, 1.25, -4.27, 0.83]]
+    },
+    elana: {
+      L: [[-3.25, -3.03, 0, 3.72, 0.1, 3.99, 0.11], [-3, -1, -0.9, -2.61, 0.95, -0.46, 1.43, 4.08, 1.74, 4.76, 1.71, 10.62, 0.05], [1.08, 2.92, -0.82, -1.22, 1.06, -0.8, 1.08, 4.92, 0.83], [3.03, 3.25, 0, 3.72, 0.1, 3.99, 0.11]],
+      R: [[-3.25, -3.03, 0, 3.72, 0.1, 3.99, 0.11], [-2.92, -1.08, -0.82, -1.22, 1.06, -0.8, 1.08, 4.92, 0.83], [1, 3, -0.9, -2.61, 0.95, -0.46, 1.43, 4.08, 1.74, 4.76, 1.71, 10.62, 0.05], [3.03, 3.25, 0, 3.72, 0.1, 3.99, 0.11]],
+      ck: [[-1.59, 0, 0.32, -8.03, 1, -7.51, 2.27, -7.08, 2.21, -3.96, 0.73], [0, 1.59, 0.32, -8.03, 1, -7.51, 2.27, -7.08, 2.21, -3.92, 0.71]]
+    },
+    odo: {
+      L: [[-3.97, -3, -1.54, -1.73, -0.33, -1.65, 1.25, 0.09, 2, 0.6, 2.03, 6.44, 1.19, 7.07, 0.56], [-3, -0.83, -1.54, -1.73, 1.48, 0.09, 2, 3.95, 2.59, 4.49, 2.55, 7.07, 0.93, 7.66, 0.05], [1.03, 2.76, -1.37, 5.15, 1.37, 5.19, 1.4, 5.25, 1.37], [3.03, 3.78, -1.19, 5.15, 1.19, 5.25, 1.19]],
+      R: [[-3.78, -3.03, -1.19, 5.15, 1.19, 5.25, 1.19], [-2.76, -1.03, -1.37, 5.15, 1.37, 5.19, 1.4, 5.25, 1.37], [0.83, 3, -1.54, -1.73, 1.48, 0.09, 2, 3.95, 2.59, 4.49, 2.55, 7.07, 0.93, 7.66, 0.05], [3, 3.97, -1.54, -1.73, -0.33, -1.65, 1.25, 0.09, 2, 0.6, 2.03, 6.44, 1.19, 7.07, 0.56]],
+      ck: [[-1.41, 0, 0.52, -7.08, 0.91, -6.91, 1.44, -6.46, 2.15, -6.27, 2.29, -6.06, 2.33, -5.43, 2.29, -3.47, 1.15, -3.38, 0.63], [0, 1.41, 0.52, -7.08, 0.91, -6.91, 1.44, -6.46, 2.15, -6.27, 2.29, -6.06, 2.33, -5.43, 2.29, -3.47, 1.15, -3.38, 0.63]]
+    },
+    cyclone: {
+      L: [[-4.68, -3, -1.79, -0.48, 1.3, 0.8, 2.02, 1.31, 2.05, 5.51, 1.78, 5.73, 1.69], [-3, -0.72, -1.85, -0.48, 1.3, 0.8, 2.02, 3.16, 2.58, 4.71, 2.42, 5.73, 1.68, 7.2, 0.03], [2.15, 2.73, -1.45, 1.07, -1.07, 3.68, 1.37, 4.71, 1.82, 4.74, 1.76], [3.15, 3.25, -1.45, 1.07, -1.07, 1.12, -1.01, 3.68, -1.01, 3.73, -1.07]],
+      R: [[-3.25, -3.15, -1.45, 1.07, -1.07, 1.12, -1.01, 3.68, -1.01, 3.73, -1.07], [-2.73, -2.15, -1.45, 1.07, -1.07, 3.68, 1.37, 4.71, 1.82, 4.74, 1.76], [0.72, 3, -1.85, -0.48, 1.3, 0.8, 2.02, 3.16, 2.58, 4.71, 2.42, 5.73, 1.69, 7.2, 0.03], [3, 4.68, -1.79, -0.48, 1.3, 0.8, 2.02, 1.31, 2.05, 5.51, 1.78, 5.73, 1.68]],
+      ck: [[-1.01, 0, 0.3, -8.52, 1.41, -8.46, 2.02, -6.32, 2.45, -3.9, 1.26], [0, 1.01, 0.3, -8.52, 1.41, -8.46, 2.02, -6.35, 2.45, -3.9, 1.26]]
+    },
+    halo: {
+      L: [[-4.61, -3, -1.74, -2.02, -0.1, -1.94, 0.53, -0.47, 1.01, 2.74, 1.76, 4.16, 1.76, 6.74, 0.49, 6.84, 0.32, 6.86, 0.19], [-3, -0.89, -1.8, -2.02, 0.67, 2.69, 1.75, 3.61, 1.8, 4.21, 1.76, 9.11, 0.05], [2.68, 2.82, -1.8, -1.6, 0.46, -0.09, 0.53, 4.12, -1.62], [4.09, 4.17, -1.13, 3.42, 1.13, 3.46, 1.16, 3.48, 1.13]],
+      R: [[-4.17, -4.09, -1.13, 3.42, 1.13, 3.46, 1.16, 3.48, 1.13], [-2.82, -2.68, -1.8, -1.6, 0.46, -0.09, 0.53, 4.12, -1.62], [0.89, 3, -1.8, -2.02, 0.67, 2.69, 1.75, 3.61, 1.8, 4.21, 1.76, 9.11, 0.05], [3, 4.61, -1.74, -2.02, -0.1, -1.94, 0.53, -0.47, 1.01, 2.74, 1.76, 4.16, 1.76, 6.74, 0.49, 6.84, 0.32, 6.86, 0.19]],
+      ck: [[-1.06, 0, 0.27, -6.74, 0.9, -5.65, 2.08, -3.68, 0.9], [0, 1.06, 0.27, -7.08, 0.84, -5.63, 2.08, -3.66, 0.9]]
+    },
+    manta: {
+      L: [[-4.56, -3, -0.61, -1.92, 0.52, -1.04, 1.44, 0.05, 1.53, 6.04, 0.97, 7.27, 0.61, 8.86, 0.05], [-3, -0.44, -0.61, -1.92, 0.52, -1.04, 1.44, -0.3, 1.52, 3.81, 1.51, 4.49, 1.47, 9.16, 0.05], [1.37, 1.46, -0.31, -1.3, 0.41, -0.8, 0.48, 7.95, -0.23], [3.46, 3.63, -0.31, -1.3, 0.41, -0.8, 0.48, 8.86, 0.05]],
+      R: [[-3.63, -3.46, -0.31, -1.3, 0.41, -0.8, 0.48, 8.86, 0.05], [-1.46, -1.37, -0.31, -1.3, 0.41, -0.8, 0.48, 7.95, -0.23], [0.44, 3, -0.61, -1.92, 0.52, -1.04, 1.44, -0.3, 1.52, 3.81, 1.51, 4.49, 1.47, 9.16, 0.05], [3, 4.56, -0.61, -1.92, 0.52, -1.04, 1.44, 0.05, 1.53, 7.24, 0.61, 8.86, 0.05]],
+      ck: [[-1.28, 0, 0.32, -7.95, 0.97, -7.88, 1.73, -6.88, 1.8, -5.68, 1.49, -4.32, 0.98], [0, 1.28, 0.32, -7.95, 0.97, -7.88, 1.73, -6.88, 1.8, -5.68, 1.49, -4.02, 0.96]]
+    },
+    volt: {
+      L: [[-3.77, -3, -1.03, -1.73, -0.13, -1.65, 0.52, -0.12, 1.74, 0.39, 1.77, 6.48, 0.9, 6.67, 0.38], [-3, -0.93, -1.15, -1.73, 0.94, -0.12, 1.74, 4.5, 2.27, 5.81, 2.2, 8.36, 0.05], [1.89, 2.81, -1.13, 0.58, -0.78, 5.81, 2.2, 5.84, 2.15, 5.87, 1.73, 5.88, 1.4]],
+      R: [[-2.81, -1.89, -1.13, 0.58, -0.78, 5.81, 2.2, 5.84, 2.15, 5.87, 1.73, 5.88, 1.4], [0.93, 3, -1.15, -1.73, 0.94, -0.12, 1.74, 4.5, 2.27, 5.81, 2.2, 8.36, 0.05], [3, 3.77, -1.03, -1.73, -0.13, -1.65, 0.52, -0.12, 1.74, 0.39, 1.77, 6.48, 0.9, 6.67, 0.37]],
+      ck: [[-0.83, 0, 0.2, -6.21, 0.99, -6.15, 1.26, -5.42, 3.15, -5.36, 3.14, -4.67, 1.23, -4.6, 0.99], [0, 0.83, 0.18, -6.21, 0.99, -6.16, 1.27, -5.43, 3.15, -5.37, 3.14, -4.59, 0.99]]
+    }
+  }
+};
+
 // ../../src/game/podDesigns.ts
 var collCache = /* @__PURE__ */ new Map();
 function podCollision(def) {
@@ -91171,22 +91248,16 @@ function podCollision(def) {
   collCache.set(def.id, out);
   return out;
 }
-var POD_BOX = {
-  aurora: [2.46, 2.46, 1.65, 4.55],
-  brute: [4.18, 2.81, 2.53, 4.2],
-  gasvaro: [3.43, 3.43, 1.58, 4.49],
-  bomquad: [3.56, 3.56, 1.71, 3.2],
-  mavik: [1.43, 1.43, 1.97, 2.64],
-  rattis: [1.89, 1.89, 1.73, 3.55],
-  aldo: [2.26, 2.26, 1.63, 3.64],
-  teemo: [3.96, 3.96, 2.13, 3.82],
-  elana: [1.71, 1.71, 2.24, 3.25],
-  odo: [2.56, 2.56, 2.32, 3.97],
-  cyclone: [2.55, 2.55, 2.42, 4.68],
-  halo: [1.77, 1.77, 2.05, 4.61],
-  manta: [1.5, 1.5, 1.77, 4.56],
-  volt: [2.24, 2.24, 3.13, 3.77]
-};
+var COCKPIT_SWAY = { roll: 0.14, pitch: 0.07 };
+function hullCorners(slabs) {
+  const out = [];
+  for (const r of slabs) {
+    const x0 = r[0], x1 = r[1], y0 = r[2], n = r.length;
+    for (let i = 3; i + 1 < n; i += 2) out.push(x0, r[i + 1], r[i], x1, r[i + 1], r[i]);
+    out.push(x0, y0, r[3], x1, y0, r[3], x0, y0, r[n - 2], x1, y0, r[n - 2]);
+  }
+  return new Float32Array(out);
+}
 var envCache = /* @__PURE__ */ new Map();
 function podEnvelope(def) {
   const hit = envCache.get(def.id);
@@ -91212,24 +91283,26 @@ function podEnvelope(def) {
   const ck = L.cockpit;
   const floorY = ck.y - ck.hw * 0.68 - 0.14;
   const engL = sideEnv(-1), engR = sideEnv(1);
-  const row = POD_BOX[def.id];
-  const guess = (sign3) => Math.max(0, ...L.engines.filter((e) => (e.x < 0 ? -1 : 1) === sign3).map((e) => e.y + engineExtent(e.spec).top)) + 2;
+  const row = podHulls_default.pods[def.id];
+  const guess = (sign3, e) => {
+    const top = Math.max(0, ...L.engines.filter((q) => (q.x < 0 ? -1 : 1) === sign3).map((q) => q.y + engineExtent(q.spec).top)) + 2;
+    return [[Math.min(0, e.outerX - 0.6), Math.max(0, e.outerX + 0.6), e.minY - 0.6, e.backZ - bz - 0.6, top, e.frontZ - bz + 0.6, top]];
+  };
   const out = {
     engL,
     engR,
     // the ground clamp may reach deeper than the tub (`keel`: raised cockpits keep their old clamp); the strobe sits on the visible cockpit
     cockpit: { z: ck.z + bz, minY: floorY - (ck.keel ?? 0), topY: ck.topY !== void 0 ? ck.y + ck.topY : floorY + 1.75 },
     length: Math.max(engL.frontZ, engR.frontZ) - (ck.z + bz - ck.len * 0.5),
-    // a pod without a row (a new one being built – the audit refuses it until its row is measured) gets a rough guess:
-    // 2 m above the body of its highest engine, 3.5 m above the cockpit origin, 0.6 m wider than the ground-clearance envelope
-    box: row ? { topL: row[0], topR: row[1], topCockpit: row[2], halfW: row[3] } : { topL: guess(-1), topR: guess(1), topCockpit: ck.y + 3.5, halfW: Math.max(-engL.outerX, engR.outerX) + 0.6 }
+    bodyZ: bz,
+    hull: row ? { L: hullCorners(row.L), R: hullCorners(row.R), ck: hullCorners(row.ck) } : {
+      L: hullCorners(guess(-1, engL)),
+      R: hullCorners(guess(1, engR)),
+      ck: hullCorners([[-ck.hw - 0.6, ck.hw + 0.6, floorY - (ck.keel ?? 0) - 0.6, ck.z - ck.len * 0.5 - 0.6, ck.y + 3.5, ck.z + ck.len * 0.5 + 0.6, ck.y + 3.5]])
+    }
   };
   envCache.set(def.id, out);
   return out;
-}
-function podHeight(env, liftL, liftR, roll) {
-  const b = env.box;
-  return Math.max(b.topCockpit, b.topL + liftL, b.topR + liftR) * Math.abs(Math.cos(roll)) + b.halfW * Math.abs(Math.sin(roll));
 }
 
 // ../../src/game/weather.ts
@@ -94214,6 +94287,109 @@ function bodyToWorld(p, bodyZ, v) {
   const y2 = y1 * cp - v.z * sp, z2 = y1 * sp + v.z * cp + bodyZ;
   return v.set(p.pos.x + x1 * cy + z2 * sy, p.pos.y + y2, p.pos.z - x1 * sy + z2 * cy);
 }
+var HULL_PTS = new Float32Array(3 * 512);
+function hullWorld(p, env, out = HULL_PTS) {
+  const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw), sp = Math.sin(p.pitch), cp = Math.cos(p.pitch), sr = Math.sin(p.roll), cr = Math.cos(p.roll), bz = env.bodyZ;
+  const px2 = p.pos.x, py2 = p.pos.y, pz2 = p.pos.z;
+  let n = 0;
+  const put = (x, y, z) => {
+    const x1 = x * cr - y * sr, y1 = x * sr + y * cr, z2 = y1 * sp + z * cp + bz;
+    out[n++] = px2 + x1 * cy + z2 * sy;
+    out[n++] = py2 + y1 * cp - z * sp;
+    out[n++] = pz2 - x1 * sy + z2 * cy;
+  };
+  const L = env.hull.L, R = env.hull.R, C = env.hull.ck, yl = p.engYL ?? 0, yr = p.engYR ?? 0;
+  for (let i = 0; i < L.length; i += 3) put(L[i], L[i + 1] + yl, L[i + 2]);
+  for (let i = 0; i < R.length; i += 3) put(R[i], R[i + 1] + yr, R[i + 2]);
+  const kx = p.ckX ?? 0, ky = p.ckY ?? 0, kz = p.ckZ ?? 0, az = -kx * COCKPIT_SWAY.roll, ax = kz * COCKPIT_SWAY.pitch;
+  const sa = Math.sin(az), ca = Math.cos(az), sb = Math.sin(ax), cb = Math.cos(ax);
+  for (let i = 0; i < C.length; i += 3) {
+    const x = C[i] * ca - C[i + 1] * sa, y = C[i] * sa + C[i + 1] * ca, z = C[i + 2];
+    put(x + kx, y * cb - z * sb + ky, y * sb + z * cb + kz);
+  }
+  return n / 3;
+}
+var VAULT_CLAMP = 0.96;
+var VAULT_LOW = tunnelProfile(VAULT_CLAMP);
+var XA;
+var XB;
+var XF = 0;
+function crossSection(path, idx, x, z) {
+  const S2 = path.samples, N3 = S2.length, wrap2 = path.closed;
+  let j = idx, sa = S2[j], a = (x - sa.x) * sa.tx + (z - sa.z) * sa.tz;
+  for (let it = 0; it < 5 && (a > DS * 0.5 || a < -DS * 0.5); it++) {
+    let k2 = j + Math.round(a / DS);
+    if (wrap2) k2 = (k2 % N3 + N3) % N3;
+    else k2 = k2 < 0 ? 0 : k2 >= N3 ? N3 - 1 : k2;
+    if (k2 === j) break;
+    const sk = S2[k2], ak = (x - sk.x) * sk.tx + (z - sk.z) * sk.tz;
+    if (Math.abs(ak) >= Math.abs(a)) break;
+    j = k2;
+    sa = sk;
+    a = ak;
+  }
+  let k = a >= 0 ? j + 1 : j - 1;
+  if (wrap2) k = (k % N3 + N3) % N3;
+  else k = k < 0 ? 0 : k >= N3 ? N3 - 1 : k;
+  let sb = S2[k], f = 0;
+  if (sb !== sa) {
+    const ab = (x - sb.x) * sb.tx + (z - sb.z) * sb.tz;
+    f = a * ab < 0 ? a / (a - ab) : Math.min(1, Math.abs(a) / DS);
+  }
+  if (!(sa.roof > 0)) {
+    if (!(sb.roof > 0) || f < 0.5) return false;
+    sa = sb;
+    f = 0;
+  } else if (!(sb.roof > 0)) {
+    if (f >= 0.5) return false;
+    sb = sa;
+    f = 0;
+  }
+  XA = sa;
+  XB = sb;
+  XF = f;
+  return true;
+}
+function shellHeight(x, z, low) {
+  const sa = XA, sb = XB, la = (x - sa.x) * sa.rx + (z - sa.z) * sa.rz, ba = sa.y + sa.ramp - la * sa.bank + 1.5, ha = sa.roof - 1.5;
+  const va = ba + ha * (low ? VAULT_LOW : tunnelProfile(Math.min(VAULT_CLAMP, Math.abs(la) / (sa.hw + TUNNEL_SHOULDER + (sa.caveW ?? 0)))));
+  if (sb === sa) return va;
+  const lb = (x - sb.x) * sb.rx + (z - sb.z) * sb.rz, bb = sb.y + sb.ramp - lb * sb.bank + 1.5, hb = sb.roof - 1.5;
+  const vb = bb + hb * (low ? VAULT_LOW : tunnelProfile(Math.min(VAULT_CLAMP, Math.abs(lb) / (sb.hw + TUNNEL_SHOULDER + (sb.caveW ?? 0)))));
+  return va + (vb - va) * XF;
+}
+function nearestOnLinked(path, other, x, y, z) {
+  if (other.id !== 0) return nearestGlobal(other, x, z, 0, other.samples.length - 1);
+  const M3 = other.samples, nm = M3.length;
+  let best = (path.mainFrom % nm + nm) % nm, bd = 1e12;
+  for (const center of [path.mainFrom, path.mainTo]) for (let k = -65; k <= 65; k++) {
+    let j = center + k;
+    if (other.closed) j = (j % nm + nm) % nm;
+    else if (j < 0 || j >= nm) continue;
+    const q = M3[j], d = (q.x - x) ** 2 + (q.z - z) ** 2 + (q.y - y) ** 2 * 4;
+    if (d < bd) {
+      bd = d;
+      best = j;
+    }
+  }
+  return best;
+}
+function vaultOver(td, path, idx, pts, n, exact = false) {
+  let over = -1e9, og = -1;
+  for (let i = 0; i < n * 3; i += 3) {
+    const x = pts[i], y = pts[i + 1], z = pts[i + 2];
+    if (!crossSection(path, idx, x, z)) continue;
+    if (!exact && y <= shellHeight(x, z, true)) continue;
+    let shell2 = shellHeight(x, z, false);
+    if ((exact || y > shell2) && XA.link >= 0 && XA.link !== path.id && ((x - XA.x) * XA.rx + (z - XA.z) * XA.rz < 0 ? XA.openL : XA.openR)) {
+      const other = td.paths[XA.link];
+      if (og < 0) og = nearestOnLinked(path, other, pts[0], pts[1], pts[2]);
+      if (crossSection(other, og, x, z)) shell2 = Math.max(shell2, shellHeight(x, z, false));
+    }
+    if (y - shell2 > over) over = y - shell2;
+  }
+  return over;
+}
 function applyDamage(p, side, amount, zone) {
   const m = DAMAGE_RULES.armor || DAMAGE_RULES.parts ? damageModel(p.def.id) : null;
   let aL = side === "both" || side < 0 ? amount : side > 0 ? 0 : amount * 0.5;
@@ -94477,21 +94653,6 @@ function stepPod(p, td, dt, time12, gripMul, frozen) {
     landImpulse = imp;
     p.events.push({ type: "land", strength: imp, x: p.pos.x, y: fr.groundY, z: p.pos.z, nx: 0, nz: 0 });
   }
-  if (S2.roof > 0 && !fr.gap && !p.upper) {
-    const l = Math.min(0.96, Math.abs(fr.lat) / (fr.hw + TUNNEL_SHOULDER + (S2.caveW ?? 0)));
-    const ceil2 = fr.groundY + 1.5 + (S2.roof - 1.5) * tunnelProfile(l) - podHeight(env0, p.engYL ?? 0, p.engYR ?? 0, rollA);
-    if (p.pos.y > ceil2) {
-      const imp = Math.max(0, p.vel.y);
-      p.pos.y = Math.max(ceil2, p.pos.y - 45 * dt);
-      if (p.vel.y > 0) p.vel.y *= -0.3;
-      if (imp > 6 && p.invuln <= 0) {
-        const dmg = Math.min(20, (imp - 6) * 0.8 * P.sturdy);
-        applyDamage(p, 0, dmg, "top");
-        p.shake = Math.min(1, p.shake + 0.3);
-        p.events.push({ type: "wall", strength: imp, x: p.pos.x, y: p.pos.y + 1, z: p.pos.z, nx: 0, nz: 0 });
-      }
-    }
-  }
   if (p.zeroG) {
     const dy = p.pos.y - (fr.groundY + 7), dl = fr.lat, dist = Math.hypot(dl, dy), R = fr.hw + 1.4;
     if (dist > R) {
@@ -94566,16 +94727,25 @@ function stepPod(p, td, dt, time12, gripMul, frozen) {
     }
   }
   if (td.overheads && td.overheads.length && p.path === 0) {
-    const Nm = td.N, ext = 1.5 + knife * halfSpan;
+    const Nm = td.N;
+    let hn = -1;
     for (const oh of td.overheads) {
       let di = p.idx - oh.idx;
       if (td.main.closed) {
         if (di > Nm / 2) di -= Nm;
         else if (di < -Nm / 2) di += Nm;
       }
-      if (Math.abs(di) > 5 + oh.half / DS) continue;
-      const s0 = td.main.samples[oh.idx], along = (p.pos.x - s0.x) * s0.tx + (p.pos.z - s0.z) * s0.tz;
-      if (Math.abs(along) > oh.half + 2.4) continue;
+      if (Math.abs(di) > 10 + oh.half / DS) continue;
+      const s0 = td.main.samples[oh.idx];
+      if (hn < 0) hn = hullWorld(p, env0);
+      let top = -1e9, bot = 1e9;
+      for (let i = 0; i < hn * 3; i += 3) {
+        if (Math.abs((HULL_PTS[i] - s0.x) * s0.tx + (HULL_PTS[i + 2] - s0.z) * s0.tz) > oh.half + 1) continue;
+        const y = HULL_PTS[i + 1];
+        if (y > top) top = y;
+        if (y < bot) bot = y;
+      }
+      if (top < bot) continue;
       let y0 = oh.y0, y1 = oh.y1;
       if (oh.arch) {
         const A = oh.arch, lat = (p.pos.x - s0.x) * s0.rx + (p.pos.z - s0.z) * s0.rz, Ri = A.R - (A.inner ?? 1.7);
@@ -94583,15 +94753,16 @@ function stepPod(p, td, dt, time12, gripMul, frozen) {
         y0 = s0.y + (A.yOff ?? 0) + A.sy * Math.sqrt(Math.max(0, Ri * Ri - lat * lat));
         y1 = y0 + (A.thick ?? 3.6);
       }
-      if (p.pos.y + ext <= y0 || p.pos.y - ext >= y1) continue;
+      if (top <= y0 || bot >= y1) continue;
       const below = p.pos.y < (y0 + y1) * 0.5, hitY = below ? y0 : y1;
       if (below) {
-        p.pos.y = y0 - ext;
+        p.pos.y -= top - y0;
         if (p.vel.y > -5) p.vel.y = -5;
       } else {
-        p.pos.y = y1 + ext;
+        p.pos.y += y1 - bot;
         if (p.vel.y < 4) p.vel.y = 4;
       }
+      hn = -1;
       const wc = p;
       if (p.invuln <= 0 && !(wc.wCd > 0)) {
         wc.wCd = 0.5;
@@ -94788,6 +94959,20 @@ function stepPod(p, td, dt, time12, gripMul, frozen) {
     p.ckVX = vx;
     p.ckVY = vy;
     p.ckVZ = vz;
+  }
+  if (S2.roof > 0 && !fr.gap && !p.upper && !p.grounded) {
+    const over = vaultOver(td, path, p.idx, HULL_PTS, hullWorld(p, env0));
+    if (over > 0) {
+      const imp = Math.max(0, p.vel.y);
+      p.pos.y -= Math.min(over, 45 * dt);
+      if (p.vel.y > 0) p.vel.y *= -0.3;
+      if (imp > 6 && p.invuln <= 0) {
+        const dmg = Math.min(20, (imp - 6) * 0.8 * P.sturdy);
+        applyDamage(p, 0, dmg, "top");
+        p.shake = Math.min(1, p.shake + 0.3);
+        p.events.push({ type: "wall", strength: imp, x: p.pos.x, y: p.pos.y + 1, z: p.pos.z, nx: 0, nz: 0 });
+      }
+    }
   }
   p.shake *= Math.exp(-dt * 3);
 }
@@ -104719,8 +104904,8 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
   }
   const setCockpitSway = (x, y, z) => {
     ckGrp.position.set(x, y, z);
-    ckGrp.rotation.z = -x * 0.14;
-    ckGrp.rotation.x = z * 0.07;
+    ckGrp.rotation.z = -x * COCKPIT_SWAY.roll;
+    ckGrp.rotation.x = z * COCKPIT_SWAY.pitch;
     cabCk.value.set(x, y, z);
   };
   let inside = false;
@@ -109250,6 +109435,7 @@ window.track = async (i, view) => {
       if (qs.get("wx")) prof2.race.weather = qs.get("wx");
       if (qs.has("ultra")) Object.assign(prof2.gfx, PRESETS.ultra, { preset: "ultra", texRes: 1024, renderScale: 0.6 });
       if (qs.get("tex")) prof2.gfx.texRes = +qs.get("tex");
+      if (qs.get("pod")) prof2.podId = qs.get("pod");
     }
     prof2.gfx.renderScale = 0.6;
     prof2.gfx.shadows = 1;
@@ -109449,6 +109635,41 @@ window.track = async (i, view) => {
     });
     G2.camera.position.set(a.x, a.y + 5, a.z);
     if (dir) G2.camera.lookAt(a.x + dir.x, a.y + 5 + dir.y * 0.6, a.z + dir.z);
+  } else if (view === "top" || view === "topw" || view === "topf") {
+    const S2 = G2.td.main.samples;
+    let a0 = S2.findIndex((q, j) => j > 50 && q.roof > 0 && q.tun === 1);
+    if (a0 < 0) a0 = 100;
+    const s = S2[a0 + 45], pl = G2.player, wall = view !== "top", lat = wall ? s.wallR - 6 : 0, x0 = s.x + s.rx * lat, z0 = s.z + s.rz * lat, speed = wall ? 100 : 0;
+    pl.pos.set(x0, s.y + 6, z0);
+    pl.yaw = Math.atan2(s.tx, s.tz);
+    pl.path = 0;
+    pl.idx = a0 + 45;
+    pl.dead = 0;
+    pl.invuln = 99;
+    pl.inRoof = true;
+    pl.upper = false;
+    pl.grounded = false;
+    for (let k = 0; k < 260; k++) {
+      pl.pos.x = x0;
+      pl.pos.z = z0;
+      pl.vel.set(s.tx * speed, 9, s.tz * speed);
+      pl.input.pitch = 0;
+      pl.input.roll = 0;
+      stepPod(pl, G2.td, 1 / 60, G2.clock + k / 60, 1, false);
+    }
+    pl.pos.x = x0;
+    pl.pos.z = z0;
+    pl.invuln = 0;
+    G2.updateVisuals();
+    window.coverInfo = `pod ${pl.def.id} at the vault: ${(pl.pos.y - s.y).toFixed(2)} m above the road (roof ${s.roof} m), pitch ${pl.pitch.toFixed(2)}, lat ${lat.toFixed(1)}`;
+    const side = wall ? -1 : 1;
+    if (view === "topf") {
+      G2.camera.position.set(x0 - s.rx * 6 + s.tx * 26, pl.pos.y + 1, z0 - s.rz * 6 + s.tz * 26);
+      G2.camera.lookAt(x0 + s.rx * 1.5, pl.pos.y + 1.5, z0 + s.rz * 1.5);
+    } else {
+      G2.camera.position.set(x0 + s.rx * side * 15 + s.tx * 9, pl.pos.y - 2.5, z0 + s.rz * side * 15 + s.tz * 9);
+      G2.camera.lookAt(x0 + s.tx * 4, pl.pos.y + 2.5, z0 + s.tz * 4);
+    }
   } else if (view === "r") {
     G2.state = "race";
     G2.keys.add("KeyW");

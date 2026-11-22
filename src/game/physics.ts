@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import type { PilotDef, PodDef, StatKey } from './data';
-import { DS, TUNNEL_SHOULDER, boulderState, tunnelCeiling, bridgeSwing, frameAt, gateDrop, nearestGlobal, nearestOnPath, roadSurfaceAt, rotorAngle, tunnelProfile, type Obstacle, type SetPiece, type TrackData } from './trackBuilder';
+import { DS, TUNNEL_SHOULDER, boulderState, tunnelCeiling, bridgeSwing, frameAt, gateDrop, nearestGlobal, nearestOnPath, roadSurfaceAt, rotorAngle, tunnelProfile, type Obstacle, type Path, type Sample, type SetPiece, type TrackData } from './trackBuilder';
 import type { PodVisual } from './podModel';
-import { podCollision, podEnvelope, podHeight } from './podDesigns';
+import { COCKPIT_SWAY, podCollision, podEnvelope, type PodEnvelope } from './podDesigns';
 import { surfaceOf } from './surfaces';
 import { DAMAGE_RULES, FX_NONE, damageModel, partsDue, partsFx, zoneFactor, type DamageZone, type PodFx } from './podDamage';
 export { FX_NONE, type DamageZone, type PodFx };
@@ -70,6 +70,95 @@ export function bodyToWorld(p: Pose, bodyZ: number, v: THREE.Vector3) {
   return v.set(p.pos.x + x1 * cy + z2 * sy, p.pos.y + y2, p.pos.z - x1 * sy + z2 * cy); // yaw
 }
 
+const HULL_PTS = new Float32Array(3 * 512); // scratch: the corners of one pod's hull in the world (the largest hull has about 150)
+/** The corners of the pod's hull (podDesigns `hull`) in the world, in the pose its model is drawn in: yaw, pitch and roll about the body
+ *  origin, each engine side with its vertical travel, the cockpit swaying in its cables. Writes x, y, z triples to `out` and returns
+ *  the number of corners. Tunnel vaults and overhead structures are tested against these points – not against one height per pod:
+ *  with its nose up a pod reaches up to 8 m higher at the engine intakes than when it is level. */
+export function hullWorld(p: PodState, env: PodEnvelope, out: Float32Array = HULL_PTS): number {
+  const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw), sp = Math.sin(p.pitch), cp = Math.cos(p.pitch), sr = Math.sin(p.roll), cr = Math.cos(p.roll), bz = env.bodyZ;
+  const px = p.pos.x, py = p.pos.y, pz = p.pos.z; let n = 0;
+  const put = (x: number, y: number, z: number) => { // body space -> world (as `bodyToWorld`)
+    const x1 = x * cr - y * sr, y1 = x * sr + y * cr, z2 = y1 * sp + z * cp + bz;
+    out[n++] = px + x1 * cy + z2 * sy; out[n++] = py + y1 * cp - z * sp; out[n++] = pz - x1 * sy + z2 * cy;
+  };
+  const L = env.hull.L, R = env.hull.R, C = env.hull.ck, yl = p.engYL ?? 0, yr = p.engYR ?? 0;
+  for (let i = 0; i < L.length; i += 3) put(L[i], L[i + 1] + yl, L[i + 2]);
+  for (let i = 0; i < R.length; i += 3) put(R[i], R[i + 1] + yr, R[i + 2]);
+  // the cockpit leans about the body origin with its sway, then shifts (podModel `setCockpitSway`: rotation.z, rotation.x, position)
+  const kx = p.ckX ?? 0, ky = p.ckY ?? 0, kz = p.ckZ ?? 0, az = -kx * COCKPIT_SWAY.roll, ax = kz * COCKPIT_SWAY.pitch;
+  const sa = Math.sin(az), ca = Math.cos(az), sb = Math.sin(ax), cb = Math.cos(ax);
+  for (let i = 0; i < C.length; i += 3) { const x = C[i] * ca - C[i + 1] * sa, y = C[i] * sa + C[i + 1] * ca, z = C[i + 2]; put(x + kx, y * cb - z * sb + ky, y * sb + z * cb + kz); }
+  return n / 3;
+}
+/** The tunnel vault is cut off at this share of its half width (`vaultOver`): next to the wall foot it would come down to the road. */
+export const VAULT_CLAMP = 0.96;
+const VAULT_LOW = tunnelProfile(VAULT_CLAMP);
+// the cross-section of a tunnel a point lies in (`crossSection`): between the samples XA and XB, the share XF of the way towards XB
+let XA: Sample, XB: Sample, XF = 0;
+/** Finds the cross-section of `path` that the world point (x, z) lies in, walking along the samples from `idx` until the point is level
+ *  with one (a few steps: on a bend the cross-sections fan out, a point on the inside passes more of them per metre). Sets XA, XB, XF.
+ *  False where there is no roof (beyond a portal: open sky). */
+function crossSection(path: Path, idx: number, x: number, z: number): boolean {
+  const S = path.samples, N = S.length, wrap = path.closed;
+  let j = idx, sa = S[j], a = (x - sa.x) * sa.tx + (z - sa.z) * sa.tz; // `a` = how far the point is ahead of the plane of sample j
+  for (let it = 0; it < 5 && (a > DS * 0.5 || a < -DS * 0.5); it++) {
+    let k = j + Math.round(a / DS); if (wrap) k = ((k % N) + N) % N; else k = k < 0 ? 0 : k >= N ? N - 1 : k;
+    if (k === j) break;
+    const sk = S[k], ak = (x - sk.x) * sk.tx + (z - sk.z) * sk.tz; if (Math.abs(ak) >= Math.abs(a)) break; // (no closer: a fold in the road)
+    j = k; sa = sk; a = ak;
+  }
+  let k = a >= 0 ? j + 1 : j - 1; if (wrap) k = ((k % N) + N) % N; else k = k < 0 ? 0 : k >= N ? N - 1 : k; // the neighbour on the point's side
+  let sb = S[k], f = 0;
+  if (sb !== sa) { const ab = (x - sb.x) * sb.tx + (z - sb.z) * sb.tz; f = a * ab < 0 ? a / (a - ab) : Math.min(1, Math.abs(a) / DS); }
+  if (!(sa.roof > 0)) { if (!(sb.roof > 0) || f < 0.5) return false; sa = sb; f = 0; } else if (!(sb.roof > 0)) { if (f >= 0.5) return false; sb = sa; f = 0; } // a portal between the two
+  XA = sa; XB = sb; XF = f;
+  return true;
+}
+/** Height (world y) of the tunnel shell above (x, z) in the cross-section found by `crossSection`: the superellipse of the mesh
+ *  (`tunnelProfile`) over the road, sheared with the bank, straight between two samples – as the mesh is built. `low`: only the lowest
+ *  the shell can be anywhere across that cross-section (cheap: no roots). */
+function shellHeight(x: number, z: number, low: boolean): number {
+  const sa = XA, sb = XB, la = (x - sa.x) * sa.rx + (z - sa.z) * sa.rz, ba = sa.y + sa.ramp - la * sa.bank + 1.5, ha = sa.roof - 1.5;
+  const va = ba + ha * (low ? VAULT_LOW : tunnelProfile(Math.min(VAULT_CLAMP, Math.abs(la) / (sa.hw + TUNNEL_SHOULDER + (sa.caveW ?? 0)))));
+  if (sb === sa) return va;
+  const lb = (x - sb.x) * sb.rx + (z - sb.z) * sb.rz, bb = sb.y + sb.ramp - lb * sb.bank + 1.5, hb = sb.roof - 1.5;
+  const vb = bb + hb * (low ? VAULT_LOW : tunnelProfile(Math.min(VAULT_CLAMP, Math.abs(lb) / (sb.hw + TUNNEL_SHOULDER + (sb.caveW ?? 0)))));
+  return va + (vb - va) * XF;
+}
+/** The sample of `other` nearest to (x, y, z) – for a pod on `path` at a junction of the two (a branch is searched as a whole, the
+ *  main path round the branch's two ends only: tracks cross over themselves). */
+function nearestOnLinked(path: Path, other: Path, x: number, y: number, z: number): number {
+  if (other.id !== 0) return nearestGlobal(other, x, z, 0, other.samples.length - 1);
+  const M = other.samples, nm = M.length; let best = ((path.mainFrom % nm) + nm) % nm, bd = 1e12;
+  for (const center of [path.mainFrom, path.mainTo]) for (let k = -65; k <= 65; k++) {
+    let j = center + k; if (other.closed) j = ((j % nm) + nm) % nm; else if (j < 0 || j >= nm) continue;
+    const q = M[j], d = (q.x - x) ** 2 + (q.z - z) ** 2 + (q.y - y) ** 2 * 4; if (d < bd) { bd = d; best = j; }
+  }
+  return best;
+}
+/** How far the pod reaches into the tunnel vault (metres; ≤ 0: clear of it by that much): every one of the `n` hull corners in `pts`
+ *  (`hullWorld`) against the shell above THAT corner (`crossSection`, `shellHeight`) – so the vault follows the road down a slope,
+ *  round a bend and into a cave chamber, and a corner beyond a portal is under the open sky. Where a cave branches (the side of the
+ *  cross-section is open to the linked path), the two tubes are one cavern: the higher of the two shells counts, as in the mesh.
+ *  `idx` = the pod's sample on `path`. `exact`: also work out the clearance of corners far below the vault (unit checks); the game
+ *  skips them. */
+export function vaultOver(td: TrackData, path: Path, idx: number, pts: Float32Array, n: number, exact = false): number {
+  let over = -1e9, og = -1; // (og: the pod's sample on the linked path, found when a corner needs it)
+  for (let i = 0; i < n * 3; i += 3) {
+    const x = pts[i], y = pts[i + 1], z = pts[i + 2];
+    if (!crossSection(path, idx, x, z)) continue;
+    if (!exact && y <= shellHeight(x, z, true)) continue; // below even the lowest part of the vault
+    let shell = shellHeight(x, z, false);
+    if ((exact || y > shell) && XA.link >= 0 && XA.link !== path.id && ((x - XA.x) * XA.rx + (z - XA.z) * XA.rz < 0 ? XA.openL : XA.openR)) {
+      const other = td.paths[XA.link];
+      if (og < 0) og = nearestOnLinked(path, other, pts[0], pts[1], pts[2]);
+      if (crossSection(other, og, x, z)) shell = Math.max(shell, shellHeight(x, z, false));
+    }
+    if (y - shell > over) over = y - shell;
+  }
+  return over;
+}
 export function applyDamage(p: PodState, side: number | 'both', amount: number, zone: DamageZone) {
   const m = DAMAGE_RULES.armor || DAMAGE_RULES.parts ? damageModel(p.def.id) : null;
   let aL = side === 'both' || side < 0 ? amount : side > 0 ? 0 : amount * 0.5;
@@ -300,20 +389,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
     landImpulse = imp;
     p.events.push({ type: 'land', strength: imp, x: p.pos.x, y: fr.groundY, z: p.pos.z, nx: 0, nz: 0 });
   }
-  // tunnel ceilings & zero-G tubes (matches wide-shouldered tunnel & chamber vault geometry Wd = hw + 3.4 + caveW)
-  if (S.roof > 0 && !fr.gap && !p.upper) {
-    // Session 20: same superellipse as the mesh (`tunnelProfile`); the limit applies to the TOP of the pod – before, only the pod centre
-    // was tested and its upper half dipped into the vault. The top is the pod's own (`podHeight`): its cockpit roof or the higher
-    // engine side with that side's present travel, turned by the knife-edge roll – at 90° the half width of the model. (One height
-    // of 2.15 m for every pod left the tall ones up to 2 m inside the vault, a lifted outer engine more.) The vault is tested above
-    // the pod centre.
-    const l = Math.min(0.96, Math.abs(fr.lat) / (fr.hw + TUNNEL_SHOULDER + (S.caveW ?? 0)));
-    const ceil = fr.groundY + 1.5 + (S.roof - 1.5) * tunnelProfile(l) - podHeight(env0, p.engYL ?? 0, p.engYR ?? 0, rollA);
-    if (p.pos.y > ceil) {
-      const imp = Math.max(0, p.vel.y); p.pos.y = Math.max(ceil, p.pos.y - 45 * dt); if (p.vel.y > 0) p.vel.y *= -0.3; // pressed down quickly, never teleported
-      if (imp > 6 && p.invuln <= 0) { const dmg = Math.min(20, (imp - 6) * 0.8 * P.sturdy); applyDamage(p, 0, dmg, 'top'); p.shake = Math.min(1, p.shake + 0.3); p.events.push({ type: 'wall', strength: imp, x: p.pos.x, y: p.pos.y + 1, z: p.pos.z, nx: 0, nz: 0 }); }
-    }
-  }
+  // zero-G tubes (tunnel vaults: at the end of the step, once the pod's pose is final)
   if (p.zeroG) {
     const dy = p.pos.y - (fr.groundY + 7), dl = fr.lat, dist = Math.hypot(dl, dy), R = fr.hw + 1.4;
     if (dist > R) {
@@ -368,23 +444,33 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
     }
   }
 
-  // overhead structures (sponsor gantries, start portal): solid – a pod flying into one is knocked back down (or up, if it came from above)
+  // overhead structures (sponsor gantries, start portal, gates, arches): solid – a pod flying into one is knocked back down (or up, if
+  // it came from above). The pod is as tall and as deep as its hull in its present pose (`hullWorld`): the highest and the lowest of
+  // its corners that are under the structure. (Before: 1.5 m above and below the pod centre for every pod – the upper 2.7 m of a
+  // tall one went through.) An arch is still read at the pod CENTRE's lateral position: its collision shape is padded for that.
   if (td.overheads && td.overheads.length && p.path === 0) {
-    const Nm = td.N, ext = 1.5 + knife * halfSpan;
+    const Nm = td.N; let hn = -1; // (hull corners: worked out when the pod comes near an overhead)
     for (const oh of td.overheads) {
       let di = p.idx - oh.idx; if (td.main.closed) { if (di > Nm / 2) di -= Nm; else if (di < -Nm / 2) di += Nm; }
-      if (Math.abs(di) > 5 + oh.half / DS) continue;
-      const s0 = td.main.samples[oh.idx], along = (p.pos.x - s0.x) * s0.tx + (p.pos.z - s0.z) * s0.tz;
-      if (Math.abs(along) > oh.half + 2.4) continue;
+      if (Math.abs(di) > 10 + oh.half / DS) continue; // (the pod reaches up to 14 m ahead of its centre)
+      const s0 = td.main.samples[oh.idx];
+      if (hn < 0) hn = hullWorld(p, env0);
+      let top = -1e9, bot = 1e9;
+      for (let i = 0; i < hn * 3; i += 3) {
+        if (Math.abs((HULL_PTS[i] - s0.x) * s0.tx + (HULL_PTS[i + 2] - s0.z) * s0.tz) > oh.half + 1) continue; // this corner is not under it
+        const y = HULL_PTS[i + 1]; if (y > top) top = y; if (y < bot) bot = y;
+      }
+      if (top < bot) continue;
       let y0 = oh.y0, y1 = oh.y1;
       if (oh.arch) { // arch (checkpoint gate, rock arch, set-piece arch): the ceiling follows the half ellipse – low near the road edges, high over the centre
         const A = oh.arch, lat = (p.pos.x - s0.x) * s0.rx + (p.pos.z - s0.z) * s0.rz, Ri = A.R - (A.inner ?? 1.7);
         if (A.sp !== undefined && td.setPieces[A.sp] && td.setPieces[A.sp].state >= 1 && Math.abs(lat) < A.R * 0.5) continue; // collapsed: the middle is gone
         y0 = s0.y + (A.yOff ?? 0) + A.sy * Math.sqrt(Math.max(0, Ri * Ri - lat * lat)); y1 = y0 + (A.thick ?? 3.6);
       }
-      if (p.pos.y + ext <= y0 || p.pos.y - ext >= y1) continue;
+      if (top <= y0 || bot >= y1) continue;
       const below = p.pos.y < (y0 + y1) * 0.5, hitY = below ? y0 : y1;
-      if (below) { p.pos.y = y0 - ext; if (p.vel.y > -5) p.vel.y = -5; } else { p.pos.y = y1 + ext; if (p.vel.y < 4) p.vel.y = 4; }
+      if (below) { p.pos.y -= top - y0; if (p.vel.y > -5) p.vel.y = -5; } else { p.pos.y += y1 - bot; if (p.vel.y < 4) p.vel.y = 4; }
+      hn = -1; // (the pod has moved)
       const wc = p as unknown as { wCd?: number };
       if (p.invuln <= 0 && !(wc.wCd! > 0)) {
         wc.wCd = 0.5; const spd = Math.hypot(p.vel.x, p.vel.z), dmg = Math.min(18, 5 + spd * 0.07) * P.sturdy;
@@ -542,6 +628,21 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
     vy += ((p.grounded ? Math.sin(time * 9 + p.id) * 0.03 * Math.min(1, sp / 60) : 0) - y) * 64 * dt - vy * 2 * 0.38 * 8 * dt; y += vy * dt;
     p.ckX = Math.max(-1.9, Math.min(1.9, x)); p.ckY = Math.max(-0.35, Math.min(0.8, y)); p.ckZ = Math.max(-1.3, Math.min(1.0, z));
     p.ckVX = vx; p.ckVY = vy; p.ckVZ = vz;
+  }
+  // Tunnel vaults (matches the wide-shouldered tunnel & chamber vault geometry Wd = hw + 3.4 + caveW) – last in the step: the pose the
+  // model will be drawn in is final (pitch, roll, engine travel, cockpit sway). Session 20: no part of the pod may reach into the
+  // shell. Tested: every corner of the pod's hull against the vault above THAT corner (`vaultOver`) – the nose of a pod that flies
+  // up into the roof is metres above its centre, the outer engine on the flank is under a lower part of the vault than the cockpit,
+  // and each pod has its own height (one height for all of them left the tall ones up to 3.5 m inside the vault).
+  // Only a pod in the AIR: one that rides on its repulsors is never touched by the vault – upright it is metres below it everywhere
+  // (unit check), and on knife-edge right beside a wall, where its upper wing tip stands in the vault's flank, pressing it down
+  // would fight the ground clamp.
+  if (S.roof > 0 && !fr.gap && !p.upper && !p.grounded) {
+    const over = vaultOver(td, path, p.idx, HULL_PTS, hullWorld(p, env0));
+    if (over > 0) {
+      const imp = Math.max(0, p.vel.y); p.pos.y -= Math.min(over, 45 * dt); if (p.vel.y > 0) p.vel.y *= -0.3; // pressed down quickly, never teleported
+      if (imp > 6 && p.invuln <= 0) { const dmg = Math.min(20, (imp - 6) * 0.8 * P.sturdy); applyDamage(p, 0, dmg, 'top'); p.shake = Math.min(1, p.shake + 0.3); p.events.push({ type: 'wall', strength: imp, x: p.pos.x, y: p.pos.y + 1, z: p.pos.z, nx: 0, nz: 0 }); }
+    }
   }
   p.shake *= Math.exp(-dt * 3);
 }

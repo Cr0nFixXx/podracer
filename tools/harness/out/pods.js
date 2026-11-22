@@ -75754,6 +75754,9 @@ function assembleRival(def, seg, head, colors, pattern, kit = NO_KIT) {
   return { ...b, banks, cockpit, binders, spanX, far: { hull, dark: far0.dark, glow }, breaks: br.map, owned };
 }
 
+// ../../src/game/podDesigns.ts
+var COCKPIT_SWAY = { roll: 0.14, pitch: 0.07 };
+
 // ../../src/game/podTextures.ts
 function mulberry(a) {
   return () => {
@@ -77074,8 +77077,8 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
   }
   const setCockpitSway = (x, y, z) => {
     ckGrp.position.set(x, y, z);
-    ckGrp.rotation.z = -x * 0.14;
-    ckGrp.rotation.x = z * 0.07;
+    ckGrp.rotation.z = -x * COCKPIT_SWAY.roll;
+    ckGrp.rotation.x = z * COCKPIT_SWAY.pitch;
     cabCk.value.set(x, y, z);
   };
   let inside = false;

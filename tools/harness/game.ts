@@ -3,6 +3,7 @@ import { Game } from '../../src/game/Game';
 import { TRACKS } from '../../src/game/data';
 import { PRESETS, defaultProfile } from '../../src/game/settings';
 import { loadPhotoTextures } from '../../src/game/photoAssets';
+import { stepPod } from '../../src/game/physics';
 if (!location.search.includes('nophoto')) void loadPhotoTextures();
 const div = document.createElement('div'); div.style.cssText = 'width:1280px;height:720px;position:fixed;left:0;top:0'; document.body.style.margin = '0'; document.body.appendChild(div);
 let g: Game | null = null; let cur = -1;
@@ -10,7 +11,7 @@ let g: Game | null = null; let cur = -1;
   if (cur !== i) {
     g?.dispose(); cur = i;
     const prof = defaultProfile(); prof.race.trackId = TRACKS[i].id; prof.race.opponents = 7; prof.gfx.texRes = 1024; if (location.search.includes('webgl')) prof.gfx.backend = 'webgl'; if (location.search.includes('csm')) prof.gfx.csm = true; if (location.search.includes('ssr')) prof.gfx.ssr = true;
-    { const qs = new URLSearchParams(location.search); if (qs.get('tod')) prof.race.timeOfDay = qs.get('tod') as never; if (qs.get('wx')) prof.race.weather = qs.get('wx') as never; if (qs.has('ultra')) Object.assign(prof.gfx, PRESETS.ultra, { preset: 'ultra', texRes: 1024, renderScale: 0.6 }); if (qs.get('tex')) prof.gfx.texRes = +qs.get('tex')!; /* tex=256: small textures for the WebGPU console check on machines with little RAM */ } prof.gfx.renderScale = 0.6; prof.gfx.shadows = 1;
+    { const qs = new URLSearchParams(location.search); if (qs.get('tod')) prof.race.timeOfDay = qs.get('tod') as never; if (qs.get('wx')) prof.race.weather = qs.get('wx') as never; if (qs.has('ultra')) Object.assign(prof.gfx, PRESETS.ultra, { preset: 'ultra', texRes: 1024, renderScale: 0.6 }); if (qs.get('tex')) prof.gfx.texRes = +qs.get('tex')!; if (qs.get('pod')) prof.podId = qs.get('pod')!; /* pod=brute: the player's pod */ /* tex=256: small textures for the WebGPU console check on machines with little RAM */ } prof.gfx.renderScale = 0.6; prof.gfx.shadows = 1;
     g = new Game(div, prof, { onHud: () => {}, onLoading: () => {}, onFinish: () => {}, onPause: () => {}, onReady: () => {} });
     const tLoad = performance.now(); await g.start(); (window as unknown as Record<string, unknown>).loadInfo = `load=${Math.round(performance.now() - tLoad)}ms ` + JSON.stringify(g.world.timings) + ' ' + JSON.stringify((g as unknown as { loadMs?: unknown }).loadMs ?? {}); g.paused = true; await new Promise(r => setTimeout(r, 400));
   }
@@ -100,6 +101,16 @@ let g: Game | null = null; let cur = -1;
   } else if (view === 'n') { // towards the gas giant in the sky of Oovo IV (Session 20)
     const a = G.td.main.samples[300]; let dir: THREE.Vector3 | null = null; G.scene.traverse(o => { if (o.userData.dir) dir = o.userData.dir as THREE.Vector3; });
     G.camera.position.set(a.x, a.y + 5, a.z); if (dir) G.camera.lookAt(a.x + (dir as THREE.Vector3).x, a.y + 5 + (dir as THREE.Vector3).y * 0.6, a.z + (dir as THREE.Vector3).z);
+  } else if (view === 'top' || view === 'topw' || view === 'topf') { // the player's pod pushed up against the vault of the first standard tunnel (top: at the crown, nose up · topw: beside the wall, level · topf: as topw, seen from the front – both engine sides under the flank of the vault) – no part of the model may stand in the shell
+    const S = G.td.main.samples; let a0 = S.findIndex((q, j) => j > 50 && q.roof > 0 && q.tun === 1); if (a0 < 0) a0 = 100;
+    const s = S[a0 + 45], pl = G.player, wall = view !== 'top', lat = wall ? s.wallR - 6 : 0, x0 = s.x + s.rx * lat, z0 = s.z + s.rz * lat, speed = wall ? 100 : 0;
+    pl.pos.set(x0, s.y + 6, z0); pl.yaw = Math.atan2(s.tx, s.tz); pl.path = 0; pl.idx = a0 + 45; pl.dead = 0; pl.invuln = 99; pl.inRoof = true; pl.upper = false; pl.grounded = false;
+    for (let k = 0; k < 260; k++) { pl.pos.x = x0; pl.pos.z = z0; pl.vel.set(s.tx * speed, 9, s.tz * speed); pl.input.pitch = 0; pl.input.roll = 0; stepPod(pl, G.td, 1 / 60, G.clock + k / 60, 1, false); }
+    pl.pos.x = x0; pl.pos.z = z0; pl.invuln = 0; G.updateVisuals(); // (an invulnerable pod blinks: it would be invisible in every other shot)
+    (window as unknown as Record<string, unknown>).coverInfo = `pod ${pl.def.id} at the vault: ${(pl.pos.y - s.y).toFixed(2)} m above the road (roof ${s.roof} m), pitch ${pl.pitch.toFixed(2)}, lat ${lat.toFixed(1)}`;
+    const side = wall ? -1 : 1; // (beside the wall: seen from the middle of the tunnel)
+    if (view === 'topf') { G.camera.position.set(x0 - s.rx * 6 + s.tx * 26, pl.pos.y + 1, z0 - s.rz * 6 + s.tz * 26); G.camera.lookAt(x0 + s.rx * 1.5, pl.pos.y + 1.5, z0 + s.rz * 1.5); }
+    else { G.camera.position.set(x0 + s.rx * side * 15 + s.tx * 9, pl.pos.y - 2.5, z0 + s.rz * side * 15 + s.tz * 9); G.camera.lookAt(x0 + s.tx * 4, pl.pos.y + 2.5, z0 + s.tz * 4); }
   } else if (view === 'r') { // 3.4 s of real racing (AI + player idle) so exhaust/dust particles, banking and engine heave are live
     G.state = 'race'; (G as unknown as { keys: Set<string> }).keys.add('KeyW'); for (let k = 0; k < 170; k++) { G.update(1 / 60); if (k % 3 === 0) G.updateVisuals(); } G.updateCamera(0.5);
   } else { G.updateCamera(0.5); }

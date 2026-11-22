@@ -1,13 +1,22 @@
 # TODO
 
 ## Aus dem Merge von Session 20 (Strecken) und Session 20 (Pods) (2026-11-22)
-- [x] **Tunneldecke je Pod** – erledigt im Folge-Commit: gemessener Kasten je Pod (`POD_BOX`), `podHeight`, zwei Unit-Prüfungen, Audit-Spalte `box` (`HANDOFF.md` → „Tunneldecke je Pod")
-- [ ] Tunneldecke, Rest: sie wird über der Pod-Mitte geprüft – an der Flanke kann die äußere Triebwerksseite weiter ins Gewölbe reichen; Nicken ist nicht eingerechnet → an drei Punkten prüfen (Cockpit, beide Triebwerksseiten)?
-- [ ] Überkopf-Bauten (Sponsor-Brücken, Startportal, Bögen) rechnen mit festen 1,5 m Pod-Höhe (`physics.ts`, `ext`) → `podHeight` verwenden
+- [x] **Tunneldecke je Pod** – erledigt in zwei Schritten: erst eine gemessene Höhe je Pod, dann die **Hülle je Pod** (`src/game/podHulls.json`, `hullWorld`, `vaultOver`; `HANDOFF.md` → „Hülle je Pod")
+- [x] Tunneldecke, Rest: jeder Eckpunkt der Hülle wird gegen die Schale über ihm geprüft – Nicken, Rollen, Triebwerkshub und Cockpit-Pendeln sind eingerechnet (nicht nur drei Punkte)
+- [x] Überkopf-Bauten (Startbrücke, Sponsor-Brücken, Tore, Bögen) rechnen mit der Hülle statt mit festen 1,5 m
 - [ ] Entscheidung prüfen: ein Pod zählt so hoch wie seine größte Ausstattung (Aurora XR-7 ab Werk 0,70 m mehr, als sie ist) – oder Höhe je montierter Ausstattung?
-- [ ] Sichtprüfung im Browser: einen hohen Pod (Vrak Splitter-X) im Tunnel an die Decke fliegen
-- [ ] `tools/harness/papp.mjs` schreibt und liest noch den Profil-Schlüssel `podracer-profile-v1` → auf v2 umstellen (die Zeile „stored:" gibt sonst `undefined` aus und prüft nichts)
-- [ ] `tools/` ist nicht im Typecheck: 4 Typfehler in `tools/ci/unit.ts` (Parametertyp von `triCount`, Zeilen 41 / 59 / 140 / 145) – beheben und `tools/ci`, `tools/harness` in `tsconfig.json` aufnehmen?
+- [x] Sichtprüfung: Vrak Splitter-X an der Tunneldecke – Harness-Ansichten `top`, `topw`, `topf` (Software-Rendering). Auf echter GPU: siehe unten
+- [x] `tools/harness/papp.mjs` nutzt den Profil-Schlüssel `podracer-profile-v2` und prüft die gespeicherte Tastenbelegung wirklich
+- [x] `tools/ci` und `tools/harness` sind im Typecheck (`tsconfig.json`), die 4 Typfehler in `tools/ci/unit.ts` sind behoben
+
+### Neu offen aus „Hülle je Pod" (2026-11-22)
+- [ ] **Auf echter GPU ansehen:** einen hohen Pod (Vrak Splitter-X) im Tunnel an die Decke fliegen – und in eine Sponsor-Brücke und einen Checkpoint-Bogen. Die echten Überkopf-Bauten entstehen erst mit der Welt; geprüft ist die Regel nur an einer künstlichen Brücke und einem künstlichen Bogen
+- [ ] Bögen (Checkpoint-Bögen, Felsbögen, einstürzender Bogen) werden an der seitlichen Position der Pod-Mitte gelesen, ihre Kollisionsform ist dafür gepolstert → Eckpunkt für Eckpunkt prüfen? Dafür müssten die Bogenformen neu vermessen werden
+- [ ] Ein Pod, der auf seinen Repulsoren fährt, wird von der Decke nie heruntergedrückt: im Messerflug direkt neben der Tunnelwand kann die obere Flügelspitze im Fels stehen (gemessen: bis 4,16 m) → den Messerflug nahe der Wand begrenzen oder hinnehmen?
+- [ ] Stahlrippen der Tunnel ragen bis 0,53 m unter die Schale, an der ein Pod stoppt (Portalrahmen bis 0,35 m) → die Schale in Tunneln mit Rippen um dieses Maß senken?
+- [ ] Der Fels ist verrauscht: im oberen Gewölbe bis 0,35 m unter der gerechneten Schale, in der unteren Hälfte der Flanken ± 0,65 m (Höhlen ± 1,3 m) – ein Teil kann so weit im Fels stehen. Rauschen in die Schale einrechnen?
+- [ ] Die Luftbrems-Klappen schwenken seitlich aus und sind nicht in der Hülle (zählt nur bei gerolltem Pod)
+- [ ] Hülle der Gegner-Cockpits ist nicht gegen das Modell geprüft (die Triebwerksseiten sind es: höchstens 1,7 cm außerhalb)
 
 ## 0. Direkt aus Session 20 (Strecken)
 - [ ] **Probefahrt + FPS-Messung auf echter GPU** (weiter offen – die Sandbox rendert nur in Software): durchgehende Höhlen und Gabelungen, neue Tunnelhöhen (27–30 m), See-Passagen, Untergrund-Physik (ist Eis mit −25 % Haftung fair?), Oovo-Mond
