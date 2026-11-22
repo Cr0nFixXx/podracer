@@ -181,10 +181,12 @@ Alle Änderungen sind committet (Remote `origin` = `github.com/Cr0nFixXx/podrace
 
 Neue Änderungen sichern: `npm run save -- "Beschreibung"` (committet und erneuert die Kopie).
 
+**Achtung:** diese Textkopie steht auf dem Stand von Session 19 (Branch `B`). Der aktuelle Stand liegt auf GitHub – dort holen (`git clone`, Branch `new_pods` bzw. nach dem Merge von Pull Request #2 `main`) statt wiederherstellen.
+
 ## Für Entwickler: Prüfbefehle
 
 1. `npm run check` – Typecheck + Unit-Prüfungen (`tools/ci/unit.ts`) + Pod-Audit + Physik-Simulation aller 13 Strecken (11 Pods, 45 s, ca. 40 s Laufzeit, kein Browser nötig). Das Startfeld wandert je Strecke um drei Pods weiter, damit alle 14 gefahren werden; `ROSTER_OLD=1` fährt das alte Feld der ersten zehn Pods (Vergleich mit früheren Tabellen).
-2. `npm run check:pods` – nur das Pod-Audit (1 s): baut jeden Pod ohne Browser, vergleicht Mesh- und Dreieckszahlen mit `tools/ci/pods-baseline.json` und prüft das Sichtmodell gegen die Kollisionsform.
+2. `npm run check:pods` – nur das Pod-Audit (1 s): baut jeden Pod ohne Browser, vergleicht Mesh- und Dreieckszahlen mit `tools/ci/pods-baseline.json` und prüft das Sichtmodell gegen die Kollisionsform und gegen den gemessenen Kasten je Pod (`POD_BOX`: Höhe und halbe Breite, damit kein Pod in einer Tunneldecke steckt).
 3. `npm run check:gpu` – lädt Strecken im Headless-Chrome mit WebGPU und meldet jeden Shader-/Konsolenfehler (braucht Puppeteer, siehe `HANDOFF.md`). Bei wenig Arbeitsspeicher: `TRACKS=1 QUERY='?tex=256' npm run check:gpu` (eine Strecke, kleine Texturen).
 4. `npm run build` – erzeugt `dist/index.html`.
 5. Pods ansehen: `npm run dev`, dann `http://localhost:5173/tools/harness/pods.dev.html` öffnen und in der Browser-Konsole z. B. `await sheet('front')` oder `await show(0)` aufrufen (Befehle im Kopf von `tools/harness/pods.ts`).

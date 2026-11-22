@@ -2,7 +2,7 @@
 
 ## Nächster Schritt (zuerst lesen)
 Session 20 lief in zwei Zweigen und ist zusammengeführt (Abschnitt „Merge" unten): **Session 20 (Strecken)** aus `B` und **Session 20 (Pods)** aus `new_pods`. Offen:
-0. **Pull Request #2** (`new_pods` → `main`) auf GitHub mergen: `new_pods` enthält seit dem Merge beide Sitzungen, die Konflikte sind dort gelöst (`https://github.com/Cr0nFixXx/podracer/pull/2`). Danach als Nächstes im Code: **Tunneldecke je Pod** (`TODO.md`, oberster Abschnitt).
+0. **Pull Request #2** (`new_pods` → `main`) auf GitHub mergen: `new_pods` enthält seit dem Merge beide Sitzungen, die Konflikte sind dort gelöst (`https://github.com/Cr0nFixXx/podracer/pull/2`). Die **Tunneldecke je Pod** ist als Folge-Commit erledigt (Abschnitt direkt unter „Git-Stand").
 1. **Strecken – Probefahrt auf echter GPU** (`npm run dev`, ≈ 10 Min.; in der Sandbox ließ sich nur in Software rendern):
    - **Aquilaris-Küstenlauf** und **Oovo-IV-Gefängnis**: Schrägkurven abfahren – ragt noch irgendwo ein Balken aus der Fahrbahn?
    - **Frostspalt-Ring:** 30-m-Tunnel, durchgehende Eishöhle mit Gabelung, Eissee (25 % weniger Haftung – fair?).
@@ -26,6 +26,43 @@ Session 20 lief in zwei Zweigen und ist zusammengeführt (Abschnitt „Merge" un
 - **Nach einem Sandbox-Reset** fehlt `.git/config`: `git config core.fileMode false` (sonst erscheinen alle Dateien als geändert – nur Dateirechte), `git remote add origin https://github.com/Cr0nFixXx/podracer.git`, `git checkout -- tools/harness/out`.
 - **Zweige seit Session 20:** `main` ist der Sammelzweig; bisher kam alles über Pull Requests auf GitHub hinein. PR #1 hat **Session 20 (Strecken)** aus `B` nach `main` gebracht; **Session 20 (Pods)** liegt in `new_pods` (PR #2). Damit PR #2 ohne Konflikte mergebar ist, wurde `main` in `new_pods` gemergt (Abschnitt „Merge" unten). Die erste Zeile dieses Abschnitts (Branch `B`) beschreibt den Stand bis Session 19.
 
+## Stand: 2026-11-22 – Tunneldecke je Pod (Folge-Commit zum Merge)
+
+**Fehler:** Die Tunneldecke (`physics.ts`, Session 20 (Strecken)) hielt jeden Pod mit derselben Höhe draußen: 2,15 m über dem Pod-Ursprung. Am Modell gemessen sind viele Pods höher – Vrak Splitter-X 4,18 m (Haifinne), Pagali Ironclad 3,31 m, Quadra Lumber 3,27 m, Tenroc 6-Fach 2,96 m, Quill Voltspire 3,12 m (Cockpit-Spitze); mit dem Style-Teil „Haifinne" bis 3,95 m. Dazu hebt sich in Kurven das äußere Triebwerk (bis 1,95 m). Gegen die Decke gedrückt steckten solche Pods bis 3,5 m im Gewölbe.
+
+**Lösung**
+1. **`POD_BOX` in `podDesigns.ts`:** je Pod vier gemessene Zahlen – Oberkante der linken und der rechten Triebwerksseite, Oberkante des Cockpits, halbe Breite. Gemessen am Modell in seiner **größten Ausstattung** (Werk oder mit Teilen), nicht berechnet: der höchste Punkt ist ein Kabelmast, eine Lampe, eine Spitze oder eine Finne, die keine Formel kennt. Über `podEnvelope(def).box` erreichbar.
+2. **`podHeight(env, liftL, liftR, roll)`** (`podDesigns.ts`): wie weit der Pod in seiner jetzigen Lage über seinen Ursprung reicht – das höhere von Cockpit und Triebwerksseiten (jede Seite mit ihrem momentanen Hub `engYL` / `engYR`), gedreht um die Messerflug-Rolle. Aufrecht ist das die gemessene Höhe, bei 90° die halbe Breite.
+3. **`physics.ts`:** Grenze = Gewölbeschale − `podHeight(…)`. Sanftes Herunterdrücken (höchstens 45 m/s) und Schaden (`'top'`) sind unverändert.
+4. **Pod-Audit** (`tools/ci/pods.ts`, neue Spalte `box`): misst jeden Pod neu (Werk + die drei Teile-Kombinationen) und schlägt fehl, wenn eine Zahl mehr als 2 cm zu klein oder 5 cm zu groß ist oder ein Pod keine Zeile hat. Die Meldung nennt die gemessene Zeile zum Übernehmen. Gegengeprüft (einmalig): die drei Kombinationen des Audits ergeben dieselbe Höhe und Breite wie alle 192 Kombinationen aus 4 Finnen × 4 Einlässen × 4 Düsen × 3 Tuning-Stufen.
+5. **Zwei neue Unit-Prüfungen** (`tools/ci/unit.ts`, jetzt 71):
+   - „pushed up against the vault": jeder Pod wird im Tunnel 2,5 s lang nach oben gedrückt – aufrecht (Scheitel, Flanke, linkes Triebwerk 1,5 m angehoben), in halber Rolle nach beiden Seiten und im Messerflug. Gemessen wird der höchste Punkt des Modells Eckpunkt für Eckpunkt. 84 Fälle: höchstens 0,007 m über der Schale. Mit der alten Regel: 38 Fälle im Gewölbe, 0,08 – 3,48 m.
+   - „every pod fits under every tunnel": an jedem überdachten Sample aller 13 Strecken, von der Mittellinie bis zur Wand, liegt die Deckengrenze über der Höhe, in der ein Pod fährt (Anheben-Taste gehalten; aufrecht, Triebwerk voll angehoben, halbe Rolle, Messerflug). Engste Stelle: 0,50 m Luft (Tarn Cyclone im Messerflug auf Magma-Inferno, 22 m neben der Mittellinie bei 14 m halber Fahrbahnbreite, Decke 27 m).
+6. **`tools/ci/sim.ts`:** der Deck-Selbsttest hebt Pod 1 in den letzten 2 s eines Laufs nicht mehr an. Erreichte der Pod den ersten Tunnel erst im letzten Augenblick, endete der Lauf vor den geforderten 20 Bildern auf dem Deck – ein Fehlalarm (so aufgetreten auf Mos Espa: 1 Bild, „FAIL").
+
+**Entscheidung dabei (bitte prüfen):** ein Pod zählt immer so hoch wie seine größte Ausstattung. So ändern Teile nie das Fahrverhalten, und kein Teil steckt in der Decke. Preis: ein Pod ohne Finne wird etwas früher gebremst, als er hoch ist (Aurora XR-7 ab Werk: 0,70 m). Alternative: Höhe je montierter Ausstattung.
+
+**Was sich beim Fahren ändert**
+- Normales Fahren: nichts. Aufrecht bleiben auch an der Tunnelwand, mit gehaltener Anheben-Taste und voll angehobenem Triebwerk, mindestens 3,3 m Luft (einmalige Messung über alle Strecken).
+- Fliegt ein hoher Pod an die Decke, stoppt er jetzt früher (Splitter-X: 2,03 m).
+- Messerflug: die Grenze ist die halbe Breite statt „2,15 m + 95 % der halben Spannweite". Rechnerisch lag die alte Grenze für einen breiten Pod im Messerflug mit gehaltener Anheben-Taste stellenweise bis 1,2 m **unter** der Fahrhöhe (Magma, Dschungelfluss, Kristallschlucht – dort, wo die Wand weit neben der Fahrbahn steht; einmalige Messung). Das entfällt.
+
+**Verifiziert**
+- `npm run check`: grün in 41 s – Typecheck, 71 Unit-Prüfungen, Pod-Audit (14 Pods), Simulation 13/13 (0 NaN, 0,00 m Wanddurchdringung, Bodenfreiheit ≥ 0,67 m, 1 Ausfall auf dem Kristallschlucht-Sprint).
+- Deckenkontakte in der Simulation (einmalig mitgezählt): im 45-s-Lauf genau **einer** – Malastare, Tenroc 6-Fach, Sample 964: der Pod kommt aus einem Sprung 20,8 m über der Straße in den Tunnel, seine Oberkante liegt 1,26 m über der Schale, er wird in 3 Bildern heruntergedrückt (kein Schaden, er fällt bereits). Mit `GRIP=0.88` und `SECS=120`: keiner.
+- Vergleich mit dem Merge-Commit: jede Strecke einzeln (`TRACK=<id>`) byte-gleich, ebenso `GRIP=0.88` und `SECS=120` (0 „downward teleports"). Im Gesamtlauf sind die ersten 8 Zeilen gleich; ab Malastare weichen die Zahlen ab, weil alle Strecken einen Zufallsstrom teilen und der eine Deckenkontakt ihn verschiebt.
+- Gegenprobe gegen `main` (`ROSTER_OLD=1 ARMOR=0 PARTS=0`): alle Tabellenzeilen gleich; es fehlt nur die Deck-Selbsttest-Zeile von Oovo IV (Punkt 6: der Pod erreicht den Tunnel dort in den letzten 2 s und wird nicht mehr angehoben).
+- `npm run build`: 17 600 129 Bytes. Harness-Bundle `game.js` neu gebaut (19 743 706 Bytes), `pods.js` unverändert.
+- `papp.mjs` auf diesem Build (Quill Voltspire auf dem Frostspalt-Ring, WebGL2 in Software): „App smoke test passed." – der Test fährt nicht an eine Tunneldecke, er zeigt nur, dass das Spiel weiter startet und läuft.
+- Typprüfung von `tools/ci` und `tools/harness`: weiter nur die vier bekannten Fehler in `unit.ts`, keine neuen.
+
+**Nicht verifiziert / offen** (steht auch in `TODO.md`)
+- Im Browser nicht angesehen: kein Pod wurde im laufenden Spiel an eine Decke geflogen.
+- Die Decke wird **über der Pod-Mitte** geprüft. An der Flanke fällt das Gewölbe nach außen ab (am Fahrbahnrand rechnerisch etwa 1,4 m je Meter) – die äußere Triebwerksseite kann dort weiter ins Gewölbe reichen. Nicken (Bug hoch) ist ebenfalls nicht eingerechnet.
+- In halber Rolle ist die Grenze vorsichtig: der Pod stoppt 0,2 – 1,6 m unter der Decke (Ecke des Kastens um den Pod).
+- **Überkopf-Bauten** (Sponsor-Brücken, Startportal, Bögen) rechnen weiter mit festen 1,5 m (`physics.ts`, `ext`). Nicht angefasst – nicht Teil des Auftrags.
+- Die Portal-Regel (`p.upper`: aufs Deck oder in den Tunnel) entscheidet weiter mit Pod-Mitte + 1,2 m.
+
 ## Stand: 2026-11-22 – Merge von Session 20 (Strecken) und Session 20 (Pods)
 
 Beide Sitzungen hießen „Session 20" und liefen gleichzeitig ab dem Commit `d7b9c4b`: die Strecken-Sitzung in `B` (per PR #1 in `main`), die Pod-Sitzung in `new_pods` (PR #2). In der Doku heißen sie jetzt **Session 20 (Strecken)** und **Session 20 (Pods)** (Wunsch des Nutzers). Für PR #2 wurde `main` in `new_pods` gemergt; `main` selbst blieb unberührt.
@@ -45,7 +82,7 @@ Beide Sitzungen hießen „Session 20" und liefen gleichzeitig ab dem Commit `d7
 - `papp.mjs` auf genau diesem Build (Quill Voltspire auf dem Frostspalt-Ring, 5 Gegner, WebGL2 in Software, 20 FPS): „App smoke test passed." – HUD-Seiten, Pause-Audio, Grafik-Menü, Umbelegen (Q), Gamepad (L3). Im Bildschirmfoto stehen die Untergrund-Zeile („Rennpiste", Strecken-Sitzung) und die Bruchteil-Lampen in den Schadensfeldern (Pod-Sitzung) nebeneinander.
 
 ### Aufgefallen beim Merge
-- **Tunneldecke rechnete fest mit 2,15 m Pod-Höhe** (Session 20 (Strecken)). Vier alte Pods ragen höher auf (Vrak Splitter-X 4,18 m), die höheren Cockpits und Anbauteile aus Session 20 (Pods) ebenfalls → eigener Abschnitt „Tunneldecke je Pod" (Folge-Commit).
+- **Tunneldecke rechnete fest mit 2,15 m Pod-Höhe** (Session 20 (Strecken)). Vier alte Pods ragen höher auf (Vrak Splitter-X 4,18 m), die höheren Cockpits und Anbauteile aus Session 20 (Pods) ebenfalls → behoben im Folge-Commit, Abschnitt „Tunneldecke je Pod" oben.
 - `tools/harness/papp.mjs` schreibt und liest noch den Profil-Schlüssel `podracer-profile-v1`. Das Profil kommt an (v1 wird einmal importiert), aber die Zeile „stored:" liest nach dem Umbelegen den alten Schlüssel und gibt `undefined` aus – die Prüfung „Belegung gespeichert" greift so nicht (→ `TODO.md`).
 - `tools/` ist nicht Teil des Typechecks (`tsconfig.json` → `include: ["src", "vite.config.ts"]`). Mit `tools/ci/*.ts` und `tools/harness/*.ts` geprüft (ohne die Regeln für ungenutzte Namen): 4 Typfehler in `tools/ci/unit.ts` (`BufferGeometry` als Parameter des Zählhelfers `triCount`), sonst keine – auch keine durch den Merge; auf `new_pods` allein dieselben vier. Die Prüfungen laufen (esbuild prüft keine Typen).
 - Beim Langlauf `SECS=120` sind `avgSpeed` und `slowest` auf den sechs Sprint-Strecken gleich und niedrig (z. B. 74 m/s): alle Pods erreichen dort vor Ablauf das Ziel, danach wächst der Fortschritt nicht mehr. Kein Fahrfehler; auf `new_pods` allein genauso. Für Tempo-Aussagen auf Sprints taugt nur der 45-s-Lauf.
@@ -263,7 +300,7 @@ Ultra-Grenze 250 Tsd. – der größte Pod (Tenroc, sechs Triebwerke) liegt bei 
 
 ### Nicht verifiziert / aufgefallen (Phase 5)
 - **Balance von Hand nicht gefahren** – nur KI-Sim. Ob 5–10 % je Teil spürbar genug oder zu viel sind, muss der Nutzer fahren.
-- **Langlauf `SECS=120` mit Schadensmodellen: Malastare meldet 1 echten „downward teleport"** (Gegner-Pod Splitter-X, t = 14,7 s, Sample 964, Standard-Tunnel: der Pod gilt als „im Tunnel" (`upper = false`, `inRoof = true`), ist aber 23 m über der Straße und wird unter die Decke gesetzt). Das ist Tunnel-Logik aus Session 17, kein Pod-Thema; im Standardlauf (45 s) und im Langlauf ohne Schadensmodelle tritt es nicht auf – andere Flugbahnen. Nachstellen: `DEBUG=1 SECS=120 node tools/ci/out/sim.mjs` (ganzer Lauf nötig, wegen des Zufallsstroms).
+- **Langlauf `SECS=120` mit Schadensmodellen: Malastare meldet 1 echten „downward teleport"** (Gegner-Pod Splitter-X, t = 14,7 s, Sample 964, Standard-Tunnel: der Pod gilt als „im Tunnel" (`upper = false`, `inRoof = true`), ist aber 23 m über der Straße und wird unter die Decke gesetzt). Das ist Tunnel-Logik aus Session 17, kein Pod-Thema; im Standardlauf (45 s) und im Langlauf ohne Schadensmodelle tritt es nicht auf – andere Flugbahnen. Nachstellen: `DEBUG=1 SECS=120 node tools/ci/out/sim.mjs` (ganzer Lauf nötig, wegen des Zufallsstroms). *Nachtrag nach dem Merge:* die Tunneldecke setzt nicht mehr um, sie drückt höchstens 45 m/s herunter – derselbe Fall an Sample 964 ist im Abschnitt „Tunneldecke je Pod" beschrieben.
 - Die Lampen stehen in gleichen Abständen, nicht auf Höhe der Stufen 50 / 35 / 20 % der Füllung.
 - Verlorene Teile sind am Pod **noch nicht zu sehen** (Phase 6) – bisher nur Lampe, Meldung, Ton, Funken und Fahrwirkung.
 
@@ -389,7 +426,7 @@ Sichtmodell gegen Physikform: breiter als die Kollisionsform höchstens 0,50 m (
 ### Erledigt in Session 20 (Strecken)
 **Bugs**
 1. **„Balken" am Boden in Schrägkurven (Aquilaris, Oovo IV) – `world.ts → addViaductPiers`:** Ursache: die Hammerkopf-Kappen der Viaduktpfeiler lagen waagerecht, die Fahrbahn ist in Kurven aber bis ≈ 21° überhöht → das Kappenende stach auf der tiefen Seite als Balken durch die Fahrbahn. Jetzt neigt sich jede Kappe mit der Überhöhung, jedes Bein bekommt seine eigene Höhe.
-2. **Tunneldecken noch einmal +6,5 … 7,5 m und anderes Profil (`trackBuilder.ts`, `world.ts`, `physics.ts`, `Game.ts`):** Standard **27 m** (Ando Prime **30 m**), Unterführung 26 / 28 m, Abkürzung 25 / 27 m, Höhle 27 / 29 m + 8,5–16 m in den Kammern (bis 45 m), Unterwasserröhre 26 m. Querschnitt = **Superellipse (n = 3)** statt Halbellipse: bei 90 % der Breite sind noch 65 % der Scheitelhöhe frei (vorher 44 %) – genau dort tauchte man in die Decke. Die Deckenkollision rechnet jetzt mit der Pod-Oberkante (2,15 m + Flügelspitze bei Rolle), die Verfolgerkamera bleibt im Gewölbe. Stalaktiten-Spitzen ≥ 22 m über der Fahrbahn. Eine einzige Profilquelle: `tunnelProfile` / `tunnelArc` / `tunnelCeiling` (Mesh, Kollision, Kamera).
+2. **Tunneldecken noch einmal +6,5 … 7,5 m und anderes Profil (`trackBuilder.ts`, `world.ts`, `physics.ts`, `Game.ts`):** Standard **27 m** (Ando Prime **30 m**), Unterführung 26 / 28 m, Abkürzung 25 / 27 m, Höhle 27 / 29 m + 8,5–16 m in den Kammern (bis 45 m), Unterwasserröhre 26 m. Querschnitt = **Superellipse (n = 3)** statt Halbellipse: bei 90 % der Breite sind noch 65 % der Scheitelhöhe frei (vorher 44 %) – genau dort tauchte man in die Decke. Die Deckenkollision rechnet jetzt mit der Pod-Oberkante (2,15 m + Flügelspitze bei Rolle; seit dem Commit „Tunneldecke je Pod" mit der gemessenen Höhe des jeweiligen Pods – Abschnitt oben), die Verfolgerkamera bleibt im Gewölbe. Stalaktiten-Spitzen ≥ 22 m über der Fahrbahn. Eine einzige Profilquelle: `tunnelProfile` / `tunnelArc` / `tunnelCeiling` (Mesh, Kollision, Kamera).
 3. **Höhlen (Vulkan, Ando Prime ×2, Kristall, Dschungel) – `trackBuilder.ts`, `world.ts → buildTunnel`:** vorher waren die Kammern getrennte 150-m-Röhren mit offenem Himmel dazwischen, Schluchtklippen standen in der Höhle, die verbreiterte Kammer (`caveW`) lag hinter einer unsichtbaren Wand, und die Abzweigröhre schnitt mit sichtbaren Wänden durch die Hauptröhre. Jetzt: **eine durchgehende Höhle** (`tun === 3` über die ganze Länge), die **Fahrbahn selbst weitet sich** in den Kammern (kein `caveW` mehr), Abzweigröhren sind von Anfang bis Ende überdacht und werden per **Hüllen-Vereinigung** (`insideCave` + Dreiecks-Culling) mit der Hauptröhre verschmolzen; Klippen werden in Höhlen ausgelassen. Der Wandrest der Abzweigröhre an der Gabelung hat eigene Texturkoordinaten (vorher zog sich die Fels-Textur dort zu dünnen Streifen zusammen).
 4. **Folgefehler aus (2), in derselben Session behoben (`physics.ts`):** ein Pod, der über dem niedrigeren Seitengewölbe in ein Portal einflog, wurde durch die Stirnwand gedrückt (CI: 1 Teleport auf `executioner`). Der Deck-Einstieg entscheidet jetzt nach der Gewölbehöhe an der seitlichen Position des Pods, die Decke drückt mit höchstens 45 m/s nach unten.
 

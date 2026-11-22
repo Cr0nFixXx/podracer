@@ -5,15 +5,15 @@ import { PILOTS, PODS, STAT_KEYS, TRACKS, type PodDef, type StatKey } from '../.
 import { podLayout } from '../../src/game/podLayouts';
 import { cockpitGeo } from '../../src/game/podCockpits';
 import { engineExtent, engineGeo } from '../../src/game/podParts';
-import { podCollision, podEnvelope } from '../../src/game/podDesigns';
+import { podCollision, podEnvelope, podHeight } from '../../src/game/podDesigns';
 import { assembleHero, assembleRival, segFor, visibleIndices, type BreakShow } from '../../src/game/podAssembly';
 import { pickRivals, rivalKit } from '../../src/game/roster';
 import { engineKit, tuneTiers, NO_KIT } from '../../src/game/podKitParts';
 import { ciRoster } from './roster';
-import { applyDamage, bodyToWorld, podParams, respawn, worldToBody, FX_NONE, type PodState } from '../../src/game/physics';
+import { applyDamage, bodyToWorld, podParams, respawn, stepPod, worldToBody, FX_NONE, HOVER, type PodState } from '../../src/game/physics';
 import { DAMAGE_RULES, damageModel, partLamps, partsFx, zoneFactor, type DamageZone } from '../../src/game/podDamage';
-import { buildTrack } from '../../src/game/trackBuilder';
-import { loadProfile, saveProfile } from '../../src/game/settings';
+import { buildTrack, tunnelCeiling, TUNNEL_SHOULDER, type TrackData } from '../../src/game/trackBuilder';
+import { effectiveStats, loadProfile, saveProfile } from '../../src/game/settings';
 
 let failed = 0, passed = 0;
 const ONLY = process.env.ONLY;
@@ -558,6 +558,96 @@ test('profile: Style-Teile are clamped into range; a save without them means Wer
 test('profile: the rival count is clamped to 0..10', () => {
   saved(V2, { race: { opponents: 99 } }); eq(loadProfile().race.opponents, 10);
   saved(V2, { race: { opponents: -2 } }); eq(loadProfile().race.opponents, 0);
+});
+
+// ------------------------------------------------------------------ tunnel ceiling (how tall a pod is)
+const ROLLS = [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2]; // attitudes the ceiling checks measure the model in: upright, half roll both ways, knife-edge
+/** How far the pod model reaches above the pod origin, measured on every vertex: per roll angle of `ROLLS` the highest point of the
+ *  left engine side, the right engine side and the cockpit (Three.js: roll φ lifts a body point to x·sin φ + y·cos φ). Most detailed
+ *  build, the tallest of the factory pod and the three Finnen (the Style-Teile that stand on the engine spine). */
+function modelTops(def: PodDef) {
+  const out = ROLLS.map(() => ({ L: -9, R: -9, ck: -9 }));
+  const reach = (g: THREE.BufferGeometry, k: 'L' | 'R' | 'ck', ox = 0, oy = 0) => {
+    const a = g.attributes.position.array as ArrayLike<number>;
+    ROLLS.forEach((phi, i) => { const sn = Math.sin(phi), cs = Math.cos(phi); let m = out[i][k]; for (let j = 0; j < a.length; j += 3) { const h = (a[j] + ox) * sn + (a[j + 1] + oy) * cs; if (h > m) m = h; } out[i][k] = m; });
+  };
+  for (const fins of [0, 1, 2, 3]) {
+    const a = assembleHero(def, segFor(3, false), headOf(def), { ...NO_KIT, fins });
+    for (const b of a.banks) {
+      const k = b.side < 0 ? 'L' : 'R';
+      for (const g of b.buckets.values()) reach(g, k, b.pivot.x, b.pivot.y);
+      for (const e of b.engines) { reach(e.geo.fan, k, b.pivot.x + e.off.x, b.pivot.y + e.off.y); reach(e.geo.petals, k, b.pivot.x + e.off.x, b.pivot.y + e.off.y); for (const f of e.flaps) reach(f.geo, k, b.pivot.x, b.pivot.y); }
+    }
+    for (const g of a.cockpit.values()) reach(g, 'ck');
+    for (const g of a.owned) g.dispose();
+  }
+  return out;
+}
+/** A complete pod hanging in the air over sample `idx` of the main path (`stepPod` reads every field). */
+function racer(def: PodDef, td: TrackData, idx: number, lat: number, y: number): PodState {
+  const s = td.main.samples[idx], pilot = PILOTS.find(q => q.id === def.pilotId) ?? PILOTS[0];
+  return {
+    id: 0, isPlayer: true, def, pilot, stats: effectiveStats(def.id, undefined), name: pilot.name, color: pilot.color,
+    pos: new THREE.Vector3(s.x + s.rx * lat, y, s.z + s.rz * lat), vel: new THREE.Vector3(), yaw: Math.atan2(s.tx, s.tz), yawRate: 0, steer: 0,
+    path: 0, idx, lat, grounded: false, zeroG: false, air: 0, groundY: s.y, prevGroundY: s.y, engYL: 0, engYR: 0, engVL: 0, engVR: 0, engPL: 0, engPR: 0,
+    input: { throttle: 0, brake: 0, steer: 0, boost: false, airbrake: false, repair: false },
+    hpL: 100, hpR: 100, heat: 0, boosting: false, overheat: false, repairing: false, airbraking: false,
+    lap: 0, passedMid: true, rel: 0, prog: 0, finished: false, finishTime: 0, lapStart: 0, lapTimes: [],
+    dead: 0, invuln: 99, lastSafePath: 0, lastSafeIdx: idx, wrongWay: 0, roll: 0, pitch: 0, shake: 0, events: [], visual: null, place: 1,
+    inRoof: true, upper: false, // already inside the tunnel, below its shell
+  } as unknown as PodState;
+}
+test('tunnel ceiling: pushed up against the vault, no pod reaches into it – the highest point of every pod (tallest Style-Teile mounted) stops at the shell above the pod centre: upright at the crown and on the flank, with the outer engine lifted, in a half roll and on knife-edge', () => {
+  const td = buildTrack(TRACKS[0]), S = td.main.samples;
+  const a = S.findIndex((s, i) => i > 80 && s.roof > 0 && s.tun === 1); let b = a; while (b + 1 < S.length && S[b + 1].roof > 0) b++;
+  ok(a > 0 && b - a > 40, 'the first track has no standard tunnel to test in');
+  const idx = (a + b) >> 1, bad: string[] = [];
+  // [name, lateral position / half width, left engine held this far up (m), roll attitude (index into ROLLS), how far below the vault the pod may stop (m)]
+  // (upright the pod must come right up to the vault – it is as tall as measured; rolled, the limit is the corner of the box round the pod)
+  const cases: [string, number, number, number, number][] = [['crown', 0, 0, 0, 0.15], ['flank', 0.7, 0, 0, 0.15], ['crown, left engine lifted 1.5 m', 0, 1.5, 0, 0.15],
+    ['half roll (left side up)', 0, 0, 1, 2], ['half roll (right side up)', 0, 0, 2, 2], ['knife-edge', 0, 0, 3, 0.6]];
+  for (const def of PODS) {
+    const m = modelTops(def);
+    for (const [name, latF, lift, ri, slack] of cases) {
+      const s0 = S[idx], lat = latF * s0.hw, roll = ROLLS[ri], rc = roll / (Math.PI / 2), mt = m[ri];
+      const p = racer(def, td, idx, lat, s0.y + tunnelCeiling(s0, lat) - 12);
+      let reach = -9; // how far the highest point of the model got past the shell (m): > 0 = inside the vault
+      for (let f = 0; f < 150; f++) {
+        p.vel.set(0, 9, 0); p.rollCtl = rc; p.input.roll = rc; if (lift) { p.engYL = lift; p.engVL = 0; } // pushed up all the time (a pod flying into the roof)
+        stepPod(p, td, 1 / 60, f / 60, 1, false);
+        if (f < 100) continue; // (rising for the first moments)
+        if (Math.abs(p.roll - roll) > 0.002) { bad.push(`${def.id} ${name}: the test pod rolled to ${p.roll.toFixed(3)} instead of ${roll.toFixed(3)}`); break; }
+        const shell = p.groundY + tunnelCeiling(td.paths[p.path].samples[p.idx], p.lat), cs = Math.cos(roll);
+        reach = Math.max(reach, p.pos.y + Math.max(mt.ck, mt.L + (p.engYL ?? 0) * cs, mt.R + (p.engYR ?? 0) * cs) - shell);
+      }
+      if (p.dead > 0 || p.upper) bad.push(`${def.id} ${name}: the test pod did not stay inside the tunnel`);
+      else if (reach > 0.05) bad.push(`${def.id} ${name}: ${reach.toFixed(2)} m inside the vault`); // (5 cm: the engines move on after the ceiling test of the same step)
+      else if (reach < -slack) bad.push(`${def.id} ${name}: stopped ${(-reach).toFixed(2)} m below the vault (limit ${slack}) – the pod counts as taller than it is`);
+      if (process.env.CEIL_TABLE) console.log(`   ${def.id.padEnd(8)} ${name.padEnd(32)} highest point ${reach >= 0 ? '+' : ''}${reach.toFixed(3)} m past the shell`);
+    }
+  }
+  ok(!bad.length, `\n         ${bad.join('\n         ')}`);
+});
+test('tunnel ceiling: every pod fits under every tunnel – at no roofed sample of any track does the ceiling limit come below the height a pod rides at (lift key held; upright, outer engine fully lifted, half roll, knife-edge; from the centre line to the walls)', () => {
+  // ride height as in stepPod (`targetY`): HOVER + 0.1 bob + 1.6 lift key + knife · half span · 0.92; ceiling limit as in stepPod: shell − podHeight
+  const pods = PODS.map(d => { const e = podEnvelope(d); return { id: d.id, e, hs: Math.max(Math.abs(e.engL.outerX), Math.abs(e.engR.outerX)) }; });
+  const cases: [string, number, number][] = [['upright', 0, 0], ['outer engine lifted', 0, 1.95], ['half roll', Math.PI / 4, 0], ['knife-edge', Math.PI / 2, 0]];
+  let worst = 1e9, where = '';
+  for (const def of TRACKS) {
+    const td = buildTrack(def);
+    for (const path of td.paths) for (const s of path.samples) {
+      if (!(s.roof > 0) || s.gap) continue;
+      for (const wall of [s.wallL, s.wallR]) for (const f of [0, 0.5, 0.8, 1]) {
+        const shell = tunnelCeiling(s, wall * f < 0.96 * (s.hw + TUNNEL_SHOULDER + (s.caveW ?? 0)) ? wall * f : 0.96 * (s.hw + TUNNEL_SHOULDER + (s.caveW ?? 0))); // (stepPod clamps there)
+        for (const q of pods) for (const [name, roll, lift] of cases) {
+          const room = shell - podHeight(q.e, lift, lift, roll) - (HOVER + 0.1 + 1.6 + Math.abs(Math.sin(roll)) * q.hs * 0.92);
+          if (room < worst) { worst = room; where = `${def.id}: ${q.id}, ${name}, ${(wall * f).toFixed(0)} m off the centre line (road half width ${s.hw.toFixed(0)} m, roof ${s.roof.toFixed(0)} m)`; }
+        }
+      }
+    }
+  }
+  if (process.env.CEIL_TABLE) console.log(`   tightest spot: ${worst.toFixed(2)} m of room – ${where}`);
+  ok(worst > 0.3, `the ceiling presses a normally riding pod down: ${worst.toFixed(2)} m of room – ${where}`);
 });
 
 console.log(failed ? `\n${failed} unit check(s) FAILED, ${passed} passed.` : `All ${passed} unit checks passed.`);

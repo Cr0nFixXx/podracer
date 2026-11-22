@@ -1,7 +1,11 @@
 # TODO
 
 ## Aus dem Merge von Session 20 (Strecken) und Session 20 (Pods) (2026-11-22)
-- [ ] **Tunneldecke je Pod:** die Deckenkollision rechnet fest mit 2,15 m Pod-Höhe; Vrak Splitter-X (4,18 m), Tenroc 6-Fach, Quadra Lumber, Pagali Ironclad und die hohen Cockpits ragen darüber (Details in `HANDOFF.md` → „Merge")
+- [x] **Tunneldecke je Pod** – erledigt im Folge-Commit: gemessener Kasten je Pod (`POD_BOX`), `podHeight`, zwei Unit-Prüfungen, Audit-Spalte `box` (`HANDOFF.md` → „Tunneldecke je Pod")
+- [ ] Tunneldecke, Rest: sie wird über der Pod-Mitte geprüft – an der Flanke kann die äußere Triebwerksseite weiter ins Gewölbe reichen; Nicken ist nicht eingerechnet → an drei Punkten prüfen (Cockpit, beide Triebwerksseiten)?
+- [ ] Überkopf-Bauten (Sponsor-Brücken, Startportal, Bögen) rechnen mit festen 1,5 m Pod-Höhe (`physics.ts`, `ext`) → `podHeight` verwenden
+- [ ] Entscheidung prüfen: ein Pod zählt so hoch wie seine größte Ausstattung (Aurora XR-7 ab Werk 0,70 m mehr, als sie ist) – oder Höhe je montierter Ausstattung?
+- [ ] Sichtprüfung im Browser: einen hohen Pod (Vrak Splitter-X) im Tunnel an die Decke fliegen
 - [ ] `tools/harness/papp.mjs` schreibt und liest noch den Profil-Schlüssel `podracer-profile-v1` → auf v2 umstellen (die Zeile „stored:" gibt sonst `undefined` aus und prüft nichts)
 - [ ] `tools/` ist nicht im Typecheck: 4 Typfehler in `tools/ci/unit.ts` (Parametertyp von `triCount`, Zeilen 41 / 59 / 140 / 145) – beheben und `tools/ci`, `tools/harness` in `tsconfig.json` aufnehmen?
 
@@ -35,7 +39,7 @@
 - [ ] Kleinigkeiten aus der Durchsicht (Liste in `HANDOFF.md` → „Zurückgestellt"): Halo-Abschlussplatten 4 cm durch die Ringhaut · Treffermarken bei Manta / Halo / Cyclone auf dem Kernradius · keine Marke bei der Hälfte der Pod-Kontakte · Hangar baut das Modell bei jedem Tuning-Klick neu · toter Code (`cockpit.style`, `cockpitExtras`) · `loadProfile` prüft `difficulty` / `laps` nicht
 - [ ] In der ersten Rennsekunde werden 3 Pipelines nachübersetzt (Welt-Meshes, keine Pods) – ins Aufwärmen nehmen?
 - [ ] Schadens-Balance von Hand fahren (bisher nur KI-Sim): sind 5–10 % je Bruchteil richtig?
-- [ ] Tunnel-Logik: Pod gilt als „im Tunnel", ist aber über der Decke und wird heruntergesetzt (Malastare, Sample 964; `DEBUG=1 SECS=120 node tools/ci/out/sim.mjs`)
+- [ ] Tunnel-Logik: ein Pod kommt aus einem Sprung hoch über der Straße in den Tunnel und gilt als „im Tunnel" (Malastare, Sample 964). Seit dem Merge wird er nicht mehr umgesetzt, sondern sanft unter die Decke gedrückt (im 45-s-Lauf gemessen: 20,8 m über der Straße, 3 Bilder, 1,26 m). Offen ist nur noch, ob er dort nicht aufs Deck gehört: `p.upper` entscheidet mit Pod-Mitte + 1,2 m
 - [ ] `tools/harness/pui.mjs:39` prüft noch die gelöschte „Neon-Spirale" → anpassen; `tools/harness/run.sh` läuft nur unter Linux
 
 ## Erledigt (Session 20 (Strecken) – Höhlen, „Balken", Tunneldecken, Untergründe, Seen, Oovo-Mond, PBR-Fotosets, HQ-Assets)

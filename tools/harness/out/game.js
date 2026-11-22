@@ -91171,6 +91171,22 @@ function podCollision(def) {
   collCache.set(def.id, out);
   return out;
 }
+var POD_BOX = {
+  aurora: [2.46, 2.46, 1.65, 4.55],
+  brute: [4.18, 2.81, 2.53, 4.2],
+  gasvaro: [3.43, 3.43, 1.58, 4.49],
+  bomquad: [3.56, 3.56, 1.71, 3.2],
+  mavik: [1.43, 1.43, 1.97, 2.64],
+  rattis: [1.89, 1.89, 1.73, 3.55],
+  aldo: [2.26, 2.26, 1.63, 3.64],
+  teemo: [3.96, 3.96, 2.13, 3.82],
+  elana: [1.71, 1.71, 2.24, 3.25],
+  odo: [2.56, 2.56, 2.32, 3.97],
+  cyclone: [2.55, 2.55, 2.42, 4.68],
+  halo: [1.77, 1.77, 2.05, 4.61],
+  manta: [1.5, 1.5, 1.77, 4.56],
+  volt: [2.24, 2.24, 3.13, 3.77]
+};
 var envCache = /* @__PURE__ */ new Map();
 function podEnvelope(def) {
   const hit = envCache.get(def.id);
@@ -91196,15 +91212,24 @@ function podEnvelope(def) {
   const ck = L.cockpit;
   const floorY = ck.y - ck.hw * 0.68 - 0.14;
   const engL = sideEnv(-1), engR = sideEnv(1);
+  const row = POD_BOX[def.id];
+  const guess = (sign3) => Math.max(0, ...L.engines.filter((e) => (e.x < 0 ? -1 : 1) === sign3).map((e) => e.y + engineExtent(e.spec).top)) + 2;
   const out = {
     engL,
     engR,
     // the ground clamp may reach deeper than the tub (`keel`: raised cockpits keep their old clamp); the strobe sits on the visible cockpit
     cockpit: { z: ck.z + bz, minY: floorY - (ck.keel ?? 0), topY: ck.topY !== void 0 ? ck.y + ck.topY : floorY + 1.75 },
-    length: Math.max(engL.frontZ, engR.frontZ) - (ck.z + bz - ck.len * 0.5)
+    length: Math.max(engL.frontZ, engR.frontZ) - (ck.z + bz - ck.len * 0.5),
+    // a pod without a row (a new one being built – the audit refuses it until its row is measured) gets a rough guess:
+    // 2 m above the body of its highest engine, 3.5 m above the cockpit origin, 0.6 m wider than the ground-clearance envelope
+    box: row ? { topL: row[0], topR: row[1], topCockpit: row[2], halfW: row[3] } : { topL: guess(-1), topR: guess(1), topCockpit: ck.y + 3.5, halfW: Math.max(-engL.outerX, engR.outerX) + 0.6 }
   };
   envCache.set(def.id, out);
   return out;
+}
+function podHeight(env, liftL, liftR, roll) {
+  const b = env.box;
+  return Math.max(b.topCockpit, b.topL + liftL, b.topR + liftR) * Math.abs(Math.cos(roll)) + b.halfW * Math.abs(Math.sin(roll));
 }
 
 // ../../src/game/weather.ts
@@ -94454,7 +94479,7 @@ function stepPod(p, td, dt, time12, gripMul, frozen) {
   }
   if (S2.roof > 0 && !fr.gap && !p.upper) {
     const l = Math.min(0.96, Math.abs(fr.lat) / (fr.hw + TUNNEL_SHOULDER + (S2.caveW ?? 0)));
-    const ceil2 = fr.groundY + 1.5 + (S2.roof - 1.5) * tunnelProfile(l) - (2.15 + knife * halfSpan * 0.95);
+    const ceil2 = fr.groundY + 1.5 + (S2.roof - 1.5) * tunnelProfile(l) - podHeight(env0, p.engYL ?? 0, p.engYR ?? 0, rollA);
     if (p.pos.y > ceil2) {
       const imp = Math.max(0, p.vel.y);
       p.pos.y = Math.max(ceil2, p.pos.y - 45 * dt);

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { PilotDef, PodDef, StatKey } from './data';
 import { DS, TUNNEL_SHOULDER, boulderState, tunnelCeiling, bridgeSwing, frameAt, gateDrop, nearestGlobal, nearestOnPath, roadSurfaceAt, rotorAngle, tunnelProfile, type Obstacle, type SetPiece, type TrackData } from './trackBuilder';
 import type { PodVisual } from './podModel';
-import { podCollision, podEnvelope } from './podDesigns';
+import { podCollision, podEnvelope, podHeight } from './podDesigns';
 import { surfaceOf } from './surfaces';
 import { DAMAGE_RULES, FX_NONE, damageModel, partsDue, partsFx, zoneFactor, type DamageZone, type PodFx } from './podDamage';
 export { FX_NONE, type DamageZone, type PodFx };
@@ -302,10 +302,13 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   }
   // tunnel ceilings & zero-G tubes (matches wide-shouldered tunnel & chamber vault geometry Wd = hw + 3.4 + caveW)
   if (S.roof > 0 && !fr.gap && !p.upper) {
-    // Session 20: same superellipse as the mesh (`tunnelProfile`); the limit applies to the TOP of the pod (engine radius + lifted outer
-    // engine = 2.15 m, knife-edge roll adds the half span) – before, only the pod centre was tested and its upper half dipped into the vault.
+    // Session 20: same superellipse as the mesh (`tunnelProfile`); the limit applies to the TOP of the pod – before, only the pod centre
+    // was tested and its upper half dipped into the vault. The top is the pod's own (`podHeight`): its cockpit roof or the higher
+    // engine side with that side's present travel, turned by the knife-edge roll – at 90° the half width of the model. (One height
+    // of 2.15 m for every pod left the tall ones up to 2 m inside the vault, a lifted outer engine more.) The vault is tested above
+    // the pod centre.
     const l = Math.min(0.96, Math.abs(fr.lat) / (fr.hw + TUNNEL_SHOULDER + (S.caveW ?? 0)));
-    const ceil = fr.groundY + 1.5 + (S.roof - 1.5) * tunnelProfile(l) - (2.15 + knife * halfSpan * 0.95);
+    const ceil = fr.groundY + 1.5 + (S.roof - 1.5) * tunnelProfile(l) - podHeight(env0, p.engYL ?? 0, p.engYR ?? 0, rollA);
     if (p.pos.y > ceil) {
       const imp = Math.max(0, p.vel.y); p.pos.y = Math.max(ceil, p.pos.y - 45 * dt); if (p.vel.y > 0) p.vel.y *= -0.3; // pressed down quickly, never teleported
       if (imp > 6 && p.invuln <= 0) { const dmg = Math.min(20, (imp - 6) * 0.8 * P.sturdy); applyDamage(p, 0, dmg, 'top'); p.shake = Math.min(1, p.shake + 0.3); p.events.push({ type: 'wall', strength: imp, x: p.pos.x, y: p.pos.y + 1, z: p.pos.z, nx: 0, nz: 0 }); }

@@ -2,21 +2,24 @@
 // Builds every pod exactly the way the game does (src/game/podAssembly.ts, material-free) and checks:
 //   1. mesh + triangle counts against the golden numbers in pods-baseline.json (measured on the real models in the browser)
 //   2. every geometry: required attributes, no NaN, index range – a bucket with mismatching attributes would vanish in the merge
-//   3. the visible pod against the physics shapes (podCollision / podEnvelope): how far it sticks out sideways or hangs below the ground clamp
+//   3. the visible pod against the physics shapes (podCollision / podEnvelope): how far it sticks out sideways or hangs below the ground clamp,
+//      and the box round it – top of each engine side and of the cockpit, half width, largest outfit (factory pod or with Teile) –
+//      against the measured rows in POD_BOX (tunnel ceilings)
 //   4. the physics shapes themselves against pods-shapes.json: the handling of an existing pod must not move by accident
 // Env: POD=<id> only that pod · UPDATE=1 prints fresh baseline rows instead of comparing.
 import * as THREE from 'three';
 import fs from 'node:fs';
 import { PILOTS, PODS, STAT_KEYS, type PodDef } from '../../src/game/data';
 import { tuneTiers, NO_KIT, type KitSpec } from '../../src/game/podKitParts';
-import { podCollision, podEnvelope } from '../../src/game/podDesigns';
+import { podCollision, podEnvelope, POD_BOX } from '../../src/game/podDesigns';
 import { assembleHero, assembleRival, segFor } from '../../src/game/podAssembly';
 import BASE from './pods-baseline.json';
 import SHAPES from './pods-shapes.json';
 
 /** How far the visible model may exceed the physics shapes (metres). Calibrated on the Session 19 pods: worst case + 5 cm
  *  (wide: Tyr Vespa's blade wings 0.50 · engines: Splitter-X 0.02 · no cockpit hangs below its ground clamp). */
-const TOL = { wide: 0.55, lowEngine: 0.07, lowCockpit: 0, /** how much wider than the factory pod kit parts may make it when that is already past `wide` */ kit: 0.12 };
+const TOL = { wide: 0.55, lowEngine: 0.07, lowCockpit: 0, /** how much wider than the factory pod kit parts may make it when that is already past `wide` */ kit: 0.12,
+  /** box round the pod (POD_BOX): the largest outfit may reach this far past a number of its row · and the number this far past the largest outfit (a stale row) */ box: 0.02, boxStale: 0.05 };
 /** Triangle / draw budgets. Old pods are measured against their Session 19 numbers (`budgetRef` in pods-baseline.json):
  *  the player pod may grow 20 % below Ultra, a near Gegner must not grow at all. New pods and Ultra have absolute caps. */
 const BUDGET = { playerGrow: 1.2, newPlayerHigh: 70000, newRivalNear: 26000, ultraPlayer: 250000, ultraPlayerDraws: 110, ultraRival: 100000, rivalDraws: 60, far: 1100 };
@@ -109,7 +112,7 @@ function shapeOf(def: PodDef) {
   return { halfW: r6(c.halfW), circles: c.circles.map(q => [r6(q.x), r6(q.z), r6(q.r), q.side]), engL: side(e.engL), engR: side(e.engR), cockpit: [r6(e.cockpit.z), r6(e.cockpit.minY)] };
 }
 
-console.log('pod        hero q1        hero q2        hero q3      rival q2      rival q3     far     wide   lowL   lowR   lowCk  result');
+console.log('pod        hero q1        hero q2        hero q3      rival q2      rival q3     far     wide   lowL   lowR   lowCk    box  result');
 const fresh: (string | number)[][] = [], shapes: string[] = [], kitNote: string[] = [];
 for (const def of PODS) {
   if (ONLY && def.id !== ONLY) continue;
@@ -144,21 +147,30 @@ for (const def of PODS) {
   // Tuning-Teile + Style-Teile (Phase 4): every Style-Teil choice with all tuning at tier 1 / tier 2 must build, stay inside the same
   // tolerances round the physics shapes and inside the Ultra budget; a Gegner with Style-Teile must not cost more than before the overhaul.
   let kitTris = 0, kitMeshes = 0, kitWide = -9, kitLow = -9, kitRival = 0;
+  const widthOf = (k: typeof hq) => Math.max(-k.L.min.x, k.R.max.x, -k.ck.min.x, k.ck.max.x);
+  const big = [hq.L.max.y, hq.R.max.y, hq.ck.max.y, widthOf(hq)]; // over all outfits: top of the left engine side, of the right one, of the cockpit · half width
   for (const [ci, tier] of [[1, 1], [2, 2], [3, 2]] as const) {
     const kit: KitSpec = { fins: ci, intake: ci, nozzle: ci, tune: tuneTiers(Object.fromEntries(STAT_KEYS.map(k => [k, tier * 2]))) };
     const k = hero(def, 3, kit), kr = rival(def, 2, { ...kit, tune: NO_KIT.tune });
     kitTris = Math.max(kitTris, k.tris); kitMeshes = Math.max(kitMeshes, k.meshes); kitRival = Math.max(kitRival, kr.near.tris);
     kitWide = Math.max(kitWide, Math.max(-k.L.min.x, k.R.max.x, -k.ck.min.x, k.ck.max.x) - halfW);
     kitLow = Math.max(kitLow, env.engL.minY - k.L.min.y, env.engR.minY - k.R.min.y);
+    big[0] = Math.max(big[0], k.L.max.y); big[1] = Math.max(big[1], k.R.max.y); big[2] = Math.max(big[2], k.ck.max.y); big[3] = Math.max(big[3], widthOf(k));
     over(`player triangles on Ultra with kit ${ci}`, k.tris, BUDGET.ultraPlayer); over(`player draws on Ultra with kit ${ci}`, k.meshes, BUDGET.ultraPlayerDraws);
     over(`Gegner (near) triangles below Ultra with Style-Teile ${ci}`, kr.near.tris, ref ? ref[8] : BUDGET.newRivalNear);
   }
   if (kitWide > Math.max(TOL.wide, wide + TOL.kit)) fail(`${def.id}: with kit ${kitWide.toFixed(2)} m wider than its collision shape (factory ${wide.toFixed(2)}, kit may add ${TOL.kit})`);
   if (kitLow > TOL.lowEngine) fail(`${def.id}: kit parts hang ${kitLow.toFixed(2)} m below the ground clamp (limit ${TOL.lowEngine})`);
-  kitNote.push(`${def.id.padEnd(9)} kit: player Ultra up to ${String(kitMeshes).padStart(3)} meshes (+${kitMeshes - hq.meshes}) / ${String(kitTris).padStart(6)} (+${kitTris - hq.tris}) · Gegner with Style-Teile up to ${String(kitRival).padStart(5)} · wide ${kitWide.toFixed(2)} · low ${kitLow.toFixed(2)}`);
+  // box round the pod: the largest outfit against the pod's row in POD_BOX (what the tunnel ceiling works with) – not past it, and the row not stale
+  const rowBox = [env.box.topL, env.box.topR, env.box.topCockpit, env.box.halfW], past = big.map((t, i) => t - rowBox[i]), boxOver = Math.max(...past);
+  const want = `[${big.map(t => (Math.ceil(t * 100 - 1e-6) / 100).toFixed(2)).join(', ')}]`;
+  if (!POD_BOX[def.id]) fail(`${def.id}: no row in POD_BOX (src/game/podDesigns.ts) – measured [top left engines, top right engines, top cockpit, half width]: ${want}`);
+  else if (boxOver > TOL.box) fail(`${def.id}: the model reaches ${boxOver.toFixed(2)} m past its row in POD_BOX (limit ${TOL.box}) – it would reach into tunnel vaults; measured row: ${want}`);
+  else if (Math.min(...past) < -TOL.boxStale) fail(`${def.id}: its row in POD_BOX is ${(-Math.min(...past)).toFixed(2)} m larger than the largest outfit (limit ${TOL.boxStale}) – a stale row; measured row: ${want}`);
+  kitNote.push(`${def.id.padEnd(9)} kit: player Ultra up to ${String(kitMeshes).padStart(3)} meshes (+${kitMeshes - hq.meshes}) / ${String(kitTris).padStart(6)} (+${kitTris - hq.tris}) · Gegner with Style-Teile up to ${String(kitRival).padStart(5)} · wide ${kitWide.toFixed(2)} · low ${kitLow.toFixed(2)} · Teile raise the top by ${(Math.max(big[0], big[1]) - Math.max(hq.L.max.y, hq.R.max.y)).toFixed(2)}`);
   const c = (m: number, t: number) => `${String(m).padStart(3)}/${String(t).padStart(6)}`;
   const f = (v: number) => v.toFixed(2).padStart(6);
-  console.log(`${def.id.padEnd(9)} ${c(h[0].meshes, h[0].tris)}     ${c(h[1].meshes, h[1].tris)}     ${c(h[2].meshes, h[2].tris)}    ${c(n2.near.meshes, n2.near.tris)}    ${c(n3.near.meshes, n3.near.tris)}  ${c(n2.far.meshes, n2.far.tris).trim().padStart(6)} ${f(wide)} ${f(lowL)} ${f(lowR)} ${f(lowCk)}  ${failed > before ? 'FAIL' : 'ok'}`);
+  console.log(`${def.id.padEnd(9)} ${c(h[0].meshes, h[0].tris)}     ${c(h[1].meshes, h[1].tris)}     ${c(h[2].meshes, h[2].tris)}    ${c(n2.near.meshes, n2.near.tris)}    ${c(n3.near.meshes, n3.near.tris)}  ${c(n2.far.meshes, n2.far.tris).trim().padStart(6)} ${f(wide)} ${f(lowL)} ${f(lowR)} ${f(lowCk)} ${f(boxOver)}  ${failed > before ? 'FAIL' : 'ok'}`);
 }
 if (UPDATE) console.log('\npods-baseline.json rows:\n' + fresh.map(r => '    ' + JSON.stringify(r)).join(',\n') + '\n\npods-shapes.json:\n{\n' + shapes.join(',\n') + '\n  }');
 console.log(''); for (const l of kitNote) console.log(l);
@@ -171,5 +183,5 @@ if (process.env.UPDATE === 'write' && !ONLY) { // take the fresh numbers over (d
   fs.writeFileSync('tools/ci/pods-shapes.json', '{\n' + shapes.join(',\n') + '\n  }\n');
   console.log(`\nwrote ${file} and tools/ci/pods-shapes.json`);
 }
-console.log(failed ? `\n${failed} pod audit failure(s).` : '\nAll pods passed the audit (meshes/triangles per build; wide/low = metres outside the physics shape).');
+console.log(failed ? `\n${failed} pod audit failure(s).` : '\nAll pods passed the audit (meshes/triangles per build; wide/low = metres outside the physics shape; box = metres past the measured box in POD_BOX, largest outfit).');
 process.exit(failed ? 1 : 0);
