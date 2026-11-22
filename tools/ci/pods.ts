@@ -7,7 +7,7 @@
 //      largest outfit (factory pod or with Teile) must lie inside it, and the hull must not be stale
 //   4. the physics shapes themselves against pods-shapes.json: the handling of an existing pod must not move by accident
 // Env: POD=<id> only that pod · UPDATE=1 prints fresh baseline rows instead of comparing · HULL=write measures the hulls again and
-//      writes src/game/podHulls.json (after a pod, a cockpit, an engine style or a Teil changed shape – say why in HANDOFF.md).
+//      writes src/game/podHulls.json (after a pod, a cockpit, an engine style or a Teil changed shape – say why in the task's file in docs/verlauf/).
 import * as THREE from 'three';
 import fs from 'node:fs';
 import { PILOTS, PODS, STAT_KEYS, type PodDef } from '../../src/game/data';
@@ -139,7 +139,7 @@ for (const def of PODS) {
     if (!gold) fail(`${def.id}: no baseline row (run with UPDATE=1 and add it on purpose)`);
     else for (let i = 1; i < row.length; i++) if (row[i] !== gold[i]) fail(`${def.id}: ${BASE.columns[i]} = ${row[i]}, baseline ${gold[i]}`);
   }
-  // budgets (HANDOFF "Session 20"): below Ultra a pod must not cost more than before the overhaul, Ultra targets a gaming PC
+  // budgets (docs/regeln/pods.md; decided in Session 20 (Pods)): below Ultra a pod must not cost more than before the overhaul, Ultra targets a gaming PC
   const ref = (BASE.budgetRef.rows as (string | number)[][]).find(r => r[0] === def.id) as number[] | undefined; // Session 19 numbers
   const over = (what: string, v: number, lim: number) => { if (v > lim) fail(`${def.id}: ${what} = ${v}, budget ${Math.round(lim)}`); };
   if (ref) { over('player triangles on "Niedrig"', h[0].tris, ref[2] * BUDGET.playerGrow); over('player triangles on "Hoch"', h[1].tris, ref[4] * BUDGET.playerGrow); over('Gegner (near) triangles below Ultra', n2.near.tris, ref[8]); }
@@ -208,7 +208,7 @@ for (const def of PODS) {
 }
 if (UPDATE) console.log('\npods-baseline.json rows:\n' + fresh.map(r => '    ' + JSON.stringify(r)).join(',\n') + '\n\npods-shapes.json:\n{\n' + shapes.join(',\n') + '\n  }');
 console.log(''); for (const l of kitNote) console.log(l);
-if (process.env.UPDATE === 'write' && !ONLY) { // take the fresh numbers over (deliberate step: say why in HANDOFF.md)
+if (process.env.UPDATE === 'write' && !ONLY) { // take the fresh numbers over (deliberate step: say why in the task's file in docs/verlauf/)
   const file = 'tools/ci/pods-baseline.json', j = JSON.parse(fs.readFileSync(file, 'utf8'));
   j.rows = fresh; j.measured = process.env.NOTE ?? j.measured;
   const head = JSON.stringify({ ...j, rows: 0, budgetRef: 0 }, null, 2).replace(/\n\}$/, '');
@@ -217,7 +217,7 @@ if (process.env.UPDATE === 'write' && !ONLY) { // take the fresh numbers over (d
   fs.writeFileSync('tools/ci/pods-shapes.json', '{\n' + shapes.join(',\n') + '\n  }\n');
   console.log(`\nwrote ${file} and tools/ci/pods-shapes.json`);
 }
-if (HULL_WRITE && !ONLY) { // take the freshly measured hulls over (deliberate step: say why in HANDOFF.md)
+if (HULL_WRITE && !ONLY) { // take the freshly measured hulls over (deliberate step: say why in the task's file in docs/verlauf/)
   const file = 'src/game/podHulls.json', rows = (r: number[][]) => '[' + r.map(q => '[' + q.map(v => (Math.round(v * 100) / 100).toString()).join(', ') + ']').join(', ') + ']';
   fs.writeFileSync(file, '{\n  "note": ' + JSON.stringify(HULLS.note) + ',\n  "pods": {\n' + Object.entries(hullFresh).map(([id, h]) => `    ${JSON.stringify(id)}: {\n      "L": ${rows(h.L)},\n      "R": ${rows(h.R)},\n      "ck": ${rows(h.ck)}\n    }`).join(',\n') + '\n  }\n}\n');
   console.log(`\nwrote ${file} – run the audit again to check it`);

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Visual test harness (headless Chromium + SwiftShader WebGL2). See CLAUDE.md "Visual testing".
+# Visual test harness (headless Chromium + SwiftShader WebGL2). See docs/regeln/tests.md.
 # Usage:  tools/harness/run.sh pods "0,1,g,7:0.1"     (pod index[:hp], g = grid of all pods)
 #         tools/harness/run.sh game "t0:a,t0:b,t7:c"  (track index : a = chase cam, b = tightest corner, c = canyon)
 set -e

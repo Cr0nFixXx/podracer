@@ -173,22 +173,22 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 
 Alle Änderungen sind committet (Remote `origin` = `github.com/Cr0nFixXx/podracer`). Session 20 besteht aus zwei Teilen: **Strecken** (Branch `B`, per Pull Request #1 in `main`) und **Pods** (Branch `new_pods`, per Pull Request #2 in `main`). `main` enthält beide; die Weiterarbeit liegt im Zweig `dev`.
 
-**GitHub ist die Sicherung.** Den Stand holen: `git clone https://github.com/Cr0nFixXx/podracer.git` (`main` = gemergter Stand, `dev` = Weiterarbeit).
+**GitHub ist die Sicherung.** Den Stand holen: `git clone https://github.com/Cr0nFixXx/podracer.git` (`main` = gemergter Stand, `dev` = Weiterarbeit). Fehlt im Arbeitsordner nur der Ordner `.git`: `npm run restore-git` holt ihn von GitHub (Zweig `dev`) – nie gepushte Commits sind dann weg, lokale Änderungen erscheinen als geändert.
 
 **Der versteckte Ordner `.git` fehlt im Download des Arbeitsordners.** Früher lag er deshalb als Textkopie im Repo (`.archiv/repo-sicherung/`, erneuert von `npm run save`). Diese Kopie stand auf Session 19 und ist seit dem 2026-11-22 gelöscht. Die Git-Historie behält sie: `git show ee3dc4b:.archiv/repo-sicherung/podracer-git.tar.gz.b64.txt`.
 
-**`npm run save` ist seit dem 2026-11-22 abgeschaltet.** Der Befehl meldet das, bricht ab und ändert nichts. Grund: das Skript legte drei Kopien von `.git` an (gemessen: zusammen 123 MB) – der gesicherte Arbeitsordner der Sandbox darf aber nur 128 MB groß sein. Committen stattdessen: `git add <Pfade>`, `git commit`, `git gc --prune=now` (Regeln in `HANDOFF.md`, Abschnitt „Git-Stand"). Wieder einschalten: den markierten Block am Anfang von `tools/save.sh` löschen.
+**`npm run save` ist seit dem 2026-11-22 abgeschaltet.** Der Befehl meldet das, bricht ab und ändert nichts. Grund: das Skript legte drei Kopien von `.git` an (gemessen: zusammen 123 MB) – der gesicherte Arbeitsordner der Sandbox darf aber nur 128 MB groß sein. Committen stattdessen: `git add <Pfade>`, `git commit`, `git gc --prune=now` (Regeln in `docs/regeln/git-sandbox.md`). Wieder einschalten: den markierten Block am Anfang von `tools/save.sh` löschen.
 
 ## Für Entwickler: Prüfbefehle
 
 1. `npm run check` – Typecheck + Unit-Prüfungen (`tools/ci/unit.ts`) + Pod-Audit + Physik-Simulation aller 13 Strecken (11 Pods, 45 s; kein Browser nötig; etwa 1 bis 1,5 Minuten Laufzeit auf zwei CPU-Kernen). Der Typecheck schließt `tools/ci` und `tools/harness` ein. Das Startfeld wandert je Strecke um drei Pods weiter, damit alle 14 gefahren werden; `ROSTER_OLD=1` fährt das alte Feld der ersten zehn Pods (Vergleich mit früheren Tabellen).
 2. `npm run check:pods` – nur das Pod-Audit (ca. 6 s): baut jeden Pod ohne Browser, vergleicht Mesh- und Dreieckszahlen mit `tools/ci/pods-baseline.json` und prüft das Sichtmodell gegen die Kollisionsform und gegen die Hülle je Pod (`src/game/podHulls.json` – gegen sie werden Tunneldecken, Brücken und Bögen geprüft; das Modell darf höchstens 2 cm herausragen, die Hülle höchstens 9 cm größer sein). Nach einer Änderung an einem Pod-Modell die Hüllen neu messen: `HULL=write npm run check:pods`.
-3. `npm run check:gpu` – lädt Strecken im Headless-Chrome mit WebGPU und meldet jeden Shader-/Konsolenfehler (braucht Puppeteer, siehe `HANDOFF.md`). Bei wenig Arbeitsspeicher: `TRACKS=1 QUERY='?tex=256' npm run check:gpu` (eine Strecke, kleine Texturen).
+3. `npm run check:gpu` – lädt Strecken im Headless-Chrome mit WebGPU und meldet jeden Shader-/Konsolenfehler (braucht Puppeteer, siehe `docs/regeln/tests.md` → „Test-Setup"). Bei wenig Arbeitsspeicher: `TRACKS=1 QUERY='?tex=256' npm run check:gpu` (eine Strecke, kleine Texturen).
 4. `npm run build` – erzeugt `dist/index.html`.
 5. Pods ansehen: `npm run dev`, dann `http://localhost:5173/tools/harness/pods.dev.html` öffnen und in der Browser-Konsole z. B. `await sheet('front')` oder `await show(0)` aufrufen (Befehle im Kopf von `tools/harness/pods.ts`).
 6. Strecken-Aufbau ansehen (Tunnel, Untergründe, Seen, engste Kurven): `npx esbuild tools/ci/info.ts --bundle --platform=node --format=esm --outfile=tools/ci/out/info.mjs --log-level=error && node tools/ci/out/info.mjs frost`.
 
-Begriffe des Projekts stehen in `CONTEXT.md`, grundlegende Entscheidungen in `docs/adr/`.
+Begriffe des Projekts stehen in `CONTEXT.md`, grundlegende Entscheidungen in `docs/adr/`. Stand und nächster Schritt: `HANDOFF.md`. Regeln für die Arbeit am Code: `CLAUDE.md` und `docs/regeln/`. Was in welcher Sitzung gemacht wurde: `docs/verlauf/`.
 
 ## Bildnachweis
 

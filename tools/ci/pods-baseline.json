@@ -1,5 +1,5 @@
 {
-  "note": "Golden numbers of the pod models (meshes / triangles per build). tools/ci/pods.ts must reproduce `rows` exactly from src/game/podAssembly.ts; the browser harness (tools/harness/pods.ts -> statsAll()) measures the same on the real models. Pods changed on purpose: `UPDATE=write npm run check:pods` and say why in HANDOFF.md.",
+  "note": "Golden numbers of the pod models (meshes / triangles per build). tools/ci/pods.ts must reproduce `rows` exactly from src/game/podAssembly.ts; the browser harness (tools/harness/pods.ts -> statsAll()) measures the same on the real models. Pods changed on purpose: `UPDATE=write npm run check:pods` and say why in the task's file in docs/verlauf/.",
   "columns": [
     "id",
     "heroQ1 meshes",

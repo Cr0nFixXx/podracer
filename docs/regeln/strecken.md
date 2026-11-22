@@ -1,0 +1,65 @@
+# Rules: tracks, tunnels, landscape
+
+Part of the agent manual (`CLAUDE.md`). Read this before you change how a track is built: layout, surfaces, tunnels, caves, crossings, set pieces, dressing, landscape and decor.
+
+- The tag at the end of a rule is the session that wrote it; rules written after Session 20 carry their date. **If two rules disagree, the later one wins** (date > `S20 …` > `S19` > … > `≤ S9`).
+- Design intent: `DESIGN.md` → „Strecken & Bauwerke" and „Landschaft & Leben".
+- What a pod does in a tunnel or under an overhead (hull, vault, `p.upper`): `physik-steuerung.md`. Textures and photo sets: `grafik.md`.
+
+## Layout, width, profile
+- **Track layouts are expanded procedurally** in `trackBuilder.ts → controlPoints()` (scale `TRACK_SCALE`, meander insertion with clearance check, two open flats). `data.ts` control points stay the designer's base layout; index-based hints (`def.shortcuts`) must go through the returned `map`. `NO_EXPAND=1` (CI) builds the old layouts. Fraction-based fields (canyons, ramps, set pieces …) shift slightly – that is expected. *(S18)*
+- **Open flats** = samples with `hw > wideLim` (min(1.45 × median, 45 m)): no canyon flag, no tunnels. Keep anything that assumes a narrow road (tunnels, arches) out of them. *(S18)*
+- **Track width:** change only `TRACK_WIDTH`; rerun `npm run check`. *(S11)*
+- **Track profile (`trackBuilder.ts`):** banking via `finalizeSamples(S, closed, banked = true)` for the main path only; hills are added after ramps are placed and are damped to 0 at grid/finish/ramps/gaps/zero-G and wherever the track comes within `hwA + hwB + 14 m` of itself. Do not add height elsewhere (jump tuning + over/underpass clearance depend on it). *(S10)*
+
+## Surfaces and flat basins
+- **Surfaces (`surfaces.ts`, `Sample.surf`):** every sample carries an index into `SURFACES` (0 = built race deck). The file is pure data (no three/DOM imports – builder, physics, CI and world share it). New surface → entry in `SURFACES` (grip / vmax / heat, photo set + procedural fallback kind + tile + palette, wake) and in `THEME_SURFACES` (`general` / `open` / `cave` per theme, `pal` overrides). `buildTrack` assigns them in two places: the open runs (`openRuns`, before `finalizeSamples`) and all remaining passages (end of `buildTrack`). Global `NO_SURFACES` = old uniform deck for A/B. *(S20 Strecken)*
+- **Flat basins (`Sample.lake`, `lakeY`, `lakeL` / `lakeR`, `lvl`)** = lakes, frozen lakes, plateaus (`SurfaceDef.flat`). Profile and camber are levelled over `lvl`; rails, kerbs, `trackDetail`, `props`, `scifi`, `mechProps` all skip `lake` samples; the edge is marked by beacons. `world.ts → buildBasins` draws one level sheet per run (liquid → `waterMaterial(…, LIQUIDS[liquid])` / `lavaSeaMaterial`, else the surface material). **The sheet is double-wound with +Y normals** because it folds over itself wherever `hw + shore > R`; keep it level and textured in world space so overlaps stay invisible. Where the road band itself is wider than the corner radius (`hw · |curv| ≥ 1`) the inner shore keeps 34 m so the sheets before and after the kink overlap – otherwise a diamond-shaped hole opens. Aquilaris lakes are the ocean itself (`seaY0 + 0.4`, no sheet). `tools/ci/info.ts` prints `fold` and `basin` lines for these cases. *(S20 Strecken)*
+
+## Tunnels and caves
+- **Tunnel cross-section has ONE source:** `tunnelProfile(l)`, `tunnelArc(ang)`, `tunnelCeiling(sample, lat)` in `trackBuilder.ts` (superellipse `TUNNEL_N = 3`, half width `hw + TUNNEL_SHOULDER`). Mesh, ceiling collision, camera clamp and stalactites must use them. Roof constants in `buildTrack`: `STD_ROOF 27 / 30`, `UNDER_ROOF 26 / 28`, `SC_ROOF 25 / 27`, `CAVE_ROOF 27 / 29` (+ chamber rise), `SEA_ROOF 26` (second value = ice). Crossing separation follows `UNDER_ROOF + 11`. *(S20 Strecken)*
+- **Caves are one continuous `tun === 3` run.** The road itself widens in the chambers (`caveW` is gone), cave branch tubes are roofed end to end and merged with the main tube by a shell union in `buildTunnel` (`insideCave` + triangle culling). Cliffs are skipped in caves (`world.ts`, `terrain.ts`). Every extra face inside a cave (end walls, wedge floors) needs real texture coordinates – a fan that reuses ring vertices collapses the texture into stripes. *(S20 Strecken)*
+- **Tunnels & branching caves:** heights, profile and cave layout are superseded by the rules tagged S20 Strecken (no `caveW` any more). Still valid: caves fork into reuniting `Path.isCave` tubes marked by `buildCaveForkPylons`. Shortcut/cave merges go through `stitchBranch` (banked height match + actual `q.hw` check). *(S19)*
+- **Caves** are configured in `CAVES` (theme → [samples, depth, chambers]); roof height varies per sample inside a chamber, pillars come from `cavePillars` as kind-1 obstacles. *(S18)*
+- **Tunnels have three kinds** (`Sample.tun`: 1 standard, 2 underwater, 3 cave) and are placed in `buildTrack` BEFORE obstacles / hazards / set pieces (those skip `roof > 0`). Underwater tubes and the cave dip the road (`dip()`); never put a ramp within 520–600 m before them (`rampBefore`). *(S17)*
+- **`buildTunnel`** (world.ts) builds per roof run: inner shell, berm or caisson, drivable deck (road material, UV integrated per segment), portal faces, ribs, lamps; underwater: window faces share the shell's vertex buffer and use `oceanWindowMaterial` (scifi.ts) where the tube top is below `td.seaY`. *(S17)*
+- **Sea level of ocean worlds is `td.seaY`** (fixed before the dips). The water plane takes a hole mask (`tunnelWaterMask`) where an underwater tube breaks the surface. *(S17)*
+- **Tunnels:** `sample.roof > 0` (main path: placed at the end of `buildTrack`, shortcuts: middle half). `buildTunnel` builds one shell per roof run, sheared with `bank`. Physics ceiling, rain cover, lamp strips follow `roof` automatically. *(S16)*
+
+## Crossings, banked decks, overheads
+- **Anything under a banked deck follows the camber** (`addViaductPiers`: tilted hammerhead, per-leg height). A level beam sticks out of the low side of a 21° corner. *(S20 Strecken)*
+- **Self-crossings (`td.crossings`, `Sample.bridge / underpass`, `tun = 4`):** detected & grade-separated (≥ 30–33.5 m) in `buildTrack`; `terrain.ts` skips `s.bridge` for ground shaping (keeps it in `roadClear`); `buildBridges` renders box girders, abutments and clearance-checked piers. Branch rejoin queries must stay scoped (`nearestMainScoped`). *(S19)*
+- **Everything that spans the road is solid:** push an `Overhead` (`{ idx, y0, y1, half }` or `arch: { R, sy, inner?, yOff?, thick?, sp? }`) to `td.overheads` when building it (gantries, start portal, checkpoint gates, rock arches, set-piece arches). Never place such structures on samples with `roof > 0` or `zeroG`. *(S16)*
+- **Overheads** may carry `arch: { R, sy }` (checkpoint gates): ceiling = `sy·√((R−1.7)² − lat²)` above the road. *(S15)*
+- **Overheads:** `td.overheads` (filled by `trackDetail` gantries and the start portal) are solid in `stepPod`. New overhead structure → push `{ idx, y0, y1, half }`. Keep banner undersides ≥ 16 m above the road. *(S14)*
+
+## Obstacles and set pieces
+- **Grounded plates & arches, airlocks:** conform road decals/pads/lips/vents to 3D slope + bank + crown; sink all arch/gate/gantry/mast feet into `heightAt` (or deck cantilevers on `prison`/`ocean`). `gate` set-piece is a 3-bay biome-fused futuristic blast-door airlock (`LIFT = 12.6 m`). *(S19)*
+- **Set-piece materials are opaque.** Broken-out arch/ice blocks are capped torus segments; flying chunks are real meshes (`debris.ts → DebrisPool`), not sprites. *(S15)*
+- **Breakable / vanished obstacles:** `o.breakable` (crates, rocks r < 2.9). A broken or despawned obstacle gets `broken = true` and is moved to x/z = 1e9, lat = 1e6 – every consumer ignores it without extra checks. Visual removal: `world.breakObstacle(o)`. *(S14)*
+- **Obstacles & set pieces (`trackBuilder.ts`, `setPieces.ts`, `world.ts`):** ~7.5 spaced obstacles/track (`≥ 52 m` apart, clear of ramps/landings) marked with glowing ground rings + top strobe beacons; 6 `SetPiece` types (`rotor`, `gate`, `arch`, `icefall`, `boulder`, `bridge`); corridor AI (`aiInputs`) evaluates 27+ lanes with exact ETA timing. *(≤ S9)*
+
+## Dressing: sci-fi, mechanical props, start gate
+- **Sci-fi dressing** lives in `scifi.ts` (`SCIFI_THEMES`); edge light strips also light every tunnel. Animated in the shader only. *(S16)*
+- **Mechanical props (`mechProps.ts`):** instanced only, no shadows; animated parts via per-frame instance matrices (≤ ~70). Towers stand `wall + 10.5 m` outside the road and are skipped at cliffs, gaps, tunnels, water. *(S11)*
+- Start gate: add parts only through `put(mat, geo)` / `strut(...)` in `mkGate` (5 merged buckets). *(S9)*
+
+## Track mesh
+- **Texture coordinates along the track must be integrated per segment** (`vAcc += ds / tile(width)`), never `distance / tile(width)` – the latter smears the texture wherever the width changes (worse the further along the track). *(S15)*
+
+## Worlds
+- **Oovo IV has ground** (`terrain.ts` prison = moon surface with craters, `LAYERS.oovo`); piers only under built decks; gas giant and ring in `world.ts`; theme sun 19°. *(S20 Strecken)*
+- **Ökumenopolis (`city` / `neon`) is removed** (13 tracks across 8 planets; keep `cityRoad` texture for `aquilaris` and `malastare`; `loadProfile` falls back to `TRACKS[0].id` for unknown `trackId`). *(S19)*
+
+## Landscape and decor
+- **HQ decor:** `snowPineGeometry` + `pineMaterial` (atlas layout of the tree atlas; alpha in a separate `alphaMap`), `boulderGeometry` + `heightSampler` (CPU displacement by the rock texture's height channel, box-projected uv, creased normals; the LOD twin MUST be `boulderGeometry` at low detail – `rockGeometry` has a different texture mapping and would pop), `cactusGeometry` uv (u = rib phase, v = length / 0.42) + `cactusMaterial`. Builders that the harness should find set `geometry.name` (`boulder`, `cactus`). *(S20 Strecken)*
+- **Tree material / atlas:** `foliage.ts → treeMaterial` (map + `alphaMap` + `alphaTest`; alpha must be a separate grey texture – the shadow pass only copies `alphaMap`). UV conventions in `decorGeo.ts`: `barkUV` (left half, mirror-tiled), `plainUV` (white strip), `LEAF_TILE(q)` (4 sprig tiles). Every part merged into a tree needs position, normal, uv, color. *(S18)*
+- **Decor density:** `dens` in `scatterDecor` (track length + 20 %, cap 2.6) multiplies every `place()` count – change counts there, not per call. *(S18)*
+- **Placing objects on terrain:** use the minimum of several height samples under the footprint (`groundMin` in `world.ts`, `place()` in `scatterDecor`), not the centre height. *(S15)*
+- **Decor LOD:** `place(geo, …, { lod: { geo, dist } })` builds a far twin per sector (forces sector chunking); LOD geometry must come from the same seed (`jungleTreeGeometry(seed, gq, true)`, `spireGeometry(seed, halfRadial, sameStrata)`). *(S10)*
+- All scatter decor geometry lives in `src/game/decorGeo.ts` (pure functions, seeded, **no materials**). `world.ts → scatterDecor` only calls builders and `place(...)`. *(S9)*
+- Variants = call the builder with different seeds and split the instance count (rocks 3, spires 3, mesas 2, trees 2). Keep the total count unchanged. *(S9)*
+- Helpers: `ringSurface` (welded lathe grid, outward normals), `tube`, `paint` (vertex colours), `flat` / `smooth`, `merge`. Merged parts need identical attributes (`position, normal, uv` + `color` for trees/pines). *(S9)*
+- Keep unit sizes: spire/mesa height `0..1` (scaled by `scaleY`), tree ≈ 19 m, pine ≈ 11 m, crystal cluster `h` param. `foot` in `place` must cover the base radius. *(S9)*
+- Triangle budget per instance (gq 2): tree ≤ 1 400, spire ≤ 1 100, mesa ≤ 1 050, snow pine ≤ 750 (cone twin beyond 230 m), boulder 720 within 120 m (980 at gq 3) and 180 beyond, cactus ≤ 600. Check with a node script before raising. *(S9)*
+- **Landscape (`world.ts`):** `terrain` → `waterfalls` → `landmarks` (`LandmarkFoot[]`) → `smoke` → `groundCover` (non-overlapping dome LOD) → `wildlife` (landmark avoidance, fleeing herds, perching birds, `nearAudio`) → `trackDetail` (reactive energy barrier) → `batcher.build`. *(≤ S9)*

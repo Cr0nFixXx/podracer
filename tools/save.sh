@@ -5,7 +5,7 @@
 
 # --- SWITCHED OFF since 2026-11-22 (user decision, "for now") -------------------------------------------
 # The script writes three copies of .git (measured: 123 MB together). The saved workspace of the sandbox
-# may only hold 128 MB; above that the state is lost (HANDOFF.md, section "Git-Stand").
+# may only hold 128 MB; above that the state is lost (docs/regeln/git-sandbox.md).
 # To switch it on again: delete this block down to the line "--- end of switch ---".
 cat >&2 <<'TXT'
 npm run save ist abgeschaltet (seit 2026-11-22). Es wurde nichts committet und nichts gesichert.

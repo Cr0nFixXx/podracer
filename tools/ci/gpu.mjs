@@ -1,5 +1,5 @@
 // GPU shader check: `npm run check:gpu` – loads tracks in headless Chrome on the real WebGPU backend (SwiftShader) and fails on ANY
-// console error/warning (WGSL validation, uniformity analysis, pipeline errors). Needs Puppeteer: PUPPETEER_DIR=/tmp/t (see HANDOFF "Test-Setup").
+// console error/warning (WGSL validation, uniformity analysis, pipeline errors). Needs Puppeteer: PUPPETEER_DIR=/tmp/t (see docs/regeln/tests.md, "Test-Setup").
 import { createRequire } from 'node:module'; import { execSync } from 'node:child_process'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'), H = path.join(root, 'tools/harness');
 const require = createRequire(path.join(process.env.PUPPETEER_DIR ?? '/tmp/t', 'x.js'));
