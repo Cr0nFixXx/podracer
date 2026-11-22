@@ -12,6 +12,12 @@
 - **Git:** commit after every finished task (user request) with plain commits – `git add <explicit paths>`, `git commit` – and run **`git gc --prune=now`** after every commit: the saved sandbox workspace may only hold 128 MB. Never `git add -A` by hand, never push unless asked. `npm run save` is switched off. The harness bundles (`tools/harness/out/`) are not in git: `npm run harness:build`. Work branch: `dev`. Details: `docs/regeln/git-sandbox.md`.
 - **Words:** use the glossary in `CONTEXT.md` (Racer, Cockpit, Tuning-Teil, Style-Teil, Schadensmodell, Bruchteil, Gegner …). Hard-to-reverse decisions live in `docs/adr/`.
 
+## Agent skills
+- **Skill set `mattpocock/skills`:** one folder per skill, `.agents/skills/<name>/SKILL.md`. Not in git – folder missing → reinstall: `docs/regeln/git-sandbox.md` → „Skills". Read the skill's `SKILL.md` before you use it.
+- **Reach for them when the task fits:** `grilling` (a decision is the user's: ask the whole frontier in one round, every question with a recommended answer; facts you look up yourself), `diagnosing-bugs` (a red loop first, theory after), `tdd` (red before green; seam = `tools/ci/unit.ts`), `code-review`, `domain-modeling`, `writing-for-agents` (this manual and `docs/regeln/`).
+- **Issue tracker: none.** User decision 2026-11-22: „erstmal keine Ticket-Skills" – `to-spec`, `to-tickets`, `triage`, `wayfinder`, `implement-spec` stay unused; open work lives in `TODO.md`, finished work in `docs/verlauf/`.
+- **Domain docs:** single-context. The glossary is `CONTEXT.md` (the skills call it `GLOSSARY.md`), decisions are in `docs/adr/`.
+
 ## Repo
 - Root = Klon von `https://github.com/Cr0nFixXx/podracer.git`, Arbeitszweig **`dev`** (Stand: `HANDOFF.md` → „Git-Stand"). `.archiv/` enthält fremde Alt-Dateien (nicht anfassen, nicht ins Spiel einbinden).
 

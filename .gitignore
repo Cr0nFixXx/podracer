@@ -4,3 +4,4 @@ build/
 .shot.jpg
 tools/harness/out/
 tools/ci/out/
+.agents/skills/

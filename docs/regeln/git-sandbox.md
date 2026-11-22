@@ -28,6 +28,14 @@ Part of the agent manual (`CLAUDE.md`). Read this before your first commit in a 
 - **Nach einem Sandbox-Reset** fehlt `.git/config`: `git config core.fileMode false` (sonst erscheinen alle Dateien als geändert – nur Dateirechte), `git remote add origin https://github.com/Cr0nFixXx/podracer.git`. Weg sind dann auch `node_modules`, `dist`, `build` und `tools/harness/out`: `npm ci`, vor einem Browser-Test `npm run harness:build`.
 - Fehlt nach einem Reset doch einmal ein Commit: die Schritte aus dem Punkt darüber, `npm run check`, neu committen. Ein nur lokaler Commit ist erst sicher, wenn er gepusht ist – dem Nutzer sagen, wenn einer nur lokal liegt.
 
+## Skills
+- **Skill set `mattpocock/skills`** (plugin 1.3.2, commit `abeeaf9`, MIT) is installed in `.agents/skills/`: the 27 skills the plugin ships, copied by hand. The installer `npx skills@latest add mattpocock/skills` needs Node ≥ 22.20, the sandbox has Node 20. The folder is git-ignored and survives a sandbox reset; after a fresh clone reinstall it:
+  ```bash
+  git clone --depth 1 https://github.com/mattpocock/skills /var/tmp/mp-skills
+  node -e "const p=require('/var/tmp/mp-skills/.claude-plugin/plugin.json'),fs=require('fs'),path=require('path');for(const r of p.skills)fs.cpSync(path.join('/var/tmp/mp-skills',r),path.join('.agents/skills',path.basename(r)),{recursive:true})"
+  ```
+  Which skills are in use and which are not: `CLAUDE.md` → „Agent skills". *(2026-11-22)*
+
 ## Sandbox: 2 GB RAM, software GL
 - **Sandbox with 2 GB RAM and software GL:** never run the headless browser together with `tsc`, the sim or esbuild; one track per browser run (two tracks with 1024 px photo sets exhaust the memory); wrap every run in `timeout`; `/tmp` is a RAM disk – delete old screenshots and `/tmp/puppeteer_dev_chrome_profile-*`; `pkill` patterns need a character class (`"pshot[.]mjs"`), otherwise they kill the calling shell. After a reset: `git config core.fileMode false`. *(S20 Strecken)*
 
