@@ -1,0 +1,63 @@
+# Runs the checks of the project on GitHub: on every push to `dev`, on every pull request into `main`, and by hand.
+# What is checked is exactly what `npm run check` checks on a developer machine (typecheck, unit checks, pod audit, physics sim of
+# all tracks – node only, no browser), and that both builds still build.
+# The WebGPU check needs a headless Chrome with software WebGPU and takes long: it only runs when started by hand with the box ticked
+# (Actions → check → Run workflow), and a failure there does not turn the run red.
+name: check
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      gpu:
+        description: "auch den WebGPU-Check laufen lassen (npm run check:gpu, ca. 10 Minuten)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: npm run check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20 # the version the checks are developed with
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - name: npm run build (single file)
+        run: npm run build && ls -l dist/index.html
+      - name: npm run build:web (folder for a web server)
+        run: npm run build:web && du -sh build
+
+  gpu:
+    name: npm run check:gpu (optional)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.gpu }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Puppeteer with its own Chrome
+        run: mkdir -p /tmp/t && cd /tmp/t && npm init -y > /dev/null && npm i puppeteer
+      - name: libraries Chrome needs
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libdbus-1-3 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libxkbcommon0 libatspi2.0-0 libcups2 libcairo2 libpango-1.0-0 libasound2t64 || true
+      - name: npm run check:gpu (one track, small textures)
+        run: PUPPETEER_DIR=/tmp/t TRACKS=1 QUERY='?tex=256' npm run check:gpu
