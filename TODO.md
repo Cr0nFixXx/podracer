@@ -40,6 +40,7 @@ Nur offene Punkte, nach Thema. Erledigtes steht im Verlauf: `docs/verlauf/`, je 
 - [ ] **Mini-Karte erweitern:** Abkürzungen, Gefahrenzonen und Set-Pieces als Symbole auf dem gecachten Minimap-Layer
 
 ## 7. Performance, Build, Werkzeuge, Doku
+- [ ] **GitHub-Action auf GitHub bringen:** `.github/workflows/check.yml` ist fertig und lokal committet, aber GitHub hat den Push abgelehnt – dem Zugangstoken des Nutzers fehlt das Recht, Workflow-Dateien zu schreiben (auf GitHub: Token → Repository permissions → „Workflows: Read and write"). Danach: pushen, den ersten Lauf unter „Actions" ansehen, den optionalen WebGPU-Job einmal von Hand starten
 - [ ] **Build-Größe:** die eine Datei (`dist/index.html`) bleibt 17,6 MB, weil die Fotosets als Text darin stecken; der Web-Build (`build/`) ist 13,1 MB und lädt Texturen erst je Strecke. Weiter möglich: WebP/AVIF oder 512-px-Sets für die Voreinstellung „Niedrig"
 - [ ] Nur falls der Speicher wieder knapp wird: lokale Historie kürzen (`git fetch --depth 1`, rund 21 MB: die alte Text-Sicherung und die alten Harness-Bundles liegen nur noch in der Historie)
 - [ ] **Harness:** WebGPU-Screenshots im headless Chrome reparieren (weiß; nur Konsolencheck möglich)
