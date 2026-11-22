@@ -6,7 +6,6 @@ import type { EngineSpec } from './podParts';
 import { CAGE_ARC_STEP } from './podEngines';
 import { type PartBuilder, M4, cyl, extrude, lathe, prof, rbox, sphere, torus, tube } from './podKit';
 
-export type CockpitStyle = 'pod' | 'wedge' | 'saucer' | 'long';
 export interface EngineMount { spec: EngineSpec; x: number; y: number; z: number; }
 /** Energy binder between two engines (indices into `engines`). `zOff` shifts both ends along the engines (m): several arcs on one pair. */
 export interface BinderLink { a: number; b: number; zOff?: number }
@@ -17,7 +16,7 @@ export type Extras = (pb: PartBuilder, L: PodLayout, hi: boolean) => void;
 export interface PodLayout {
   engines: EngineMount[];
   cockpit: {
-    style: CockpitStyle; hw: number; len: number; y: number; z: number; pilot: number;
+    hw: number; len: number; y: number; z: number; pilot: number;
     /** ground clamp only: physics treats the cockpit as reaching this far (m) below the visible tub. Set for the raised
      *  Session 19 pods (see `raised`); a new pod leaves it out – its clamp is the tub's real floor. */
     keel?: number;
@@ -35,8 +34,6 @@ export interface PodLayout {
   livery: number;
   /** extra parts that ride with the engine banks (split by side: keep every part on one side of x = 0) */
   engineExtras?: Extras;
-  /** extra parts fixed to the cockpit */
-  cockpitExtras?: Extras;
   /** additional collision circles besides engines + cockpit (wide wings …); `z` in layout space like the engine mounts */
   extraCircles?: CollCircle[];
   /** widens the ground-clearance envelope of both engine sides: outermost |x| and lowest y of parts the engine formulas do not know */
@@ -67,7 +64,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   aurora: () => {
     const s = spec(9, 1.15, 'turbine', 6, 18);
     return {
-      engines: pair(s, 2.5, 0, 4), cockpit: { style: 'pod', hw: 0.95, len: 3.4, ...raised(0.1, 0.9), z: -6, pilot: 1 }, binders: MAIN, livery: 0,
+      engines: pair(s, 2.5, 0, 4), cockpit: { hw: 0.95, len: 3.4, ...raised(0.1, 0.9), z: -6, pilot: 1 }, binders: MAIN, livery: 0,
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) for (const s2 of SIDES) {
           const cx = sd * 2.5 + s2 * 1.5, tip = sd * 2.5 + s2 * 1.97;
@@ -92,7 +89,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   brute: () => {
     const s = spec(8, 1.5, 'split', 7, 20, false);
     return {
-      engines: pair(s, 2.4, 0, 2), cockpit: { style: 'wedge', hw: 1.1, len: 3.0, ...raised(0.25, 1.0), z: -9, pilot: 1.05, far: 'cage' }, binders: MAIN, livery: 2,
+      engines: pair(s, 2.4, 0, 2), cockpit: { hw: 1.1, len: 3.0, ...raised(0.25, 1.0), z: -9, pilot: 1.05, far: 'cage' }, binders: MAIN, livery: 2,
       engineExtras: (pb, _L, hi) => {
         // the big shark fin stays on the left engine only (Vrak's trademark)
         const fin = extrude([[0, 0], [2.2, 0], [2.7, 2.7], [1.6, 2.7]], 0.12, 0.03); fin.rotateY(Math.PI / 2);
@@ -110,7 +107,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   gasvaro: () => {
     const s = spec(6, 0.8, 'quad', 4, 12);
     return {
-      engines: [...pair(s, 1.6, 0, 3), ...pair(s, 3.4, 0, 3), ...pair(s, 2.5, 1.55, 4)], cockpit: { style: 'long', hw: 0.75, len: 3.6, ...raised(0, 0.8), z: -7, pilot: 0.95 }, binders: MAIN, livery: 1,
+      engines: [...pair(s, 1.6, 0, 3), ...pair(s, 3.4, 0, 3), ...pair(s, 2.5, 1.55, 4)], cockpit: { hw: 0.75, len: 3.6, ...raised(0, 0.8), z: -7, pilot: 0.95 }, binders: MAIN, livery: 1,
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           pb.add('steel', tube([V(sd * 1.6, 0.7, 3.4), V(sd * 2.05, 1.3, 3.7), V(sd * 2.5, 2.1, 4)], 0.07, 12, 8));
@@ -134,7 +131,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
     const s = spec(7.6, 0.66, 'ring', 5, 12);
     return {
       engines: [{ spec: s, x: -2.3, y: -0.35, z: 3 }, { spec: s, x: 2.3, y: -0.35, z: 3 }, { spec: s, x: -2.3, y: 2.05, z: 3 }, { spec: s, x: 2.3, y: 2.05, z: 3 }],
-      cockpit: { style: 'saucer', hw: 1.0, len: 2.4, ...raised(0.2, 0.65), z: -6, pilot: 0.95, far: 'disc' }, binders: [{ a: 0, b: 3 }, { a: 2, b: 1 }], arcLoss: { arcL: [0], arcR: [1] }, livery: 3,
+      cockpit: { hw: 1.0, len: 2.4, ...raised(0.2, 0.65), z: -6, pilot: 0.95, far: 'disc' }, binders: [{ a: 0, b: 3 }, { a: 2, b: 1 }], arcLoss: { arcL: [0], arcR: [1] }, livery: 3,
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           for (const z of [1.0, 4.8]) pb.add('steel', tube([V(sd * 2.3, 0.35, z), V(sd * 2.3, 1.35, z)], 0.08, 4, 6));
@@ -152,7 +149,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   mavik: () => {
     const s = spec(8, 0.62, 'needle', 6, 10);
     return {
-      engines: pair(s, 1.7, 0, 3), cockpit: { style: 'pod', hw: 0.72, len: 2.5, ...raised(-0.05, 0.8), z: -5.5, pilot: 0.92, far: 'fin' }, binders: MAIN, livery: 1,
+      engines: pair(s, 1.7, 0, 3), cockpit: { hw: 0.72, len: 2.5, ...raised(-0.05, 0.8), z: -5.5, pilot: 0.92, far: 'fin' }, binders: MAIN, livery: 1,
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           // Session 20: swept canards behind each intake, a long outboard pitot and a ventral keel
@@ -168,7 +165,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   rattis: () => {
     const s = spec(6, 0.85, 'blade', 4, 14);
     return {
-      engines: pair(s, 1.7, 0, 2.5), cockpit: { style: 'wedge', hw: 0.78, len: 2.6, ...raised(-0.1, 0.85), z: -3.2, pilot: 0.92, viewScale: 1.9 }, binders: MAIN, livery: 2,
+      engines: pair(s, 1.7, 0, 2.5), cockpit: { hw: 0.78, len: 2.6, ...raised(-0.1, 0.85), z: -3.2, pilot: 0.92, viewScale: 1.9 }, binders: MAIN, livery: 2,
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           // Session 20: twin feelers on every engine, landing skids underneath and a stripe band like the wasp body
@@ -187,7 +184,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   aldo: () => {
     const s = spec(9, 1.0, 'long', 7, 16, true, 6);
     return {
-      engines: pair(s, 2.3, 0, 3.5), cockpit: { style: 'long', hw: 0.85, len: 3.2, ...raised(0, 0.9), z: -6, pilot: 1 }, binders: MAIN, livery: 0,
+      engines: pair(s, 2.3, 0, 3.5), cockpit: { hw: 0.85, len: 3.2, ...raised(0, 0.9), z: -6, pilot: 1 }, binders: MAIN, livery: 0,
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           // Session 20: an external cooling loop over each engine, a coolant tank underneath and two radiator vanes at the rear
@@ -208,7 +205,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
     const s = spec(5, 1.25, 'heavy', 4, 20, true);
     return {
       engines: [{ spec: s, x: -2.3, y: -0.4, z: 0 }, { spec: s, x: 2.3, y: -0.4, z: 0 }, { spec: s, x: -2.3, y: 1.45, z: 6 }, { spec: s, x: 2.3, y: 1.45, z: 6 }],
-      cockpit: { style: 'saucer', hw: 0.82, len: 2.2, ...raised(0.35, 0.6), z: -5.5, pilot: 0.95, far: 'disc' }, binders: MAIN, livery: 3,
+      cockpit: { hw: 0.82, len: 2.2, ...raised(0.35, 0.6), z: -5.5, pilot: 0.95, far: 'disc' }, binders: MAIN, livery: 3,
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           pb.add('dark', rbox(0.3, 0.3, 3.6, 0.06), M4.trs(sd * 2.3, 0.55, 3.0, -0.31, 0, 0));
@@ -228,7 +225,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   elana: () => {
     const s = spec(8.5, 0.78, 'needle', 6, 12);
     return {
-      engines: pair(s, 2, 0, 3), cockpit: { style: 'long', hw: 0.8, len: 3.3, ...raised(0, 0.8), z: -6, pilot: 0.95, topY: 1.42, far: 'fin' }, binders: MAIN, livery: 1, // (dorsal fin = part of the cockpit design)
+      engines: pair(s, 2, 0, 3), cockpit: { hw: 0.8, len: 3.3, ...raised(0, 0.8), z: -6, pilot: 0.95, topY: 1.42, far: 'fin' }, binders: MAIN, livery: 1, // (dorsal fin = part of the cockpit design)
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           // Session 20: three tail feathers fanned around each nozzle and a slim winglet like the cockpit's
@@ -244,7 +241,7 @@ const LAYOUTS: Record<string, (def: PodDef) => PodLayout> = {
   odo: () => { // ram
     const s = spec(7, 1.3, 'heavy', 5, 16, false);
     return {
-      engines: pair(s, 2.4, 0, 3), cockpit: { style: 'wedge', hw: 1.0, len: 2.8, ...raised(0, 1.05), z: -5.5, pilot: 1, far: 'cage' }, binders: MAIN, livery: 2, // (ram prow = part of the cockpit design)
+      engines: pair(s, 2.4, 0, 3), cockpit: { hw: 1.0, len: 2.8, ...raised(0, 1.05), z: -5.5, pilot: 1, far: 'cage' }, binders: MAIN, livery: 2, // (ram prow = part of the cockpit design)
       engineExtras: (pb, _L, hi) => {
         for (const sd of SIDES) {
           // Session 20: a ram hoop on three struts in front of every intake and a hazard band around the cowling
@@ -271,7 +268,7 @@ const rail = (pb: PartBuilder, pts: THREE.Vector3[], r: number) => {
 LAYOUTS.cyclone = () => { // Tarn Cyclone: two short fat engines, each driving a big open rotor inside a guard hoop
   const s = spec(5.2, 1.25, 'rotor', 3, 5), ex = 2.7, ez = 3.2, R = s.R, Rh = 1.42 * R;
   return {
-    engines: pair(s, ex, 0, ez), cockpit: { style: 'wedge', hw: 1.0, len: 3.0, y: 1.02, z: -5.4, pilot: 1.08, far: 'fin' }, binders: MAIN, livery: 3,
+    engines: pair(s, ex, 0, ez), cockpit: { hw: 1.0, len: 3.0, y: 1.02, z: -5.4, pilot: 1.08, far: 'fin' }, binders: MAIN, livery: 3,
     fanLoss: { bladeL: [0], bladeR: [1] },
     engineExtras: (pb, _L, hi) => {
       for (const sd of SIDES) {
@@ -294,7 +291,7 @@ LAYOUTS.cyclone = () => { // Tarn Cyclone: two short fat engines, each driving a
 LAYOUTS.halo = () => { // Lyss Halo-9: two slim cores, each inside a big ring wing; the energy binder jumps from ring to ring
   const s = spec(7.5, 0.5, 'hoop', 4, 10), ex = 2.75, ez = 3, Rw = 3.4 * s.R;
   return {
-    engines: pair(s, ex, 0, ez), cockpit: { style: 'pod', hw: 0.8, len: 2.6, y: 0.8, z: -5.2, pilot: 0.95, far: 'ring' }, binders: MAIN, livery: 1,
+    engines: pair(s, ex, 0, ez), cockpit: { hw: 0.8, len: 2.6, y: 0.8, z: -5.2, pilot: 0.95, far: 'ring' }, binders: MAIN, livery: 1,
     engineExtras: (pb, _L, hi) => {
       for (const sd of SIDES) {
         // a slim tail sting behind each core and a keel vane under each ring
@@ -311,7 +308,7 @@ LAYOUTS.halo = () => { // Lyss Halo-9: two slim cores, each inside a big ring wi
 LAYOUTS.manta = () => { // Dorn Manta: two flat engine slabs with slot nozzles, twin fins and drooped winglets
   const s = spec(8.6, 0.5, 'slab', 3, 9), ex = 2.5, ez = 3.4, W = 3 * s.R;
   return {
-    engines: pair(s, ex, 0, ez), cockpit: { style: 'wedge', hw: 1.05, len: 3.4, y: 0.92, z: -6.2, pilot: 1, far: 'box' }, binders: MAIN, livery: 4,
+    engines: pair(s, ex, 0, ez), cockpit: { hw: 1.05, len: 3.4, y: 0.92, z: -6.2, pilot: 1, far: 'box' }, binders: MAIN, livery: 4,
     engineExtras: (pb, _L, hi) => {
       for (const sd of SIDES) {
         // a pitot boom on the outer front corner of each slab and a chin splitter under each intake
@@ -328,7 +325,7 @@ LAYOUTS.manta = () => { // Dorn Manta: two flat engine slabs with slot nozzles, 
 LAYOUTS.volt = () => { // Quill Voltspire: two open truss cages round plasma coils, coupled by three arcs
   const s = spec(7, 0.95, 'cage', 5, 6), ex = 2.35, ez = 3, R = s.R;
   return {
-    engines: pair(s, ex, 0, ez), cockpit: { style: 'saucer', hw: 0.9, len: 2.2, y: 0.9, z: -5.4, pilot: 0.92, topY: 0.95, far: 'cage' },
+    engines: pair(s, ex, 0, ez), cockpit: { hw: 0.9, len: 2.2, y: 0.9, z: -5.4, pilot: 0.92, topY: 0.95, far: 'cage' },
     binders: [{ a: 0, b: 1, zOff: -CAGE_ARC_STEP }, { a: 0, b: 1 }, { a: 0, b: 1, zOff: CAGE_ARC_STEP }], livery: 5,
     arcLoss: { arcA: [0], arcB: [2] }, // the rear arc dies first, then the front one – the middle one holds
     engineExtras: (pb, _L, hi) => {

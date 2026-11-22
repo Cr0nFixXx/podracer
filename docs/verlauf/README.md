@@ -7,6 +7,7 @@ Eine Datei je Aufgabe oder Sitzung, neueste zuerst. Jede Datei hält fest, was g
 
 | Datum | Datei | Inhalt |
 |---|---|---|
+| 2026-11-22 | [2026-11-22-todo-runde.md](2026-11-22-todo-runde.md) | TODO-Runde: Wandtreffer, Pod-Kleinigkeiten, Aufwärmen, zweiter Build, GitHub-Action |
 | 2026-11-22 | [2026-11-22-speicher-und-doku.md](2026-11-22-speicher-und-doku.md) | Speicher aufgeräumt, Doku nach Thema neu geordnet |
 | 2026-11-22 | [2026-11-22-huelle-je-pod.md](2026-11-22-huelle-je-pod.md) | Hülle je Pod: Tunneldecke und Überkopf-Bauten fertig, Test-Werkzeuge repariert |
 | 2026-11-22 | [2026-11-22-tunneldecke-je-pod.md](2026-11-22-tunneldecke-je-pod.md) | Tunneldecke je Pod (Folge-Commit zum Merge) |

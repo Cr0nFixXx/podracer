@@ -1,4 +1,4 @@
-// Pod harness. Dev: `npm run dev` → http://localhost:5173/tools/harness/pods.dev.html   (bundle: see tools/harness/run.sh)
+// Pod harness. Dev: `npm run dev` → http://localhost:5173/tools/harness/pods.dev.html   (bundle for a headless browser: npm run harness:build)
 //   await show(idx, health = 1, quality = 3, { rival?, save? })   4 views of one pod (¾, front, engine close-up, behind the pilot);
 //                                                                 `health` (0..1) = left engine side, `{ both: true }` = both sides.
 //                                                                 Bruchteile below their step are gone (or `{ parts: mask }`)

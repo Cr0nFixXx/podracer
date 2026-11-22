@@ -12,7 +12,10 @@
     "save": "sh tools/save.sh",
     "restore-git": "sh tools/restore-git.sh",
     "check:pods": "esbuild tools/ci/pods.ts --bundle --platform=node --format=esm --outfile=tools/ci/out/pods.mjs --log-level=error && node tools/ci/out/pods.mjs",
-    "check:unit": "esbuild tools/ci/unit.ts --bundle --platform=node --format=esm --outfile=tools/ci/out/unit.mjs --log-level=error && node tools/ci/out/unit.mjs"
+    "check:unit": "esbuild tools/ci/unit.ts --bundle --platform=node --format=esm --outfile=tools/ci/out/unit.mjs --log-level=error && node tools/ci/out/unit.mjs",
+    "harness:build": "node tools/harness/build.mjs",
+    "build:web": "vite build --config vite.web.config.ts",
+    "preview:web": "vite preview --config vite.web.config.ts"
   },
   "dependencies": {
     "@types/three": "^0.187.0",

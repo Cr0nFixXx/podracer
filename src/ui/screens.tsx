@@ -4,7 +4,7 @@ import { KeyBindings, PadBindings } from './KeyBindings';
 import { sanitizeEnv, timeOptionsFor, weatherOptionsFor, type TimeOfDay, type WeatherKind } from '../game/environment';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, STAT_LABELS, THEMES, TRACKS, type StatKey } from '../game/data';
-import { effectiveStats, KIT_SLOTS, LIVERY_PATTERNS, MAX_OPPONENTS, PAINT_FINISHES, type PaintFinish, type PodKit, type Profile } from '../game/settings';
+import { effectiveStats, KIT_SLOTS, LIVERY_PATTERNS, MAX_LAPS, MAX_OPPONENTS, PAINT_FINISHES, type PaintFinish, type PodKit, type Profile } from '../game/settings';
 import { buildTrack, type TrackData } from '../game/trackBuilder';
 import { damageModel } from '../game/podDamage';
 import { CAMERA_NAMES, fmt } from '../game/Game';
@@ -150,7 +150,7 @@ export function RaceSetup({ profile, update, go, start }: { profile: Profile; up
             </div>
           </Panel>
           <Panel title="Renneinstellungen">
-            {track.type === 'circuit' ? <Slider label="Runden" value={r.laps} min={1} max={7} step={1} onChange={v => set('laps', v)} /> : <div className="text-[11px] uppercase tracking-widest text-stone-400 mb-3">Sprint – Punkt zu Punkt</div>}
+            {track.type === 'circuit' ? <Slider label="Runden" value={r.laps} min={1} max={MAX_LAPS} step={1} onChange={v => set('laps', v)} /> : <div className="text-[11px] uppercase tracking-widest text-stone-400 mb-3">Sprint – Punkt zu Punkt</div>}
             <Slider label="Gegner" value={r.opponents} min={0} max={MAX_OPPONENTS} step={1} onChange={v => set('opponents', v)} />
             <div className="text-[11px] uppercase tracking-widest text-stone-300 mb-2">Schwierigkeit</div>
             <div className="grid grid-cols-2 gap-2 mb-4">{DIFFICULTIES.map((d, i) => <Btn key={d.id} active={r.difficulty === i} onClick={() => set('difficulty', i)}>{d.name}</Btn>)}</div>
@@ -212,7 +212,7 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
           <div className="flex gap-2"><Btn active={profile.podId === sel} onClick={() => update(p => ({ ...p, podId: sel }))}>{profile.podId === sel ? '✓ Ausgewählt' : 'Diesen Pod fahren'}</Btn><Btn onClick={() => go('menu')}>‹ Zurück</Btn></div>
         </div>
         <div className="grid grid-cols-[230px_1fr_320px] gap-4 flex-1 min-h-0">
-          <Panel title="Podracer">
+          <Panel title="Racer">
             {/* one line per racer: 14 rows fit the panel without scrolling (pod name left, pilot right) */}
             <div className="flex flex-col gap-1">
               {PODS.map(p => (

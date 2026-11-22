@@ -181,7 +181,7 @@ export function mesaGeometry(seed: number, radial = 44): THREE.BufferGeometry {
   const r = rng(seed * 19 + 11); const ph = [r() * TAU, r() * TAU, r() * TAU];
   // [height t, radius, gully strength]
   const prof: V3[] = [[0, 1.62, 0.15], [0.09, 1.44, 0.2], [0.2, 1.24, 0.35], [0.23, 1.13, 1], [0.5, 1.09, 1], [0.53, 1.0, 0.4], [0.61, 0.94, 0.35], [0.64, 0.87, 1], [0.93, 0.84, 1], [0.97, 0.8, 0.5], [1.0, 0.74, 0.2]];
-  return ringSurface(radial, prof.length, (a, j) => {
+  const g = ringSurface(radial, prof.length, (a, j) => {
     const [t, pr, gs] = prof[j];
     const plan = 1 + 0.2 * Math.cos(a * 2 + ph[0]) + 0.13 * Math.cos(a * 3 + ph[1]) + 0.07 * Math.cos(a * 7 + ph[2]) + (fbm(a * 1.9 + seed, seed * 0.37, 3) - 0.5) * 0.36;
     const gully = Math.pow(Math.abs(Math.sin(a * 8.5 + fbm(a * 2.2 + seed, 3.3, 2) * 3.2)), 2.4) * 0.09 * gs + (fbm(a * 6.5, t * 5 + seed, 3) - 0.5) * 0.11 * gs;
@@ -189,6 +189,8 @@ export function mesaGeometry(seed: number, radial = 44): THREE.BufferGeometry {
     const y = t + (j > 0 && j < prof.length - 1 ? (fbm(a * 2.6 + j * 5.1, seed, 2) - 0.5) * 0.03 : 0);
     return [Math.cos(a) * rad, y, Math.sin(a) * rad];
   }, [0, 1.012, 0]);
+  g.name = 'mesa'; // (the harness finds it by name)
+  return g;
 }
 
 /** Layered conifer with drooping star-shaped branch tiers and snow load (vertex colours). Height ≈ 11. */

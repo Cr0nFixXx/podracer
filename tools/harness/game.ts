@@ -13,6 +13,7 @@ let g: Game | null = null; let cur = -1;
     const prof = defaultProfile(); prof.race.trackId = TRACKS[i].id; prof.race.opponents = 7; prof.gfx.texRes = 1024; if (location.search.includes('webgl')) prof.gfx.backend = 'webgl'; if (location.search.includes('csm')) prof.gfx.csm = true; if (location.search.includes('ssr')) prof.gfx.ssr = true;
     { const qs = new URLSearchParams(location.search); if (qs.get('tod')) prof.race.timeOfDay = qs.get('tod') as never; if (qs.get('wx')) prof.race.weather = qs.get('wx') as never; if (qs.has('ultra')) Object.assign(prof.gfx, PRESETS.ultra, { preset: 'ultra', texRes: 1024, renderScale: 0.6 }); if (qs.get('tex')) prof.gfx.texRes = +qs.get('tex')!; if (qs.get('pod')) prof.podId = qs.get('pod')!; /* pod=brute: the player's pod */ /* tex=256: small textures for the WebGPU console check on machines with little RAM */ } prof.gfx.renderScale = 0.6; prof.gfx.shadows = 1;
     g = new Game(div, prof, { onHud: () => {}, onLoading: () => {}, onFinish: () => {}, onPause: () => {}, onReady: () => {} });
+    (window as unknown as Record<string, unknown>).__podracer = g; // debug / test handle, as in the app (RaceView.tsx)
     const tLoad = performance.now(); await g.start(); (window as unknown as Record<string, unknown>).loadInfo = `load=${Math.round(performance.now() - tLoad)}ms ` + JSON.stringify(g.world.timings) + ' ' + JSON.stringify((g as unknown as { loadMs?: unknown }).loadMs ?? {}); g.paused = true; await new Promise(r => setTimeout(r, 400));
   }
   const G = g!; G.paused = true;
@@ -160,6 +161,7 @@ let g: Game | null = null; let cur = -1;
     g?.dispose(); cur = i;
     const prof = defaultProfile(); prof.race.trackId = TRACKS[i].id; prof.race.opponents = 10; prof.gfx.texRes = 512; prof.gfx.geometry = 1; prof.gfx.shadows = 0; prof.gfx.particles = 0.2;
     g = new Game(div, prof, { onHud: () => {}, onLoading: () => {}, onFinish: () => {}, onPause: () => {}, onReady: () => {} });
+    (window as unknown as Record<string, unknown>).__podracer = g; // debug / test handle, as in the app (RaceView.tsx)
     await g.start(); await new Promise(r => setTimeout(r, 300));
   }
   const G = g!; G.paused = true; G.state = 'race';

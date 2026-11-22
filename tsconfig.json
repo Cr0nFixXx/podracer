@@ -27,5 +27,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "vite.config.ts", "tools/ci/*.ts", "tools/harness/*.ts"]
+  "include": ["src", "vite.config.ts", "vite.web.config.ts", "tools/ci/*.ts", "tools/harness/*.ts"]
 }

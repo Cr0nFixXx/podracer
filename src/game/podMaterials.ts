@@ -224,10 +224,8 @@ export function sharedPodMaterials(texSize: number) {
     copper: new THREE.MeshStandardMaterial({ color: '#b9713d', metalness: 0.95, roughness: 0.32, envMapIntensity: 1.0 }),
     rubber: new THREE.MeshStandardMaterial({ color: '#151517', metalness: 0.08, roughness: 0.65, normalMap: braid, normalScale: new THREE.Vector2(0.7, 0.7) }),
     carbon: new THREE.MeshStandardMaterial({ map: carbon, metalness: 0.32, roughness: 0.28, envMapIntensity: 1.0 }),
-    glass: new THREE.MeshStandardMaterial({ color: '#9fd4ff', metalness: 0.1, roughness: 0.12, transparent: true, opacity: 0.28, envMapIntensity: 1.2, side: THREE.DoubleSide, depthWrite: false }),
     interior: new THREE.MeshStandardMaterial({ map: it.map, emissiveMap: it.emissive, emissive: '#ffffff', emissiveIntensity: 0.85, roughness: 0.72, metalness: 0.1, side: THREE.DoubleSide }),
     leather: new THREE.MeshStandardMaterial({ color: '#4a3226', roughness: 0.74, metalness: 0.0 }),
-    skin: new THREE.MeshStandardMaterial({ color: '#b98c68', roughness: 0.64 }),
     visor: new THREE.MeshStandardMaterial({ color: '#0e1a24', metalness: 0.92, roughness: 0.14, envMapIntensity: 1.25 }),
     hazard: new THREE.MeshStandardMaterial({ map: hazard, roughness: 0.52, metalness: 0.22 }),
   };

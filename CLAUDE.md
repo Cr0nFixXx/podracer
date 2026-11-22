@@ -6,10 +6,10 @@
 - **Read the rules for the area before you change code** – table "Rules by area" below. Those files are part of this manual.
 - **Docs:** update them at the end of every task – table "Where things are written down" below.
 - Never hand-edit `package.json` / `vite.config.ts`. Add deps with `npm install <pkg>`.
-- Finish with `npm run build` → `dist/index.html` (single file). Archived unrelated HTML stays in `.archiv/`.
+- Finish with `npm run build` → `dist/index.html` (single file). The second build `npm run build:web` → `build/` (many files, for a web server; `vite.web.config.ts`) must build too. Archived unrelated HTML stays in `.archiv/`.
 - Spec don'ts: **no film grain, no excessive bloom / overexposure.**
 - **Before finishing: `npm run check` must be green** (typecheck + unit checks + pod audit + 13-track node physics sim). Add npm scripts only with `npm pkg set scripts.<name>=…`.
-- **Git:** commit after every finished task (user request) with plain commits – `git add <explicit paths>`, `git commit` – and run **`git gc --prune=now`** after every commit: the saved sandbox workspace may only hold 128 MB. Never `git add -A` by hand, never push unless asked, no `git stash` while a rebuilt harness bundle is in the tree. `npm run save` is switched off. Work branch: `dev`. Details: `docs/regeln/git-sandbox.md`.
+- **Git:** commit after every finished task (user request) with plain commits – `git add <explicit paths>`, `git commit` – and run **`git gc --prune=now`** after every commit: the saved sandbox workspace may only hold 128 MB. Never `git add -A` by hand, never push unless asked. `npm run save` is switched off. The harness bundles (`tools/harness/out/`) are not in git: `npm run harness:build`. Work branch: `dev`. Details: `docs/regeln/git-sandbox.md`.
 - **Words:** use the glossary in `CONTEXT.md` (Racer, Cockpit, Tuning-Teil, Style-Teil, Schadensmodell, Bruchteil, Gegner …). Hard-to-reverse decisions live in `docs/adr/`.
 
 ## Repo

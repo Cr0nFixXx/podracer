@@ -9,11 +9,11 @@ Nur offene Punkte, nach Thema. Erledigtes steht im Verlauf: `docs/verlauf/`, je 
 - [ ] Teile-Kombinationen am Gaming-PC durchklicken (gesichtet sind 7; Maße und Dreiecke prüft das Audit an drei Sätzen je Pod)
 - [ ] Cockpit-Innenansicht in einem Tunnel sichten (Regen und 90°-Rolle sind gesichtet)
 - [ ] Schadens-Balance von Hand fahren (bisher nur KI-Sim): sind 5–10 % je Bruchteil richtig?
+- [ ] **Neu seit dem 2026-11-22 – ansehen / probefahren:** (1) frontal in eine Felswand mit Mandrel Ram und Vrak Splitter-X: schützt die Nase spürbar, ein Streifer nicht? (2) Brandmarken bei Dorn Manta, Lyss Halo-9, Tarn Cyclone: sitzen sie jetzt auf Flanke, Ring und Rotor-Reif? (3) Lyss Halo-9 mit verlorenen Ringsegmenten aus der Nähe: Schnittkanten sauber? (4) Start eines Rennens: kein Ruckler mehr im ersten Bild des Countdowns (Einstellung „Hoch" oder „Ultra", WebGPU)
 
 ## 2. Entscheidungen des Nutzers
-- [ ] Entscheidung prüfen: ein Pod zählt so hoch wie seine größte Ausstattung (Aurora XR-7 ab Werk 0,70 m mehr, als sie ist) – oder Höhe je montierter Ausstattung?
-- [ ] **Entscheidung des Nutzers:** sollen frontale Wandtreffer als Zone „Front" zählen (dann helfen Rammbug und harte Nase auch an der Wand)? Heute zählt jede Wand als „Seite"
-- [ ] Entscheidung offen: `npm run save` endgültig entfernen oder wieder einschalten?
+- [ ] Entscheidung offen: `npm run save` endgültig entfernen oder wieder einschalten? (2026-11-22, Nutzer: vorerst **abgeschaltet lassen**)
+- [ ] Soll der Web-Build (`npm run build:web` → `build/`) online gestellt werden – Vercel, GitHub Pages? Er ist gebaut und über einen lokalen Server getestet, aber nirgends hochgeladen
 
 ## 3. Tunnel, Decke, Überkopf-Bauten
 - [ ] Bögen (Checkpoint-Bögen, Felsbögen, einstürzender Bogen) werden an der seitlichen Position der Pod-Mitte gelesen, ihre Kollisionsform ist dafür gepolstert → Eckpunkt für Eckpunkt prüfen? Dafür müssten die Bogenformen neu vermessen werden
@@ -27,8 +27,6 @@ Nur offene Punkte, nach Thema. Erledigtes steht im Verlauf: `docs/verlauf/`, je 
 
 ## 4. Pods
 - [ ] Dampf- / Ölstrahlen je Modell (Fireflare-Radiator, Kühlschleifen) – im Plan vorgesehen, nicht gebaut
-- [ ] Kleinigkeiten aus der Durchsicht (Liste in `docs/verlauf/2026-11-21-session-20-pods.md` → „Zurückgestellt"): Halo-Abschlussplatten 4 cm durch die Ringhaut · Treffermarken bei Manta / Halo / Cyclone auf dem Kernradius · keine Marke bei der Hälfte der Pod-Kontakte · Hangar baut das Modell bei jedem Tuning-Klick neu · toter Code (`cockpit.style`, `cockpitExtras`) · `loadProfile` prüft `difficulty` / `laps` nicht
-- [ ] In der ersten Rennsekunde werden 3 Pipelines nachübersetzt (Welt-Meshes, keine Pods) – ins Aufwärmen nehmen?
 
 ## 5. Strecken & Optik
 - [ ] **HQ-Farne:** Wedel als Alpha-Karten mit Textur in `groundCover.ts` (Schneekiefern, Felsbrocken, Kakteen sind erledigt)
@@ -42,11 +40,8 @@ Nur offene Punkte, nach Thema. Erledigtes steht im Verlauf: `docs/verlauf/`, je 
 - [ ] **Mini-Karte erweitern:** Abkürzungen, Gefahrenzonen und Set-Pieces als Symbole auf dem gecachten Minimap-Layer
 
 ## 7. Performance, Build, Werkzeuge, Doku
-- [ ] **Build-Größe 17,5 MB** (Fotosets): optional WebP/AVIF oder 512-px-Sets für die Voreinstellung „Niedrig"
-- [ ] **Aufräumen:** `tools/harness/out/game.js` (19,6 MB Build-Artefakt) ist getrackt – aus dem Repo nehmen; `world.ts → place()`: der Früh-Ausstieg `if (count <= 0)` steht versehentlich hinter einem Kommentar
-- [ ] Nur falls der Speicher wieder knapp wird: lokale Historie kürzen (8,6 MB) und die Harness-Bundles `tools/harness/out/*.js` aus Git nehmen (weitere 12,4 MB)
-- [ ] `tools/harness/pui.mjs:39` prüft noch die gelöschte „Neon-Spirale" → anpassen; `tools/harness/run.sh` läuft nur unter Linux
-- [ ] **`npm run check` in GitHub Actions** (Push auf `dev`), `check:gpu` als optionaler Job
+- [ ] **Build-Größe:** die eine Datei (`dist/index.html`) bleibt 17,6 MB, weil die Fotosets als Text darin stecken; der Web-Build (`build/`) ist 13,1 MB und lädt Texturen erst je Strecke. Weiter möglich: WebP/AVIF oder 512-px-Sets für die Voreinstellung „Niedrig"
+- [ ] Nur falls der Speicher wieder knapp wird: lokale Historie kürzen (`git fetch --depth 1`, rund 21 MB: die alte Text-Sicherung und die alten Harness-Bundles liegen nur noch in der Historie)
 - [ ] **Harness:** WebGPU-Screenshots im headless Chrome reparieren (weiß; nur Konsolencheck möglich)
-- [ ] **Fern-LOD auch für Tafelberge**, falls die Messung es rechtfertigt (Kiefern und Felsbrocken haben seit Session 20 einen Zwilling)
 - [ ] **Regeln inhaltlich durchsehen** (`docs/regeln/`, `DESIGN.md`): beim Umbau am 2026-11-22 ist nur umsortiert worden. Ältere Regeln, denen eine jüngere widerspricht, stehen noch da → je Thema prüfen und streichen
+- [ ] `tools/harness/shot.mjs` und `tools/harness/app.mjs` (Playwright) ruft nichts mehr auf, seit `run.sh` gelöscht ist – `pshot.mjs` / `papp.mjs` (Puppeteer) ersetzen sie. Löschen?

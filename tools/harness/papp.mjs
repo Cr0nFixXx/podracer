@@ -13,7 +13,7 @@ const open = async () => {
   p.on('pageerror', e => { errs++; console.log('[pageerror]', e.message.slice(0, 300)); });
   p.on('console', m => { if (m.text().startsWith('[load]')) console.log(m.text()); if (m.type() === 'error' && !/fonts\.g|GPU stall|ERR_/.test(m.text())) { errs++; console.log('[console]', m.text().slice(0, 300)); } });
   await p.evaluateOnNewDocument((key, pr) => { try { localStorage.setItem(key, JSON.stringify(pr)); } catch { /* */ } }, PROFILE_KEY, prof);
-  await p.goto('file://' + dist + (process.env.QUERY ?? '')); return p;
+  await p.goto((/^https?:/.test(dist) ? dist : 'file://' + dist) + (process.env.QUERY ?? '')); return p; // a path = the single file; an http address = the web build behind a server (npm run preview:web)
 };
 const click = (p, text) => p.evaluate(t => { const el = [...document.querySelectorAll('button')].find(x => x.textContent.includes(t)); if (!el) throw new Error('button not found: ' + t); el.click(); }, text);
 const has = (p, text, timeout = 240000) => p.waitForFunction(t => document.body.textContent.includes(t), { timeout, polling: 500 }, text);

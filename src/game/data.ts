@@ -25,7 +25,7 @@ export interface PodDef {
   colors: [string, string, string]; // primary, secondary, glow
 }
 
-/** head / helmet variant of the pilot figure (podCockpits.ts → pilotParts) */
+/** head / helmet variant of the pilot figure (podCockpits.ts → pilot) */
 export type PilotHead = 'goggles' | 'snout' | 'crest' | 'aero' | 'dome' | 'maul' | 'veil' | 'horn' | 'optic';
 
 export interface PilotDef {
@@ -33,7 +33,7 @@ export interface PilotDef {
   name: string;
   species: string;
   head: PilotHead;
-  /** skin tone of the pilot figure (heads that show skin: goggles, snout, crest) */
+  /** skin tone of the pilot figure (heads that show skin: goggles, snout, crest, maul, veil, horn – not the closed helmets aero, dome, optic) */
   skin: string;
   skill: number; // 0..1
   aggression: number; // 0..1

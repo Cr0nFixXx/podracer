@@ -1,6 +1,6 @@
 node_modules/
 dist/
+build/
 .shot.jpg
-tools/harness/out/*.png
-tools/harness/out/*.jpg
+tools/harness/out/
 tools/ci/out/

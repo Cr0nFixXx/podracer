@@ -431,12 +431,13 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
         p.vel.x += nx * vt * 1.35; p.vel.z += nz * vt * 1.35;
         const scrub = 1 - Math.min(0.35, vt * 0.012 + 0.01); p.vel.x *= scrub; p.vel.z *= scrub;
         const d = wrapAngle(Math.atan2(S.tx, S.tz) - p.yaw);
+        const zone = hitZone(p, nx, nz); // which part of the pod met the wall – read before the nose is turned along it: head-on (steeper than 30° to the wall) = 'front', as for obstacles
         if (Math.abs(d) < 1.4) p.yaw += d * Math.min(1, 0.15 + vt * 0.01);
         const wc = p as unknown as { wCd?: number };
         if (vt > 4 && p.invuln <= 0 && !(wc.wCd! > 0)) {
           wc.wCd = 0.2;
           const dmg = Math.min(28, Math.max(0, vt - 9) * 0.7 * P.sturdy);
-          applyDamage(p, side, dmg, 'side');
+          applyDamage(p, side, dmg, zone);
           p.shake = Math.min(1, p.shake + vt * 0.02);
           p.events.push({ type: 'wall', strength: vt, x: hx, y: p.pos.y, z: hz, nx, nz });
         }
@@ -1131,7 +1132,9 @@ export function collidePods(ps: PodState[], time: number) {
         ac.pCd = time; bc.pCd = time;
         applyDamage(a, 0, dmg, 'side'); applyDamage(b, 0, dmg, 'side'); // pod contact knows only the centre normal: half and half, no sturdy
         a.shake = Math.min(1, a.shake + 0.3); b.shake = Math.min(1, b.shake + 0.3);
-        a.events.push({ type: 'pod', strength: -rv, x: a.pos.x + nx * ra, y: a.pos.y, z: a.pos.z + nz * ra, nx: -nx, nz: -nz });
+        // one event per contact (sparks, sound, Treffermarke) – it goes to the player when the player is one of the two
+        if (b.isPlayer) b.events.push({ type: 'pod', strength: -rv, x: b.pos.x - nx * rb, y: b.pos.y, z: b.pos.z - nz * rb, nx, nz });
+        else a.events.push({ type: 'pod', strength: -rv, x: a.pos.x + nx * ra, y: a.pos.y, z: a.pos.z + nz * ra, nx: -nx, nz: -nz });
       }
     }
   }

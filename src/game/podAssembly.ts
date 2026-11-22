@@ -278,7 +278,7 @@ function base(def: PodDef, seg: number, head: PilotHead, isOpponent: boolean) {
   const build = (fn?: Extras): ExtraSet => { const pb = new PartBuilder(); fn?.(pb, L, hi); return { parts: pb.build() as Map<string, THREE.BufferGeometry>, breaks: pb.buildBreaks() }; };
   const b: Base = { layout: L, bodyZ: -L.cockpit.z * 0.25, exhaustLocal, eye, hood };
   const model = damageModel(def.id);
-  return { b, ck, engineExtras: build(L.engineExtras), cockpitExtras: build(L.cockpitExtras), model, wanted: new Set(model.parts.map(p => p.id)) as ReadonlySet<string> };
+  return { b, ck, engineExtras: build(L.engineExtras), model, wanted: new Set(model.parts.map(p => p.id)) as ReadonlySet<string> };
 }
 const sideOf = (x: number): -1 | 1 => (x < 0 ? -1 : 1);
 /** Rear end and length of an engine bank in layout space: wings and plates mounted on it take their heat place from it (`heatAlong`). */
@@ -346,12 +346,29 @@ function layoutBreaks(L: PodLayout, wanted: ReadonlySet<string>, br: Breaks, arc
 /** An air-brake flap of the player pod. Its geometry is given in the space of its engine bank – the space the hull's Treffermarken are
  *  measured in – and it turns about `hinge` (same space); the model hangs it on a hinge group. */
 export interface HeroFlap { geo: THREE.BufferGeometry; hinge: THREE.Vector3; sign: number; gain?: number }
+/** Treffermarken: the point of a bank's skin that a hit meets first. Seen along the engine, the hit comes towards the axis (`ax`, `ay`)
+ *  against the direction (`dx`, `dy`) (unit length, pointing outwards); `z` = where along the engine it lands (a rough value: the
+ *  contact comes from a collision circle). Among the corners of the visible triangles within `zWin` of that place it is the outermost
+ *  one near that ray; a place further along the engine has to stand out by 15 cm per metre to win. "On the barrel radius" was right
+ *  only for a round engine: on a slab it lay a metre inside the flank, on a ring wing on the core. Returns false when nothing is drawn. */
+export function skinPoint(geo: THREE.BufferGeometry, ax: number, ay: number, dx: number, dy: number, z: number, zWin: number, out: THREE.Vector3): boolean {
+  const P = (geo.attributes.position as THREE.BufferAttribute).array as ArrayLike<number>, idx = geo.index;
+  const n = idx ? Math.min(idx.count, geo.drawRange.count) : (geo.attributes.position as THREE.BufferAttribute).count; // (a lost Bruchteil is no longer in the drawn part of the index)
+  let best = -Infinity, bi = -1;
+  for (let i = 0; i < n; i++) {
+    const v = (idx ? idx.array[i] : i) * 3, dz = Math.abs(P[v + 2] - z); if (dz > zWin) continue;
+    const rx = P[v] - ax, ry = P[v + 1] - ay, along = rx * dx + ry * dy, off = Math.abs(rx * dy - ry * dx);
+    const sc = along - 2 * off - 0.15 * dz; if (sc > best) { best = sc; bi = v; }
+  }
+  if (bi < 0) return zWin < 50 ? skinPoint(geo, ax, ay, dx, dy, z, 99, out) : false; // nothing drawn that close along the engine: anywhere on it
+  out.set(P[bi], P[bi + 1], P[bi + 2]); return true;
+}
 export interface EnginePart { /** index into layout.engines */ index: number; /** position relative to the bank pivot */ off: THREE.Vector3; geo: EngineGeo; /** air-brake flaps with the kit applied (larger / doubled by the Luftbremse tuning) */ flaps: HeroFlap[] }
 export interface HeroBank { side: -1 | 1; /** 3D centroid of this side's engines (body space) */ pivot: THREE.Vector3; engines: EnginePart[]; /** merged static parts of all engines of this side (+ engine-mounted extras), relative to the pivot */ buckets: Map<string, THREE.BufferGeometry> }
 export interface HeroAssembly extends Base {
   /** left bank first, then right */
   banks: HeroBank[];
-  /** cockpit + cockpit-mounted extras + pilot (body space). The pilot's triangles are the LAST ones of each bucket:
+  /** cockpit + pilot (body space). The pilot's triangles are the LAST ones of each bucket:
    *  drawing only the first `pilotStart.get(key)` indices hides him (cockpit camera) without an extra draw. */
   cockpit: Map<string, THREE.BufferGeometry>;
   pilotStart: Map<string, number>;
@@ -386,7 +403,7 @@ function cockpitViewScale(parts: Iterable<THREE.BufferGeometry>, eye: THREE.Vect
 
 /** `kit`: Tuning-Teile + Style-Teile (podKitParts.ts); their geometry joins the engine buckets – no extra draws except double flaps. */
 export function assembleHero(def: PodDef, seg: number, head: PilotHead, kit: KitSpec = NO_KIT): HeroAssembly {
-  const { b, ck, engineExtras, cockpitExtras, model, wanted } = base(def, seg, head, false); const L = b.layout; const owned: THREE.BufferGeometry[] = [];
+  const { b, ck, engineExtras, model, wanted } = base(def, seg, head, false); const L = b.layout; const owned: THREE.BufferGeometry[] = [];
   const banks: HeroBank[] = []; const br = new Breaks(); const outOf = flameOutOf(L, wanted);
   for (const side of [-1, 1] as const) {
     const mounts = L.engines.map((em, index) => ({ em, index })).filter(m => sideOf(m.em.x) === side);
@@ -418,7 +435,7 @@ export function assembleHero(def: PodDef, seg: number, head: PilotHead, kit: Kit
     banks.push({ side, pivot: piv, engines, buckets: mergeAll(T.lists, owned, `${def.id} engine bank ${side}`) });
   }
   disposeExtras(engineExtras);
-  // Cockpit + cockpit-mounted extras
+  // Cockpit
   const T = new Tagged(); const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
   const pushC = (k: string, g: THREE.BufferGeometry, id?: string) => { const gc = g.clone(); gc.applyMatrix4(ckM); T.push(k, gc, id); };
   for (const [k, g] of ck.parts) pushC(k, g);
@@ -427,8 +444,6 @@ export function assembleHero(def: PodDef, seg: number, head: PilotHead, kit: Kit
     for (const [k, g] of bp.parts) pushC(k, g, id);
     if (id) br.at(id, bp.center.x, L.cockpit.y + bp.center.y, L.cockpit.z + bp.center.z);
   }
-  for (const [k, g] of cockpitExtras.parts) T.push(k, g);
-  for (const bp of cockpitExtras.breaks) for (const [k, g] of bp.parts) T.push(k, g);
   const viewScale = L.cockpit.viewScale ?? cockpitViewScale([...T.lists.values()].flat(), b.eye);
   const pilotStart = new Map<string, number>(); // the pilot goes in last (see HeroAssembly.cockpit)
   for (const [k, g] of ck.pilot) { pilotStart.set(k, T.count(k)); pushC(k, g); }
@@ -477,7 +492,7 @@ export interface RivalAssembly extends Base {
 
 /** `pattern`: livery pattern 0..5; undefined / negative = the pod's factory pattern. */
 export function assembleRival(def: PodDef, seg: number, head: PilotHead, colors: [string, string, string], pattern?: number, kit: KitSpec = NO_KIT): RivalAssembly {
-  const { b, ck, engineExtras, cockpitExtras, model, wanted } = base(def, seg, head, true); const L = b.layout; const owned: THREE.BufferGeometry[] = [];
+  const { b, ck, engineExtras, model, wanted } = base(def, seg, head, true); const L = b.layout; const owned: THREE.BufferGeometry[] = [];
   const liv = pattern !== undefined && pattern >= 0 ? pattern : L.livery;
   const glowCol = new THREE.Color(colors[2]), glowBoost = glowCol.clone().multiplyScalar(1.2);
   const bake = (k: string, mg: THREE.BufferGeometry) => { if (k === 'hull') bakeHullVertexColors(mg, colors[0], colors[1], liv); else if (k === 'glow') bakeSolidColor(mg, glowBoost); };
@@ -529,9 +544,6 @@ export function assembleRival(def: PodDef, seg: number, head: PilotHead, colors:
     if (id) br.at(id, bp.center.x, L.cockpit.y + bp.center.y, L.cockpit.z + bp.center.z);
   }
   for (const [k, g] of ck.pilot) pushC(T, k, g, ckM);
-  for (const [k, g] of cockpitExtras.parts) pushC(T, k, g);
-  for (const bp of cockpitExtras.breaks) for (const [k, g] of bp.parts) pushC(T, k, g);
-  disposeExtras(cockpitExtras);
   const cp = new THREE.Vector3(0, L.cockpit.y, L.cockpit.z);
   const cabPB = new PartBuilder();
   for (const em of L.engines) {

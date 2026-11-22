@@ -165,7 +165,12 @@ function rotorEngine(spec: EngineSpec, seg: number): EngineGeo {
 
 // ------------------------------------------------------------------ hoop: Lyss Halo-9
 /** Radius of the ring wing relative to the core radius, and its chord relative to the engine length. */
-const RING = 3.4, RING_CHORD = 0.2;
+/** ring wing of the hoop engine: radius = RING × engine radius, chord = RING_CHORD × engine length */
+export const RING = 3.4, RING_CHORD = 0.2;
+/** end plate of a ring segment: [place along the chord from the trailing edge (0..1), metres off the ring's centre line] – inside `wingProf` everywhere */
+export const END_PLATE: [number, number][] = [[0.05, 0], [0.3, 0.026], [0.86, 0.037], [0.96, 0], [0.86, -0.037], [0.3, -0.026]];
+/** bevel that `plateYZ` puts round a plate of thickness `t` (it widens the outline by this much) */
+export const plateBevel = (t: number) => Math.min(0.012, t * 0.3);
 function hoopExtent({ R, L }: EngineSpec): EngineExtent { const Rw = RING * R; return { coll: Rw + 0.06, bottom: Rw + 0.09, side: Rw + 0.12, top: R, halfL: L * 0.5 }; }
 
 /** A slim turbine core inside a big ring wing: the ring carries light strips, the air brakes and the binder couplers. */
@@ -203,8 +208,10 @@ function hoopEngine(spec: EngineSpec, seg: number): EngineGeo {
     pb.add('chrome', lathe(strip(Rw, zTE - 0.004, 0.014), n, 0, p0, len));
     for (let q = 0; q < 4; q++) { const a = Math.PI / 4 + q * HALF; if (inside(a)) pb.add('dark', rbox(0.03, 0.2, 0.26, 0.008), onRing(a, Rw + 0.02, zTE - 0.05)); } // trim vanes on the trailing edge
     if (hi) { // rivets on the outer skin; Ultra: on the inner skin too, and static wicks on the trailing edge
-      const nb = Math.round(seg * 0.9), bolt = (a: number, r: number) => pb.add('chrome', cyl(0.012, 0.012, 0.0084, 6), onRing(a, r + 0.003, zTE + 0.3 * c));
-      for (let i = 0; i < nb; i++) { const a = (i / nb) * TAU; if (!inside(a)) continue; bolt(a, Rw + 0.052); if (ultra) bolt(a, Rw - 0.052); }
+      // (a rivet is a pin sunk into the skin: its head stands 4 mm proud at a rib of the ring and can never float over the flat between
+      //  two ribs. `skin` = half thickness of the ring section where the rivets sit, 0.3 c behind the trailing edge.)
+      const nb = Math.round(seg * 0.9), skin = 0.03 + 0.02 * (0.05 / 0.35), bolt = (a: number, out: number) => pb.add('chrome', cyl(0.012, 0.012, 0.03, 6), onRing(a, Rw + out * (skin - 0.011), zTE + 0.3 * c));
+      for (let i = 0; i < nb; i++) { const a = (i / nb) * TAU; if (!inside(a)) continue; bolt(a, 1); if (ultra) bolt(a, -1); }
       if (ultra) for (let i = 0; i < 12; i++) { const a = 0.2 + (i / 12) * TAU; if (inside(a)) pb.add('dark', cyl(0.006, 0.006, 0.16, 4).rotateX(HALF), onRing(a, Rw, zTE - 0.1)); }
     }
   };
@@ -214,7 +221,8 @@ function hoopEngine(spec: EngineSpec, seg: number): EngineGeo {
     const f = sd < 0 ? '-' : '+';
     pb.brk('ringA' + f, () => (sd > 0 ? ringArc(A0, A1) : ringArc(-A1, -A0)));
     pb.brk('ringB' + f, () => (sd > 0 ? ringArc(B0, B1) : ringArc(-B1, -B0)));
-    for (const a of [A0, A1, B0, B1]) pb.add('dark', rbox(0.012, 0.09, 0.94 * c, 0.004), onRing(sd * a, Rw, zc)); // end plates (seen only once an arc is gone)
+    // end plates (seen only once an arc is gone): the ring's own section, a little smaller – a plain bar stood up to 4 cm proud of the skin at both edges
+    for (const a of [A0, A1, B0, B1]) pb.add('dark', plateYZ(END_PLATE.map(([t, y]) => [zTE + t * c, y] as [number, number]), 0.012), onRing(sd * a, Rw, 0));
   }
   { // three struts carry the ring (none on top: the control cable leaves there)
     const ri = R * 0.96, ro = Rw - 0.035;
@@ -260,7 +268,7 @@ function hoopEngine(spec: EngineSpec, seg: number): EngineGeo {
 const SLAB_W = 3;
 function slabExtent({ R, L }: EngineSpec): EngineExtent { const W = SLAB_W * R; return { coll: W + 0.12, bottom: R + 0.14, side: W + 0.56, top: R + 0.05, halfL: L * 0.5 }; }
 /** thin plate in the YZ plane (points [z, y]), `t` thick */
-const plateYZ = (pts: [number, number][], t: number) => { const g = extrude(pts, t, Math.min(0.012, t * 0.3)); g.rotateY(-HALF); return g; };
+const plateYZ = (pts: [number, number][], t: number) => { const g = extrude(pts, t, plateBevel(t)); g.rotateY(-HALF); return g; };
 /** Lip flaps of a slot nozzle (upper and lower row of `n` panels): they open up / down when the nozzle is wide open. */
 function slotPetals(ws: number, hs: number, zH: number, zT: number, swing: number, n: number) {
   const pos: number[] = [], pet: number[] = [], idx: number[] = [];

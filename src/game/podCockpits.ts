@@ -718,4 +718,3 @@ export function cockpitGeo(L: PodLayout, seg: number, head: PilotHead = 'goggles
   return out;
 }
 /** ids of all cockpit designs (tests, tools) */
-export const cockpitDesigns = () => Object.keys(DESIGNS);

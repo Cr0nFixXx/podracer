@@ -1,4 +1,4 @@
-import { PODS, STAT_KEYS, TRACKS, type StatKey } from './data';
+import { DIFFICULTIES, PODS, STAT_KEYS, TRACKS, type StatKey } from './data';
 
 import type { TimeOfDay, WeatherKind } from './environment';
 import { defaultKeys, defaultPad, normalizeKeys, normalizePad, type KeyMap, type PadMap } from './keymap';
@@ -100,7 +100,17 @@ const KEY_V1 = 'podracer-profile-v1';
 /** Largest rival field a race can have (slider in the race setup, clamp in Game.createPods). */
 export const MAX_OPPONENTS = 10;
 
+/** Camera modes (the `C` key cycles through them; `RaceConfig.camera` is an index into this list). */
+export const CAMERA_NAMES = ['Verfolger', 'Verfolger (fern)', 'Cockpit', 'Motorhaube', 'TV-Kamera', 'Kino-Orbit'];
+/** Most laps the race setup offers. */
+export const MAX_LAPS = 7;
+const TIMES_OF_DAY: readonly TimeOfDay[] = ['auto', 'dawn', 'day', 'dusk', 'night', 'sunset', 'sunrise', 'cycle'];
+const WEATHERS: readonly WeatherKind[] = ['auto', 'clear', 'rain', 'storm', 'snow', 'dust', 'fog', 'front', 'clearing', 'changing'];
+
 const clampInt = (v: unknown, lo: number, hi: number, d: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : d);
+const clampNum = (v: unknown, lo: number, hi: number, d: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
+const oneOf = <T,>(v: unknown, list: readonly T[], d: T): T => (list.includes(v as T) ? (v as T) : d);
+const bool = (v: unknown, d: boolean) => (typeof v === 'boolean' ? v : d);
 const hexColor = (v: unknown, d: string) => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v : d);
 
 /** One pod's saved look + tuning, forced into the valid range (old, damaged or foreign saves). `base` = that pod's defaults. */
@@ -112,6 +122,54 @@ export function sanitizeCustom(c: Partial<PodCustom> | undefined | null, base: P
   if (c?.finish !== undefined && c.finish !== null) out.finish = clampInt(c.finish, 0, PAINT_FINISHES.length - 1, 0) as PaintFinish;
   if (c?.kit && typeof c.kit === 'object') out.kit = Object.fromEntries(KIT_SLOTS.map(s => [s.key, clampInt((c.kit as Partial<PodKit>)[s.key], 0, s.choices.length - 1, 0)])) as unknown as PodKit;
   return out;
+}
+
+/** A saved race setup forced into what the race setup screen can produce (a save edited by hand must not crash the game:
+ *  `difficulty` and `camera` are list indices). `d` = the defaults. An unknown track falls back to the first one. */
+export function sanitizeRace(r: Partial<RaceConfig> | undefined | null, d: RaceConfig): RaceConfig {
+  return {
+    trackId: TRACKS.some(t => t.id === r?.trackId) ? r!.trackId! : TRACKS[0].id, // (e.g. a deleted track)
+    laps: clampInt(r?.laps, 1, MAX_LAPS, d.laps),
+    opponents: clampInt(r?.opponents, 0, MAX_OPPONENTS, d.opponents),
+    difficulty: clampInt(r?.difficulty, 0, DIFFICULTIES.length - 1, d.difficulty),
+    camera: clampInt(r?.camera, 0, CAMERA_NAMES.length - 1, d.camera),
+    timeOfDay: oneOf(r?.timeOfDay, TIMES_OF_DAY, d.timeOfDay ?? 'auto'),
+    weather: oneOf(r?.weather, WEATHERS, d.weather ?? 'auto'),
+  };
+}
+/** Saved graphics settings forced into the ranges of the settings screen; a value of the wrong kind becomes the default `d`.
+ *  Fields this build does not know are dropped. */
+export function sanitizeGfx(g: Partial<GfxSettings> | undefined | null, d: GfxSettings): GfxSettings {
+  const o = (g && typeof g === 'object' ? g : {}) as Partial<GfxSettings>;
+  return {
+    preset: oneOf(o.preset, ['low', 'medium', 'high', 'ultra', 'custom'] as const, d.preset),
+    renderScale: clampNum(o.renderScale, 0.5, 1.5, d.renderScale),
+    shadows: clampInt(o.shadows, 0, 3, d.shadows),
+    texRes: oneOf(o.texRes, [512, 1024, 2048], d.texRes),
+    parallax: bool(o.parallax, d.parallax), ao: bool(o.ao, d.ao), bloom: bool(o.bloom, d.bloom),
+    bloomStrength: clampNum(o.bloomStrength, 0, 1.5, d.bloomStrength),
+    godRays: bool(o.godRays, d.godRays), ssr: bool(o.ssr, d.ssr),
+    reflRes: clampNum(o.reflRes, 0.35, 1, d.reflRes ?? 0.75),
+    lodBias: clampNum(o.lodBias, 0.5, 2, d.lodBias ?? 1),
+    podDetail: clampNum(o.podDetail, 0.5, 3, d.podDetail ?? 1),
+    weatherFx: clampInt(o.weatherFx, 0, 2, d.weatherFx ?? 2),
+    volumetrics: clampInt(o.volumetrics, 0, 2, d.volumetrics ?? 2),
+    lensFx: bool(o.lensFx, d.lensFx ?? true), csm: bool(o.csm, d.csm ?? false),
+    motionBlur: bool(o.motionBlur, d.motionBlur), cinematic: bool(o.cinematic, d.cinematic),
+    particles: clampNum(o.particles, 0.2, 1.5, d.particles),
+    detail: clampNum(o.detail, 0.2, 1.6, d.detail),
+    geometry: clampInt(o.geometry, 1, 3, d.geometry),
+    aa: oneOf(o.aa, ['none', 'fxaa', 'smaa'] as const, d.aa),
+    anisotropy: oneOf(o.anisotropy, [1, 4, 8, 16], d.anisotropy),
+    shaderDetail: clampInt(o.shaderDetail, 0, 2, d.shaderDetail),
+    bumpMapping: bool(o.bumpMapping, d.bumpMapping),
+    tessellation: clampInt(o.tessellation, 0, 2, d.tessellation),
+    fov: clampNum(o.fov, 60, 100, d.fov),
+    drawDistance: clampNum(o.drawDistance, 0.5, 1.5, d.drawDistance),
+    showFps: bool(o.showFps, d.showFps),
+    backend: oneOf(o.backend, ['auto', 'webgl'] as const, d.backend ?? 'auto'),
+    batching: bool(o.batching, d.batching ?? true),
+  };
 }
 
 export function defaultProfile(): Profile {
@@ -126,14 +184,14 @@ export function loadProfile(): Profile {
     const raw = localStorage.getItem(KEY) ?? localStorage.getItem(KEY_V1);
     if (!raw) return d;
     const p = JSON.parse(raw) as Partial<Profile>;
-    const race = { ...d.race, ...(p.race || {}) };
-    if (!TRACKS.some(t => t.id === race.trackId)) race.trackId = TRACKS[0].id; // safe fallback if saved track (e.g. deleted neon) no longer exists
-    race.opponents = clampInt(race.opponents, 0, MAX_OPPONENTS, d.race.opponents);
+    const race = sanitizeRace({ ...d.race, ...(p.race || {}) }, d.race);
     // every pod of THIS build gets a valid entry; entries of pods this build does not know are dropped
     const custom: Record<string, PodCustom> = {};
     for (const pod of PODS) custom[pod.id] = sanitizeCustom(p.custom?.[pod.id], d.custom[pod.id]);
     const podId = PODS.some(x => x.id === p.podId) ? p.podId! : d.podId; // the menus look the pod up without a fallback
-    return { ...d, ...p, podId, custom, race, gfx: { ...d.gfx, ...(p.gfx || {}) }, best: { ...(p.best || {}) }, keys: normalizeKeys(p.keys), pad: normalizePad(p.pad) };
+    const best: Record<string, number> = {}; // best times: seconds per track id
+    if (p.best && typeof p.best === 'object') for (const [k, v] of Object.entries(p.best)) if (typeof v === 'number' && Number.isFinite(v) && v > 0) best[k] = v;
+    return { podId, custom, race, gfx: sanitizeGfx(p.gfx, d.gfx), volume: clampNum(p.volume, 0, 1, d.volume), best, keys: normalizeKeys(p.keys), pad: normalizePad(p.pad) };
   } catch { return d; }
 }
 export function saveProfile(p: Profile) { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* ignore */ } }

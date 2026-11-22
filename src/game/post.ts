@@ -32,6 +32,9 @@ const AnyTHREE = THREE as any;
  *  - God Rays: 14-tap `textureLoad` sky-depth shafts (0 ms when sun off-axis, zero water/ground streaks).
  *  - `warmup()`: compiles HalfFloat scene + shadow + PostFX pipelines & flushes GPU queue BEFORE countdown!
  */
+/** frames the warm-up draws before the countdown: the longest chain of nested passes measured is 3 (SSR inside the SMAA input), one in reserve */
+const WARM_FRAMES = 4;
+
 export class PostFX {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   pipeline: any;
@@ -323,18 +326,21 @@ export class PostFX {
     }
   }
 
-  /** Pre-compile HalfFloat scenePass + shadow + all PostFX passes & flush GPU queue before race countdown. */
+  /** Pre-compile HalfFloat scenePass + shadow + all PostFX passes & flush GPU queue before race countdown.
+   *  `WARM_FRAMES` frames, not one: a pass that is a node of its own (SSR, bloom, the textures between two passes) builds its inner
+   *  materials again in the frame AFTER the material round it was built. With SSR + SMAA that chain is three frames long – with two
+   *  warm-up frames the three SSR pipelines were created once more in the first frame of the countdown (measured on WebGPU). */
   async warmup(renderer: THREE.WebGPURenderer) {
     try { await this.scenePass?.compileAsync?.(renderer); } catch { /* ignore */ }
     await new Promise(res => setTimeout(res, 0));
     try {
-      this.pipeline.render();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const bk = renderer.backend as any;
-      if (bk?.device?.queue?.onSubmittedWorkDone) await bk.device.queue.onSubmittedWorkDone();
-      else if (bk?.gl?.finish) bk.gl.finish();
-      this.pipeline.render();
-      if (bk?.device?.queue?.onSubmittedWorkDone) await bk.device.queue.onSubmittedWorkDone();
+      for (let i = 0; i < WARM_FRAMES; i++) {
+        this.pipeline.render();
+        if (bk?.device?.queue?.onSubmittedWorkDone) await bk.device.queue.onSubmittedWorkDone();
+        else if (i === 0 && bk?.gl?.finish) bk.gl.finish();
+      }
     } catch { /* ignore */ }
   }
 

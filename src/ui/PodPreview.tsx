@@ -5,6 +5,7 @@ import { buildPodModel, type PodLook, type PodVisual } from '../game/podModel';
 import { podEnvelope } from '../game/podDesigns';
 import { damageModel, partsDue } from '../game/podDamage';
 import { makeSky } from '../game/sky';
+import { tuneTiers } from '../game/podKitParts';
 
 interface Props { podId: string; colors: [string, string, string]; pattern?: number; finish?: number; /** Style-Teile */ kit?: PodLook['kit']; /** tuning steps (their parts show on the pod) */ tune?: PodLook['tune'];
   /** Schadens-Vorschau: engine health in percent (both sides); Bruchteile below their step are gone. Default 100 */ health?: number; className?: string; autoRotate?: boolean; }
@@ -78,7 +79,7 @@ export default function PodPreview({ podId, colors, pattern, finish, kit, tune, 
     st.scene.add(pod.group); st.pod = pod; st.podId = podId;
     pod.setParts(partsDue(damageModel(podId), st.health, st.health));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [podId, colors, pattern, finish, JSON.stringify(kit), JSON.stringify(tune)]);
+  }, [podId, colors, pattern, finish, JSON.stringify(kit), JSON.stringify(tuneTiers(tune))]); // (the model shows tuning as part tiers: a step that changes no tier needs no rebuild)
 
   useEffect(() => { // Schadens-Vorschau: no rebuild, the model only drops or gets back its Bruchteile
     const st = stateRef.current; if (!st) return;

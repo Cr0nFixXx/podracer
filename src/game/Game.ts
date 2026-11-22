@@ -11,7 +11,7 @@ import { podEnvelope } from './podDesigns';
 import { WeatherFx } from './weather';
 import { CSMShadowNode } from 'three/examples/jsm/csm/CSMShadowNode.js';
 import { DIFFICULTIES, PILOTS, PODS, THEMES, TRACKS } from './data';
-import { effectiveStats, MAX_OPPONENTS, type Profile, type GfxSettings } from './settings';
+import { CAMERA_NAMES, effectiveStats, MAX_OPPONENTS, type Profile, type GfxSettings } from './settings';
 import { pickRivals, rivalKit } from './roster';
 import { buildTrack, type TrackData } from './trackBuilder';
 import { buildWorld, type World, worldTextureSpecs } from './world';
@@ -27,7 +27,7 @@ import type { LifeAudio } from './wildlife';
 
 const ZERO = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
 const C_ICE = new THREE.Color('#d8f2ff'), WHITE_C = new THREE.Color(1, 1, 1);
-export const CAMERA_NAMES = ['Verfolger', 'Verfolger (fern)', 'Cockpit', 'Motorhaube', 'TV-Kamera', 'Kino-Orbit'];
+export { CAMERA_NAMES };
 
 export interface Standing { name: string; color: string; isPlayer: boolean; gap: string; finished: boolean; }
 export interface HudState {
@@ -1021,7 +1021,7 @@ export class Game {
     this.ro?.disconnect();
     this.audio?.dispose();
     this.pods.forEach(p => p.visual?.dispose());
-    this.weather?.dispose(); this.world?.dispose(); this.particles?.dispose(); this.post?.dispose(); this.csm?.dispose();
+    this.weather?.dispose(); this.world?.dispose(); this.particles?.dispose(); this.debris?.dispose(); this.scrap?.dispose(); this.post?.dispose(); this.csm?.dispose();
     this.sky?.mesh.geometry.dispose(); (this.sky?.mesh.material as THREE.Material | undefined)?.dispose();
     (this.scene.environment as THREE.Texture | null)?.dispose();
     this.renderer?.dispose();

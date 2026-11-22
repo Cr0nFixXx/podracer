@@ -39,13 +39,13 @@ const armor = (front: number, side: number, top: number, belly: number, heat: nu
 const pair = (step: Bruchteil['step'], id: string, label: string, fx?: Fx, x: Extra = {}): Bruchteil[] => ([-1, 1] as const).map(side => ({ id: id + (side < 0 ? 'L' : 'R'), label, side, step, ...(fx ? { fx } : {}), ...x }));
 /** a single part on one side or in the centre */
 const one = (side: Bruchteil['side'], step: Bruchteil['step'], id: string, label: string, fx?: Fx, x: Extra = {}): Bruchteil => ({ id, label, side, step, ...(fx ? { fx } : {}), ...x });
-const OUT = 'ausgefallen', DEAD = 'erloschen';
+const OUT = 'ausgefallen', DEAD = 'erloschen'; // for what stays on the pod and only stops working (an engine flames out, an arc dies) – a part that breaks off is 'abgerissen'
 
 // One Schadensmodell per racer (pod id). Zones: front · side · top · belly · heat. Each HUD box has exactly one Bruchteil per step.
 const MODELS: Record<string, DamageModel> = {
   // ---- light twin-engine racers: thin skin on the flanks, wings and fins go first
   aurora: { armor: armor(1.0, 1.15, 1.0, 0.9, 0.95), parts: [ // wing plates tear off (grip), the tail gyro fails (turn)
-    ...pair(50, 'wing', 'Flügelplatte', { grip: 0.93 }), one(0, 35, 'gyro', 'Kreisel-Stabilisator', { turn: 0.92 }, { lost: OUT }), ...pair(20, 'inner', 'Innenflügel', { grip: 0.94 })] },
+    ...pair(50, 'wing', 'Flügelplatte', { grip: 0.93 }), one(0, 35, 'gyro', 'Kreisel-Stabilisator', { turn: 0.92 }), ...pair(20, 'inner', 'Innenflügel', { grip: 0.94 })] },
   mavik: { armor: armor(1.2, 1.0, 1.0, 0.9, 0.9), parts: [ // Hollo Needle: the nose probe bends (turn), canards and fin snap
     one(0, 50, 'probe', 'Nasensonde', { turn: 0.94 }), ...pair(35, 'canard', 'Canards', { grip: 0.94 }), one(0, 20, 'fin', 'Heckfinne', { turn: 0.92 })] },
   rattis: { armor: armor(0.95, 1.2, 1.0, 0.95, 0.9), parts: [ // Tyr Vespa: a blade wing shears off (grip)
@@ -57,10 +57,10 @@ const MODELS: Record<string, DamageModel> = {
 
   // ---- heavy twin-engine racers
   brute: { armor: armor(0.75, 0.95, 1.15, 1.0, 1.15), parts: [ // Vrak Splitter-X: hard nose; top slats rip (cooling), intake petals jam (accel)
-    ...pair(50, 'slats', 'Kühllamellen', { cool: 0.92 }), ...pair(35, 'petals', 'Ansaugklappen', { accel: 0.93 }, { lost: 'verklemmt' }),
+    ...pair(50, 'slats', 'Kühllamellen', { cool: 0.92 }), ...pair(35, 'petals', 'Ansaugklappen', { accel: 0.93 }),
     one(-1, 20, 'fin', 'Haifinne', { turn: 0.93 }), one(1, 20, 'stub', 'Stummelfinne', { turn: 0.95 })] },
   aldo: { armor: armor(1.0, 1.1, 1.05, 1.05, 0.8), parts: [ // Beerak Fireflare: built for heat; radiators leak (cooling, more heat)
-    ...pair(50, 'rad', 'Radiator', { cool: 0.92, heatRate: 1.06 }, { lost: 'leck' }), ...pair(35, 'loop', 'Kühlschleife', { cool: 0.93, heatRate: 1.05 }, { lost: 'geplatzt' }), ...pair(20, 'vane', 'Radiatorflügel', { grip: 0.95 })] },
+    ...pair(50, 'rad', 'Radiator', { cool: 0.92, heatRate: 1.06 }), ...pair(35, 'loop', 'Kühlschleife', { cool: 0.93, heatRate: 1.05 }, { lost: 'geplatzt' }), ...pair(20, 'vane', 'Radiatorflügel', { grip: 0.95 })] },
   odo: { armor: armor(1.15, 1.05, 1.2, 1.0, 1.2), parts: [ // Mandrel Ram: ram rings and ram bar eat front hits until they drop
     ...pair(50, 'hoop', 'Rammring', undefined, { guard: { front: 0.85 } }), one(0, 35, 'ram', 'Rammbug', undefined, { guard: { front: 0.55 } }), ...pair(20, 'skid', 'Kufenplatte', undefined, { guard: { belly: 0.8 } })] },
   manta: { armor: armor(0.9, 1.1, 0.9, 1.2, 0.9), parts: [ // Dorn Manta: flat and low – soft belly; wing tips (grip), fins (turn)

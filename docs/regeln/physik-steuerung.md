@@ -7,6 +7,7 @@ Part of the agent manual (`CLAUDE.md`). Read this before you change `physics.ts`
 - Measuring the hull of a pod (`podHulls.json`): `pods.md`. Tunnel shapes and overheads as they are built: `strecken.md`.
 
 ## Hull, tunnel vault, overheads
+- **Decided by the user (2026-11-22): a pod counts as high as its largest outfit.** One hull per pod (`podHulls.json`, "largest outfit"): Teile never change what fits under a vault, no Teil ever sticks in the ceiling; the price is up to 0.70 m less room than the factory pod shows (Aurora XR-7). Do not measure hulls per mounted outfit. *(2026-11-22)*
 - **What a pod must stay out of is tested against ONE shape: its hull** – `src/game/podHulls.json` → `podEnvelope().hull` (three parts: left engine side, right engine side, cockpit; slabs `HULL_SLAB` = 3 m wide; the pod in its largest outfit, so Teile never change how a pod drives). `hullWorld(p, env)` in `physics.ts` puts its corners where the model is drawn: yaw, pitch, roll, engine travel, cockpit sway (`COCKPIT_SWAY` – shared with `podModel.ts`). Tunnel vaults (`vaultOver`: every corner against the shell above THAT corner) and overheads (highest / lowest corner under the structure) use it. Never put a pod height or a box into physics again: 2.15 m for all left tall pods 3.5 m inside the vault, and one height above the pod centre ignored pitch (the nose of a climbing pod was up to 5.96 m higher). *(S20 Strecken)*
 - **The vault only stops a pod in the AIR** (`!p.grounded`) and is tested LAST in `stepPod`, when pitch, roll, engine travel and cockpit sway are final. A pod that rides on its repulsors is never pressed down: on knife-edge right beside a wall its upper wing tip stands in the vault's flank, and pressing it down would fight the ground clamp – do not add that back. Where a cave forks the higher shell of the two tubes counts; a corner beyond a portal is under the open sky. **Arches are read at the pod CENTRE's lateral position** (their collision shape is padded for that: `arch.inner`); only the pod's height comes from the hull. *(S20 Strecken)*
 - **Portal entry is decided by the vault height at the pod's lateral position** (`p.upper`), and the ceiling pushes down at most 45 m/s. Otherwise a pod that enters above the low side vault is pressed through the headwall (CI: downward teleports). *(S20 Strecken)*
@@ -31,6 +32,7 @@ Part of the agent manual (`CLAUDE.md`). Read this before you change `physics.ts`
 
 ## Pod contact
 - **Pod contact** lives in `physics.ts → collidePods` (game + CI share it). *(S11)*
+- Who gets the event of a contact, and which zone a wall hit counts as: `pods.md` → "Damage". *(2026-11-22)*
 
 ## AI
 - **AI start discipline:** `ai.gridLat` (grid lane) is held for ~4.5 s, blended out until 7.5 s; no lateral dodging and lift-off when tailgating during that phase. CI column `startTouch`. *(S16)*

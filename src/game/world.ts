@@ -1221,7 +1221,8 @@ function scatterDecor(
   const decorCells: { mesh: THREE.InstancedMesh; x: number; z: number; view2: number; sh2: number; lod?: THREE.InstancedMesh; lod2?: number }[] = [];
   // Sector-chunked + distance/shadow-culled InstancedMesh placement: skips distant sectors & shadows beyond the shadow box!
   const place = (geo: THREE.BufferGeometry, mat: THREE.Material, count: number, dMin: number, dMax: number, sMin: number, sMax: number, opts: { foot?: number; yOff?: number; tilt?: number; air?: number; shadow?: boolean; scaleY?: [number, number]; colors?: string[]; keepDry?: boolean; view?: number; lod?: { geo: THREE.BufferGeometry; dist: number } } = {}) => {
-    count = Math.floor(count * det * dens); // Session 18: density follows the (longer) track + 20 % more decoration if (count <= 0) { geo.dispose(); return; }
+    count = Math.floor(count * det * dens); // Session 18: density follows the (longer) track + 20 % more decoration
+    if (count <= 0) { geo.dispose(); opts.lod?.geo.dispose(); return; }
     const SEC = dMax > 900 ? 900 : 340;
     const sectors = new Map<string, { m: THREE.Matrix4[]; c: THREE.Color[]; cx: number; cz: number }>();
     const q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();

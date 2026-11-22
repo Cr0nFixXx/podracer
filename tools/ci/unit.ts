@@ -1,19 +1,20 @@
 // Headless unit checks for pure game logic (part of `npm run check`). No framework: tiny test / expect helpers.
 // Env: ONLY=<substring> runs only the tests whose name contains it.
 import * as THREE from 'three';
-import { PILOTS, PODS, STAT_KEYS, TRACKS, type PodDef, type StatKey } from '../../src/game/data';
+import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, TRACKS, type PodDef, type StatKey } from '../../src/game/data';
 import { podLayout } from '../../src/game/podLayouts';
 import { cockpitGeo } from '../../src/game/podCockpits';
 import { engineExtent, engineGeo } from '../../src/game/podParts';
+import { END_PLATE, RING, RING_CHORD, plateBevel } from '../../src/game/podEngines';
 import { podCollision, podEnvelope, COCKPIT_SWAY } from '../../src/game/podDesigns';
-import { assembleHero, assembleRival, segFor, visibleIndices, type BreakShow } from '../../src/game/podAssembly';
+import { assembleHero, assembleRival, segFor, skinPoint, visibleIndices, type BreakShow } from '../../src/game/podAssembly';
 import { pickRivals, rivalKit } from '../../src/game/roster';
 import { engineKit, tuneTiers, NO_KIT } from '../../src/game/podKitParts';
 import { ciRoster } from './roster';
-import { applyDamage, bodyToWorld, hullWorld, podParams, respawn, stepPod, vaultOver, worldToBody, FX_NONE, HOVER, VAULT_CLAMP, type PodState } from '../../src/game/physics';
-import { DAMAGE_RULES, damageModel, partLamps, partsFx, zoneFactor, type DamageZone } from '../../src/game/podDamage';
+import { applyDamage, bodyToWorld, collidePods, hullWorld, podParams, respawn, stepPod, vaultOver, worldToBody, FX_NONE, HOVER, VAULT_CLAMP, type PodState } from '../../src/game/physics';
+import { DAMAGE_RULES, damageModel, lostMessage, partLamps, partsFx, zoneFactor, type DamageZone } from '../../src/game/podDamage';
 import { buildTrack, frameAt, tunnelCeiling, DS, TUNNEL_SHOULDER, type Path, type Sample, type TrackData } from '../../src/game/trackBuilder';
-import { effectiveStats, loadProfile, saveProfile } from '../../src/game/settings';
+import { defaultProfile, effectiveStats, loadProfile, saveProfile, CAMERA_NAMES, MAX_LAPS, PRESETS, type GfxSettings } from '../../src/game/settings';
 
 let failed = 0, passed = 0;
 const ONLY = process.env.ONLY;
@@ -130,6 +131,25 @@ test('Voltspire: its engines are mostly closed – painted outer skin covers at 
 });
 test('Quadra Lumber keeps its X: binders between different engine pairs stay separate meshes', () => {
   const p = podById('bomquad'); eq(assembleHero(p, 28, 'dome').binders.length, 2); eq(assembleRival(p, 14, 'dome', p.colors).binders.length, 2);
+});
+test('Lyss Halo-9: the end plate of a ring segment stays inside the skin of the ring (a plain bar stood up to 4 cm proud at both edges)', () => {
+  const p = podById('halo'), sp = podLayout(p).engines[0].spec, hull = engineGeo(sp, 28).parts.get('hull')!, P = hull.attributes.position;
+  const Rw = RING * sp.R, c = RING_CHORD * sp.L, zTE = -sp.L / 2 + 0.56 * sp.L - c / 2;
+  // the section of the ring, read off the built skin: its half thickness at every rib of the lathe (place along the chord 0..1)
+  const half = new Map<number, number>();
+  for (let i = 0; i < P.count; i++) {
+    const r = Math.hypot(P.getX(i), P.getY(i)), t = (P.getZ(i) - zTE) / c; if (Math.abs(r - Rw) > 0.08 || t < -0.005 || t > 1.005) continue;
+    const k = Math.round(t * 100) / 100; half.set(k, Math.max(half.get(k) ?? 0, Math.abs(r - Rw)));
+  }
+  const sec = [...half].sort((a, b) => a[0] - b[0]); ok(sec.length >= 5 && sec[0][0] === 0 && sec[sec.length - 1][0] === 1 && sec[0][1] < 1e-6 && sec[sec.length - 1][1] < 1e-6, `the ring section should run from edge to edge: ${JSON.stringify(sec)}`);
+  const skin = (t: number) => { for (let i = 1; i < sec.length; i++) if (t <= sec[i][0]) { const [t0, h0] = sec[i - 1], [t1, h1] = sec[i]; return h0 + (h1 - h0) * (t - t0) / (t1 - t0); } return 0; };
+  const bevel = plateBevel(0.012); let least = 1;
+  for (let i = 0; i < END_PLATE.length; i++) for (let q = 0; q <= 10; q++) { // along every edge of the plate
+    const [t0, y0] = END_PLATE[i], [t1, y1] = END_PLATE[(i + 1) % END_PLATE.length], t = t0 + (t1 - t0) * q / 10, y = Math.abs(y0 + (y1 - y0) * q / 10);
+    const room = Math.min(skin(t) - y - bevel, (t - bevel / c) > 0 && (t + bevel / c) < 1 ? 1 : -1); if (room < least) least = room;
+    ok(room >= 0.001, `at ${(t * 100).toFixed(0)} % of the chord the plate (${(y * 100).toFixed(1)} cm + ${(bevel * 100).toFixed(2)} cm bevel) meets a skin of ${(skin(t) * 100).toFixed(1)} cm`);
+  }
+  ok(least < 0.03, `the plate should fill most of the cut: least room ${(least * 100).toFixed(1)} cm`);
 });
 
 // ------------------------------------------------------------------ Session 20 / Phase 4: tuning look (Tuning-Teile + Style-Teile)
@@ -508,7 +528,61 @@ test('Treffermarken: the flaps of the player pod are built in the space of their
     ok(n > 0 || !podLayout(p).engines.some(em => engineGeo(em.spec, segFor(2, false)).flaps.length), `${p.id}: flaps got lost`);
     A.owned.forEach(g => g.dispose());
   }
+});test("Bruchteile: the HUD says what the player sees – a part that drops off the model is 'abgerissen', 'geplatzt' or the like, never 'ausgefallen' (that is an engine or an arc that stays and goes out)", () => {
+  const bad: string[] = [];
+  for (const p of PODS) {
+    const A = assembleHero(p, 28, headOf(p));
+    for (const b of damageModel(p.id).parts) {
+      const sh = A.breaks.get(b.id)!, stays = sh.engines.length > 0 || sh.arcs.length > 0 || sh.fans.length > 0, word = b.lost ?? 'abgerissen';
+      if (!stays && ['ausgefallen', 'erloschen', 'verklemmt', 'leck'].includes(word)) bad.push(`${p.id}/${b.id}: drops off, message "${lostMessage(b)}"`);
+      if (stays && sh.engines.length > 0 && word !== 'ausgefallen') bad.push(`${p.id}/${b.id}: the engine stays and flames out, message "${lostMessage(b)}"`);
+    }
+  }
+  ok(!bad.length, bad.join(' · '));
 });
+
+// ------------------------------------------------------------------ Treffermarken: on the skin the hit meets first, whatever the engine's shape
+/** [metres from the engine axis, metres along the engine from its middle] of the mark for a hit from direction (dx, dy) on the first engine of bank `b` */
+function markAt(A: ReturnType<typeof assembleHero>, b: number, dx: number, dy: number, v = new THREE.Vector3()): [number, number] {
+  const bank = A.banks[b], e = bank.engines[0];
+  ok(skinPoint(bank.buckets.get('hull')!, e.off.x, e.off.y, dx, dy, e.off.z, e.geo.L * 0.5 + 0.3, v), 'no skin found');
+  return [Math.hypot(v.x - e.off.x, v.y - e.off.y), v.z - e.off.z];
+}
+test('Treffermarke: a hit on the flank lands on the flank – on the wing of the slab (Dorn Manta), on the ring (Lyss Halo-9), on the rotor hoop (Tarn Cyclone), not on the core barrel', () => {
+  for (const id of ['manta', 'halo', 'cyclone']) {
+    const p = byId(id), A = assembleHero(p, 28, headOf(p)), sp = podLayout(p).engines[A.banks[0].engines[0].index].spec, x = engineExtent(sp);
+    for (let b = 0; b < A.banks.length; b++) {
+      const [r] = markAt(A, b, A.banks[b].side, 0);
+      ok(r > x.side - 0.15 && r <= x.side + 0.02, `${id}, bank ${b}: mark ${r.toFixed(2)} m from the axis – the flank is at ${x.side.toFixed(2)} m, the barrel at ${sp.R.toFixed(2)} m`);
+    }
+  }
+});
+test('Treffermarke: on every racer a mark sits on the skin – no deeper than the barrel, no further out than the pod is wide, within the engine', () => {
+  for (const p of PODS) {
+    const A = assembleHero(p, 28, headOf(p)), env = podEnvelope(p);
+    for (let b = 0; b < A.banks.length; b++) for (const [dx, dy] of [[A.banks[b].side, 0], [-A.banks[b].side, 0], [0, 1], [0, -1]]) {
+      const e = A.banks[b].engines[0], [r, dz] = markAt(A, b, dx, dy);
+      ok(r > e.geo.R * 0.85, `${p.id}, bank ${b}, from (${dx}, ${dy}): ${r.toFixed(2)} m from the axis, barrel ${e.geo.R.toFixed(2)} m`);
+      ok(Math.abs(dz) <= e.geo.L * 0.5 + 0.3 + 1e-9, `${p.id}: ${dz.toFixed(2)} m along an engine of ${e.geo.L} m`);
+      if (dy === 0 && dx === A.banks[b].side) ok(Math.abs(A.banks[b].pivot.x + e.off.x) + r <= Math.max(Math.abs(env.engL.outerX), Math.abs(env.engR.outerX)) + 0.6, `${p.id}: mark outside the pod`);
+    }
+  }
+});
+test('Treffermarke: a ring segment that has broken off gets no mark (Lyss Halo-9: the hit goes on what is still there)', () => {
+  const p = byId('halo'), A = assembleHero(p, 28, headOf(p)), b = 0, bank = A.banks[b], geo = bank.buckets.get('hull')!, sd = bank.side;
+  const up = [sd * Math.sin(0.55), Math.cos(0.55)] as const; // 32° from the top towards the outer flank: the middle of the upper outer arc (10°–55°)
+  const [r0] = markAt(A, b, up[0], up[1]); ok(r0 > 1.6, `intact: the mark should sit on the ring, ${r0.toFixed(2)} m`);
+  const v = new THREE.Vector3(), e = bank.engines[0]; skinPoint(geo, e.off.x, e.off.y, up[0], up[1], e.off.z, e.geo.L * 0.5 + 0.3, v);
+  const ang0 = Math.atan2(Math.abs(v.x - e.off.x), v.y - e.off.y); ok(ang0 > 0.17 && ang0 < 0.96, `intact: mark at ${(ang0 * 57.3).toFixed(0)}° from the top (arc 10°–55°)`);
+  // lose every Bruchteil of this bank's skin, as podModel's Hider does
+  const ranges = [...A.breaks].flatMap(([id, sh]) => sh.ranges.filter(q => q.where === b && q.key === 'hull').map(q => ({ id, start: q.start, count: q.count })));
+  ok(ranges.length >= 2, `Bruchteile in the skin of bank ${b}: ${ranges.length}`);
+  const idx = geo.index!, full = (idx.array as Uint16Array | Uint32Array).slice(), n = visibleIndices(full, ranges, new Set(ranges.map(q => q.id)), idx.array as Uint16Array | Uint32Array);
+  geo.setDrawRange(0, n); skinPoint(geo, e.off.x, e.off.y, up[0], up[1], e.off.z, e.geo.L * 0.5 + 0.3, v);
+  const ang = Math.atan2(Math.abs(v.x - e.off.x), v.y - e.off.y), r = Math.hypot(v.x - e.off.x, v.y - e.off.y);
+  ok(!(r > 1.6 && ang > 0.19 && ang < 0.94), `arc gone: the mark is still on it (${r.toFixed(2)} m, ${(ang * 57.3).toFixed(0)}° from the top)`);
+});
+
 // ------------------------------------------------------------------ saved profile (localStorage)
 const store = new Map<string, string>();
 (globalThis as unknown as { localStorage: unknown }).localStorage = {
@@ -558,6 +632,30 @@ test('profile: Style-Teile are clamped into range; a save without them means Wer
 test('profile: the rival count is clamped to 0..10', () => {
   saved(V2, { race: { opponents: 99 } }); eq(loadProfile().race.opponents, 10);
   saved(V2, { race: { opponents: -2 } }); eq(loadProfile().race.opponents, 0);
+});
+test('profile: a save edited by hand cannot crash a race – difficulty, laps and camera are forced into their lists (difficulty 9 used to crash Game.createPods)', () => {
+  saved(V2, { race: { difficulty: 9, laps: 0, camera: -4 } }); let r = loadProfile().race;
+  eq([r.difficulty, r.laps, r.camera], [DIFFICULTIES.length - 1, 1, 0]);
+  saved(V2, { race: { difficulty: 'hard', laps: null, camera: 2.4, timeOfDay: 'noon', weather: 'acid' } }); r = loadProfile().race;
+  eq([r.difficulty, r.laps, r.camera, r.timeOfDay, r.weather], [1, 3, 2, 'auto', 'auto'], 'wrong kinds become the defaults:');
+  saved(V2, { race: { laps: 99, camera: 99, timeOfDay: 'night', weather: 'storm' } }); r = loadProfile().race;
+  eq([r.laps, r.camera, r.timeOfDay, r.weather], [MAX_LAPS, CAMERA_NAMES.length - 1, 'night', 'storm']);
+});
+test('profile: graphics values are forced into the ranges of the settings screen, wrong kinds become the default, unknown fields go', () => {
+  saved(V2, { gfx: { geometry: 99, shadows: -1, texRes: 300, aa: 'msaa', renderScale: 9, fov: 'wide', bloom: 'yes', anisotropy: 5, preset: 'insane', backend: 'vulkan', particles: 0, bogus: 1 }, volume: -3, best: { boonta: 91.5, frost: 'fast', magma: -1 } });
+  const p = loadProfile(), g = p.gfx, d = defaultProfile().gfx;
+  eq([g.geometry, g.shadows, g.texRes, g.aa, g.renderScale, g.fov, g.bloom, g.anisotropy, g.preset, g.backend, g.particles], [3, 0, d.texRes, d.aa, 1.5, d.fov, d.bloom, d.anisotropy, d.preset, 'auto', 0.2]);
+  ok(!('bogus' in g), 'unknown field kept'); eq(p.volume, 0); eq(p.best, { boonta: 91.5 });
+});
+test('profile: every setting the screens can produce survives saving and loading (all four presets, custom values)', () => {
+  for (const preset of ['low', 'medium', 'high', 'ultra'] as const) {
+    const p0 = defaultProfile(); Object.assign(p0.gfx, PRESETS[preset], { preset, fov: 88, bloomStrength: 1.2, showFps: false, backend: 'webgl' });
+    p0.volume = 0.25; p0.best = { boonta: 123.4 }; p0.race = { trackId: 'frost', laps: 5, opponents: 9, difficulty: 3, camera: 4, timeOfDay: 'cycle', weather: 'changing' };
+    store.clear(); saveProfile(p0); const p = loadProfile();
+    for (const k of Object.keys(p0.gfx) as (keyof GfxSettings)[]) eq(p.gfx[k], p0.gfx[k], `${preset}: gfx.${k}`);
+    eq(Object.keys(p.gfx).sort(), Object.keys(p0.gfx).sort(), `${preset}: gfx fields`);
+    eq(p.race, p0.race); eq(p.volume, 0.25); eq(p.best, p0.best);
+  }
 });
 
 // ------------------------------------------------------------------ tunnel vaults & overheads (the hull round a pod)
@@ -760,6 +858,61 @@ test('overheads: a pod that flies into a gantry or an arch is knocked down by it
   td.overheads = [];
   ok(!bad.length, `\n         ${bad.slice(0, 12).join('\n         ')}`);
 });
+
+// ------------------------------------------------------------------ pod against pod: who is told
+test('pod contact: one event per contact – the player gets it whichever of the two comes first in the field (Treffermarke, full sound)', () => {
+  const two = (playerFirst: boolean) => {
+    const mk = (x: number, vx: number, isPlayer: boolean) => pod({ isPlayer, invuln: 0, dead: 0, shake: 0, pos: new THREE.Vector3(x, 0, 0), vel: new THREE.Vector3(vx, 0, 0) });
+    const a = mk(-1, 12, playerFirst), b = mk(1, -12, !playerFirst); collidePods([a, b], 1);
+    return { a, b, player: playerFirst ? a : b, other: playerFirst ? b : a };
+  };
+  for (const first of [true, false]) {
+    const { a, b, player, other } = two(first), e = player.events;
+    eq([e.length, other.events.length], [1, 0], `player ${first ? 'first' : 'second'} – events at [player, Gegner]:`); eq(e[0].type, 'pod');
+    ok(a.hpL < 100 && b.hpL < 100, 'both pods pay');
+    ok((e[0].x - player.pos.x) * (other.pos.x - player.pos.x) > 0 && Math.abs(e[0].x - player.pos.x) < Math.abs(other.pos.x - player.pos.x), `the mark sits on the player's flank towards the other pod: x ${e[0].x}, player at ${player.pos.x}, Gegner at ${other.pos.x}`);
+    ok(e[0].nx * (player.pos.x - other.pos.x) > 0, 'the normal points from the other pod to the player');
+  }
+  const mk = (x: number, vx: number) => pod({ isPlayer: false, invuln: 0, dead: 0, shake: 0, pos: new THREE.Vector3(x, 0, 0), vel: new THREE.Vector3(vx, 0, 0) });
+  const a = mk(-1, 12), b = mk(1, -12); collidePods([a, b], 1); eq([a.events.length, b.events.length], [1, 0], 'two Gegner – the first one reports:');
+});
+
+// ------------------------------------------------------------------ walls: which part of the pod pays (user decision 2026-11-22)
+/** Puts `def` against the right-hand rock wall of a straight piece of canyon on Boonta, moving `into` m/s towards the wall, nose turned
+ *  `nose` rad towards it (0 = along the wall), and steps once. Rock, because a guard rail only hurts a pod that flies low – above it the
+ *  energy field catches the pod. Returns [health lost on both engine sides together, the damage of the hit before any Panzerzone]
+ *  (which collision circle touches decides who pays: one side, or half and half). */
+function wallHit(def: PodDef, into: number, nose: number): [number, number] {
+  const td = trackOf('boonta'), S = td.main.samples;
+  let idx = -1;
+  for (let k = 40; k < S.length - 40 && idx < 0; k++) {
+    let fine = true;
+    for (let j = k - 8; j <= k + 8 && fine; j++) { const q = S[j]; fine = !q.gap && !q.zeroG && !q.lake && !q.roof && !q.ramp && q.hR > 0 && Math.abs(q.curv) < 0.004 && Math.abs(q.bank) < 0.07; }
+    if (fine) idx = k;
+  }
+  ok(idx > 0, 'no straight piece of canyon found on boonta');
+  const s = S[idx], p = racer(def, td, idx, s.wallR - 1, s.y + HOVER);
+  p.invuln = 0; p.yaw = Math.atan2(s.tx * Math.cos(nose) + s.rx * Math.sin(nose), s.tz * Math.cos(nose) + s.rz * Math.sin(nose)); p.vel.set(s.rx * into, 0, s.rz * into);
+  stepPod(p, td, 1 / 60, 0, 1, false);
+  const hits = p.events.filter(e => e.type === 'wall'); eq(hits.length, 1, 'wall events in the step:');
+  return [200 - p.hpL - p.hpR, Math.min(28, Math.max(0, hits[0].strength - 9) * 0.7 * podParams(p).sturdy)];
+}
+test("walls: a head-on hit counts as zone 'front', a brush along the wall as 'side' (Mandrel Ram: its bar takes the wall as it takes a rock)", () => {
+  const def = byId('odo'), m = damageModel('odo'), front = zoneFactor(m, 0, 1, 'front'), side = zoneFactor(m, 0, 1, 'side');
+  eq(zoneFactor(m, 0, -1, 'front'), front); eq(zoneFactor(m, 0, -1, 'side'), side); // (an intact Ram is armoured alike on both sides)
+  const [h, hraw] = wallHit(def, 30, 1.2), [b, braw] = wallHit(def, 30, 0.2); // nose 69° / 11° off the wall, both 30 m/s into it
+  ok(hraw > 5 && braw > 5, `damage before armour: head-on ${hraw}, brush ${braw}`);
+  near(h / hraw, front, 'head-on, share of the hit that gets through:'); near(b / braw, side, 'brush, share of the hit that gets through:');
+  ok(front < side * 0.7, `the bar should take clearly more off a front hit (${front}) than off a side hit (${side})`);
+});
+test("walls: the limit is 30° to the wall, as for obstacles (nose 25° off the wall = 'side', 35° = 'front')", () => {
+  const def = byId('odo'), m = damageModel('odo'), [a, araw] = wallHit(def, 30, 25 * Math.PI / 180), [b, braw] = wallHit(def, 30, 35 * Math.PI / 180);
+  near(a / araw, zoneFactor(m, 0, 1, 'side'), '25°:'); near(b / braw, zoneFactor(m, 0, 1, 'front'), '35°:');
+});
+test('walls: with Panzerzonen switched off the angle makes no difference (CI: ARMOR=0)', () => plain(() => {
+  const def = byId('odo'), [h, hraw] = wallHit(def, 30, 1.2), [b, braw] = wallHit(def, 30, 0.2);
+  near(h / hraw, 1, 'head-on:'); near(b / braw, 1, 'brush:');
+}));
 
 console.log(failed ? `\n${failed} unit check(s) FAILED, ${passed} passed.` : `All ${passed} unit checks passed.`);
 process.exit(failed ? 1 : 0);

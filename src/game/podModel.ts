@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { PILOTS, type PodDef } from './data';
-import { assembleHero, assembleRival, segFor, visibleIndices, type BreakShow, type PartRange } from './podAssembly';
+import { assembleHero, assembleRival, segFor, skinPoint, visibleIndices, type BreakShow, type PartRange } from './podAssembly';
 import { damageModel } from './podDamage';
 import { tuneTiers, type KitSpec } from './podKitParts';
 import type { StatKey } from './data';
@@ -253,6 +253,8 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
   const hc = new THREE.Color(), hot = new THREE.Color('#ff5a1a');
 
   const heroPivots: THREE.Vector3[] = [];
+  /** per bank: the geometry drawn with the hull material (Treffermarken are put on its skin) */
+  const skins: (THREE.BufferGeometry | undefined)[] = [];
   A.banks.forEach((bank, bi) => {
     const side = bank.side;
     heroPivots.push(bank.pivot);
@@ -271,10 +273,10 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
         m.position.set(off.x, off.y, off.z + eg.flameZ); m.renderOrder = 2; engGrp.add(m); flames.push({ m, side, engine: index });
       }
     }
-    addMeshes(bank.buckets, engGrp, hull, bi);
+    skins[bi] = addMeshes(bank.buckets, engGrp, hull, bi).find(x => x.k === 'hull')?.m.geometry;
   });
 
-  // Cockpit + cockpit-mounted extras + GPU-flexing control cables. `ckView` carries the enlargement of the cockpit camera.
+  // Cockpit + GPU-flexing control cables. `ckView` carries the enlargement of the cockpit camera.
   const ckView = new THREE.Group(); ckGrp.add(ckView); body.add(ckGrp);
   const ckMeshes = addMeshes(A.cockpit, ckView, hullC, 'cockpit');
   // three live dash lamps (boost · heat · damage): one small vertex-coloured mesh
@@ -316,6 +318,8 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
   };
 
   let boostK = 0, flapT = 0, glowH = 0;
+  /** flame material: time, colour (`hc`) and power – called per frame, so no array is built for the four of them */
+  const setFx = (m: THREE.Material, t: number, power: number) => { const u = m.userData.u as FxU; u.uTime.value = t; u.uColor.value.copy(hc); u.uPower.value = power; };
   const update = (t: number, throttle: number, boost: number, airbrake: number, dmgL: number, dmgR: number, heat: number) => {
     podSharedTime.value = t;
     const fl = 0.35 + throttle * 0.75 + boost * 0.8;
@@ -328,9 +332,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     }
     hc.copy(glowCol).lerp(hot, Math.min(1, Math.max(0, heat - 0.6) * 2.5));
     const pw = 0.55 + throttle * 0.45 + boost * 0.5;
-    for (const [m, sp] of [[flameL, spL], [coreL, spL], [flameR, spR], [coreR, spR]] as [THREE.Material, number][]) {
-      const u = m.userData.u as FxU; u.uTime.value = t; u.uColor.value.copy(hc); u.uPower.value = pw * sp;
-    }
+    setFx(flameL, t, pw * spL); setFx(coreL, t, pw * spL); setFx(flameR, t, pw * spR); setFx(coreR, t, pw * spR);
     glow.color.copy(hc).multiplyScalar(1.1 + boost * 0.3);
     const fanAng = t * (16 + throttle * 42);
     for (let i = 0; i < fans.length; i++) if (!engineOut[fans[i].userData.engine as number]) fans[i].rotation.z = fanAng * (fans[i].userData.spin as number) + i * 0.7; // (a dead engine's fan stands still)
@@ -385,9 +387,11 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     for (const e of bank.engines) { const d = Math.hypot(hv.x - bank.pivot.x - e.off.x, hv.y - bank.pivot.y - e.off.y); if (d < bd) { bd = d; best = e; } }
     const R = best.geo.R, hl = best.geo.L * 0.5;
     let dx = hv.x - bank.pivot.x - best.off.x, dy = hv.y - bank.pivot.y - best.off.y; const dl = Math.hypot(dx, dy);
-    if (side || dl < 1e-3) { dx = 0; dy = R; } else { dx *= R / dl; dy *= R / dl; } // onto the barrel, on the side the hit came from
+    if (side || dl < 1e-3) { dx = 0; dy = 1; } else { dx /= dl; dy /= dl; } // the direction the hit came from, seen along the engine (no side: from above)
     const z = side ? (Math.random() * 1.2 - 0.3) * hl : Math.max(-hl * 0.8, Math.min(hl * 0.95, hv.z - bank.pivot.z - best.off.z));
-    mark(bank.side < 0 ? 0 : 1, best.off.x + dx, best.off.y + dy, best.off.z + z, k);
+    const skin = skins[bi]; // the mark goes on the skin the hit meets first – whatever the engine's shape (ring wing, slab, rotor hoop)
+    if (skin && skinPoint(skin, best.off.x, best.off.y, dx, dy, best.off.z + z, hl + 0.3, hv)) mark(bank.side < 0 ? 0 : 1, hv.x, hv.y, hv.z, k);
+    else mark(bank.side < 0 ? 0 : 1, best.off.x + dx * R, best.off.y + dy * R, best.off.z + z, k); // (no skin drawn: on the barrel)
   };
   const clearMarks = () => { for (const h of hulls) for (const u of h) u.value.set(0, 0, 0, 0); };
   const dispose = () => { own.forEach(m => m.dispose()); A.owned.forEach(g => g.dispose()); };

@@ -2,7 +2,7 @@
 
 ## Nächster Schritt (zuerst lesen)
 Session 20 lief in zwei Zweigen und ist zusammengeführt ([Merge](docs/verlauf/2026-11-22-merge-session-20.md)): **Session 20 (Strecken)** aus `B` und **Session 20 (Pods)** aus `new_pods`. Offen:
-0. **`dev` nach `main` bringen** (Pull Request auf GitHub – Schritt des Nutzers). `main` (`3625c99`) enthält beide Sitzungen und die Tunneldecke je Pod (Pull Request #2, gemergt am 2026-11-22). Auf `dev` liegen danach: die **Hülle je Pod** (Tunneldecke fertig, Überkopf-Bauten, Test-Werkzeuge repariert – [Protokoll](docs/verlauf/2026-11-22-huelle-je-pod.md); die [Vorstufe](docs/verlauf/2026-11-22-tunneldecke-je-pod.md) ist überholt), das **Aufräumen des Speichers** und der **Umbau der Doku** ([Protokoll](docs/verlauf/2026-11-22-speicher-und-doku.md)). Was davon schon auf GitHub ist, steht unter „Git-Stand". **Vor dem ersten Commit lesen:** `docs/regeln/git-sandbox.md` (Speicher-Limit 128 MB).
+0. **`dev` nach `main` bringen** (Pull Request auf GitHub – Schritt des Nutzers). `main` (`3625c99`) enthält beide Sitzungen und die Tunneldecke je Pod (Pull Request #2, gemergt am 2026-11-22). Auf `dev` liegen danach: die **Hülle je Pod** (Tunneldecke fertig, Überkopf-Bauten, Test-Werkzeuge repariert – [Protokoll](docs/verlauf/2026-11-22-huelle-je-pod.md); die [Vorstufe](docs/verlauf/2026-11-22-tunneldecke-je-pod.md) ist überholt), das **Aufräumen des Speichers** und der **Umbau der Doku** ([Protokoll](docs/verlauf/2026-11-22-speicher-und-doku.md)) und die **TODO-Runde** (Wandtreffer frontal = „Front", zehn Kleinigkeiten an den Pods, Aufwärmen, zweiter Build `npm run build:web`, GitHub-Action, Harness-Bundles aus Git – [Protokoll](docs/verlauf/2026-11-22-todo-runde.md)). Was davon schon auf GitHub ist, steht unter „Git-Stand". **Vor dem ersten Commit lesen:** `docs/regeln/git-sandbox.md` (Speicher-Limit 128 MB).
 1. **Strecken – Probefahrt auf echter GPU** (`npm run dev`, ≈ 10 Min.; in der Sandbox ließ sich nur in Software rendern):
    - **Aquilaris-Küstenlauf** und **Oovo-IV-Gefängnis**: Schrägkurven abfahren – ragt noch irgendwo ein Balken aus der Fahrbahn?
    - **Frostspalt-Ring:** 30-m-Tunnel, durchgehende Eishöhle mit Gabelung, Eissee (25 % weniger Haftung – fair?).
@@ -13,7 +13,7 @@ Session 20 lief in zwei Zweigen und ist zusammengeführt ([Merge](docs/verlauf/2
 
 ## Git-Stand
 - Remote `origin` = `https://github.com/Cr0nFixXx/podracer.git`. Arbeitszweig **`dev`** (vom Nutzer am 2026-11-22 angelegt, gleich nach dem Merge von PR #2). `main` nicht direkt anfassen (Pull Requests). **Pushen** nur auf ausdrücklichen Wunsch: `git push origin dev`.
-- **Stand 2026-11-22:** `dev` ist ganz auf GitHub (zuletzt gepusht am 2026-11-22, auf Wunsch des Nutzers). Vor `main` (`3625c99`) liegen: Hülle je Pod `ee3dc4b`, Speicher aufgeräumt `a2925a4`, `npm run save` abgeschaltet `f845466`, `npm run restore-git` holt `dev` `a5a1fb7`, Doku neu geordnet `9fcd38a` – und der Commit mit diesem Eintrag. Prüfen, ob lokal etwas Ungepushtes liegt: `git log --oneline origin/dev..dev` (leer = alles ist auf GitHub).
+- **Stand 2026-11-22:** auf GitHub liegt `dev` bis `50c310b` (Hülle je Pod `ee3dc4b`, Speicher aufgeräumt `a2925a4`, `npm run save` abgeschaltet `f845466`, `npm run restore-git` holt `dev` `a5a1fb7`, Doku neu geordnet `9fcd38a`, Git-Stand `50c310b`). Die TODO-Runde vom 2026-11-22 ist committet; der Nutzer hat entschieden, dass sie direkt auf `dev` gepusht wird. Ob lokal etwas Ungepushtes liegt: `git log --oneline origin/dev..dev` (leer = alles ist auf GitHub).
 - **Zweige seit Session 20:** `main` ist der Sammelzweig; bisher kam alles über Pull Requests auf GitHub hinein. PR #1 hat **Session 20 (Strecken)** aus `B` nach `main` gebracht; PR #2 hat **Session 20 (Pods)** aus `new_pods` nach `main` gebracht (gemergt am 2026-11-22). Damit PR #2 ohne Konflikte mergebar war, wurde vorher `main` in `new_pods` gemergt (`docs/verlauf/2026-11-22-merge-session-20.md`). Seitdem gibt es den Zweig `dev`.
 - **Regeln zu Git und Sandbox** (Speicher-Limit 128 MB, nach jedem Commit `git gc --prune=now`, was nach einem Reset zu tun ist): `docs/regeln/git-sandbox.md`.
 
@@ -35,10 +35,10 @@ Session 20 lief in zwei Zweigen und ist zusammengeführt ([Merge](docs/verlauf/2
 | `CONTEXT.md`, `docs/adr/` | Begriffe, grundlegende Entscheidungen |
 
 ## Verlauf (neueste zuerst)
+- 2026-11-22 – [TODO-Runde: Wandtreffer, Pod-Kleinigkeiten, Aufwärmen, zweiter Build, GitHub-Action](docs/verlauf/2026-11-22-todo-runde.md)
 - 2026-11-22 – [Speicher aufgeräumt, Doku nach Thema neu geordnet](docs/verlauf/2026-11-22-speicher-und-doku.md)
 - 2026-11-22 – [Hülle je Pod: Tunneldecke und Überkopf-Bauten fertig, Test-Werkzeuge repariert](docs/verlauf/2026-11-22-huelle-je-pod.md)
 - 2026-11-22 – [Tunneldecke je Pod (Folge-Commit zum Merge)](docs/verlauf/2026-11-22-tunneldecke-je-pod.md)
 - 2026-11-22 – [Merge von Session 20 (Strecken) und Session 20 (Pods)](docs/verlauf/2026-11-22-merge-session-20.md)
 - 2026-11-21 – [Session 20 (Pods), alle Phasen fertig – Pod-Überholung: Cockpits, Details, 4 neue Pods, Tuning-Optik, Schadensmodelle](docs/verlauf/2026-11-21-session-20-pods.md)
-- 2026-11-21 – [Session 20 (Strecken) – Bugfixes (Höhlen, „Balken", Tunneldecken), Untergründe je Passage, Seen, Oovo-Mond, PBR-Fotosets](docs/verlauf/2026-11-21-session-20-strecken.md)
-- Ältere Sitzungen (Session 8 bis 19) und die ganze Liste: [docs/verlauf/README.md](docs/verlauf/README.md)
+- Ältere Sitzungen (Session 8 bis 20 (Strecken)) und die ganze Liste: [docs/verlauf/README.md](docs/verlauf/README.md)

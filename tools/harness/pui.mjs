@@ -36,7 +36,8 @@ for (const [w, h] of sizes) {
     if (btn) { await click(p, 'Zurück'); await sleep(500); }
   }
   // planet filter
-  if (w === 1280) { await click(p, 'Rennen starten'); await sleep(600); const before = await p.evaluate(() => document.body.textContent.includes('Neon-Spirale')); await p.select('select[aria-label="Planet"]', 'Tatooine'); await sleep(400); const after = await p.evaluate(() => document.body.textContent.includes('Neon-Spirale')); console.log('planet filter: Neon-Spirale listed before/after "Tatooine":', before, after, before && !after ? 'ok' : 'FAIL'); if (!(before && !after)) bad++; }
+  // (a track of another planet must leave the list, a track of the chosen planet must stay – the names come from src/game/data.ts → TRACKS)
+  if (w === 1280) { await click(p, 'Rennen starten'); await sleep(600); const listed = () => p.evaluate(() => ['Frostspalt-Ring', 'Boonta-Kessel'].map(n => document.body.textContent.includes(n))); const before = await listed(); await p.select('select[aria-label="Planet"]', 'Tatooine'); await sleep(400); const after = await listed(); const fine = before[0] && before[1] && !after[0] && after[1]; console.log('planet filter "Tatooine": Frostspalt-Ring (Ando Prime) listed before/after:', before[0], after[0], '· Boonta-Kessel (Tatooine) before/after:', before[1], after[1], fine ? 'ok' : 'FAIL'); if (!fine) bad++; }
   const uni = new Set(scales).size === 1; console.log(`${w}x${h} uniform UI scale across screens: ${uni ? 'ok (' + scales[0] + ')' : 'FAIL ' + [...new Set(scales)].join(', ')}`); if (!uni) bad++;
   await p.close();
 }
