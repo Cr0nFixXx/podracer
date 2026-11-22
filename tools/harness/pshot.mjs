@@ -1,6 +1,7 @@
 // Puppeteer variant of shot.mjs (use when Playwright is unavailable). Also writes a contact sheet `<out>_grid.jpg`.
 // Usage (from a dir with puppeteer installed, e.g. /tmp/t):
 //   node pshot.mjs <abs path to out/game.html> "t0:a,t5:c" <abs out prefix> [?webgl]
+//   items: t<track>:<view> screenshot · b<track>:<view> frame-time benchmark of that view (Session 20) · s<track>:<secs> sim · audio · tex
 import puppeteer from 'puppeteer';
 const [,, page, list, out, query = ''] = process.argv;
 const b = await puppeteer.launch({ headless: 'new', protocolTimeout: 900000, args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--allow-file-access-from-files', '--enable-unsafe-webgpu', '--enable-features=Vulkan,WebGPU', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader', '--disable-vulkan-surface', '--autoplay-policy=no-user-gesture-required'] });
@@ -12,7 +13,7 @@ await p.waitForFunction(() => typeof window.show === 'function' || typeof window
 const shots = [];
 for (const item of list.split(',')) {
   const [i, d] = item.split(':'); const t0 = Date.now();
-  const info = await p.evaluate(([i, d]) => i === 'audio' ? window.audioTest() : i === 'tex' ? window.texBench(+(d ?? 1024)) : i === 'g' ? window.grid() : i.startsWith('s') ? window.sim(+i.slice(1), +(d ?? 40)) : i.startsWith('t') ? window.track(+i.slice(1), d) : window.show(+i, d === undefined ? 1 : +d), [i, d]);
+  const info = await p.evaluate(([i, d]) => i === 'audio' ? window.audioTest() : i === 'tex' ? window.texBench(+(d ?? 1024)) : i === 'g' ? window.grid() : i.startsWith('s') ? window.sim(+i.slice(1), +(d ?? 40)) : i.startsWith('b') ? window.bench(+i.slice(1), d) : i.startsWith('t') ? window.track(+i.slice(1), d) : window.show(+i, d === undefined ? 1 : +d), [i, d]);
   console.log(info, (Date.now() - t0) + 'ms');
   const buf = await p.screenshot({ path: `${out}_${i}${d ? '_' + d : ''}.png` });
   if (!i.startsWith('s') && i !== 'audio' && i !== 'tex') shots.push('data:image/png;base64,' + Buffer.from(buf).toString('base64'));

@@ -7,7 +7,7 @@ Podracer-Rennspiel im Stil von *Star Wars Episode I: Racer*. Läuft komplett im 
 ```bash
 npm install
 npm run dev      # Entwicklungsserver
-npm run build    # erzeugt dist/index.html (alles inline, offline lauffähig)
+npm run build    # erzeugt dist/index.html (alles inline, offline lauffähig, ca. 17,5 MB)
 ```
 
 `dist/index.html` direkt im Browser öffnen – fertig. Rechts unten im Rennen steht, welcher Renderer läuft (`WebGPU` oder `WebGL2`).
@@ -51,9 +51,26 @@ In der Ansicht „Cockpit" (`C`) sitzt man im Pod und sieht das eigene Cockpit v
 
 **Schwerelosigkeit (Oovo IV):** In den Röhren gibt es keine Schwerkraft und keinen Luftwiderstand: der Pod wird schneller, schwebt frei und driftet seitlich nach. `↓` und `↑` schieben ihn dort wie Steuerdüsen nach oben und unten. Kurz vor dem Röhrenende sinkt er von selbst auf Schwebehöhe.
 
-**Tunnel, Brücken & verzweigte Höhlen:** Jede Strecke hat hohe Tunnel (19,5–22,5 m; oben befahrbar). Zehn Strecken kreuzen sich über/unter sich selbst über **Hohlkasten-Viaduktbrücken** und **Unterführungstunnel**.
-- **Aquilaris:** zwei hohe (19,5 m) Panorama-Unterwassertunnel mit Ozeanfenstern, Kaustik und Fischschwärmen sowie zwei Skyway-Überführungen.
-- **Verzweigte Höhlensysteme** (Vulkanwelt, Ando Prime, Kristallschluchten, Dschungelmond): bis zu 38 m hohe, verbreiterte Kammern mit Höhlenboden, Stalagmiten/Stalaktiten und **echten Höhlengabelungen** (zwei Röhren, die sich weiter hinten wieder vereinen).
+**Tunnel, Brücken & verzweigte Höhlen:** Jede Strecke hat hohe Tunnel (27 m, auf Ando Prime 30 m; oben befahrbar) mit breitem Gewölbe – auch am Rand bleibt viel Luft nach oben. Zehn Strecken kreuzen sich über/unter sich selbst über **Hohlkasten-Viaduktbrücken** und **Unterführungstunnel**.
+- **Aquilaris:** zwei hohe (26 m) Panorama-Unterwassertunnel mit Ozeanfenstern, Kaustik und Fischschwärmen sowie zwei Skyway-Überführungen.
+- **Verzweigte Höhlensysteme** (Vulkanwelt, Ando Prime, Kristallschluchten, Dschungelmond): eine durchgehende Höhle mit bis zu 45 m hohen Kammern, in denen die Piste breiter wird, Stalagmiten/Stalaktiten und **echten Höhlengabelungen** (zwei Röhren, die sich weiter hinten wieder vereinen).
+
+### Untergründe
+
+Jede Strecke wechselt zwischen mehreren Untergründen. Unter der Wetterzeile im HUD steht, worüber der Pod gerade schwebt – und was das bewirkt. Für die Gegner gilt dasselbe.
+
+| Untergrund | Wirkung |
+|---|---|
+| Rennpiste, Fels, Felsplateau, Riff-Fels, Stationsdeck, Basalt | volle Haftung, volles Tempo |
+| Sand, Schnee, Waldboden, Geröll, Strand, Mondstaub, Kristallfeld | fast wie Fels: 2–8 % weniger Haftung, bis 4 % weniger Höchsttempo |
+| Eis, Eissee | 25 % weniger Haftung – früher einlenken, Slides tragen weiter |
+| Dünen (tiefer Sand), Pulverschnee, Schlamm, Sumpf, Aschefeld | 5–8 % weniger Höchsttempo, 6–10 % weniger Haftung |
+| Lavakruste, Lavasee | Triebwerke heizen 30 % bzw. 60 % schneller auf – Boost kürzer halten |
+| See (Aquilaris), Spiegelsee, Methansee | 4–5 % weniger Haftung; der Pod zieht Gischt. Methan heizt 15 % schneller auf |
+
+Kalte Untergründe (Schnee, Eis, Wasser) kühlen: die Triebwerke heizen dort 10 % langsamer auf. Haftung und Höchsttempo ändern sich nur am Boden – nicht in der Luft und nicht in den Zero-G-Röhren. Die HUD-Zeile nennt den Untergrund und einen Hinweis („wenig Haftung", „bremst", „rutschig", „Triebwerke heizen auf").
+
+**Seen:** In den weiten offenen Passagen fährt man direkt über die Oberfläche von Eissee, Lavasee, Methansee, Sumpf, Spiegelsee oder dem Meer von Aquilaris. Die Fläche ist eben und bis über 100 m breit; Baken und ein Energiefeld markieren den Rand. Hineinfallen kann man nicht.
 
 ## Tageszeit & Wetter
 
@@ -117,9 +134,12 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 - **Tuning, das man sieht:** jede der 7 Tuning-Größen baut ab Stufe 2 ein kleines und ab Stufe 4 ein großes Teil an (Nachbrennerring, Kompressorhutzen, Radiatoren, Steuerflächen, Repulsor-Pads, Doppelklappen, Reparatureinheit). Dazu vier Steckplätze mit **Style-Teilen** im Hangar-Reiter „Teile": Finnen (Haifinne, Doppel-Leitwerk, Pfeilflügel), Einlass (Gitter, Langer Dorn, Irisblende), Düse (Lang, Schubvektor-Paddel, Zackenkrone), Kanzel (klar, Rauch, Bernstein, Spiegel). Style-Teile ändern nur das Aussehen; Gegner tragen ausgeloste.
 - **Schadensmodell je Racer:** jeder Pod ist an anderen Stellen empfindlich (z. B. Splitter-X: harte Nase, weiche Oberseite; Voltspire: schwache Hülle, aber hitzefest) und verliert eigene **Bruchteile**, wenn ein Triebwerk unter 50 / 35 / 20 % fällt – Flügelplatten, Finnen, Radiatoren, ganze Triebwerke oder Energiebögen. Jedes verlorene Teil kostet 5–10 % Haftung, Wendigkeit, Tempo, Beschleunigung, Bremse oder Kühlung (zusammen höchstens 15 % je Wert); Rammbug und Panzerschürzen fangen stattdessen Treffer ab, bis sie abfallen. Reparieren (`R`) heilt die Triebwerke, die Teile kommen erst nach einem Respawn zurück. Die drei Lampen in jeder Schadensanzeige zeigen, was noch dran ist. Man sieht es auch am Pod: Flügel und Finnen reißen ab und fliegen als Blech in Pod-Farbe davon, Ringflügel verlieren Segmente, einzelne Triebwerke gehen aus, Energiebögen erlöschen; Treffer hinterlassen Brandmarken mit blankem Metall. Im Hangar zeigt die **Schadens-Vorschau** (Regler in der Pod-Ansicht), was jeder Racer bei 50 / 35 / 20 % verliert. Auch den Gegnern sieht man ihren Zustand an: verrußte Triebwerke, fehlende Teile, schwache und stotternde Flammen. Hitze und Ruß wandern bei jedem Pod von der Düse nach vorn – auch über Flügel, Finnen und Klappen.
 - **Hangar & Podracer:** 6 Lackiermuster (Klassik, Streifen, Flammen, Rennringe, Chevron, Rallye), 3 Finishes (Klarlack, Metallic, Matt) und 8 Vorlagen neben freier Farbwahl; individuelle Piloten-Spezies, seitengetrennte lose Schadensklappen und Hitzeflimmern auch hinter Gegner-Pods.
-- **Größere Strecken:** alle 13 Kurse sind 7–16 km lang, mit S-Kurven, zwei weiten offenen Flächen je Strecke (bis über 100 m breit) und hohen Tunneln (19,5–22,5 m).
-- **Verzweigte Höhlensysteme (neu):** auf Vulkanwelt (5 Kammern, 2 Gabelungen), Ando Prime, Kristallschluchten und Dschungelmond – bis 38 m hohe, verbreiterte Kammern mit Höhlenboden, Lichtschächten, Felssäulen, Leuchtadern und wieder zusammenführenden Seitenröhren.
-- **HQ-Vegetation und echte Texturen:** Urwaldbäume mit Blattwerk aus einzelnen Zweigen und fotografierter Rinde; Fels, Sand und Waldboden tragen Detail aus echten Fotos.
+- **Größere Strecken:** alle 13 Kurse sind 7–16 km lang, mit S-Kurven, zwei weiten offenen Flächen je Strecke (bis über 100 m breit) und hohen Tunneln (27 m, Ando Prime 30 m).
+- **Verzweigte Höhlensysteme:** auf Vulkanwelt (2 Gabelungen), Ando Prime, Kristallschluchten und Dschungelmond – eine durchgehende Höhle ohne Lücken, bis 45 m hohe Kammern, in denen die Piste breiter wird, Felssäulen, Leuchtadern und wieder zusammenführende Seitenröhren.
+- **Untergründe, Seen und Plateaus (neu):** jede Strecke wechselt zwischen den Böden ihres Planeten – Sand, Fels und Dünen auf Tatooine; Schnee, Eis und Pulverschnee auf Ando Prime; Basalt, Lavakruste und Asche auf der Vulkanwelt; Waldboden, Schlamm und Kies im Dschungel; Strand, Riff-Fels und Plattform auf Aquilaris; Kristallfelder in den Kristallschluchten. Die offenen Flächen sind Seen (Eis, Lava, Methan, Sumpf, Spiegelsee, Meer) oder Felsplateaus. Jeder Boden fährt sich anders (Tabelle „Untergründe" oben).
+- **Oovo IV mit Mondoberfläche (neu):** grauer Regolith mit Kratern statt Stelzen ins Nichts, dazwischen Stationsdecks; am Himmel ein Gasriese mit Ring.
+- **Echte Foto-Texturen (neu: 15 PBR-Sets):** Fels, Klippen, Sand, Schnee, Eis, Lava, Asche, Waldboden, Schlamm, Kies, Riff, Mondstaub und Metallplatten stammen aus fotografierten Materialien mit echter Normal-Map (1024 px). Die Farbe passt sich weiter der Welt an.
+- **HQ-Vegetation und -Felsen:** Urwaldbäume mit Blattwerk aus einzelnen Zweigen und fotografierter Rinde; Schneekiefern mit hängenden Nadelzweigen und Schneeauflage; Felsbrocken, deren Form der Textur folgt (Risse im Bild sind Risse im Stein); Kakteen mit Rippen und Dornen.
 - **Sci-Fi-Ausstattung:** bündig eingelassene Licht-Leitstreifen an den Fahrbahnrändern (Oovo IV, Aquilaris, Malastare, auf allen Brücken und in jedem Tunnel), Holo-Tafeln, Schwebe-Baken, Energieleitungen und futuristische 3-Spur-Panzerschleusen.
 - **Breitere Pisten & Renntechnik (neu):** alle Strecken sind 18 % breiter. Am Rand stehen Repulsor-Relaistürme mit gegenläufig drehenden Ringen, Patrouillen-Drohnen begleiten das Feld.
 - **Offene Welten & Schluchten:** Barchan-Dünen und Kies-Wadis (Tatooine), Gletschergrate (Ando Prime), Karsthügel und Flussläufe (Dschungel/Malastare), glühende Lavarinnen (Vulkanwelt), Atolle und Felsnadeln (Aquilaris), dreistufige Horizont-Silhouetten, Talnebel und **ziehende Wolkenschatten**.
@@ -151,7 +171,7 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 
 ## Git: lokale Commits und Kopie im Archiv
 
-Alle Änderungen sind lokal committet (Branch `B`, Remote `origin` = `github.com/Cr0nFixXx/podracer`).
+Alle Änderungen sind committet (Remote `origin` = `github.com/Cr0nFixXx/podracer`). Session 20 besteht aus zwei Teilen: **Strecken** (Branch `B`, per Pull Request #1 in `main`) und **Pods** (Branch `new_pods`, Pull Request #2). In `new_pods` sind beide zusammengeführt. In der Textkopie unten ist Session 20 nicht enthalten (sie steht auf Session 19; `npm run save` erneuert sie).
 
 **Der versteckte Ordner `.git` fehlt im Download.** Er steckt deshalb als Textdatei in **`.archiv/repo-sicherung/podracer-git.tar.gz.b64.txt`**. Wiederherstellen (im Projektordner ausführen):
 
@@ -163,14 +183,19 @@ Neue Änderungen sichern: `npm run save -- "Beschreibung"` (committet und erneue
 
 ## Für Entwickler: Prüfbefehle
 
-1. `npm run check` – Typecheck + Unit-Prüfungen (`tools/ci/unit.ts`) + Pod-Audit + Physik-Simulation aller 13 Strecken (11 Pods, 45 s, ca. 30 s Laufzeit, kein Browser nötig). Das Startfeld wandert je Strecke um drei Pods weiter, damit alle 14 gefahren werden; `ROSTER_OLD=1` fährt das alte Feld der ersten zehn Pods (Vergleich mit früheren Tabellen).
+1. `npm run check` – Typecheck + Unit-Prüfungen (`tools/ci/unit.ts`) + Pod-Audit + Physik-Simulation aller 13 Strecken (11 Pods, 45 s, ca. 40 s Laufzeit, kein Browser nötig). Das Startfeld wandert je Strecke um drei Pods weiter, damit alle 14 gefahren werden; `ROSTER_OLD=1` fährt das alte Feld der ersten zehn Pods (Vergleich mit früheren Tabellen).
 2. `npm run check:pods` – nur das Pod-Audit (1 s): baut jeden Pod ohne Browser, vergleicht Mesh- und Dreieckszahlen mit `tools/ci/pods-baseline.json` und prüft das Sichtmodell gegen die Kollisionsform.
-3. `npm run check:gpu` – lädt Strecken im Headless-Chrome mit WebGPU und meldet jeden Shader-/Konsolenfehler (braucht Puppeteer, siehe `HANDOFF.md`).
+3. `npm run check:gpu` – lädt Strecken im Headless-Chrome mit WebGPU und meldet jeden Shader-/Konsolenfehler (braucht Puppeteer, siehe `HANDOFF.md`). Bei wenig Arbeitsspeicher: `TRACKS=1 QUERY='?tex=256' npm run check:gpu` (eine Strecke, kleine Texturen).
 4. `npm run build` – erzeugt `dist/index.html`.
 5. Pods ansehen: `npm run dev`, dann `http://localhost:5173/tools/harness/pods.dev.html` öffnen und in der Browser-Konsole z. B. `await sheet('front')` oder `await show(0)` aufrufen (Befehle im Kopf von `tools/harness/pods.ts`).
+6. Strecken-Aufbau ansehen (Tunnel, Untergründe, Seen, engste Kurven): `npx esbuild tools/ci/info.ts --bundle --platform=node --format=esm --outfile=tools/ci/out/info.mjs --log-level=error && node tools/ci/out/info.mjs frost`.
 
 Begriffe des Projekts stehen in `CONTEXT.md`, grundlegende Entscheidungen in `docs/adr/`.
 
 ## Bildnachweis
 
-Foto-Texturen von Pexels (freie Lizenz): Fels – Alfo Medeiros, Rinde – Marina Leonova, Sand – Alejandro Henriquez, Boden – Engin Akyurt.
+1. **PBR-Texturen (CC0, gemeinfrei):**
+   - [Poly Haven](https://polyhaven.com): `aerial_beach_01` (Sand), `sandstone_cracks` (Fels), `cliff_side` (Klippen, Höhlen), `mud_cracked_dry_03` (Plateau), `snow_02` (Schnee), `snow_01` (Pulverschnee), `burned_ground_01` (Asche), `moon_02` (Mondstaub), `brown_mud_02` (Schlamm), `forest_floor` (Waldboden), `river_small_rocks` (Kies), `metal_plate_02` (Stationsdeck), `coast_land_rocks_01` (Riff).
+   - [ambientCG](https://ambientcg.com): `Ice003` (Eis), `Lava001` (Lavakruste).
+   - Neu laden und umwandeln: `python3 tools/photos/pbr.py` (braucht Pillow und Internet).
+2. **Foto-Details von Pexels (freie Lizenz):** Fels – Alfo Medeiros, Rinde – Marina Leonova, Sand – Alejandro Henriquez, Boden – Engin Akyurt.

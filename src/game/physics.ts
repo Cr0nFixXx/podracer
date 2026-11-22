@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import type { PilotDef, PodDef, StatKey } from './data';
-import { DS, boulderState, bridgeSwing, frameAt, gateDrop, nearestGlobal, nearestOnPath, roadSurfaceAt, rotorAngle, type Obstacle, type SetPiece, type TrackData } from './trackBuilder';
+import { DS, TUNNEL_SHOULDER, boulderState, tunnelCeiling, bridgeSwing, frameAt, gateDrop, nearestGlobal, nearestOnPath, roadSurfaceAt, rotorAngle, tunnelProfile, type Obstacle, type SetPiece, type TrackData } from './trackBuilder';
 import type { PodVisual } from './podModel';
 import { podCollision, podEnvelope } from './podDesigns';
+import { surfaceOf } from './surfaces';
 import { DAMAGE_RULES, FX_NONE, damageModel, partsDue, partsFx, zoneFactor, type DamageZone, type PodFx } from './podDamage';
 export { FX_NONE, type DamageZone, type PodFx };
 
@@ -109,6 +110,10 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   const P = podParams(p);
   const inp = p.input;
   if (p.dead > 0) return;
+  // Session 20: the ground under the pod changes the handling – for the player and the rivals alike (surfaces.ts). Airborne and
+  // in zero-G only the heat factor applies (the hot air over a lava lake, the cold over ice).
+  const SF = surfaceOf(td.paths[p.path]?.samples[p.idx]?.surf), onSurf = p.grounded && !p.zeroG;
+  const sfGrip = onSurf ? SF.grip : 1, sfVmax = onSurf ? SF.vmax : 1;
   if (p.invuln > 0) p.invuln -= dt;
   { const pc = p as unknown as { obCd?: number; wCd?: number }; if (pc.obCd) pc.obCd = Math.max(0, pc.obCd - dt); if (pc.wCd) pc.wCd = Math.max(0, pc.wCd - dt); }
   // steering smoothing
@@ -148,7 +153,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   // heat / boost
   const wantBoost = inp.boost && inp.throttle > 0.5 && vf > 35 && !p.overheat && !frozen && !p.repairing;
   p.boosting = wantBoost;
-  if (p.boosting) p.heat += P.heatRate * dt; else p.heat -= P.cool * dt * (p.repairing ? 1.5 : 1);
+  if (p.boosting) p.heat += P.heatRate * SF.heat * dt; else p.heat -= P.cool / SF.heat * dt * (p.repairing ? 1.5 : 1);
   // Session 17 – overdrive: at the heat limit the boost can be held for up to 3 more seconds at the cost of slow engine damage.
   // After 3 s the engines cut out (lock-out until they have cooled to 55 %). Releasing early cools down normally; the used time recovers below 90 %.
   if (p.heat >= 1) {
@@ -176,7 +181,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   p.yaw -= p.yawRate * dt;
 
   // thrust
-  let vmaxE = P.vmax * (0.72 + 0.28 * hp) * (p.boosting ? 1.32 : 1) * (p.repairing ? 0.55 : 1) * (p.zeroG ? 1.28 : 1); // Session 16: zero-G = no drag → faster
+  let vmaxE = P.vmax * sfVmax * (0.72 + 0.28 * hp) * (p.boosting ? 1.32 : 1) * (p.repairing ? 0.55 : 1) * (p.zeroG ? 1.28 : 1); // Session 16: zero-G = no drag → faster
   if (p.isPlayer === false && p.ai) vmaxE *= p.ai.speedF * p.ai.rubber;
   if (!frozen) {
     if (inp.throttle > 0) {
@@ -190,7 +195,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   } else vf *= Math.exp(-3 * dt);
   vf *= Math.exp(-(p.zeroG ? (inp.throttle > 0 ? 0 : 0.05) : inp.throttle > 0 ? 0.04 : 0.28) * dt);
   const attGrip = (p.bankGrip ?? 1) * (pc < 0 ? 1 - 0.14 * pc : 1 - 0.2 * pc);
-  vr *= Math.exp(-P.grip * gripMul * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.035 * sk) * (p.grounded ? 1 : p.zeroG ? 0.6 : 0.15)); // zero-G: the pod floats sideways, but stays steerable
+  vr *= Math.exp(-P.grip * gripMul * sfGrip * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.035 * sk) * (p.grounded ? 1 : p.zeroG ? 0.6 : 0.15)); // zero-G: the pod floats sideways, but stays steerable
   const fx2 = Math.sin(p.yaw), fz2 = Math.cos(p.yaw), rx2 = -fz2, rz2 = fx2;
   p.vel.x = fx2 * vf + rx2 * vr; p.vel.z = fz2 * vf + rz2 * vr;
 
@@ -231,7 +236,9 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   // Session 17 – standard & cave tunnels carry a drivable top deck; underwater tubes (2) & bridge-underpass tunnels (4) do not.
   if (S.roof > 0 && !fr.gap) {
     if (!p.inRoof) {
-      p.inRoof = true; p.upper = S.tun !== 2 && p.pos.y > fr.groundY + S.roof - 1.5;
+      // Session 20: a pod arriving ABOVE the portal opening at its lateral position (the vault is lower near the walls) is carried onto
+      // the deck instead of being pressed down through the headwall
+      p.inRoof = true; p.upper = S.tun !== 2 && p.pos.y + 1.2 > fr.groundY + tunnelCeiling(S, fr.lat);
       if (p.upper && p.pos.y < fr.groundY + S.roof + 2.4 && p.invuln <= 0) { // clipped the portal lip on the way up
         const dmg = 5 * P.sturdy; applyDamage(p, 'both', dmg, 'belly'); p.shake = Math.min(1, p.shake + 0.4);
         p.events.push({ type: 'wall', strength: 16, x: p.pos.x, y: p.pos.y, z: p.pos.z, nx: 0, nz: 0 });
@@ -295,10 +302,12 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   }
   // tunnel ceilings & zero-G tubes (matches wide-shouldered tunnel & chamber vault geometry Wd = hw + 3.4 + caveW)
   if (S.roof > 0 && !fr.gap && !p.upper) {
-    const l = Math.min(0.96, Math.abs(fr.lat) / (fr.hw + 3.4 + (S.caveW ?? 0)));
-    const ceil = fr.groundY + 1.5 + (S.roof - 1.5) * Math.sqrt(1 - l * l) - 1.1;
+    // Session 20: same superellipse as the mesh (`tunnelProfile`); the limit applies to the TOP of the pod (engine radius + lifted outer
+    // engine = 2.15 m, knife-edge roll adds the half span) – before, only the pod centre was tested and its upper half dipped into the vault.
+    const l = Math.min(0.96, Math.abs(fr.lat) / (fr.hw + TUNNEL_SHOULDER + (S.caveW ?? 0)));
+    const ceil = fr.groundY + 1.5 + (S.roof - 1.5) * tunnelProfile(l) - (2.15 + knife * halfSpan * 0.95);
     if (p.pos.y > ceil) {
-      const imp = Math.max(0, p.vel.y); p.pos.y = ceil; if (p.vel.y > 0) p.vel.y *= -0.3;
+      const imp = Math.max(0, p.vel.y); p.pos.y = Math.max(ceil, p.pos.y - 45 * dt); if (p.vel.y > 0) p.vel.y *= -0.3; // pressed down quickly, never teleported
       if (imp > 6 && p.invuln <= 0) { const dmg = Math.min(20, (imp - 6) * 0.8 * P.sturdy); applyDamage(p, 0, dmg, 'top'); p.shake = Math.min(1, p.shake + 0.3); p.events.push({ type: 'wall', strength: imp, x: p.pos.x, y: p.pos.y + 1, z: p.pos.z, nx: 0, nz: 0 }); }
     }
   }
@@ -330,7 +339,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
         best = pen; nx = -cs.rx * sg; nz = -cs.rz * sg; hx = wx - nx * c.r; hz = wz - nz * c.r; side = c.side;
         const cliff = (sg > 0 ? cs.hR : cs.hL) > 0;
         const railTop = cs.y + cs.ramp - sg * cs.hw * cs.bank + 1.55;
-        soft = !cliff && (cs.zeroG || p.pos.y - 0.9 > railTop);
+        soft = !cliff && (cs.zeroG || !!cs.lake || p.pos.y - 0.9 > railTop); // lakes have no rails – beacons carry an energy field
       }
     }
     if (best > 0) {

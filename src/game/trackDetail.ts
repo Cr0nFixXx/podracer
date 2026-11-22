@@ -160,26 +160,27 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
     const P = path.samples, n = P.length;
     for (const side of [-1, 1]) {
       const ok = (s: Sample) => !((side > 0 ? s.hR : s.hL) > 0) && !(side > 0 ? s.openR : s.openL) && !s.gap && !s.zeroG;
-      let prev = false, along = 0, postCount = 0;
+      let prev = false, prevRail = false, along = 0, postCount = 0;
       for (let i = 0; i < n; i += 2) {
         const s = P[i]; const on = ok(s); if (i > 0) along += 4;
+        const rail = on && !s.lake; // Session 20: basins (lakes, plateaus) have no rails – beacons + a taller energy field mark the edge
         const wall = side > 0 ? s.wallR : s.wallL;
         if (on) {
           const lat = side * (wall + 0.06); const base = surf(s, side * s.hw) + 0.02;
           const ix = -side * s.rx, iz = -side * s.rz;
-          for (const hgt of [0.58, 1.12]) for (let k = 0; k < RING; k++) { const [px, py] = ring[k]; rp.push(s.x + s.rx * lat + ix * px, base + hgt + py, s.z + s.rz * lat + iz * px); ru.push(along / 8, k / (RING - 1)); }
-          if (prev) for (let r = 0; r < 2; r++) { const a0 = rv - RING * 2 + r * RING, b0 = rv + r * RING; for (let k = 0; k < RING - 1; k++) ri.push(a0 + k, b0 + k, a0 + k + 1, a0 + k + 1, b0 + k, b0 + k + 1); }
-          rv += RING * 2;
+          if (rail) for (const hgt of [0.58, 1.12]) for (let k = 0; k < RING; k++) { const [px, py] = ring[k]; rp.push(s.x + s.rx * lat + ix * px, base + hgt + py, s.z + s.rz * lat + iz * px); ru.push(along / 8, k / (RING - 1)); }
+          if (rail && prevRail) for (let r = 0; r < 2; r++) { const a0 = rv - RING * 2 + r * RING, b0 = rv + r * RING; for (let k = 0; k < RING - 1; k++) ri.push(a0 + k, b0 + k, a0 + k + 1, a0 + k + 1, b0 + k, b0 + k + 1); }
+          if (rail) rv += RING * 2;
           const topY = base + 1.29;
-          gp.push(s.x + s.rx * lat + ix * 0.04, topY, s.z + s.rz * lat + iz * 0.04, s.x + s.rx * lat - ix * 0.04, topY, s.z + s.rz * lat - iz * 0.04); gu.push(along, 0, along, 1);
-          if (prev) gi.push(gv - 2, gv - 1, gv, gv - 1, gv + 1, gv);
-          gv += 2;
+          if (rail) { gp.push(s.x + s.rx * lat + ix * 0.04, topY, s.z + s.rz * lat + iz * 0.04, s.x + s.rx * lat - ix * 0.04, topY, s.z + s.rz * lat - iz * 0.04); gu.push(along, 0, along, 1);
+          if (prevRail) gi.push(gv - 2, gv - 1, gv, gv - 1, gv + 1, gv);
+          gv += 2; }
           // Energy-field curtain rising 1.65 m above the upper rail
           const fx = s.x + s.rx * lat, fz = s.z + s.rz * lat;
-          fp.push(fx, topY + 0.02, fz, fx, topY + 1.68, fz); fuA.push(along, 0, along, 1);
+          fp.push(fx, rail ? topY + 0.02 : base + 0.3, fz, fx, rail ? topY + 1.68 : base + 3.0, fz); fuA.push(along, 0, along, 1);
           if (prev) fi.push(fv - 2, fv - 1, fv, fv - 1, fv + 1, fv);
           fv += 2;
-          if (i % 4 === 0) {
+          if (rail && i % 4 === 0) {
             const pl = side * (wall + 0.2); const px = s.x + s.rx * pl, pz = s.z + s.rz * pl;
             // Orient post so +X points outward (for angled outer buttress brace)
             const qPost = new THREE.Quaternion().setFromAxisAngle(UP, Math.atan2(s.tx, s.tz) + (side < 0 ? Math.PI : 0));
@@ -187,8 +188,8 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
             if (postCount++ % 4 === 0) caps.push(M(px, base + 1.48, pz, yawQ(s)));
           }
         }
-        prev = on;
-        if (path.id === 0 && i % 6 === 0 && !s.gap && s.ramp === 0 && !(side > 0 ? s.openR : s.openL)) {
+        prev = on; prevRail = rail;
+        if (path.id === 0 && i % 6 === 0 && !s.gap && s.ramp === 0 && !s.lake && !(side > 0 ? s.openR : s.openL)) {
           const lat = side * (s.hw - 0.72);
           (side > 0 ? studsA : studsB).push(M(s.x + s.rx * lat, surf(s, lat) + 0.015 + dOff, s.z + s.rz * lat, roadQ(i, lat)));
         }
@@ -260,7 +261,7 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
       for (const side of [-1, 1]) {
         let prev = false;
         for (let i = 0; i < n; i += 2) {
-          const s = P[i]; const on = !s.gap && s.ramp === 0 && !(side > 0 ? s.openR : s.openL) && !s.zeroG;
+          const s = P[i]; const on = !s.gap && s.ramp === 0 && !(side > 0 ? s.openR : s.openL) && !s.zeroG && !s.lake;
           if (on) {
             const wall = Math.min(side > 0 ? s.wallR : s.wallL, s.hw + 0.4);
             const amp = 0.22 + 0.78 * Math.max(0, Math.sin(s.s * 0.011 + side * 2.1) * 0.55 + Math.sin(s.s * 0.031) * 0.2 + h2(i >> 3, side + 5) * 0.5);
@@ -288,9 +289,9 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
     let i = 0;
     while (i < N) {
       const c0 = S[i].curv;
-      if (Math.abs(c0) < 1 / 230 || S[i].gap || S[i].ramp > 0) { i++; continue; }
+      if (Math.abs(c0) < 1 / 230 || S[i].gap || S[i].ramp > 0 || S[i].lake) { i++; continue; } // (no kerbs on lakes / plateaus)
       const side = c0 > 0 ? 1 : -1; let j = i;
-      while (j < N && Math.abs(S[j].curv) > 1 / 300 && Math.sign(S[j].curv) === side && !S[j].gap && S[j].ramp === 0) j++;
+      while (j < N && Math.abs(S[j].curv) > 1 / 300 && Math.sign(S[j].curv) === side && !S[j].gap && S[j].ramp === 0 && !S[j].lake) j++;
       if (j - i >= 12) {
         let along = 0;
         for (let k = i; k < j; k++) {
@@ -413,7 +414,7 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
     const poles: THREE.Matrix4[] = [], heads: THREE.Matrix4[] = [], tallies: THREE.Matrix4[] = [];
     for (const c of o.tvCams) {
       let bi = 0, bd = 1e12; for (let i = 0; i < N; i += 4) { const d = (S[i].x - c.x) ** 2 + (S[i].z - c.z) ** 2; if (d < bd) { bd = d; bi = i; } }
-      const s = S[bi]; if (s.canyon || s.gap || s.bridge || s.roof > 0 || floatWorld) continue;
+      const s = S[bi]; if (s.canyon || s.gap || s.bridge || s.roof > 0 || s.lake || floatWorld) continue;
       const ground = Math.min(s.y - 4, gAt(c.x, c.z) - 2.2); const q = new THREE.Quaternion().setFromAxisAngle(UP, Math.atan2(s.x - c.x, s.z - c.z));
       poles.push(M(c.x, (ground + c.y - 0.5) / 2, c.z, q, 1, Math.max(2, c.y - 0.5 - ground), 1));
       heads.push(M(c.x, c.y, c.z, q)); tallies.push(M(c.x, c.y + 0.55, c.z, q));
@@ -444,7 +445,7 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
     let last = -1e9;
     for (let i = 60; i < N - 60; i += 10) {
       if (i - last < 280) continue;
-      let ok = true; for (let k = -20; k <= 20 && ok; k += 2) { const q = S[(i + k + N) % N]; if (Math.abs(q.curv) > 1 / 700 || q.canyon || q.gap || q.ramp > 0 || q.openL || q.openR || q.roof > 0 || q.zeroG || q.bridge || q.underpass) ok = false; }
+      let ok = true; for (let k = -20; k <= 20 && ok; k += 2) { const q = S[(i + k + N) % N]; if (Math.abs(q.curv) > 1 / 700 || q.canyon || q.gap || q.ramp > 0 || q.lake || q.openL || q.openR || q.roof > 0 || q.zeroG || q.bridge || q.underpass) ok = false; }
       if (!ok || Math.abs(i - td.startIdx) < 90 || td.setPieces.some(sp => Math.abs(sp.idx - i) < 70)) continue;
       last = i; const s = S[i]; const yaw = Math.atan2(s.tx, s.tz); const span = Math.max(s.wallL, s.wallR) + 1.8; const H = 21;
       (td.overheads ??= []).push({ idx: i, y0: s.y + H - 1.8 - span * 1.5 / 16, y1: s.y + H + 2.1, half: 1.0 });

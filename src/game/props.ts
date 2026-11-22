@@ -36,7 +36,7 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
   const cyanGlow = new THREE.MeshBasicMaterial({ color: new THREE.Color('#42dcff').multiplyScalar(1.25) });
   disp.push(metal, darkMetal, cyanGlow);
   const floatWorld = theme.terrain === 'prison' || theme.terrain === 'ocean';
-  const sideOK = (s: Sample, side: number) => !s.gap && s.ramp === 0 && !s.bridge && !s.underpass && !(s.roof > 0) && !(side > 0 ? s.openR : s.openL) && !((side > 0 ? s.hR : s.hL) > 0);
+  const sideOK = (s: Sample, side: number) => !s.gap && s.ramp === 0 && !s.bridge && !s.underpass && !s.lake && !(s.roof > 0) && !(side > 0 ? s.openR : s.openL) && !((side > 0 ? s.hR : s.hL) > 0);
   // Ground elevation for roadside posts: sinks into true terrain on land worlds, or seats into road-edge bracket on prison/ocean
   const postBaseY = (s: Sample, side: number, x: number, z: number) => {
     const ey = s.y - side * s.hw * s.bank;
@@ -146,7 +146,7 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
       let ok = true;
       for (let r = -2; r <= 2; r++) {
         const j = td.main.closed ? ((i + r) % N + N) % N : i + r;
-        if (j < 0 || j >= N || S[j].gap || S[j].ramp > 0 || S[j].zeroG || S[j].openL || S[j].openR) { ok = false; break; }
+        if (j < 0 || j >= N || S[j].gap || S[j].ramp > 0 || S[j].zeroG || S[j].openL || S[j].openR || S[j].lake) { ok = false; break; } // (no pads on lakes)
       }
       if (!ok) continue;
       const v0 = padPos.length / 3;
@@ -278,7 +278,7 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
     const count = Math.round(N * 2 / 650);
     for (let g = 0; g < count; g++) {
       const i = Math.floor((g + 0.5) / count * N); const s = S[i];
-      if (s.gap || s.ramp > 0 || nearStart(i) || s.openL || s.openR || s.roof > 0 || s.zeroG || s.bridge || s.underpass) continue;
+      if (s.gap || s.ramp > 0 || nearStart(i) || s.openL || s.openR || s.roof > 0 || s.zeroG || s.bridge || s.underpass || s.lake) continue;
       const R = s.hw + 5;
       if (![-1, 1].every(sd => clear(s.x + s.rx * sd * R, s.z + s.rz * sd * R, 2.6, -0.5))) continue;
       const qY = new THREE.Quaternion().setFromAxisAngle(UP, yawOf(s));

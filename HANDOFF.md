@@ -1,9 +1,15 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
-1. **Pod-Überholung: alle acht Phasen (0–7) sind fertig, die Abschluss-Durchsicht ist eingearbeitet** (fünf Korrekturen, Abschnitt „Abschluss-Durchsicht" unten; dort stehen auch die zurückgestellten Kleinigkeiten) – Tabelle im Abschnitt „Session 20" unten. **Offen ist nur noch, was der Nutzer selbst prüfen muss:** „Ultra" am Gaming-PC (Bildrate mit vollen Details, Teilen und Schaden), die Schadens-Balance von Hand fahren, die Teile-Kombinationen durchklicken. Die Listen „Nicht verifiziert" je Phase stehen unten. Genauer Arbeitsstand: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur lokal).
-2. Vor jeder Änderung: `npm run check` (Typecheck + Pod-Audit + Sim) muss grün sein. Pods ansehen: `npm run dev` → `http://localhost:5173/tools/harness/pods.dev.html`.
-3. Weiterhin offen aus Session 19: `npm run dev` → **Aquilaris-Küstenlauf** (19,5-m-Unterwassertunnel, 2 Skyway-Brücken, Flutschleuse) und **Frostspalt-Ring** (22,5-m-Gletschertunnel, verzweigte Eishöhle, Eisschleuse, Viadukt) Probe fahren; im **Hangar** die 6 Lackiermuster & 3 Finishes testen (≈ 6 Min.).
+Session 20 lief in zwei Zweigen und ist zusammengeführt (Abschnitt „Merge" unten): **Session 20 (Strecken)** aus `B` und **Session 20 (Pods)** aus `new_pods`. Offen:
+0. **Pull Request #2** (`new_pods` → `main`) auf GitHub mergen: `new_pods` enthält seit dem Merge beide Sitzungen, die Konflikte sind dort gelöst (`https://github.com/Cr0nFixXx/podracer/pull/2`). Danach als Nächstes im Code: **Tunneldecke je Pod** (`TODO.md`, oberster Abschnitt).
+1. **Strecken – Probefahrt auf echter GPU** (`npm run dev`, ≈ 10 Min.; in der Sandbox ließ sich nur in Software rendern):
+   - **Aquilaris-Küstenlauf** und **Oovo-IV-Gefängnis**: Schrägkurven abfahren – ragt noch irgendwo ein Balken aus der Fahrbahn?
+   - **Frostspalt-Ring:** 30-m-Tunnel, durchgehende Eishöhle mit Gabelung, Eissee (25 % weniger Haftung – fair?).
+   - **Magma-Inferno:** Höhle (zu dunkel?), Lavasee (Triebwerke heizen schneller auf).
+   - FPS unten rechts notieren (`WebGPU`), vor allem auf den offenen See-Passagen.
+2. **Pods:** alle acht Phasen (0–7) der Pod-Überholung sind fertig, die Abschluss-Durchsicht ist eingearbeitet (fünf Korrekturen, Abschnitt „Abschluss-Durchsicht" unten; dort stehen auch die zurückgestellten Kleinigkeiten) – Tabelle im Abschnitt „Session 20 (Pods)" unten. **Selbst prüfen:** „Ultra" am Gaming-PC (Bildrate mit vollen Details, Teilen und Schaden), die Schadens-Balance von Hand fahren, die Teile-Kombinationen durchklicken. Die Listen „Nicht verifiziert" je Phase stehen unten. Genauer Arbeitsstand der Pod-Sitzung: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur auf dem Rechner des Nutzers). Im **Hangar** außerdem die 6 Lackiermuster & 3 Finishes testen (offen seit Session 19).
+3. Vor jeder Änderung: `npm run check` (Typecheck + Unit-Prüfungen + Pod-Audit + Sim) muss grün sein. Pods ansehen: `npm run dev` → `http://localhost:5173/tools/harness/pods.dev.html`.
 
 ## Git-Stand (wichtig)
 - Lokales Repo im Projekt-Root, Branch **`B`**, Remote `origin` = `https://github.com/Cr0nFixXx/podracer.git`. **Pushen:** `git push origin B`.
@@ -13,10 +19,40 @@
   2. `.archive/podracer-git.tar.gz.b64.txt` – vollständiges `.git` als Base64-Text (falls Binär-Packdateien beim Download gefiltert werden) + `wiederherstellen.sh` / `wiederherstellen.ps1` / `LIESMICH.txt`.
 - **Committen immer mit `npm run save -- "Nachricht"`** (`tools/save.sh`): committet alles außer `.archive`/`.archiv`, aktualisiert beide Sicherungen und führt Probe-Wiederherstellungen aus.
 - Commit-Autor ist der Platzhalter „Podracer Dev".
-- **Lokaler Windows-Rechner (Claude-Desktop, Git-Worktrees unter `.claude/worktrees/`):** dort ist `.git` nur eine Zeigerdatei – `npm run save` würde nur diesen Zeiger „sichern" und die versionierte Sicherungsdatei durch einen Stummel ersetzen. Entscheidung des Nutzers (2026-11-21): `.archive` und die Git-Sicherung sind in dieser Umgebung nicht relevant → dort einfache `git commit`s. Session 20 liegt auf dem Branch `claude/caveman-mode-fa82ce` (abgezweigt von `new_pods` = `origin/B`, Commit `d7b9c4b`).
+- **Lokaler Windows-Rechner (Claude-Desktop, Git-Worktrees unter `.claude/worktrees/`):** dort ist `.git` nur eine Zeigerdatei – `npm run save` würde nur diesen Zeiger „sichern" und die versionierte Sicherungsdatei durch einen Stummel ersetzen. Entscheidung des Nutzers (2026-11-21): `.archive` und die Git-Sicherung sind in dieser Umgebung nicht relevant → dort einfache `git commit`s. Session 20 (Pods) lag dort auf dem Branch `claude/caveman-mode-fa82ce` (abgezweigt von `new_pods` = `origin/B`, Commit `d7b9c4b`) und liegt auf GitHub in `new_pods`.
 - Seit dem Commit `d7b9c4b` ist `.archiv/repo-sicherung/` versioniert: im Haupt-Checkout committet dadurch jedes `npm run save` eine Kopie des ganzen Repos ins Repo (Größe wächst je Sicherung etwa um den Faktor 2,3). Nicht angefasst – Entscheidung des Nutzers offen.
+- **Session 20 (Strecken), Sandbox:** Das Repo wurde frisch von GitHub geholt (`git init` + `fetch` + `checkout --track origin/B`); `.archive/` gibt es in diesem Arbeitsordner nicht. Laut Nutzer ist die `.git`-Sicherung nicht mehr relevant → die Sitzung ist mit **normalen Commits** gesichert (`git add <Pfade>` + `git commit`, ohne `npm run save`) und auf Wunsch des Nutzers **nach `origin/B` gepusht**. Die Textkopie in `.archiv/repo-sicherung/` steht deshalb auf dem Stand von Session 19 – GitHub ist die Sicherung.
+- **Mit committet (Wunsch des Nutzers: „das Ganze"):** das neu gebaute Harness-Bundle `tools/harness/out/game.js` (Build-Artefakt, durch die Fotosets 19,6 MB) und `.archiv/canbaum.html` (fremde Datei aus einer anderen Aufgabe). Weiterhin gilt: nur auf ausdrücklichen Wunsch pushen.
+- **Nach einem Sandbox-Reset** fehlt `.git/config`: `git config core.fileMode false` (sonst erscheinen alle Dateien als geändert – nur Dateirechte), `git remote add origin https://github.com/Cr0nFixXx/podracer.git`, `git checkout -- tools/harness/out`.
+- **Zweige seit Session 20:** `main` ist der Sammelzweig; bisher kam alles über Pull Requests auf GitHub hinein. PR #1 hat **Session 20 (Strecken)** aus `B` nach `main` gebracht; **Session 20 (Pods)** liegt in `new_pods` (PR #2). Damit PR #2 ohne Konflikte mergebar ist, wurde `main` in `new_pods` gemergt (Abschnitt „Merge" unten). Die erste Zeile dieses Abschnitts (Branch `B`) beschreibt den Stand bis Session 19.
 
-## Stand: 2026-11-21 (Session 20, alle Phasen fertig) – Pod-Überholung: Cockpits, Details, 4 neue Pods, Tuning-Optik, Schadensmodelle
+## Stand: 2026-11-22 – Merge von Session 20 (Strecken) und Session 20 (Pods)
+
+Beide Sitzungen hießen „Session 20" und liefen gleichzeitig ab dem Commit `d7b9c4b`: die Strecken-Sitzung in `B` (per PR #1 in `main`), die Pod-Sitzung in `new_pods` (PR #2). In der Doku heißen sie jetzt **Session 20 (Strecken)** und **Session 20 (Pods)** (Wunsch des Nutzers). Für PR #2 wurde `main` in `new_pods` gemergt; `main` selbst blieb unberührt.
+
+### Konflikte und ihre Lösung
+1. **`src/game/physics.ts`** (2 Stellen): beide Import-Zeilen bleiben. An der Tunneldecke gilt das sanfte Herunterdrücken der Strecken-Sitzung (höchstens 45 m/s, kein Versetzen) **und** der Schaden läuft über `applyDamage(p, 0, dmg, 'top')` der Pod-Sitzung.
+2. **Die fünf Doku-Dateien** (8 Stellen): beide Session-20-Blöcke stehen untereinander; „Nächster Schritt", „Git-Stand", die Regeln in `CLAUDE.md` und die Beschreibung von `npm run check` sind zusammengeführt. Der Abschnitt „Direkt aus Session 19" in `TODO.md` entfällt – seine drei Punkte sind in Session 20 (Strecken) erledigt oder übernommen.
+3. **`tools/harness/out/game.js`** (16 Stellen) und `pods.js`: nicht gemischt, sondern aus dem zusammengeführten Quelltext neu gebaut (`cd tools/harness && npx esbuild <name>.ts --bundle --format=esm --loader:.jpg=dataurl --outfile=out/<name>.js`).
+4. **Ohne Konflikt von Git gemischt** und durchgesehen: `Game.ts` (Untergrund-Zeile im HUD, Staubfahne je Untergrund und Textur-Epoche aus der Strecken-Sitzung neben wechselndem Startfeld, Bruchteilen, Treffermarken und Trümmern aus der Pod-Sitzung), `data.ts` (Licht auf Oovo IV neben den Pod-Daten), `RaceView.tsx` (Untergrund-Zeile neben den Bruchteil-Lampen). Schaden zieht im zusammengeführten Stand nur `applyDamage` ab (`hpL` / `hpR`; geprüft mit `grep`); die direkte Abzugsstelle, die `main` an der Tunneldecke hatte, ist umgestellt.
+
+### Verifiziert (zusammengeführter Stand)
+- `npm run check` (38 s): Typecheck, 69 Unit-Prüfungen, Pod-Audit (14 Pods), Simulation 13/13 Strecken – 0 NaN, 0,00 m Wanddurchdringung, Bodenfreiheit ≥ 0,67 m, 1 Ausfall (Kristallschlucht-Sprint; erlaubt 3).
+- `GRIP=0.88 node tools/ci/out/sim.mjs`: 13/13 (2 Ausfälle auf dem Kristallschlucht-Sprint).
+- **Gegenprobe Fahrphysik:** `ROSTER_OLD=1 ARMOR=0 PARTS=0 node tools/ci/out/sim.mjs` gibt byte-gleich dieselbe Ausgabe wie die Simulation von `main` vor dem Merge (`diff` leer). Die Strecken-Physik (Untergründe, Tunneldecke, Seen) fährt für die alten Pods also unverändert; die Unterschiede der normalen Tabelle kommen vom wandernden Startfeld und vom Schadensmodell.
+- `SECS=120 node tools/ci/out/sim.mjs`: 13/13, auf allen 10 Strecken mit Tunneldeck „downward teleports: 0".
+- `npm run build`: `dist/index.html` 17 599 346 Bytes (`main` vorher 17 505 684).
+- `papp.mjs` auf genau diesem Build (Quill Voltspire auf dem Frostspalt-Ring, 5 Gegner, WebGL2 in Software, 20 FPS): „App smoke test passed." – HUD-Seiten, Pause-Audio, Grafik-Menü, Umbelegen (Q), Gamepad (L3). Im Bildschirmfoto stehen die Untergrund-Zeile („Rennpiste", Strecken-Sitzung) und die Bruchteil-Lampen in den Schadensfeldern (Pod-Sitzung) nebeneinander.
+
+### Aufgefallen beim Merge
+- **Tunneldecke rechnete fest mit 2,15 m Pod-Höhe** (Session 20 (Strecken)). Vier alte Pods ragen höher auf (Vrak Splitter-X 4,18 m), die höheren Cockpits und Anbauteile aus Session 20 (Pods) ebenfalls → eigener Abschnitt „Tunneldecke je Pod" (Folge-Commit).
+- `tools/harness/papp.mjs` schreibt und liest noch den Profil-Schlüssel `podracer-profile-v1`. Das Profil kommt an (v1 wird einmal importiert), aber die Zeile „stored:" liest nach dem Umbelegen den alten Schlüssel und gibt `undefined` aus – die Prüfung „Belegung gespeichert" greift so nicht (→ `TODO.md`).
+- `tools/` ist nicht Teil des Typechecks (`tsconfig.json` → `include: ["src", "vite.config.ts"]`). Mit `tools/ci/*.ts` und `tools/harness/*.ts` geprüft (ohne die Regeln für ungenutzte Namen): 4 Typfehler in `tools/ci/unit.ts` (`BufferGeometry` als Parameter des Zählhelfers `triCount`), sonst keine – auch keine durch den Merge; auf `new_pods` allein dieselben vier. Die Prüfungen laufen (esbuild prüft keine Typen).
+- Beim Langlauf `SECS=120` sind `avgSpeed` und `slowest` auf den sechs Sprint-Strecken gleich und niedrig (z. B. 74 m/s): alle Pods erreichen dort vor Ablauf das Ziel, danach wächst der Fortschritt nicht mehr. Kein Fahrfehler; auf `new_pods` allein genauso. Für Tempo-Aussagen auf Sprints taugt nur der 45-s-Lauf.
+
+---
+
+## Stand: 2026-11-21 – Session 20 (Pods), alle Phasen fertig – Pod-Überholung: Cockpits, Details, 4 neue Pods, Tuning-Optik, Schadensmodelle
 
 ### Auftrag und abgestimmte Entscheidungen
 1. **Umfang (nur Pods):** alle 10 Cockpits individuell neu, mehr Details, 4 neue Pods (Halo, Manta, Voltspire, Cyclone – eigene Entwürfe und Namen), Tuning mit sichtbaren Teilen, eigenes Schadensmodell je Racer.
@@ -337,6 +373,83 @@ Sichtmodell gegen Physikform: breiter als die Kollisionsform höchstens 0,50 m (
 2. Harness-Konsole: `await sheet('front', { quality: 3, save: 'name' })`, `await show(3, 0.3, 3, { rival: true })`, `statsAll()`. Bogen-Ansichten: `pod`, `front`, `rear`, `side`, `inside`, `chase` (Verfolgerkamera), `profile` (Seitenriss); `{ rival: true, far: true }` zeigt das Fern-Modell. Pod-Indizes der neuen: 10 Cyclone, 11 Halo, 12 Manta, 13 Voltspire. Teile zeigen: `await show(0, 1, 3, { kit: { fins: 3, intake: 3, nozzle: 1, canopy: 2 }, tune: { topSpeed: 5, cooling: 5 } })` (`kit` 0–3 je Steckplatz, `tune` = Tuning-Stufen 0–5; beides auch in `sheet(…)`).
 3. `ROSTER_OLD=1 node tools/ci/out/sim.mjs` (nach `npm run check`) – Sim mit dem alten Startfeld; die Tabelle muss der von Phase 2 gleichen.
 4. `ARMOR=0 PARTS=0 node tools/ci/out/sim.mjs` – Sim ohne Schadensmodelle (Tabelle = Stand Phase 4); einzeln: `ARMOR=0` nur Bruchteile, `PARTS=0` nur Panzerzonen.
+
+---
+
+## Stand: 2026-11-21 – Session 20 (Strecken) – Bugfixes (Höhlen, „Balken", Tunneldecken), Untergründe je Passage, Seen, Oovo-Mond, PBR-Fotosets
+
+### Vorgaben des Nutzers (gelten weiter, Ausnahme siehe letzter Punkt)
+1. **Fahrphysik je Untergrund:** spürbar, aber fair – und für die KI genauso.
+2. **Seen:** der Pod schwebt in den offenen Passagen direkt über der Flüssigkeit; kein Hineinfallen.
+3. **Oovo IV:** etwa 55 % Mondoberfläche, 45 % Station; Zero-G-Röhren bleiben; keine Stelzen ins Nichts.
+4. **Alle 13 Strecken** bekommen wechselnde Passagen.
+5. **Texturen:** CC0-Fotosets in 1024 px, Build bis etwa 20 MB; HQ-Assets prozedural.
+- Außerdem galt in dieser Sitzung: **Pod-Dateien nicht anfassen** (`podModel`, `podTextures`, `podDesigns`, `podKit`, `podMaterials`, `podParts`, `PodPreview.tsx`, `tools/harness/pods.ts`) – die Pods wurden gleichzeitig in Session 20 (Pods) überarbeitet. **Mit dem Merge ist diese Vorgabe erledigt.** Weiter gilt: **nicht pushen** ohne ausdrücklichen Wunsch.
+
+### Erledigt in Session 20 (Strecken)
+**Bugs**
+1. **„Balken" am Boden in Schrägkurven (Aquilaris, Oovo IV) – `world.ts → addViaductPiers`:** Ursache: die Hammerkopf-Kappen der Viaduktpfeiler lagen waagerecht, die Fahrbahn ist in Kurven aber bis ≈ 21° überhöht → das Kappenende stach auf der tiefen Seite als Balken durch die Fahrbahn. Jetzt neigt sich jede Kappe mit der Überhöhung, jedes Bein bekommt seine eigene Höhe.
+2. **Tunneldecken noch einmal +6,5 … 7,5 m und anderes Profil (`trackBuilder.ts`, `world.ts`, `physics.ts`, `Game.ts`):** Standard **27 m** (Ando Prime **30 m**), Unterführung 26 / 28 m, Abkürzung 25 / 27 m, Höhle 27 / 29 m + 8,5–16 m in den Kammern (bis 45 m), Unterwasserröhre 26 m. Querschnitt = **Superellipse (n = 3)** statt Halbellipse: bei 90 % der Breite sind noch 65 % der Scheitelhöhe frei (vorher 44 %) – genau dort tauchte man in die Decke. Die Deckenkollision rechnet jetzt mit der Pod-Oberkante (2,15 m + Flügelspitze bei Rolle), die Verfolgerkamera bleibt im Gewölbe. Stalaktiten-Spitzen ≥ 22 m über der Fahrbahn. Eine einzige Profilquelle: `tunnelProfile` / `tunnelArc` / `tunnelCeiling` (Mesh, Kollision, Kamera).
+3. **Höhlen (Vulkan, Ando Prime ×2, Kristall, Dschungel) – `trackBuilder.ts`, `world.ts → buildTunnel`:** vorher waren die Kammern getrennte 150-m-Röhren mit offenem Himmel dazwischen, Schluchtklippen standen in der Höhle, die verbreiterte Kammer (`caveW`) lag hinter einer unsichtbaren Wand, und die Abzweigröhre schnitt mit sichtbaren Wänden durch die Hauptröhre. Jetzt: **eine durchgehende Höhle** (`tun === 3` über die ganze Länge), die **Fahrbahn selbst weitet sich** in den Kammern (kein `caveW` mehr), Abzweigröhren sind von Anfang bis Ende überdacht und werden per **Hüllen-Vereinigung** (`insideCave` + Dreiecks-Culling) mit der Hauptröhre verschmolzen; Klippen werden in Höhlen ausgelassen. Der Wandrest der Abzweigröhre an der Gabelung hat eigene Texturkoordinaten (vorher zog sich die Fels-Textur dort zu dünnen Streifen zusammen).
+4. **Folgefehler aus (2), in derselben Session behoben (`physics.ts`):** ein Pod, der über dem niedrigeren Seitengewölbe in ein Portal einflog, wurde durch die Stirnwand gedrückt (CI: 1 Teleport auf `executioner`). Der Deck-Einstieg entscheidet jetzt nach der Gewölbehöhe an der seitlichen Position des Pods, die Decke drückt mit höchstens 45 m/s nach unten.
+
+**Untergründe & Passagen (alle 13 Strecken)**
+5. **25 Untergründe (`surfaces.ts`, `Sample.surf`):** jede Strecke wechselt zwischen „allgemeinen" und „offenen" Passagen ihres Planeten (Tabelle `THEME_SURFACES`). Übergänge lösen sich über 30 m auf (natürlicher Boden) bzw. über eine 26-m-Schürze (gebautes Deck).
+
+   | Welt | allgemeine Passagen | offene Passagen | Höhle |
+   |---|---|---|---|
+   | Tatooine | Sand, Gestein | Dünen, Plateau | – |
+   | Rote Tafelberge | Gestein, Sand | Plateau, Dünen | – |
+   | Ando Prime | Schnee, Eis | **Eissee**, Pulverschnee | Eis |
+   | Vulkanwelt | Basalt, Lavakruste | **Lavasee**, Asche | Basalt |
+   | Dschungelmond | Waldboden, Schlamm | **Sumpf**, Kies | Kies |
+   | Malastare | Renndeck, Kies | **Methansee**, Sumpf | – |
+   | Aquilaris | Plattform, Strand, Riff-Fels | **offene See** (auf Meereshöhe) | – |
+   | Oovo IV | Regolith, Stationsdeck | Regolith, Deck | – |
+   | Kristallschluchten | Fels, Kristallfeld | **Spiegelsee**, Kristallfeld | Kristall |
+
+6. **Fahrphysik je Untergrund (`physics.ts`, gilt auch für die KI; Werte in `surfaces.ts → SURFACES`):** Eis/Eissee Haftung ×0,75 · Höchsttempo: Pulverschnee ×0,93, Dünen ×0,94, Schlamm ×0,93, Sumpf ×0,92, Asche ×0,95 (dazu Haftung ×0,90–0,94) · Triebwerkshitze: Lavakruste ×1,3, Lavasee ×1,6, Methansee ×1,15, Basalt/Asche ×1,1, Schnee/Eis/Wasser ×0,9 · Fels, Plateau, Riff, Deck, Rennpiste voll · übrige Naturböden ×0,92–0,98 Haftung, ×0,96–1,0 Tempo. Haftung/Tempo wirken nur am Boden (`grounded && !zeroG`). Grund-Haftung der Welt dafür angehoben (`Game.baseGrip` Eis 0,8 statt 0,55, Dschungel 0,9 statt 0,85). KI-Referenztempo skaliert mit der Haftung. **HUD:** Untergrund-Zeile unter der Wetterzeile (`HudState.surface` / `surfaceFx`: Name + Hinweis „wenig Haftung" / „bremst" / „rutschig" / „Triebwerke heizen auf"), Staub-/Gischtfahne in der Farbe des Untergrunds.
+7. **Seen & Plateaus als offene Passage (`Sample.lake`, `world.ts → buildBasins`, `terrain.ts`):** Die bis ~108 m breite offene Fläche ist die See-Oberfläche selbst – der Pod schwebt direkt über Eis, Lava, Methan, Sumpf, Wasser oder Spiegelsee. Eben, keine Überhöhung, keine Leitplanken/Curbs; den Rand markieren Baken + höheres Energiefeld. Kein Hineinfallen. Aquilaris-Seen liegen auf Meereshöhe (`seaY0 + 0,4`). Flüssigkeits-Looks in `terrainMaterial.ts → LIQUIDS`.
+8. **Oovo IV = Mond + Station (`terrain.ts`, `world.ts`, `data.ts`):** Mondoberfläche mit Kratern statt Stelzen ins Nichts (Pfeiler nur noch, wo wirklich Luft unter der Piste ist), ~55 % Regolith / ~45 % Stationsdeck, Gasriese + Sterne am Himmel, Sonne 19° über dem Horizont, helleres Fülllicht. Zero-G-Röhren unverändert.
+9. **15 echte PBR-Fotosets, 1024 px, CC0 (`pbrTex.ts`, `photoAssets.ts`, `src/assets/pbr/`, `tools/photos/pbr.py`):** Albedo + echte Normal-Map + AO/Rauheit/Höhe je Set (Lava zusätzlich Emission). Beim Laden ins `TexSet`-Layout gepackt und auf die Palette der Welt gegradet. Quellen im README („Bildnachweis"). Build dadurch **17,5 MB** (vorher 2,8 MB; vom Nutzer bis ~20 MB freigegeben).
+10. **HQ-Assets (`decorGeo.ts`, `foliage.ts`, `world.ts → scatterDecor`):**
+    - **Schneekiefern** (`snowPineGeometry`, `pineMaterial`): Stamm mit Rindenfoto, 10 Quirle hängender Nadelzweig-Karten (Alpha), Schneeauflagen, ~700 Dreiecke; ab 230 m glatter Kegel-Zwilling. Ab Geometrie-Stufe 1.
+    - **Felsbrocken mit Displacement** (`boulderGeometry`, `heightSampler`): der Bruchkörper von `rockGeometry`, feiner tesselliert (720 Dreiecke, „Ultra" 980), jeder Vertex um die **Höhe der Fels-Textur** an seiner Stelle verschoben (+ Grat-Rauschen), Textur als Box-Projektion (keine Polverzerrung mehr), geglättete Normalen mit harten Bruchkanten (52°). Ab 120 m (Lava 150 m) der 180-Dreieck-Zwilling aus demselben Verschiebungsfeld. Gilt für Streu-Felsen, Lava-Felsen und die Hindernis-Felsen auf der Piste. Ab Geometrie-Stufe 2 („Mittel").
+    - **Kakteen** (`cactusGeometry` UV, `cactusMaterial`): prozedurale Haut – Rippen dunkeln ins Tal ab, Areolen mit Dornenfächer auf jedem Rippenkamm. Nur auf „Rote Tafelberge" (Dünenpass-Sprint).
+    - **Offen:** Farne (siehe `TODO.md`).
+11. **Textur-Cache gibt alte Welten frei (`textures.ts → beginTextureEpoch`):** nur aktuelle + vorige Welt bleiben im Speicher (vorher wuchs jeder Weltwechsel um ~100 MB).
+
+12. **Loch im Plateau / See an engen Knicken (`trackBuilder.ts`, `world.ts → buildBasins`) – in dieser Session entstanden und behoben:** Wo die halbe Fahrbahnbreite größer ist als der Kurvenradius (Mos-Espa-Arena, Index 4660–4707: Breite/Radius 1,29), faltete sich die Beckenfläche; die umgeklappten Dreiecke wurden weggecullt, zwischen den sich kreuzenden Rändern klaffte eine rautenförmige Grube im Felsplateau, und die Randbaken standen als Knäuel mitten auf der Fläche. Jetzt: Fläche mit **beiden Windungen** und festen +Y-Normalen (eben und in Weltkoordinaten texturiert → Überlappungen unsichtbar), Innenufer behält an solchen Knicken 34 m (die Flächen vor und nach dem Knick überlappen), keine Baken, wo der Rand rückwärts läuft. Geprüft per Rasterabdeckung (0 Löcher) und Screenshot.
+
+**Werkzeuge**
+13. `tools/ci/info.ts` (Strecken-Dump: Tunnel, Wände, offene Flächen, Untergründe, Abzweige, engste Kurven) · Harness: Sonden-Ansicht `p<idx>_<lat>_<höhe>_<voraus>_<pfad>_<blickLat>_<blickHöhe>`, Ansicht `n` (Gasriese), Ansicht `g_<name>[_<instanz>[_<abstand×10>]]` (Nahaufnahme eines Dekor-Objekts: `g_boulder`, `g_cactus`), Query `bright` (dunkle Höhlen), `tex=256` (kleine Texturen für den WebGPU-Check bei wenig RAM), Bench-Items `b<strecke>:<ansicht>` (Frame-Zeit synchron über `readPixels`). `info.ts` meldet zusätzlich `fold` (Fahrbahn breiter als der Kurvenradius) und `basin` (Ufer jenseits des Radius).
+
+### Verifiziert
+- `npm run check`: **13/13 Strecken bestanden** – 0 Tode, 0 NaN, 0,00 m Wand-Durchdringung, Bodenfreiheit ≥ 0,66 m, Deck- und Overhead-Selbsttest grün, 0 Teleports. Auch mit Sturm-Haftung (`GRIP=0.88`): 13/13 (1 Tod auf Magma, erlaubt ≤ 3).
+- `npm run check:gpu` (WebGPU, SwiftShader, je Strecke einzeln mit `QUERY='?tex=256'`): **alle 13 Strecken, 0 Konsolenfehler/-warnungen** – mit dem Endstand des Codes.
+- `npm run build` → `dist/index.html` **17 505 684 Bytes** (gzip 12,36 MB; vorher 2,8 MB – Zuwachs = 46 JPEGs der Fotosets).
+- App-Test `papp.mjs` auf dem fertigen Build (Frostspalt-Ring; davor auch Dünenpass-Sprint): **bestanden** – Menü → Rennen, HUD mit Untergrund-Zeile, Schadensseiten, Pause-Ton, Grafik-Menü in der Pause, Tasten- und Gamepad-Belegung.
+- **Screenshots (WebGL2-Harness, Software-Rendering), alle 13 Strecken gesichtet:**
+  - „Balken": Aquilaris-Schrägkurve und Oovo-Startkurve (Überhöhung 0,16) – nichts ragt mehr aus der Fahrbahn.
+  - Höhlen: Frost, Magma (mit `bright`), Howler, Kristall, Dschungel – durchgehend, kein offener Himmel, Gabelung mit Felspfeiler.
+  - Untergründe/Seen: Eissee, Lavasee, Methansee, Sumpf, Spiegelsee, offene See, Plateau, Dünen, Strand, Regolith, Stationsdeck.
+  - HQ-Assets: Schneekiefern (Frost, Howler), Felsbrocken und Kakteen (Dünenpass, Mos Espa).
+- **Frame-Zeit vorher/nachher** (Software-Rendering, 768 × 432, 6 Frames, über `readPixels` synchronisiert – nur als Verhältnis brauchbar):
+
+  | Ansicht | Session 19 (`d7b9c4b`) | Session 20 | Unterschied |
+  |---|---|---|---|
+  | Boonta, Übersicht `c` | 914 ms | 928 ms | +1,5 % |
+  | Boonta, offene Fläche `o` | 684 ms | 770 ms | +12,6 % |
+  | Frost, Tunnel `u` | 1064 ms | 1039 ms | −2,3 % |
+  | Frost, offene Fläche `o` (jetzt Eissee) | 728 ms | 829 ms | +13,9 % |
+
+  Normale Passagen und Tunnel: gleich schnell. Offene Flächen: etwa 13 % langsamer (zusätzliche Boden-/Seefläche mit eigenem Material).
+
+### Nicht verifiziert
+- **Probefahrt und FPS auf echter GPU.** Die Sandbox hat keine GPU; die Tabelle oben misst Software-Rendering (~1 s je Frame). Die HUD-FPS-Anzeige ist dort unbrauchbar.
+- **Fahrgefühl der Untergründe** (Eis −25 % Haftung, Tempo-Abzug in Schlamm/Dünen): nur die KI ist in der Node-Simulation darüber gefahren.
+- **Optisch offen** (gesehen, nicht bearbeitet): Felsschichtung am Höhlengewölbe stark gebogen; Vulkan-Höhle ohne `bright` fast schwarz; fußspurartige Flecken im Schnee-Fotoset; Fahrbahn-Falten an vier sehr engen Knicken (siehe `TODO.md`).
+- **Sandbox-Grenzen:** 2 GB RAM. Zwei Strecken mit 1024-px-Fotosets in einer Browser-Sitzung sprengen den Speicher (Software-GL hält jede Textur im RAM) → je Lauf eine Strecke, bei `check:gpu` `QUERY='?tex=256'`. Browser nie gleichzeitig mit `tsc`/Simulation starten.
 
 ---
 
@@ -736,8 +849,9 @@ Sichtmodell gegen Physikform: breiter als die Kollisionsform höchstens 0,50 m (
 ### Test-Setup in frischer Sandbox (≈ 4 Min.; `.git` fehlt? → `git clone --branch B … /tmp/rc && cp -r /tmp/rc/.git .`)
 1. `mkdir -p /tmp/t && cd /tmp/t && npm i puppeteer`
 2. `sudo apt-get update && sudo apt-get install -y --no-install-recommends libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libdbus-1-3 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libxkbcommon0 libasound2 libatspi2.0-0 libcups2 libcairo2 libpango-1.0-0`
-3. `cd <repo>/tools/harness && npx esbuild game.ts --bundle --format=esm --outfile=out/game.js && cp pshot.mjs /tmp/t/`
+3. `cd <repo> && git checkout -- tools/harness/out && cd tools/harness && npx esbuild game.ts --bundle --format=esm --loader:.jpg=dataurl --outfile=out/game.js && cp pshot.mjs papp.mjs /tmp/t/`
 4. `cd /tmp/t && node pshot.mjs <repo>/tools/harness/out/game.html "t0:e,t5:b" /tmp/t/out "?webgl"` → `/tmp/t/out_grid.jpg` (≈ 35 s pro Strecke)
+5. Seit Session 20 (Fotosets): **eine Strecke je Lauf** (≈ 50 s Laden + 12–18 s je Ansicht), immer mit `timeout 285 …`; `/tmp` ist ein RAM-Laufwerk – alte Screenshots und `/tmp/puppeteer_dev_chrome_profile-*` löschen. WebGPU-Check: `PUPPETEER_DIR=/tmp/t TRACKS=1 QUERY='?tex=256' npm run check:gpu`.
 
 ---
 

@@ -3,6 +3,7 @@ import type { ThemeDef } from './data';
 import type { GfxSettings } from './settings';
 import type { Sample, TrackData } from './trackBuilder';
 import type { StaticBatcher } from './trackMesh';
+import { SURFACES } from './surfaces';
 
 /* ------------------------------------------------------------------------------------------------
  * Open terrain model:
@@ -52,7 +53,20 @@ export interface Extent { cx: number; cz: number; W: number; D: number }
 // open-land amplitude, far-range start / full distance (beyond the road edge), far-range amplitude
 const PARAMS: Record<string, [number, number, number, number]> = {
   canyon: [18, 400, 1480, 260], mountains: [25, 320, 1650, 500], jungle: [22, 360, 1560, 235], lava: [20, 360, 1480, 320], dunes: [28, 560, 1950, 140],
+  prison: [11, 480, 1900, 240], // Session 20: Oovo IV has a real moon surface (regolith plains, craters, distant crater-rim ranges)
 };
+/** Lunar crater field: one crater per 240 m cell (62 % of the cells), bowl + raised rim; returns the height offset in metres. */
+function craters(x: number, z: number) {
+  const C = 240, cx = Math.floor(x / C), cz = Math.floor(z / C); let h = 0;
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+    const gx = cx + i, gz = cz + j, r0 = h2(gx * 1.37 + 3.1, gz * 2.11 - 7.7); if (r0 > 0.62) continue;
+    const R = 26 + 78 * h2(gx + 11.3, gz - 4.9) ** 2, ox = (gx + 0.2 + 0.6 * h2(gx - 2.2, gz + 8.4)) * C, oz = (gz + 0.2 + 0.6 * h2(gx + 5.6, gz + 1.3)) * C;
+    const t = Math.hypot(x - ox, z - oz) / R; if (t > 1.9) continue;
+    const depth = R * 0.2;
+    h += t < 1 ? depth * (t * t * (1.25 - 0.25 * t * t) - 1) + depth * 0.24 * t * t * t : depth * 0.24 * (1 - sstep(1, 1.9, t)) ** 2; // bowl → rim → apron
+  }
+  return h;
+}
 
 export function makeTerrainField(td: TrackData, theme: ThemeDef): TerrainField {
   // Ground-shaping samples skip elevated overpass bridges (`!s.bridge`) so terrain hugs the lower road cleanly beneath every viaduct!
@@ -102,11 +116,26 @@ export function makeTerrainField(td: TrackData, theme: ThemeDef): TerrainField {
   const T = theme.terrain; const id = theme.id;
   const isDesert = id === 'desert' || id === 'mesa';
   const splat = { g: 0, b: 0, c: 0 };
+  // Session 20: depth of the ground below the road edge, smoothed along the track – 3.1 m embankment under built decks, 1.25 m under
+  // natural ground passages (the track runs ON the terrain there), 1.6 m lake bed, and deep under the station decks of Oovo IV
+  // (the decks stand on piers above the moon surface; zero-G tubes hang highest).
+  const emb = new Map<Sample, number>();
+  for (const p of td.paths) {
+    const n = p.samples.length, W = T === 'prison' ? 30 : 12;
+    const raw = p.samples.map(q => q.lake ? 1.6 : q.surf > 0 && !(T === 'prison' && SURFACES[q.surf].id === 'deck') ? 1.25 : T === 'prison' ? (q.zeroG ? 46 : 28) : 3.1);
+    const pre = new Float64Array(n + 1); for (let i = 0; i < n; i++) pre[i + 1] = pre[i] + raw[i];
+    for (let i = 0; i < n; i += 4) {
+      let sum = 0, cnt = 0;
+      if (p.closed) { for (let k = -W; k <= W; k += 2) { sum += raw[((i + k) % n + n) % n]; cnt++; } } else { const a = Math.max(0, i - W), b = Math.min(n - 1, i + W); sum = pre[b + 1] - pre[a]; cnt = b - a + 1; }
+      emb.set(p.samples[i], sum / cnt);
+    }
+  }
 
   const evalWithSample = (x: number, z: number, s: Sample, d: number, writeSplat: boolean) => {
     if (writeSplat) { splat.g = 0; splat.b = 0; splat.c = 0; }
-    if (T === 'prison') return -400;
-    const roadLow = s.y - 3.1 - Math.abs(s.bank) * s.hw;
+    const latS = (x - s.x) * s.rx + (z - s.z) * s.rz, eb = emb.get(s) ?? 3.1;
+    // natural passages: the ground follows the cambered road surface right up to its edges; built decks: classic embankment below the low edge
+    const roadLow = s.surf > 0 && !s.lake ? s.y - Math.max(-s.hw, Math.min(s.hw, latS)) * s.bank - eb : s.y - eb - Math.abs(s.bank) * s.hw;
     if (T === 'ocean') {
       // Sculpted volcanic atolls: sandy shoals + rugged coastal islets + dramatic distant sea stacks
       const isleN = fbm(x * 0.0036, z * 0.0036, 5);
@@ -116,6 +145,7 @@ export function makeTerrainField(td: TrackData, theme: ThemeDef): TerrainField {
       const bs = s.hw + 8;
       let h = roadLow + (far - roadLow) * sstep(bs, bs + 115, d);
       if (s.gap && d < s.hw + 40) h = Math.min(h, s.y - 55 + sstep(s.hw, s.hw + 40, d) * 40);
+      if (s.lake) h = Math.min(h, (s.lakeY ?? s.y) - 3 + sstep(0, 60, d - s.hw - (latS >= 0 ? s.lakeR ?? 0 : s.lakeL ?? 0)) * 3); // open water: the sea itself is the road
       if (writeSplat) {
         splat.g = Math.max(1 - sstep(6, 26, d - s.hw), sstep(0.56, 0.72, isleN) * 0.45);
         splat.c = sstep(avgY - 12, avgY + 14, h) * 0.8;
@@ -153,6 +183,10 @@ export function makeTerrainField(td: TrackData, theme: ThemeDef): TerrainField {
       open += mound - chan * 5.2;
       crest = sstep(0.56, 0.8, n1) * 0.7 * eFade;
       wadiGravel = chan * 0.65;
+    } else if (T === 'prison') {
+      // Lunar surface: gently rolling regolith plains pocked with craters (kept clear of the track), ejecta gravel on the rims
+      const cr = craters(x, z) * eFade;
+      open += cr; crest = sstep(0.5, 4, cr) * 0.8; wadiGravel = sstep(0.3, 3, Math.abs(cr)) * 0.5;
     } else if (T === 'lava') {
       // Collapsed glowing volcanic rift channels & jagged aa-lava pressure ridges
       const rift = sstep(0.44, 0.72, fbm(x * 0.0035 + 3, z * 0.0035, 4));
@@ -192,7 +226,7 @@ export function makeTerrainField(td: TrackData, theme: ThemeDef): TerrainField {
     const lat = (x - s.x) * s.rx + (z - s.z) * s.rz;
     const H = lat >= 0 ? s.hR : s.hL;
     let talus = 0;
-    if (H > 0 && !s.gap) {
+    if (H > 0 && !s.gap && s.tun !== 3) { // (caves flag their rock barrier with hL/hR = 2 – no massif there)
       const rim = s.y + H, foot = s.hw + 0.6 + H * 0.6;
       const rimTerrace = id === 'mesa' || id === 'desert' ? (terrace(n2, 3) - 0.5) * 12 : (n2 - 0.5) * 11;
       const ch = d < foot
@@ -212,7 +246,18 @@ export function makeTerrainField(td: TrackData, theme: ThemeDef): TerrainField {
       splat.c = Math.min(1, crest);
     }
     if (s.gap && d < s.hw + 40) h = Math.min(h, s.y - 55 + sstep(s.hw, s.hw + 40, d) * 40);
-    if (T === 'lava' && d < s.hw + 30) h = Math.min(h, roadLow - sstep(s.hw + 4, s.hw + 30, d) * 14);
+    if (T === 'lava' && d < s.hw + 30 && !s.lake) h = Math.min(h, roadLow - sstep(s.hw + 4, s.hw + 30, d) * 14);
+    // Session 20: level basins. Lakes / frozen lakes: a bed 1.6 m below the surface out to the shoreline (`lakeL` / `lakeR` beyond the
+    // road edge), a bank that always rises above the liquid, then back to the natural ground. Plateaus: flat top, then the mesa edge drops.
+    if (s.lake) {
+      const yL = s.lakeY ?? s.y, ext = latS >= 0 ? s.lakeR ?? 0 : s.lakeL ?? 0;
+      if (SURFACES[s.surf].id === 'plateau') h = e < ext ? yL - 0.8 : Math.min(h, yL - 0.8 - 15 * sstep(ext, ext + 20, e));
+      else {
+        const bank = yL + 1.1 + (vnoise(x * 0.05, z * 0.05) - 0.3) * 1.6;
+        h = e < ext + 5 ? yL - 1.6 + (bank - (yL - 1.6)) * sstep(ext - 6, ext + 5, e) : h + (Math.max(h, bank) - h) * (1 - sstep(ext + 5, ext + 60, e));
+      }
+      if (writeSplat) { splat.g = Math.max(splat.g, 1 - sstep(ext + 4, ext + 30, e)); splat.b = 0; }
+    }
     return h;
   };
 

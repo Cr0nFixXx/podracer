@@ -90,6 +90,8 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
           </div>
 
           {h.env && <div className="absolute top-[14.4rem] right-4 w-44 text-right text-[10px] tracking-[0.2em] text-sky-100/75 uppercase" style={{ textShadow: '0 1px 2px #000' }}>{h.env}</div>}
+          {/* Session 20: ground under the pod + what it does (amber when it changes the handling) */}
+          {h.surface && <div className="absolute top-[15.5rem] right-4 w-56 text-right text-[10px] tracking-[0.2em] uppercase" style={{ textShadow: '0 1px 2px #000' }}><span className="text-sky-100/75">{h.surface}</span>{h.surfaceFx && <span className="text-amber-300"> · {h.surfaceFx}</span>}</div>}
 
           {/* ===== engine damage (bottom left, original style) ===== */}
           <div className="absolute bottom-6 left-5 flex gap-3">

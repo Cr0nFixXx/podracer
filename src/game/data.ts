@@ -201,8 +201,9 @@ export const THEMES: Record<string, ThemeDef> = {
     decor: ['rocks', 'wrecks', 'balloons', 'pylons'], ambient: 'rain', terrain: 'ocean', barrierColor: '#3ad8ff',
   },
   oovo: {
-    id: 'oovo', name: 'Oovo IV', skyTop: '#02030a', skyHorizon: '#1a2440', sunColor: '#e8e0d0', sunElev: 8, sunAz: 200, clouds: 0.0,
-    fogColor: '#0a0e18', fogDensity: 0.00035, sunIntensity: 2.2, hemiSky: '#2a3355', hemiGround: '#0a0c12', exposure: 1.05,
+    // Session 20: the sun stands higher (8° → 19°) and the fill light is a little stronger – the track now runs over a real moon surface
+    id: 'oovo', name: 'Oovo IV', skyTop: '#02030a', skyHorizon: '#1a2440', sunColor: '#e8e0d0', sunElev: 19, sunAz: 200, clouds: 0.0,
+    fogColor: '#0a0e18', fogDensity: 0.00035, sunIntensity: 2.6, hemiSky: '#3a4468', hemiGround: '#14161c', exposure: 1.05,
     road: 'oovoRoad', wall: 'oovoWall', ground: 'oovoWall',
     palette: { road: ['#2a2e38', '#3a404c', '#5a6270'], wall: ['#1a1e28', '#2e3444', '#4a5468'], ground: ['#10141c', '#1a1e28', '#2a3040'] },
     decor: ['asteroids', 'cells', 'satellites', 'antennas', 'debris'], ambient: 'sparkle', terrain: 'prison', barrierColor: '#3ad8ff',

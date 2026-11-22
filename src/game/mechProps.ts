@@ -52,7 +52,7 @@ export function addMechProps(
   const towers: { x: number; y: number; z: number; ph: number }[] = [];
   const step = Math.max(60, Math.round(280 / DS / Math.max(0.5, Math.min(1.3, detail))));
   for (let i = 60, n = 0; i < N - 40; i += step, n++) {
-    const s = S[i]; if (s.gap || s.zeroG || s.roof > 0 || s.ramp > 0) continue;
+    const s = S[i]; if (s.gap || s.zeroG || s.roof > 0 || s.ramp > 0 || s.lake) continue;
     let side = n % 2 ? 1 : -1;
     const blocked = (sd: number) => (sd > 0 ? s.hR : s.hL) > 0 || (sd > 0 ? s.openR : s.openL);
     if (blocked(side)) side = -side; if (blocked(side)) continue;

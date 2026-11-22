@@ -42,6 +42,7 @@ export interface TerrainLayers {
   cliff?: string[]; crestTint?: [number, number, number]; crestRough?: number; ledgeColor?: string; ledgeAmt?: number;
 }
 const LAYERS: Record<string, TerrainLayers> = {
+  oovo: { gravel: ['#3c3e44', '#5a5c64', '#7e8088'], basin: ['#2e3036', '#44464e', '#5c5e66'], basinRough: 0.92, basinMetal: 0, cliff: ['#34363c', '#55575f', '#7c7e86'], crestTint: [1.1, 1.1, 1.12], crestRough: 0.9 },
   desert: { gravel: ['#8a694e', '#ab8768', '#cca884'], basin: ['#cfc0a6', '#e6dcc8', '#f8f2e6'], basinRough: 0.86, basinMetal: 0, crestTint: [1.12, 1.08, 1.0], crestRough: 0.88, ledgeColor: '#dfc096', ledgeAmt: 0.55 },
   mesa: { gravel: ['#84523a', '#a86e56', '#ca9476'], basin: ['#d2ba9e', '#e6d4be', '#f6eadc'], basinRough: 0.86, basinMetal: 0, crestTint: [1.14, 1.06, 0.98], crestRough: 0.86, ledgeColor: '#dba078', ledgeAmt: 0.52 },
   ice: { gravel: ['#525e6a', '#748290', '#9aa8b6'], basin: ['#427496', '#76a6c8', '#bedef4'], basinRough: 0.16, basinMetal: 0.08, cliff: ['#384452', '#586878', '#8292a4'], crestTint: [1.06, 1.09, 1.14], crestRough: 0.58, ledgeColor: '#eef5fc', ledgeAmt: 0.85 },
@@ -81,6 +82,8 @@ export interface TerrainMatOpts {
   themeId: string; ground: TexSet; gravel: TexSet; rock: TexSet; basin: TexSet; layers: TerrainLayers;
   strata: StrataDef | null | undefined; cloud: number; bump: boolean; waterY?: number;
   rockScale?: number; emissive?: string; emissiveIntensity?: number;
+  /** Session 20: UV multiplier of the ground layer (mesh UVs tile every 30 m; photo sets need ~11 m) */
+  groundScale?: number;
 }
 
 export function terrainMaterial(o: TerrainMatOpts) {
@@ -88,8 +91,8 @@ export function terrainMaterial(o: TerrainMatOpts) {
   const mat = new THREE.MeshStandardNodeMaterial(); mat.roughness = 1; mat.metalness = 0; mat.envMapIntensity = 0.78;
   const wp = positionWorld, nW = normalize(normalWorld); const dist = length(positionView);
   const sp = attribute('aSplat', 'vec4');
-  const uvG = uv(); const m = macroTexture();
-  const mv = texture(m, uvG.mul(0.0931)).r.mul(0.6).add(texture(m, uvG.mul(0.0217).add(0.37)).g.mul(0.4));
+  const uvG = uv().mul(o.groundScale ?? 1); const m = macroTexture();
+  const mv = texture(m, uv().mul(0.0931)).r.mul(0.6).add(texture(m, uv().mul(0.0217).add(0.37)).g.mul(0.4));
   const gT = texture(o.ground.map, uvG), gNT = texture(o.ground.normalMap, uvG);
   const uvR = wp.xz.mul(1 / 7.2); const rT = texture(o.gravel.map, uvR), rNT = texture(o.gravel.normalMap, uvR);
   const uvB = wp.xz.mul(1 / 17.5); const bT = texture(o.basin.map, uvB), bNT = texture(o.basin.normalMap, uvB);
@@ -182,26 +185,40 @@ export function terrainMaterial(o: TerrainMatOpts) {
 }
 
 /** Flicker-free, derivative-free TSL water surface (ocean, jungle rivers, glacial meltwater). */
-export function waterMaterial(themeId: string, normTex: THREE.Texture, cloud: number, hole?: { tex: THREE.Texture; x0: number; z0: number; sx: number; sz: number }) {
+/** Session 20: looks of the lakes the track crosses (the pod hovers directly over them): swamp with algae mats, bubbling methane, mirror lake. */
+export interface LiquidLook { deep: string; shallow: string; rough: number; calm: number; cap: number; metal?: number; scum?: string; glow?: string }
+export const LIQUIDS: Record<string, LiquidLook> = {
+  swamp: { deep: '#141f10', shallow: '#3a4a22', rough: 0.2, calm: 0.35, cap: 0, scum: '#6f8a34' },
+  methane: { deep: '#3f4a10', shallow: '#a8b62c', rough: 0.16, calm: 0.6, cap: 0.25, scum: '#e6ec8c', glow: '#5a6a10' },
+  mirror: { deep: '#1c1238', shallow: '#5a3f8e', rough: 0.05, calm: 0.12, cap: 0, metal: 0.55 },
+};
+export function waterMaterial(themeId: string, normTex: THREE.Texture, cloud: number, hole?: { tex: THREE.Texture; x0: number; z0: number; sx: number; sz: number }, look?: LiquidLook) {
   const mat = new THREE.MeshStandardNodeMaterial({ polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
   const wp = positionWorld.xz; const dist = length(positionView); const m = macroTexture();
-  const deep = color(themeId === 'ice' ? '#3f6e8e' : themeId === 'jungle' ? '#12362d' : '#0f5072');
-  const shallow = color(themeId === 'ice' ? '#82b4d4' : themeId === 'jungle' ? '#285e4c' : '#268cb0');
+  const deep = color(look?.deep ?? (themeId === 'ice' ? '#3f6e8e' : themeId === 'jungle' ? '#12362d' : '#0f5072'));
+  const shallow = color(look?.shallow ?? (themeId === 'ice' ? '#82b4d4' : themeId === 'jungle' ? '#285e4c' : '#268cb0'));
   const swell = texture(m, wp.mul(1 / 220).add(vec2(time.mul(0.007), time.mul(0.004)))).r;
   const chop = texture(m, wp.mul(1 / 46).sub(vec2(time.mul(0.014), time.mul(-0.011)))).g;
-  const whitecap = smoothstep(0.73, 0.88, swell.mul(0.55).add(chop.mul(0.55))).mul(themeId === 'aquilaris' ? 0.5 : 0.2).mul(ssInv(700.0, 80.0, dist));
+  const whitecap = smoothstep(0.73, 0.88, swell.mul(0.55).add(chop.mul(0.55))).mul(look ? look.cap : themeId === 'aquilaris' ? 0.5 : 0.2).mul(ssInv(700.0, 80.0, dist));
   let col = mix(deep, shallow, smoothstep(0.28, 0.74, swell.mul(0.7).add(chop.mul(0.3))));
-  col = mix(col, vec3(0.86, 0.92, 0.96), whitecap).mul(cloudShade(cloud));
+  col = mix(col, look?.scum ? color(look.scum) : vec3(0.86, 0.92, 0.96), whitecap);
+  let scumM: N = float(0);
+  if (look?.scum) { // drifting mats of algae / foam: static world-space patches, slowly breathing
+    scumM = smoothstep(0.52, 0.66, texture(m, wp.mul(1 / 64).add(vec2(time.mul(0.0012), 0.0))).g.mul(0.6).add(texture(m, wp.mul(1 / 17)).r.mul(0.4))).mul(0.85);
+    col = mix(col, color(look.scum).mul(texture(m, wp.mul(1 / 5)).b.mul(0.5).add(0.7)), scumM);
+  }
+  col = col.mul(cloudShade(cloud));
   mat.colorNode = col;
+  if (look?.glow) mat.emissiveNode = color(look.glow).mul(smoothstep(0.45, 0.8, chop).mul(0.6).add(0.15));
   // Exact analytical world-space wave normal + smooth distance attenuation (zero dFdx underflow, zero sun-glint strobe!)
   const nFade = ssInv(520.0, 30.0, dist);
   const n1 = texture(normTex, wp.mul(1 / 38).add(vec2(time.mul(0.018), time.mul(0.012)))).xy.mul(2).sub(1);
   const n2 = texture(normTex, wp.mul(1 / 15).sub(vec2(time.mul(0.024), time.mul(-0.018)))).xy.mul(2).sub(1);
-  const wxy = n1.mul(0.48).add(n2.mul(0.36).mul(ssInv(180.0, 20.0, dist))).mul(nFade);
+  const wxy = n1.mul(0.48).add(n2.mul(0.36).mul(ssInv(180.0, 20.0, dist))).mul(nFade).mul(look ? look.calm : 1);
   mat.normalNode = transformNormalToView(normalize(vec3(wxy.x, float(1.0), wxy.y)));
-  const baseR = mix(float(themeId === 'ice' ? 0.2 : 0.14), float(0.52), whitecap);
-  mat.roughnessNode = mix(baseR, float(0.38), smoothstep(45.0, 320.0, dist));
-  mat.metalness = 0.16; mat.envMapIntensity = 1.05;
+  const baseR = mix(mix(float(look ? look.rough : themeId === 'ice' ? 0.2 : 0.14), float(0.52), whitecap), float(0.62), scumM);
+  mat.roughnessNode = mix(baseR, float(look ? Math.max(look.rough, 0.2) : 0.38), smoothstep(45.0, 320.0, dist));
+  mat.metalness = look?.metal ?? 0.16; mat.envMapIntensity = 1.05;
   if (hole) { // Session 17: no water where an underwater tunnel breaks through the surface (otherwise the plane would cut through its interior)
     const hv = texture(hole.tex, positionWorld.xz.sub(vec2(hole.x0, hole.z0)).div(vec2(hole.sx, hole.sz))).r;
     mat.opacityNode = oneMinus(smoothstep(0.45, 0.55, hv)); mat.alphaTest = 0.5;
