@@ -914,5 +914,32 @@ test('walls: with Panzerzonen switched off the angle makes no difference (CI: AR
   near(h / hraw, 1, 'head-on:'); near(b / braw, 1, 'brush:');
 }));
 
+// ---- steering while reversing (2026-11-22: user report "rückwärts ist die Lenkung nicht invertiert") ----
+/** How far the nose has turned to the RIGHT (radians) after one second of holding the stick fully right, on a straight level piece
+ *  of the Boonta road. `v0` = speed along the nose at the start (m/s, negative = backwards); `reverse` holds the brake / reverse key. */
+function noseRightAfter(v0: number, reverse: boolean): number {
+  const td = trackOf('boonta'), S = td.main.samples;
+  let idx = -1;
+  for (let k = 80; k < S.length - 80 && idx < 0; k++) {
+    let fine = true;
+    for (let j = k - 40; j <= k + 40 && fine; j++) { const q = S[j]; fine = !q.gap && !q.zeroG && !q.lake && !q.roof && !q.ramp && Math.abs(q.curv) < 0.002 && Math.abs(q.bank) < 0.03; }
+    if (fine) idx = k;
+  }
+  ok(idx > 0, 'no straight level piece of road found on boonta');
+  const s = S[idx], p = racer(byId('aurora'), td, idx, 0, s.y + HOVER), yaw0 = p.yaw;
+  p.vel.set(s.tx * v0, 0, s.tz * v0); p.input.steer = 1; p.input.brake = reverse ? 1 : 0; p.input.throttle = reverse ? 0 : 1;
+  for (let f = 0; f < 60; f++) stepPod(p, td, 1 / 60, f / 60, 1, false);
+  // forward = (sin yaw, cos yaw), right = (-cos yaw, sin yaw): the nose's new direction, measured along the old right-hand side
+  return Math.asin(Math.max(-1, Math.min(1, Math.sin(p.yaw) * -Math.cos(yaw0) + Math.cos(p.yaw) * Math.sin(yaw0))));
+}
+test('steering: flying forwards, stick right turns the nose to the right', () => {
+  const a = noseRightAfter(30, false);
+  ok(a > 0.2, `nose turned ${a.toFixed(3)} rad to the right, expected clearly more than 0.2`);
+});
+test('steering: reversing, stick right swings the TAIL to the right – the nose turns left, as a car does in reverse', () => {
+  const a = noseRightAfter(-12, true);
+  ok(a < -0.1, `nose turned ${a.toFixed(3)} rad to the right, expected clearly to the left (below -0.1)`);
+});
+
 console.log(failed ? `\n${failed} unit check(s) FAILED, ${passed} passed.` : `All ${passed} unit checks passed.`);
 process.exit(failed ? 1 : 0);

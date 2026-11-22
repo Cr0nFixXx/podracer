@@ -31,6 +31,8 @@ npm run build:web  # erzeugt den Ordner build/ für einen Webserver (mehrere Dat
 | Ansicht wechseln | `C` | Y |
 | Pause | `Esc` / `P` | Start |
 
+Rückwärts (Umkehrschub halten, bis der Pod zurücksetzt) lenkt der Pod wie ein Auto im Rückwärtsgang: das Heck schwenkt zur gelenkten Seite.
+
 In der Ansicht „Cockpit" (`C`) sitzt man im Pod und sieht das eigene Cockpit von innen: Armaturenbrett mit drei Warnlampen (Boost, Hitze, Schaden), Scheibenrahmen und die Hände des Piloten – bei jedem Racer anders. Die Cockpits hängen über der Triebwerkslinie: man schaut über die Triebwerke hinweg auf die Strecke. Die freie Sicht ganz ohne Cockpit bietet weiterhin die Ansicht „Motorhaube".
 
 **Gamepad ändern:** Einstellungen → Steuerung → Abschnitt „Gamepad": Aktion anklicken, dann Taste drücken oder Stick bewegen. „Standard" stellt die Belegung aus der Tabelle wieder her.

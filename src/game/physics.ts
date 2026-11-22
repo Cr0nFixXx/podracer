@@ -258,7 +258,10 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   const sp = Math.abs(vf);
   const lowF = Math.min(1, sp / 22);
   const highF = 1 - 0.32 * Math.min(1, sp / P.vmax);
-  let omega = p.steer * P.turn * lowF * highF * (1 + ((P.abTurn - 1) * 0.45 + 0.6) * sk) * (p.grounded ? 1 : 0.55) * (1 + 0.45 * knife); // Session 15: lift/dive steer with MORE authority on knife-edge (was -40 %)
+  // 2026-11-22: reversing mirrors the yaw, as in a car – stick right swings the tail to the right. The authority runs through 0 at
+  // standstill (`lowF`), so nothing jumps when the direction of travel changes.
+  const dirF = vf < 0 ? -1 : 1;
+  let omega = p.steer * dirF * P.turn * lowF * highF * (1 + ((P.abTurn - 1) * 0.45 + 0.6) * sk) * (p.grounded ? 1 : 0.55) * (1 + 0.45 * knife); // Session 15: lift/dive steer with MORE authority on knife-edge (was -40 %)
   if (sk > 0 && p.steer * vr < 0) { // steering deeper into the slide: fade the yaw input beyond ~35° slip (no spin-outs)
     const slip = Math.atan2(Math.abs(vr), Math.max(8, vf));
     if (slip > 1.05) omega *= Math.max(0.12, 1 - (slip - 1.05) / 0.4); // Session 16: the rear may swing out to ~60°
