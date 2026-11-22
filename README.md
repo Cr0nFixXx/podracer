@@ -177,7 +177,7 @@ Alle Änderungen sind committet (Remote `origin` = `github.com/Cr0nFixXx/podrace
 
 **Der versteckte Ordner `.git` fehlt im Download des Arbeitsordners.** Früher lag er deshalb als Textkopie im Repo (`.archiv/repo-sicherung/`, erneuert von `npm run save`). Diese Kopie stand auf Session 19 und ist seit dem 2026-11-22 gelöscht. Die Git-Historie behält sie: `git show ee3dc4b:.archiv/repo-sicherung/podracer-git.tar.gz.b64.txt`.
 
-**`npm run save` nicht in der Sandbox benutzen.** Das Skript legt drei Kopien von `.git` an (gemessen: zusammen 123 MB) – der gesicherte Arbeitsordner darf dort aber nur 128 MB groß sein. Dort stattdessen: `git add <Pfade>`, `git commit`, `git gc --prune=now` (Regeln in `HANDOFF.md`, Abschnitt „Git-Stand").
+**`npm run save` ist seit dem 2026-11-22 abgeschaltet.** Der Befehl meldet das, bricht ab und ändert nichts. Grund: das Skript legte drei Kopien von `.git` an (gemessen: zusammen 123 MB) – der gesicherte Arbeitsordner der Sandbox darf aber nur 128 MB groß sein. Committen stattdessen: `git add <Pfade>`, `git commit`, `git gc --prune=now` (Regeln in `HANDOFF.md`, Abschnitt „Git-Stand"). Wieder einschalten: den markierten Block am Anfang von `tools/save.sh` löschen.
 
 ## Für Entwickler: Prüfbefehle
 

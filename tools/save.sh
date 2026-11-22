@@ -2,6 +2,27 @@
 # Commit everything locally and refresh the repository copy inside `.archive` (full `.git` copy + base64 text archive)
 # and `.archiv/repo-sicherung` (base64 text archive + restore scripts).
 # Usage: npm run save -- "commit message"
+
+# --- SWITCHED OFF since 2026-11-22 (user decision, "for now") -------------------------------------------
+# The script writes three copies of .git (measured: 123 MB together). The saved workspace of the sandbox
+# may only hold 128 MB; above that the state is lost (HANDOFF.md, section "Git-Stand").
+# To switch it on again: delete this block down to the line "--- end of switch ---".
+cat >&2 <<'TXT'
+npm run save ist abgeschaltet (seit 2026-11-22). Es wurde nichts committet und nichts gesichert.
+
+Grund: Das Skript legt drei Kopien von .git an (zusammen rund 120 MB).
+       Der Arbeitsordner der Sandbox darf aber nur 128 MB groß sein.
+
+Stattdessen committen:
+  git add <Pfade>
+  git commit -m "Nachricht"
+  git gc --prune=now
+
+Wieder einschalten: den markierten Block am Anfang von tools/save.sh löschen.
+TXT
+exit 1
+# --- end of switch --------------------------------------------------------------------------------------
+
 set -e
 cd "$(dirname "$0")/.."
 A=.archiv/repo-sicherung

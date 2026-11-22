@@ -2,7 +2,9 @@
 
 ## Speicher der Sandbox (2026-11-22)
 - [x] `.git` neu gepackt (105,8 → 33,2 MB, nichts verloren) und die alte Text-Sicherung `.archiv/repo-sicherung/` gelöscht: der Arbeitsordner ist von 130,6 auf rund 48 MB geschrumpft (Limit 128 MB). Regel seitdem: nach jedem Commit `git gc --prune=now` (`HANDOFF.md`, Abschnitt „Git-Stand")
-- [ ] Entscheidung offen: `npm run save` (`tools/save.sh`) und `npm run restore-git` entfernen oder für die Sandbox sperren? `save` schriebe heute 123 MB in den Arbeitsordner, `restore-git` holt fest den Branch `B`
+- [x] `npm run save` abgeschaltet (Entscheidung des Nutzers: „erstmal"): `tools/save.sh` meldet das, endet mit Exit-Code 1 und ändert nichts. Es schriebe heute 123 MB in den Arbeitsordner. Wieder einschalten: den markierten Block am Anfang von `tools/save.sh` löschen
+- [ ] Entscheidung offen: `npm run save` endgültig entfernen oder wieder einschalten?
+- [ ] Entscheidung offen: `npm run restore-git` holt fest den Branch `B` – auf `dev` umstellen oder entfernen?
 - [ ] Nur falls der Speicher wieder knapp wird: lokale Historie kürzen (8,6 MB) und die Harness-Bundles `tools/harness/out/*.js` aus Git nehmen (weitere 12,4 MB)
 
 ## Aus dem Merge von Session 20 (Strecken) und Session 20 (Pods) (2026-11-22)
