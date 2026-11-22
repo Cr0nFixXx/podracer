@@ -13,7 +13,7 @@ Session 20 lief in zwei Zweigen und ist zusammengeführt ([Merge](docs/verlauf/2
 
 ## Git-Stand
 - Remote `origin` = `https://github.com/Cr0nFixXx/podracer.git`. Arbeitszweig **`dev`** (vom Nutzer am 2026-11-22 angelegt, gleich nach dem Merge von PR #2). `main` nicht direkt anfassen (Pull Requests). **Pushen** nur auf ausdrücklichen Wunsch: `git push origin dev`.
-- **Stand 2026-11-22:** auf GitHub ist `dev` = `a2925a4` (Hülle je Pod `ee3dc4b`, Speicher aufgeräumt `a2925a4`), zwei Commits vor `main` (`3625c99`). **Nur lokal, noch nicht gepusht:** `f845466` (`npm run save` abgeschaltet), `a5a1fb7` (`npm run restore-git` holt `dev`) und der Umbau der Doku. Prüfen: `git log --oneline origin/dev..dev`.
+- **Stand 2026-11-22:** `dev` ist ganz auf GitHub (zuletzt gepusht am 2026-11-22, auf Wunsch des Nutzers). Vor `main` (`3625c99`) liegen: Hülle je Pod `ee3dc4b`, Speicher aufgeräumt `a2925a4`, `npm run save` abgeschaltet `f845466`, `npm run restore-git` holt `dev` `a5a1fb7`, Doku neu geordnet `9fcd38a` – und der Commit mit diesem Eintrag. Prüfen, ob lokal etwas Ungepushtes liegt: `git log --oneline origin/dev..dev` (leer = alles ist auf GitHub).
 - **Zweige seit Session 20:** `main` ist der Sammelzweig; bisher kam alles über Pull Requests auf GitHub hinein. PR #1 hat **Session 20 (Strecken)** aus `B` nach `main` gebracht; PR #2 hat **Session 20 (Pods)** aus `new_pods` nach `main` gebracht (gemergt am 2026-11-22). Damit PR #2 ohne Konflikte mergebar war, wurde vorher `main` in `new_pods` gemergt (`docs/verlauf/2026-11-22-merge-session-20.md`). Seitdem gibt es den Zweig `dev`.
 - **Regeln zu Git und Sandbox** (Speicher-Limit 128 MB, nach jedem Commit `git gc --prune=now`, was nach einem Reset zu tun ist): `docs/regeln/git-sandbox.md`.
 

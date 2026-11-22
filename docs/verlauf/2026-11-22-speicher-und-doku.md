@@ -7,7 +7,7 @@
 - **`npm run save` abgeschaltet** (Entscheidung des Nutzers: „erstmal"). **`npm run restore-git` holt den Zweig `dev`** (vorher fest `B`).
 - Regeln, Zahlen und Rezepte dazu: `docs/regeln/git-sandbox.md`.
 
-## Doku nach Thema neu geordnet
+## Doku nach Thema neu geordnet (Commit `9fcd38a`)
 Entscheidungen des Nutzers: (1) Sitzungsprotokolle und erledigte Punkte in eigene Dateien verschieben, (2) `CLAUDE.md` in Grundregeln und Themen-Dateien teilen, (3) Texte nur umsortieren und Überholtes streichen – keine Regel neu formulieren.
 
 | Datei | vorher | nachher |
@@ -56,6 +56,9 @@ Entscheidungen des Nutzers: (1) Sitzungsprotokolle und erledigte Punkte in eigen
 
 **Nicht geprüft**
 - Ob jede alte Regel noch zum Code passt. Gestrichen ist nur, was nachweislich überholt war. Ältere Regeln, denen eine jüngere widerspricht, stehen weiter da – die jüngere gilt.
+
+## Gepusht
+- Am 2026-11-22 auf Wunsch des Nutzers nach `origin/dev`: `f845466`, `a5a1fb7`, `9fcd38a`. Geprüft mit `git ls-remote` und dem Vergleich auf GitHub: `dev` = `9fcd38a`, fünf Commits vor `main`, keiner dahinter. Danach der Commit mit diesem Eintrag.
 
 ## Überholte Punkte aus dem früheren Abschnitt „Git-Stand" (wörtlich, nur zur Erinnerung)
 - Lokales Repo im Projekt-Root, Branch **`B`**, Remote `origin` = `https://github.com/Cr0nFixXx/podracer.git`. **Pushen:** `git push origin B`.
