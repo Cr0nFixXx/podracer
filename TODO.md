@@ -10,10 +10,12 @@ Nur offene Punkte, nach Thema. Erledigtes steht im Verlauf: `docs/verlauf/`, je 
 - [ ] Cockpit-Innenansicht in einem Tunnel sichten (Regen und 90°-Rolle sind gesichtet)
 - [ ] Schadens-Balance von Hand fahren (bisher nur KI-Sim): sind 5–10 % je Bruchteil richtig?
 - [ ] **Neu seit dem 2026-11-22 – ansehen / probefahren:** (1) frontal in eine Felswand mit Mandrel Ram und Vrak Splitter-X: schützt die Nase spürbar, ein Streifer nicht? (2) Brandmarken bei Dorn Manta, Lyss Halo-9, Tarn Cyclone: sitzen sie jetzt auf Flanke, Ring und Rotor-Reif? (3) Lyss Halo-9 mit verlorenen Ringsegmenten aus der Nähe: Schnittkanten sauber? (4) Start eines Rennens: kein Ruckler mehr im ersten Bild des Countdowns (Einstellung „Hoch" oder „Ultra", WebGPU)
+- [ ] **Xbox-Controller geht beim Rennstart aus** (gemeldet 2026-11-22: drahtlos, Edge; nach dem Einschalten nach 1–2 s wieder aus). Das Spiel liest den Controller nur, im Code steht nichts, was ihn ausschalten kann. Verdacht, nicht bestätigt: Microsoft GameInput 4.0.300 unter Windows. **Gegenprobe:** geht er auch aus (a) im Spiel unter Einstellungen → Steuerung, (b) auf einer Gamepad-Testseite in Edge? Version: `winget list Microsoft.GameInput`; Abhilfe: `winget upgrade Microsoft.GameInput`, PC neu starten. Ergebnis melden. Bestätigt sich der Verdacht: einen Hinweis für Spieler in `README.md` (Abschnitt „Steuerung") ergänzen. Bleibt der Controller auf der Testseite an und geht nur im Spiel aus: weiter suchen – [Protokoll](docs/verlauf/2026-11-22-controller-und-action.md)
 
 ## 2. Entscheidungen des Nutzers
 - [ ] Entscheidung offen: `npm run save` endgültig entfernen oder wieder einschalten? (2026-11-22, Nutzer: vorerst **abgeschaltet lassen**)
 - [ ] Soll der Web-Build (`npm run build:web` → `build/`) online gestellt werden – Vercel, GitHub Pages? Er ist gebaut und über einen lokalen Server getestet, aber nirgends hochgeladen
+- [ ] **Gamepad geht mitten im Rennen aus** (leere Batterien, Verbindung weg): heute fliegt der Pod ungesteuert weiter. Soll das Rennen dann pausieren – aber nur, wenn zuletzt mit dem Gamepad gesteuert wurde? Dazu: das Spiel nimmt immer das erste gemeldete Gamepad; hängt ein zweites Gerät davor, wird der Controller nicht gelesen → das Gerät nehmen, das Eingaben liefert
 
 ## 3. Tunnel, Decke, Überkopf-Bauten
 - [ ] Bögen (Checkpoint-Bögen, Felsbögen, einstürzender Bogen) werden an der seitlichen Position der Pod-Mitte gelesen, ihre Kollisionsform ist dafür gepolstert → Eckpunkt für Eckpunkt prüfen? Dafür müssten die Bogenformen neu vermessen werden
@@ -40,7 +42,7 @@ Nur offene Punkte, nach Thema. Erledigtes steht im Verlauf: `docs/verlauf/`, je 
 - [ ] **Mini-Karte erweitern:** Abkürzungen, Gefahrenzonen und Set-Pieces als Symbole auf dem gecachten Minimap-Layer
 
 ## 7. Performance, Build, Werkzeuge, Doku
-- [ ] **GitHub-Action auf GitHub bringen:** `.github/workflows/check.yml` ist fertig und lokal committet, aber GitHub hat den Push abgelehnt – dem Zugangstoken des Nutzers fehlt das Recht, Workflow-Dateien zu schreiben (auf GitHub: Token → Repository permissions → „Workflows: Read and write"). Danach: pushen, den ersten Lauf unter „Actions" ansehen, den optionalen WebGPU-Job einmal von Hand starten
+- [ ] **Optionalen WebGPU-Job der GitHub-Action einmal starten** (auf GitHub: Actions → check → Run workflow, Häkchen „auch den WebGPU-Check laufen lassen"): er ist noch nie gelaufen. Schlägt er fehl, wird der Lauf nicht rot. Der Pflicht-Teil (`npm run check`, beide Builds) läuft seit dem 2026-11-22 bei jedem Push auf `dev`
 - [ ] **Build-Größe:** die eine Datei (`dist/index.html`) bleibt 17,6 MB, weil die Fotosets als Text darin stecken; der Web-Build (`build/`) ist 13,1 MB und lädt Texturen erst je Strecke. Weiter möglich: WebP/AVIF oder 512-px-Sets für die Voreinstellung „Niedrig"
 - [ ] Nur falls der Speicher wieder knapp wird: lokale Historie kürzen (`git fetch --depth 1`, rund 21 MB: die alte Text-Sicherung und die alten Harness-Bundles liegen nur noch in der Historie)
 - [ ] **Harness:** WebGPU-Screenshots im headless Chrome reparieren (weiß; nur Konsolencheck möglich)

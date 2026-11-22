@@ -9,7 +9,7 @@ Auftrag des Nutzers: aus `TODO.md` die Entscheidungen (Abschnitt 2) durchgehen u
 | Wandtreffer | **frontal = Zone „Front"** | umgesetzt (Punkt 1) |
 | `npm run save` | **abgeschaltet lassen** | nichts geändert; ob das Skript ganz entfernt wird, bleibt offen |
 | Build in mehrere Dateien | **zweiter Build daneben** | `npm run build:web` (Punkt 4) |
-| Pushen | **am Ende direkt auf `dev`** | gepusht bis auf die GitHub-Action (siehe „Git") |
+| Pushen | **am Ende direkt auf `dev`** | gepusht; die GitHub-Action kam in der Folgerunde nach (siehe „Git") |
 
 ## Was gemacht wurde
 ### 1. Wandtreffer: womit der Pod trifft, entscheidet
@@ -53,7 +53,7 @@ Auftrag des Nutzers: aus `TODO.md` die Entscheidungen (Abschnitt 2) durchgehen u
 ### 6. GitHub-Action
 - `.github/workflows/check.yml`: bei jedem Push auf `dev` und jedem Pull Request nach `main` laufen `npm ci`, `npm run check`, `npm run build`, `npm run build:web` (Node 20 wie in der Sandbox).
 - `npm run check:gpu` ist ein zweiter Job, der nur läuft, wenn man den Lauf von Hand startet und das Häkchen setzt; schlägt er fehl, wird der Lauf nicht rot.
-- **Noch nicht auf GitHub:** der Push dieser einen Datei wurde abgelehnt – dem Zugangstoken des Nutzers fehlt das Recht, Workflow-Dateien zu schreiben (auf GitHub: Token → Repository permissions → „Workflows: Read and write"). Der Commit liegt lokal auf `dev`. Deshalb ist auch noch kein Lauf geprüft.
+- Der Push dieser einen Datei wurde in dieser Runde abgelehnt: dem Zugangstoken des Nutzers fehlte das Recht, Workflow-Dateien zu schreiben. **Nachtrag:** seit der Folgerunde ist die Action auf GitHub, der erste Lauf war grün – [Protokoll](2026-11-22-controller-und-action.md).
 
 ### 7. Fern-LOD für Tafelberge: gemessen, nicht gebaut
 | Strecke | Bild am Start | Tafelberge | Anteil | Zwilling ab 900 m spart | Draw-Calls der Tafelberge heute → mit Sektoren |
@@ -76,13 +76,13 @@ Auftrag des Nutzers: aus `TODO.md` die Entscheidungen (Abschnitt 2) durchgehen u
 
 ## Nicht geprüft
 - Auf echter GPU: ob der Ruckler im ersten Bild des Countdowns spürbar war und jetzt weg ist (gezählt sind Pipelines, nicht Millisekunden); Brandmarken an Manta, Halo, Cyclone am Bild; Halo-Schnittkanten aus der Nähe; Wandtreffer von Hand gefahren.
-- Die GitHub-Action: die Datei ist geschrieben und als YAML gültig; die Befehle darin (`npm ci` ausgenommen) liefen in der Sandbox. Auf GitHub ist sie noch nicht gelaufen (siehe „Git"). Der optionale WebGPU-Job muss ohnehin von Hand gestartet werden.
+- Die GitHub-Action lief in dieser Runde nicht auf GitHub (siehe „Git"); geprüft war nur: gültiges YAML, die Befehle darin liefen in der Sandbox. **Nachtrag:** der erste Lauf in der Folgerunde war grün. Der optionale WebGPU-Job ist noch nie gelaufen (muss von Hand gestartet werden).
 - Der Web-Build ist nirgends hochgeladen; getestet ist er nur lokal im Headless-Chrome (WebGL2).
 - Der Bild-Server des Harness nur mit `curl`, nicht aus einem Browser unter Windows.
 
 ## Git
 - Commit `6fc55fc` (alles außer der GitHub-Action) und der Commit mit dem Git-Stand sind auf Wunsch des Nutzers nach `origin/dev` gepusht.
-- Der Commit „GitHub-Action …" (`.github/workflows/check.yml`) liegt nur lokal: GitHub lehnte ihn ab („refusing to allow a Personal Access Token to create or update workflow … without `workflow` scope"). Nächster Schritt: `HANDOFF.md` → „Git-Stand".
+- Der Commit „GitHub-Action …" (`.github/workflows/check.yml`) blieb in dieser Runde lokal: GitHub lehnte ihn ab („refusing to allow a Personal Access Token to create or update workflow … without `workflow` scope"). **Nachtrag:** in der Folgerunde gepusht als `2d089ca` ([Protokoll](2026-11-22-controller-und-action.md)).
 
 ## Erledigt (aus `TODO.md`)
 - [x] Entscheidung prüfen: ein Pod zählt so hoch wie seine größte Ausstattung (Aurora XR-7 ab Werk 0,70 m mehr, als sie ist) – oder Höhe je montierter Ausstattung? → **entschieden: bleibt so** (ein Pod zählt so hoch wie seine größte Ausstattung)
@@ -92,3 +92,4 @@ Auftrag des Nutzers: aus `TODO.md` die Entscheidungen (Abschnitt 2) durchgehen u
 - [x] **Aufräumen:** `tools/harness/out/game.js` (19,6 MB Build-Artefakt) ist getrackt – aus dem Repo nehmen; `world.ts → place()`: der Früh-Ausstieg `if (count <= 0)` steht versehentlich hinter einem Kommentar → beides erledigt, der ganze Ordner `tools/harness/out/` ist ignoriert
 - [x] `tools/harness/pui.mjs:39` prüft noch die gelöschte „Neon-Spirale" → anpassen; `tools/harness/run.sh` läuft nur unter Linux → `pui.mjs` prüft mit „Frostspalt-Ring" / „Boonta-Kessel"; `run.sh` gelöscht, `npm run harness:build` läuft auf jedem System
 - [x] **Fern-LOD auch für Tafelberge**, falls die Messung es rechtfertigt (Kiefern und Felsbrocken haben seit Session 20 einen Zwilling) → gemessen: lohnt nicht, nicht gebaut
+- [x] **`npm run check` in GitHub Actions** (Push auf `dev`), `check:gpu` als optionaler Job → `.github/workflows/check.yml` (auf GitHub seit der Folgerunde)

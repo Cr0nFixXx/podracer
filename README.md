@@ -192,7 +192,7 @@ Alle Änderungen sind committet (Remote `origin` = `github.com/Cr0nFixXx/podrace
 6. Strecken-Aufbau ansehen (Tunnel, Untergründe, Seen, engste Kurven): `npx esbuild tools/ci/info.ts --bundle --platform=node --format=esm --outfile=tools/ci/out/info.mjs --log-level=error && node tools/ci/out/info.mjs frost`.
 7. `npm run harness:build` – baut die Test-Seiten für den Headless-Browser (`tools/harness/out/`, auf jedem System; sie liegen nicht in Git).
 
-**Auf GitHub** laufen `npm run check` und beide Builds bei jedem Push auf `dev` und bei jedem Pull Request nach `main` (`.github/workflows/check.yml`, unter „Actions"). Der WebGPU-Check läuft dort nur, wenn man den Lauf von Hand startet und das Häkchen setzt. (Stand 2026-11-22: die Datei ist fertig, aber noch nicht auf GitHub – siehe `HANDOFF.md` → „Git-Stand".)
+**Auf GitHub** laufen `npm run check` und beide Builds bei jedem Push auf `dev` und bei jedem Pull Request nach `main` (`.github/workflows/check.yml`, unter „Actions"). Der WebGPU-Check läuft dort nur, wenn man den Lauf von Hand startet und das Häkchen setzt.
 
 Begriffe des Projekts stehen in `CONTEXT.md`, grundlegende Entscheidungen in `docs/adr/`. Stand und nächster Schritt: `HANDOFF.md`. Regeln für die Arbeit am Code: `CLAUDE.md` und `docs/regeln/`. Was in welcher Sitzung gemacht wurde: `docs/verlauf/`.
 
