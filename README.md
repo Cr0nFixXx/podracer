@@ -169,19 +169,15 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 | Screen Space Reflections | optionale Echtzeit-Spiegelungen auf nahen Metall-/Glanzflächen (in Ultra standardmäßig aus für maximale FPS) |
 | Detail-Dichte / Geometrie | Menge & Feinheit von Bewuchs, Sektor-Deko, Podracer-LODs und Gelände |
 
-## Git: lokale Commits und Kopie im Archiv
+## Git: Stand und Sicherung
 
-Alle Änderungen sind committet (Remote `origin` = `github.com/Cr0nFixXx/podracer`). Session 20 besteht aus zwei Teilen: **Strecken** (Branch `B`, per Pull Request #1 in `main`) und **Pods** (Branch `new_pods`, per Pull Request #2 in `main`). `main` enthält beide; die Weiterarbeit liegt im Zweig `dev`. In der Textkopie unten ist Session 20 nicht enthalten (sie steht auf Session 19; `npm run save` erneuert sie).
+Alle Änderungen sind committet (Remote `origin` = `github.com/Cr0nFixXx/podracer`). Session 20 besteht aus zwei Teilen: **Strecken** (Branch `B`, per Pull Request #1 in `main`) und **Pods** (Branch `new_pods`, per Pull Request #2 in `main`). `main` enthält beide; die Weiterarbeit liegt im Zweig `dev`.
 
-**Der versteckte Ordner `.git` fehlt im Download.** Er steckt deshalb als Textdatei in **`.archiv/repo-sicherung/podracer-git.tar.gz.b64.txt`**. Wiederherstellen (im Projektordner ausführen):
+**GitHub ist die Sicherung.** Den Stand holen: `git clone https://github.com/Cr0nFixXx/podracer.git` (`main` = gemergter Stand, `dev` = Weiterarbeit).
 
-1. Windows: `powershell -ExecutionPolicy Bypass -File .archiv\repo-sicherung\wiederherstellen.ps1`
-2. Linux/macOS: `sh .archiv/repo-sicherung/wiederherstellen.sh`
-3. Danach: `git log --oneline` und `git push origin B`.
+**Der versteckte Ordner `.git` fehlt im Download des Arbeitsordners.** Früher lag er deshalb als Textkopie im Repo (`.archiv/repo-sicherung/`, erneuert von `npm run save`). Diese Kopie stand auf Session 19 und ist seit dem 2026-11-22 gelöscht. Die Git-Historie behält sie: `git show ee3dc4b:.archiv/repo-sicherung/podracer-git.tar.gz.b64.txt`.
 
-Neue Änderungen sichern: `npm run save -- "Beschreibung"` (committet und erneuert die Kopie).
-
-**Achtung:** diese Textkopie steht auf dem Stand von Session 19 (Branch `B`). Der aktuelle Stand liegt auf GitHub – dort holen (`git clone`; `main` = gemergter Stand, `dev` = Weiterarbeit) statt wiederherstellen.
+**`npm run save` nicht in der Sandbox benutzen.** Das Skript legt drei Kopien von `.git` an (gemessen: zusammen 123 MB) – der gesicherte Arbeitsordner darf dort aber nur 128 MB groß sein. Dort stattdessen: `git add <Pfade>`, `git commit`, `git gc --prune=now` (Regeln in `HANDOFF.md`, Abschnitt „Git-Stand").
 
 ## Für Entwickler: Prüfbefehle
 

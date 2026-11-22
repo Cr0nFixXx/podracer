@@ -1,5 +1,10 @@
 # TODO
 
+## Speicher der Sandbox (2026-11-22)
+- [x] `.git` neu gepackt (105,8 → 33,2 MB, nichts verloren) und die alte Text-Sicherung `.archiv/repo-sicherung/` gelöscht: der Arbeitsordner ist von 130,6 auf rund 48 MB geschrumpft (Limit 128 MB). Regel seitdem: nach jedem Commit `git gc --prune=now` (`HANDOFF.md`, Abschnitt „Git-Stand")
+- [ ] Entscheidung offen: `npm run save` (`tools/save.sh`) und `npm run restore-git` entfernen oder für die Sandbox sperren? `save` schriebe heute 123 MB in den Arbeitsordner, `restore-git` holt fest den Branch `B`
+- [ ] Nur falls der Speicher wieder knapp wird: lokale Historie kürzen (8,6 MB) und die Harness-Bundles `tools/harness/out/*.js` aus Git nehmen (weitere 12,4 MB)
+
 ## Aus dem Merge von Session 20 (Strecken) und Session 20 (Pods) (2026-11-22)
 - [x] **Tunneldecke je Pod** – erledigt in zwei Schritten: erst eine gemessene Höhe je Pod, dann die **Hülle je Pod** (`src/game/podHulls.json`, `hullWorld`, `vaultOver`; `HANDOFF.md` → „Hülle je Pod")
 - [x] Tunneldecke, Rest: jeder Eckpunkt der Hülle wird gegen die Schale über ihm geprüft – Nicken, Rollen, Triebwerkshub und Cockpit-Pendeln sind eingerechnet (nicht nur drei Punkte)
