@@ -1,0 +1,47 @@
+{
+  "note": "Golden numbers of the pod models (meshes / triangles per build). tools/ci/pods.ts must reproduce `rows` exactly from src/game/podAssembly.ts; the browser harness (tools/harness/pods.ts -> statsAll()) measures the same on the real models. Pods changed on purpose: `UPDATE=write npm run check:pods` and say why in HANDOFF.md.",
+  "columns": [
+    "id",
+    "heroQ1 meshes",
+    "heroQ1 tris",
+    "heroQ2 meshes",
+    "heroQ2 tris",
+    "heroQ3 meshes",
+    "heroQ3 tris",
+    "rivalQ2 near meshes",
+    "rivalQ2 near tris",
+    "rivalQ3 near meshes",
+    "rivalQ3 near tris",
+    "far meshes",
+    "far tris"
+  ],
+  "measured": "Session 20 / Phase 6: Lyss Halo-9 – ring wing built in arcs (Bruchteile ringA / ringB) with end plates; all other pods unchanged",
+  "rows": [
+    ["aurora",41,26806,41,42334,41,57170,30,14612,31,40576,3,444],
+    ["brute",39,26126,39,41210,39,55462,28,16052,29,39452,3,492],
+    ["gasvaro",64,50442,64,89698,64,119050,29,33016,30,84484,3,884],
+    ["bomquad",51,39972,51,68276,51,89280,27,25018,29,64790,3,536],
+    ["mavik",38,23258,38,36314,38,50754,27,12944,28,34556,3,456],
+    ["rattis",38,20618,40,34454,40,43710,28,12424,30,32696,3,444],
+    ["aldo",39,25978,39,42914,39,57662,28,14688,29,41156,3,444],
+    ["teemo",51,35942,51,62022,51,80194,28,23952,29,58536,3,528],
+    ["elana",39,24158,39,37670,39,51878,28,12940,29,35912,3,456],
+    ["odo",41,24638,41,39670,41,52638,30,14660,31,37912,3,492],
+    ["cyclone",41,22854,41,35174,41,46578,32,12032,33,33416,3,648],
+    ["halo",39,23958,39,32810,39,45094,28,13244,29,31052,3,732],
+    ["manta",38,16254,38,21554,38,27042,27,8140,28,19796,3,748],
+    ["volt",37,31130,39,44090,39,58782,25,18944,29,42332,3,508]
+  ],
+  "budgetRef": { "note": "Session 19 numbers (before the pod overhaul, measured in the browser at commit d7b9c4b). Budget reference for the old pods: never edit.", "rows": [
+    ["aurora",40,26132,40,39692,40,51068,31,22184,31,23824,3,544],
+    ["brute",37,26804,37,39888,37,50656,28,22976,28,24536,3,544],
+    ["gasvaro",62,49516,62,83388,62,106412,29,39328,29,43144,3,984],
+    ["bomquad",49,39800,49,65544,49,84664,28,31760,28,35136,3,764],
+    ["mavik",37,24092,37,35604,37,46692,28,20120,28,21776,3,544],
+    ["rattis",38,22720,38,34676,38,44196,29,19324,29,20596,3,544],
+    ["aldo",37,25044,37,39148,37,50508,28,21096,28,22736,3,544],
+    ["teemo",50,38028,50,61684,50,78308,30,30996,30,33700,3,764],
+    ["elana",38,24896,38,36496,38,47328,29,20924,29,22580,3,544],
+    ["odo",40,24580,40,37660,40,48044,31,20872,31,22352,3,544]
+  ] }
+}

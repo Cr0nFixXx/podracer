@@ -4,8 +4,9 @@ import { KeyBindings, PadBindings } from './KeyBindings';
 import { sanitizeEnv, timeOptionsFor, weatherOptionsFor, type TimeOfDay, type WeatherKind } from '../game/environment';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, STAT_LABELS, THEMES, TRACKS, type StatKey } from '../game/data';
-import { effectiveStats, LIVERY_PATTERNS, PAINT_FINISHES, type PaintFinish, type Profile } from '../game/settings';
+import { effectiveStats, KIT_SLOTS, LIVERY_PATTERNS, MAX_OPPONENTS, PAINT_FINISHES, type PaintFinish, type PodKit, type Profile } from '../game/settings';
 import { buildTrack, type TrackData } from '../game/trackBuilder';
+import { damageModel } from '../game/podDamage';
 import { CAMERA_NAMES, fmt } from '../game/Game';
 import { Btn, Panel, Slider, StatBar } from './common';
 import PodPreview from './PodPreview';
@@ -150,7 +151,7 @@ export function RaceSetup({ profile, update, go, start }: { profile: Profile; up
           </Panel>
           <Panel title="Renneinstellungen">
             {track.type === 'circuit' ? <Slider label="Runden" value={r.laps} min={1} max={7} step={1} onChange={v => set('laps', v)} /> : <div className="text-[11px] uppercase tracking-widest text-stone-400 mb-3">Sprint – Punkt zu Punkt</div>}
-            <Slider label="Gegner" value={r.opponents} min={0} max={10} step={1} onChange={v => set('opponents', v)} />
+            <Slider label="Gegner" value={r.opponents} min={0} max={MAX_OPPONENTS} step={1} onChange={v => set('opponents', v)} />
             <div className="text-[11px] uppercase tracking-widest text-stone-300 mb-2">Schwierigkeit</div>
             <div className="grid grid-cols-2 gap-2 mb-4">{DIFFICULTIES.map((d, i) => <Btn key={d.id} active={r.difficulty === i} onClick={() => set('difficulty', i)}>{d.name}</Btn>)}</div>
             <div className="grid grid-cols-2 gap-2 mb-4">
@@ -196,6 +197,11 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
   const setCustom = (c: typeof custom) => update(p => ({ ...p, custom: { ...p.custom, [sel]: c } }));
   const setColor = (i: number, v: string) => { const cols = [...custom.colors] as [string, string, string]; cols[i] = v; setCustom({ ...custom, colors: cols }); };
   const setTune = (k: StatKey, v: number) => setCustom({ ...custom, tuning: { ...custom.tuning, [k]: Math.max(0, Math.min(5, v)) } });
+  const setKit = (k: keyof PodKit, v: number) => setCustom({ ...custom, kit: { fins: 0, intake: 0, nozzle: 0, canopy: 0, ...(custom.kit ?? {}), [k]: v } });
+  const [tab, setTab] = useState<'lack' | 'teile'>('lack');
+  // Schadens-Vorschau: engine health of the preview pod (both sides) and the racer's Bruchteile per step
+  const [health, setHealth] = useState(100);
+  const breaks = useMemo(() => [50, 35, 20].map(step => ({ step, label: [...new Set(damageModel(sel).parts.filter(b => b.step === step).map(b => b.label))].join(' / ') })), [sel]);
   return (
     <div className="relative w-full h-full overflow-hidden">
       <Background dim={0.75} />
@@ -207,26 +213,46 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
         </div>
         <div className="grid grid-cols-[230px_1fr_320px] gap-4 flex-1 min-h-0">
           <Panel title="Podracer">
-            <div className="flex flex-col gap-1.5">
+            {/* one line per racer: 14 rows fit the panel without scrolling (pod name left, pilot right) */}
+            <div className="flex flex-col gap-1">
               {PODS.map(p => (
-                <button key={p.id} onClick={() => setSel(p.id)} className={`text-left px-3 py-1 border transition flex items-center gap-3 ${p.id === sel ? 'border-amber-300 bg-amber-400/15' : 'border-stone-800 bg-black/30 hover:border-amber-500/50'}`}>
-                  <span className="w-3 h-3 rounded-full" style={{ background: profile.custom[p.id].colors[0], boxShadow: `0 0 8px ${p.colors[2]}` }} />
-                  <span className="flex-1"><span className="block font-display text-sm text-amber-100">{p.name}</span><span className="block text-[10px] text-stone-400">{PILOTS.find(x => x.id === p.pilotId)!.name}</span></span>
-                  {profile.podId === p.id && <span className="text-amber-300 text-xs">●</span>}
+                <button key={p.id} onClick={() => setSel(p.id)} className={`text-left px-2.5 py-[5px] border transition flex items-center gap-2 ${p.id === sel ? 'border-amber-300 bg-amber-400/15' : 'border-stone-800 bg-black/30 hover:border-amber-500/50'}`}>
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: profile.custom[p.id].colors[0], boxShadow: `0 0 8px ${p.colors[2]}` }} />
+                  <span className="font-display text-[13px] leading-4 text-amber-100 whitespace-nowrap">{p.name}</span>
+                  <span className="flex-1 text-right text-[9px] leading-4 text-stone-400 whitespace-nowrap overflow-hidden text-ellipsis">{PILOTS.find(x => x.id === p.pilotId)!.name.split(' ')[0]}</span>
+                  {profile.podId === p.id && <span className="text-amber-300 text-[10px] leading-4">●</span>}
                 </button>
               ))}
             </div>
           </Panel>
           <div className="flex flex-col gap-4 min-h-0">
             <div className="relative flex-1 min-h-[210px] border border-amber-500/20 bg-black/40 clip-corner overflow-hidden">
-              <PodPreview podId={sel} colors={custom.colors} pattern={custom.pattern} finish={custom.finish} className="absolute inset-0" />
+              <PodPreview podId={sel} colors={custom.colors} pattern={custom.pattern} finish={custom.finish} kit={custom.kit} tune={custom.tuning} health={health} className="absolute inset-0" />
               <div className="absolute top-3 left-4 pointer-events-none">
                 <div className="font-display text-2xl text-amber-100">{pod.name}</div>
                 <div className="text-stone-300 text-xs max-w-md">{pod.desc}</div>
               </div>
               <div className="absolute bottom-2.5 right-3 text-[10px] uppercase tracking-widest text-stone-400">Ziehen · Mausrad Zoom</div>
+              {/* Schadens-Vorschau: what this racer loses at 50 / 35 / 20 % engine health */}
+              <div className="absolute bottom-2 left-3 w-[250px]" data-damage-preview>
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-stone-300">
+                  <span className="shrink-0">Schadens-Vorschau</span>
+                  <input type="range" min={0} max={100} step={5} value={100 - health} onChange={e => setHealth(100 - parseInt(e.target.value))} className="flex-1 min-w-0 accent-red-500" aria-label="Schadens-Vorschau" />
+                  <span className={`shrink-0 w-9 text-right tabular-nums ${health < 50 ? 'text-red-300' : 'text-stone-300'}`}>{health} %</span>
+                </div>
+                <div className="mt-0.5 text-[9px] leading-[1.35] text-stone-400">
+                  {breaks.map(b => <div key={b.step} className={health < b.step ? 'text-red-300' : ''}><span className="inline-block w-8 tabular-nums">{b.step} %</span>{b.label}</div>)}
+                </div>
+              </div>
             </div>
             <Panel title="Lackierung & Design">
+              {/* two tabs in the same panel: paint (Lack) and Style-Teile (Teile) */}
+              <div className="flex items-center gap-1 -mt-1 mb-2">
+                {(['lack', 'teile'] as const).map(t => (
+                  <button key={t} data-tab={t} onClick={() => setTab(t)} className={`px-3 py-0.5 border text-[10px] uppercase tracking-widest ${tab === t ? 'border-amber-300 bg-amber-400/15 text-amber-200' : 'border-stone-700 text-stone-400 hover:border-stone-400'}`}>{t === 'lack' ? 'Lack' : 'Teile'}</button>
+                ))}
+              </div>
+              {tab === 'lack' ? (<>
               <div className="grid grid-cols-3 gap-3">
                 {['Primär', 'Sekundär', 'Glühen'].map((l, i) => (
                   <div key={l}>
@@ -258,6 +284,24 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
                 <button onClick={() => setCustom({ ...custom, colors: [...pod.colors] as [string, string, string], pattern: undefined, finish: 0 })}
                   className={`px-1.5 py-1 border text-[10px] ${custom.colors.join() === pod.colors.join() && custom.pattern === undefined && (custom.finish ?? 0) === 0 ? 'border-amber-400 text-amber-200' : 'border-stone-700 text-stone-300 hover:border-stone-400'}`}>Werk</button>
               </div>
+              </>) : (
+              <div className="grid grid-cols-2 gap-x-5 gap-y-2.5">
+                {KIT_SLOTS.map(sl => (
+                  <div key={sl.key}>
+                    <div className="text-[10px] uppercase tracking-widest text-stone-300 mb-1">{sl.label}</div>
+                    <div className="flex flex-wrap gap-1">
+                      {sl.choices.map((c, i) => (
+                        <button key={c} data-kit={`${sl.key}:${i}`} onClick={() => setKit(sl.key, i)} className={`px-1.5 py-0.5 border text-[10px] ${(custom.kit?.[sl.key] ?? 0) === i ? 'border-amber-300 bg-amber-400/15 text-amber-200' : 'border-stone-700 text-stone-300 hover:border-stone-400'}`}>{c}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <div className="col-span-2 flex items-center justify-between gap-3 text-[10px] text-stone-500">
+                  <span>Style-Teile ändern nur das Aussehen. Tuning-Teile wachsen mit den Tuning-Stufen rechts: ab Stufe 2 klein, ab Stufe 4 groß.</span>
+                  <button onClick={() => setCustom({ ...custom, kit: undefined })} className={`shrink-0 px-1.5 py-1 border ${custom.kit && Object.values(custom.kit).some(v => v > 0) ? 'border-stone-700 text-stone-300 hover:border-stone-400' : 'border-amber-400 text-amber-200'}`}>Alles Werk</button>
+                </div>
+              </div>
+              )}
             </Panel>
           </div>
           <div className="flex flex-col gap-5">

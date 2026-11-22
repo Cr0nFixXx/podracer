@@ -7,10 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "tsc --noEmit -p . && esbuild tools/ci/sim.ts --bundle --platform=node --format=esm --outfile=tools/ci/out/sim.mjs --log-level=error && node tools/ci/out/sim.mjs",
+    "check": "tsc --noEmit -p . && npm run check:unit --silent && npm run check:pods --silent && esbuild tools/ci/sim.ts --bundle --platform=node --format=esm --outfile=tools/ci/out/sim.mjs --log-level=error && node tools/ci/out/sim.mjs",
     "check:gpu": "node tools/ci/gpu.mjs",
     "save": "sh tools/save.sh",
-    "restore-git": "sh tools/restore-git.sh"
+    "restore-git": "sh tools/restore-git.sh",
+    "check:pods": "esbuild tools/ci/pods.ts --bundle --platform=node --format=esm --outfile=tools/ci/out/pods.mjs --log-level=error && node tools/ci/out/pods.mjs",
+    "check:unit": "esbuild tools/ci/unit.ts --bundle --platform=node --format=esm --outfile=tools/ci/out/unit.mjs --log-level=error && node tools/ci/out/unit.mjs"
   },
   "dependencies": {
     "@types/three": "^0.187.0",

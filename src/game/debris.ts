@@ -1,4 +1,5 @@
 // ===== Session 15: solid debris chunks (instanced, opaque) – replaces the translucent sprite "chunks" =====
+// Session 20: a second shape, 'plate' = painted sheet metal (Bruchteile that tear off a pod, pieces of an exploding pod).
 import * as THREE from 'three';
 
 const N = 72, G = 32;
@@ -8,9 +9,9 @@ export class DebrisPool {
   private life = new Float32Array(N); private size = new Float32Array(N); private gy = new Float32Array(N); private ang = new Float32Array(N);
   private head = 0; private active = 0;
   private m = new THREE.Matrix4(); private q = new THREE.Quaternion(); private a = new THREE.Vector3(); private s = new THREE.Vector3(); private pos = new THREE.Vector3(); private c = new THREE.Color();
-  constructor() {
-    const geo = new THREE.IcosahedronGeometry(1, 0); geo.scale(1, 0.7, 0.85);
-    const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.88, metalness: 0.05, flatShading: true });
+  constructor(shape: 'chunk' | 'plate' = 'chunk') {
+    const geo = shape === 'plate' ? new THREE.BoxGeometry(1.5, 0.09, 1) : new THREE.IcosahedronGeometry(1, 0); if (shape === 'chunk') geo.scale(1, 0.7, 0.85);
+    const mat = shape === 'plate' ? new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.42, metalness: 0.6 }) : new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.88, metalness: 0.05, flatShading: true });
     this.mesh = new THREE.InstancedMesh(geo, mat, N); this.mesh.frustumCulled = false; this.mesh.castShadow = false; this.mesh.receiveShadow = true;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.m.makeScale(0, 0, 0); for (let i = 0; i < N; i++) { this.mesh.setMatrixAt(i, this.m); this.mesh.setColorAt(i, this.c.set('#888888')); }
@@ -29,6 +30,8 @@ export class DebrisPool {
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
     this.mesh.visible = true; this.active = N;
   }
+  /** Shows the (empty) pool for one frame so that its pipeline is compiled during the warm-up, not at the first crash. */
+  warm(on: boolean) { if (!this.active) this.mesh.visible = on; }
   update(dt: number) {
     if (!this.active || dt <= 0) return;
     let alive = 0;

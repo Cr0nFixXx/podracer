@@ -4,7 +4,7 @@ var __export = (target, all2) => {
     __defProp(target, name, { get: all2[name], enumerable: true });
 };
 
-// node_modules/three/build/three.core.js
+// ../../node_modules/three/build/three.core.js
 var REVISION = "187";
 var CullFaceNone = 0;
 var CullFaceBack = 1;
@@ -351,6 +351,7 @@ var EventDispatcher = class {
   }
 };
 var _lut = ["00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "0a", "0b", "0c", "0d", "0e", "0f", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "1a", "1b", "1c", "1d", "1e", "1f", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "2a", "2b", "2c", "2d", "2e", "2f", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "3a", "3b", "3c", "3d", "3e", "3f", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "4a", "4b", "4c", "4d", "4e", "4f", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "5a", "5b", "5c", "5d", "5e", "5f", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "6a", "6b", "6c", "6d", "6e", "6f", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "7a", "7b", "7c", "7d", "7e", "7f", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "8a", "8b", "8c", "8d", "8e", "8f", "90", "91", "92", "93", "94", "95", "96", "97", "98", "99", "9a", "9b", "9c", "9d", "9e", "9f", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "aa", "ab", "ac", "ad", "ae", "af", "b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "ba", "bb", "bc", "bd", "be", "bf", "c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "ca", "cb", "cc", "cd", "ce", "cf", "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "da", "db", "dc", "dd", "de", "df", "e0", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "ea", "eb", "ec", "ed", "ee", "ef", "f0", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "fa", "fb", "fc", "fd", "fe", "ff"];
+var _seed = 1234567;
 var DEG2RAD = Math.PI / 180;
 var RAD2DEG = 180 / Math.PI;
 function generateUUID() {
@@ -367,11 +368,101 @@ function clamp(value, min3, max4) {
 function euclideanModulo(n, m) {
   return (n % m + m) % m;
 }
+function mapLinear(x, a1, a2, b1, b2) {
+  return b1 + (x - a1) * (b2 - b1) / (a2 - a1);
+}
+function inverseLerp(x, y, value) {
+  if (x !== y) {
+    return (value - x) / (y - x);
+  } else {
+    return 0;
+  }
+}
 function lerp(x, y, t) {
   return (1 - t) * x + t * y;
 }
+function damp(x, y, lambda, dt) {
+  return lerp(x, y, 1 - Math.exp(-lambda * dt));
+}
+function pingpong(x, length4 = 1) {
+  return length4 - Math.abs(euclideanModulo(x, length4 * 2) - length4);
+}
+function smoothstep(x, min3, max4) {
+  if (x <= min3) return 0;
+  if (x >= max4) return 1;
+  x = (x - min3) / (max4 - min3);
+  return x * x * (3 - 2 * x);
+}
+function smootherstep(x, min3, max4) {
+  if (x <= min3) return 0;
+  if (x >= max4) return 1;
+  x = (x - min3) / (max4 - min3);
+  return x * x * x * (x * (x * 6 - 15) + 10);
+}
+function randInt(low, high) {
+  return low + Math.floor(Math.random() * (high - low + 1));
+}
+function randFloat(low, high) {
+  return low + Math.random() * (high - low);
+}
+function randFloatSpread(range2) {
+  return range2 * (0.5 - Math.random());
+}
+function seededRandom(s) {
+  if (s !== void 0) _seed = s;
+  let t = _seed += 1831565813;
+  t = Math.imul(t ^ t >>> 15, t | 1);
+  t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+  return ((t ^ t >>> 14) >>> 0) / 4294967296;
+}
+function degToRad(degrees2) {
+  return degrees2 * DEG2RAD;
+}
+function radToDeg(radians2) {
+  return radians2 * RAD2DEG;
+}
+function isPowerOfTwo(value) {
+  return value > 0 && Number.isInteger(value) && 2 ** Math.round(Math.log2(value)) === value;
+}
+function ceilPowerOfTwo(value) {
+  return Math.pow(2, Math.ceil(Math.log(value) / Math.LN2));
+}
 function floorPowerOfTwo(value) {
   return Math.pow(2, Math.floor(Math.log(value) / Math.LN2));
+}
+function setQuaternionFromProperEuler(q, a, b, c, order) {
+  const cos3 = Math.cos;
+  const sin4 = Math.sin;
+  const c2 = cos3(b / 2);
+  const s2 = sin4(b / 2);
+  const c13 = cos3((a + c) / 2);
+  const s13 = sin4((a + c) / 2);
+  const c1_3 = cos3((a - c) / 2);
+  const s1_3 = sin4((a - c) / 2);
+  const c3_1 = cos3((c - a) / 2);
+  const s3_1 = sin4((c - a) / 2);
+  switch (order) {
+    case "XYX":
+      q.set(c2 * s13, s2 * c1_3, s2 * s1_3, c2 * c13);
+      break;
+    case "YZY":
+      q.set(s2 * s1_3, c2 * s13, s2 * c1_3, c2 * c13);
+      break;
+    case "ZXZ":
+      q.set(s2 * c1_3, s2 * s1_3, c2 * s13, c2 * c13);
+      break;
+    case "XZX":
+      q.set(c2 * s13, s2 * s3_1, s2 * c3_1, c2 * c13);
+      break;
+    case "YXY":
+      q.set(s2 * c3_1, c2 * s13, s2 * s3_1, c2 * c13);
+      break;
+    case "ZYZ":
+      q.set(s2 * s3_1, s2 * c3_1, c2 * s13, c2 * c13);
+      break;
+    default:
+      warn("MathUtils: .setQuaternionFromProperEuler() encountered an unknown order: " + order);
+  }
 }
 function getNormalizationScale(array2) {
   switch (array2.constructor) {
@@ -404,6 +495,250 @@ function normalize(value, array2) {
   if (scale3 === void 0) throw new Error("THREE.MathUtils: Invalid component type.");
   return Math.round(value * scale3);
 }
+var MathUtils = {
+  DEG2RAD,
+  RAD2DEG,
+  /**
+   * Generate a [UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier)
+   * (universally unique identifier).
+   *
+   * @static
+   * @method
+   * @return {string} The UUID.
+   */
+  generateUUID,
+  /**
+   * Clamps the given value between min and max.
+   *
+   * @static
+   * @method
+   * @param {number} value - The value to clamp.
+   * @param {number} min - The min value.
+   * @param {number} max - The max value.
+   * @return {number} The clamped value.
+   */
+  clamp,
+  /**
+   * Computes the Euclidean modulo of the given parameters that
+   * is `( ( n % m ) + m ) % m`.
+   *
+   * @static
+   * @method
+   * @param {number} n - The first parameter.
+   * @param {number} m - The second parameter.
+   * @return {number} The Euclidean modulo.
+   */
+  euclideanModulo,
+  /**
+   * Performs a linear mapping from range `<a1, a2>` to range `<b1, b2>`
+   * for the given value.
+   *
+   * @static
+   * @method
+   * @param {number} x - The value to be mapped.
+   * @param {number} a1 - Minimum value for range A.
+   * @param {number} a2 - Maximum value for range A.
+   * @param {number} b1 - Minimum value for range B.
+   * @param {number} b2 - Maximum value for range B.
+   * @return {number} The mapped value.
+   */
+  mapLinear,
+  /**
+   * Returns the percentage in the closed interval `[0, 1]` of the given value
+   * between the start and end point.
+   *
+   * @static
+   * @method
+   * @param {number} x - The start point
+   * @param {number} y - The end point.
+   * @param {number} value - A value between start and end.
+   * @return {number} The interpolation factor.
+   */
+  inverseLerp,
+  /**
+   * Returns a value linearly interpolated from two known points based on the given interval -
+   * `t = 0` will return `x` and `t = 1` will return `y`.
+   *
+   * @static
+   * @method
+   * @param {number} x - The start point
+   * @param {number} y - The end point.
+   * @param {number} t - The interpolation factor in the closed interval `[0, 1]`.
+   * @return {number} The interpolated value.
+   */
+  lerp,
+  /**
+   * Smoothly interpolate a number from `x` to `y` in  a spring-like manner using a delta
+   * time to maintain frame rate independent movement. For details, see
+   * [Frame rate independent damping using lerp](http://www.rorydriscoll.com/2016/03/07/frame-rate-independent-damping-using-lerp/).
+   *
+   * @static
+   * @method
+   * @param {number} x - The current point.
+   * @param {number} y - The target point.
+   * @param {number} lambda - A higher lambda value will make the movement more sudden,
+   * and a lower value will make the movement more gradual.
+   * @param {number} dt - Delta time in seconds.
+   * @return {number} The interpolated value.
+   */
+  damp,
+  /**
+   * Returns a value that alternates between `0` and the given `length` parameter.
+   *
+   * @static
+   * @method
+   * @param {number} x - The value to pingpong.
+   * @param {number} [length=1] - The positive value the function will pingpong to.
+   * @return {number} The alternated value.
+   */
+  pingpong,
+  /**
+   * Returns a value in the range `[0,1]` that represents the percentage that `x` has
+   * moved between `min` and `max`, but smoothed or slowed down the closer `x` is to
+   * the `min` and `max`.
+   *
+   * See [Smoothstep](http://en.wikipedia.org/wiki/Smoothstep) for more details.
+   *
+   * @static
+   * @method
+   * @param {number} x - The value to evaluate based on its position between min and max.
+   * @param {number} min - The min value. Any x value below min will be `0`.
+   * @param {number} max - The max value. Any x value above max will be `1`.
+   * @return {number} The alternated value.
+   */
+  smoothstep,
+  /**
+   * A [variation on smoothstep](https://en.wikipedia.org/wiki/Smoothstep#Variations)
+   * that has zero 1st and 2nd order derivatives at x=0 and x=1.
+   *
+   * @static
+   * @method
+   * @param {number} x - The value to evaluate based on its position between min and max.
+   * @param {number} min - The min value. Any x value below min will be `0`.
+   * @param {number} max - The max value. Any x value above max will be `1`.
+   * @return {number} The alternated value.
+   */
+  smootherstep,
+  /**
+   * Returns a random integer from `<low, high>` interval.
+   *
+   * @static
+   * @method
+   * @param {number} low - The lower value boundary.
+   * @param {number} high - The upper value boundary
+   * @return {number} A random integer.
+   */
+  randInt,
+  /**
+   * Returns a random float from `<low, high>` interval.
+   *
+   * @static
+   * @method
+   * @param {number} low - The lower value boundary.
+   * @param {number} high - The upper value boundary
+   * @return {number} A random float.
+   */
+  randFloat,
+  /**
+   * Returns a random integer from `<-range/2, range/2>` interval.
+   *
+   * @static
+   * @method
+   * @param {number} range - Defines the value range.
+   * @return {number} A random float.
+   */
+  randFloatSpread,
+  /**
+   * Returns a deterministic pseudo-random float in the interval `[0, 1]`.
+   *
+   * @static
+   * @method
+   * @param {number} [s] - The integer seed.
+   * @return {number} A random float.
+   */
+  seededRandom,
+  /**
+   * Converts degrees to radians.
+   *
+   * @static
+   * @method
+   * @param {number} degrees - A value in degrees.
+   * @return {number} The converted value in radians.
+   */
+  degToRad,
+  /**
+   * Converts radians to degrees.
+   *
+   * @static
+   * @method
+   * @param {number} radians - A value in radians.
+   * @return {number} The converted value in degrees.
+   */
+  radToDeg,
+  /**
+   * Returns `true` if the given number is a power of two.
+   *
+   * @static
+   * @method
+   * @param {number} value - The value to check.
+   * @return {boolean} Whether the given number is a power of two or not.
+   */
+  isPowerOfTwo,
+  /**
+   * Returns the smallest power of two that is greater than or equal to the given number.
+   *
+   * @static
+   * @method
+   * @param {number} value - The value to find a POT for.
+   * @return {number} The smallest power of two that is greater than or equal to the given number.
+   */
+  ceilPowerOfTwo,
+  /**
+   * Returns the largest power of two that is less than or equal to the given number.
+   *
+   * @static
+   * @method
+   * @param {number} value - The value to find a POT for.
+   * @return {number} The largest power of two that is less than or equal to the given number.
+   */
+  floorPowerOfTwo,
+  /**
+   * Sets the given quaternion from the [Intrinsic Proper Euler Angles](https://en.wikipedia.org/wiki/Euler_angles)
+   * defined by the given angles and order.
+   *
+   * Rotations are applied to the axes in the order specified by order:
+   * rotation by angle `a` is applied first, then by angle `b`, then by angle `c`.
+   *
+   * @static
+   * @method
+   * @param {Quaternion} q - The quaternion to set.
+   * @param {number} a - The rotation applied to the first axis, in radians.
+   * @param {number} b - The rotation applied to the second axis, in radians.
+   * @param {number} c - The rotation applied to the third axis, in radians.
+   * @param {('XYX'|'XZX'|'YXY'|'YZY'|'ZXZ'|'ZYZ')} order - A string specifying the axes order.
+   */
+  setQuaternionFromProperEuler,
+  /**
+   * Normalizes the given value according to the given typed array.
+   *
+   * @static
+   * @method
+   * @param {number} value - The float value in the range `[0,1]` to normalize.
+   * @param {TypedArray} array - The typed array that defines the data type of the value.
+   * @return {number} The normalize value.
+   */
+  normalize,
+  /**
+   * Denormalizes the given value according to the given typed array.
+   *
+   * @static
+   * @method
+   * @param {number} value - The value to denormalize.
+   * @param {TypedArray} array - The typed array that defines the data type of the value.
+   * @return {number} The denormalize (float) value in the range `[0,1]`.
+   */
+  denormalize
+};
 var Vector2 = class {
   static {
     this.prototype.isVector2 = true;
@@ -3431,8 +3766,8 @@ var Texture = class _Texture extends EventDispatcher {
    * @param {number} start - Position at which to start update.
    * @param {number} count - The number of components to update.
    */
-  addUpdateRange(start, count) {
-    this.updateRanges.push({ start, count });
+  addUpdateRange(start, count2) {
+    this.updateRanges.push({ start, count: count2 });
   }
   /**
    * Clears the update ranges.
@@ -4456,8 +4791,8 @@ var RenderTarget = class extends EventDispatcher {
     this.scissorTest = false;
     this.viewport = new Vector4(0, 0, width, height);
     this.textures = [];
-    const count = options.count;
-    for (let i = 0; i < count; i++) {
+    const count2 = options.count;
+    for (let i = 0; i < count2; i++) {
       this.textures[i] = new Texture({ width, height, depth: options.depth });
       this.textures[i].isRenderTargetTexture = true;
       this.textures[i].renderTarget = this;
@@ -7063,10 +7398,10 @@ var Object3D = class _Object3D extends EventDispatcher {
     }
     output2.object = object;
     return output2;
-    function extractFromCache(cache3) {
+    function extractFromCache(cache4) {
       const values = [];
-      for (const key in cache3) {
-        const data = cache3[key];
+      for (const key in cache4) {
+        const data = cache4[key];
         delete data.metadata;
         values.push(data);
       }
@@ -9262,8 +9597,8 @@ var BufferAttribute = class extends EventDispatcher {
    * @param {number} start - Position at which to start update.
    * @param {number} count - The number of components to update.
    */
-  addUpdateRange(start, count) {
-    this.updateRanges.push({ start, count });
+  addUpdateRange(start, count2) {
+    this.updateRanges.push({ start, count: count2 });
   }
   /**
    * Clears the update ranges.
@@ -10154,10 +10489,10 @@ var BufferGeometry = class _BufferGeometry extends EventDispatcher {
    * @param {number} count - Specifies how many vertices (or indices) are part of this group.
    * @param {number} [materialIndex=0] - The material array index to use.
    */
-  addGroup(start, count, materialIndex = 0) {
+  addGroup(start, count2, materialIndex = 0) {
     this.groups.push({
       start,
-      count,
+      count: count2,
       materialIndex
     });
   }
@@ -10174,9 +10509,9 @@ var BufferGeometry = class _BufferGeometry extends EventDispatcher {
    * @param {number} count - For non-indexed BufferGeometry, `count` is the number of vertices to render.
    * For indexed BufferGeometry, `count` is the number of indices to render.
    */
-  setDrawRange(start, count) {
+  setDrawRange(start, count2) {
     this.drawRange.start = start;
-    this.drawRange.count = count;
+    this.drawRange.count = count2;
   }
   /**
    * Applies the given 4x4 transformation matrix to the geometry.
@@ -10513,8 +10848,8 @@ var BufferGeometry = class _BufferGeometry extends EventDispatcher {
     for (let i = 0, il = groups.length; i < il; ++i) {
       const group = groups[i];
       const start = group.start;
-      const count = group.count;
-      for (let j = start, jl = start + count; j < jl; j += 3) {
+      const count2 = group.count;
+      for (let j = start, jl = start + count2; j < jl; j += 3) {
         handleTriangle(
           index.getX(j + 0),
           index.getX(j + 1),
@@ -10854,8 +11189,8 @@ var InterleavedBuffer = class {
    * @param {number} start - Position at which to start update.
    * @param {number} count - The number of components to update.
    */
-  addUpdateRange(start, count) {
-    this.updateRanges.push({ start, count });
+  addUpdateRange(start, count2) {
+    this.updateRanges.push({ start, count: count2 });
   }
   /**
    * Clears the update ranges.
@@ -11918,10 +12253,10 @@ var Material = class extends EventDispatcher {
     if (this.flatShading !== void 0) data.flatShading = this.flatShading;
     if (this.fog !== void 0) data.fog = this.fog;
     if (Object.keys(this.userData).length > 0) data.userData = this.userData;
-    function extractFromCache(cache3) {
+    function extractFromCache(cache4) {
       const values = [];
-      for (const key in cache3) {
-        const data2 = cache3[key];
+      for (const key in cache4) {
+        const data2 = cache4[key];
         delete data2.metadata;
         values.push(data2);
       }
@@ -14013,18 +14348,18 @@ var Curve = class {
       return this.cacheArcLengths;
     }
     this.needsUpdate = false;
-    const cache3 = [];
+    const cache4 = [];
     let current, last = this.getPoint(0);
     let sum = 0;
-    cache3.push(0);
+    cache4.push(0);
     for (let p = 1; p <= divisions; p++) {
       current = this.getPoint(p / divisions);
       sum += current.distanceTo(last);
-      cache3.push(sum);
+      cache4.push(sum);
       last = current;
     }
-    this.cacheArcLengths = cache3;
-    return cache3;
+    this.cacheArcLengths = cache4;
+    return cache4;
   }
   /**
    * Update the cumulative segment distance cache. The method must be called
@@ -20437,7 +20772,7 @@ if (typeof window !== "undefined") {
   }
 }
 
-// node_modules/three/build/three.tsl.js
+// ../../node_modules/three/build/three.tsl.js
 var three_tsl_exports = {};
 __export(three_tsl_exports, {
   AONode: () => AONode,
@@ -21123,7 +21458,7 @@ __export(three_tsl_exports, {
   sinc: () => sinc,
   sinh: () => sinh,
   skinning: () => skinning,
-  smoothstep: () => smoothstep,
+  smoothstep: () => smoothstep2,
   smoothstepElement: () => smoothstepElement,
   specularColor: () => specularColor,
   specularColorBlended: () => specularColorBlended,
@@ -22439,10 +22774,10 @@ var Node = class _Node extends EventDispatcher {
       this.serialize(data);
       delete data.meta;
     }
-    function extractFromCache(cache3) {
+    function extractFromCache(cache4) {
       const values = [];
-      for (const key in cache3) {
-        const data2 = cache3[key];
+      for (const key in cache4) {
+        const data2 = cache4[key];
         delete data2.metadata;
         values.push(data2);
       }
@@ -22586,7 +22921,7 @@ var JoinNode = class extends Node {
     if (this.nodeType !== null) {
       return builder.getVectorType(this.nodeType);
     }
-    return builder.getTypeFromLength(this.nodes.reduce((count, cur) => count + builder.getTypeLength(cur.getNodeType(builder)), 0));
+    return builder.getTypeFromLength(this.nodes.reduce((count2, cur) => count2 + builder.getTypeLength(cur.getNodeType(builder)), 0));
   }
   generate(builder, output2) {
     const type = this.getNodeType(builder);
@@ -23016,21 +23351,21 @@ Node.prototype.get = function(value) {
 var proto = {};
 var _swizzleCache = /* @__PURE__ */ new WeakMap();
 function getSwizzleCache(node) {
-  let cache3 = _swizzleCache.get(node);
-  if (cache3 === void 0) {
-    cache3 = {};
-    _swizzleCache.set(node, cache3);
+  let cache4 = _swizzleCache.get(node);
+  if (cache4 === void 0) {
+    cache4 = {};
+    _swizzleCache.set(node, cache4);
   }
-  return cache3;
+  return cache4;
 }
 function setProtoSwizzle(property2, altA, altB) {
   proto[property2] = proto[altA] = proto[altB] = {
     get() {
-      const cache3 = getSwizzleCache(this);
-      let split2 = cache3[property2];
+      const cache4 = getSwizzleCache(this);
+      let split2 = cache4[property2];
       if (split2 === void 0) {
         split2 = new SplitNode(this, property2);
-        cache3[property2] = split2;
+        cache4[property2] = split2;
       }
       return split2;
     },
@@ -23080,11 +23415,11 @@ for (let a = 0; a < 4; a++) {
 for (let i = 0; i < 32; i++) {
   proto[i] = {
     get() {
-      const cache3 = getSwizzleCache(this);
-      let element2 = cache3[i];
+      const cache4 = getSwizzleCache(this);
+      let element2 = cache4[i];
       if (element2 === void 0) {
         element2 = new ArrayElementNode(this, new ConstNode(i, "uint"));
-        cache3[i] = element2;
+        cache4[i] = element2;
       }
       return element2;
     },
@@ -23744,9 +24079,9 @@ var ArrayNode = class extends Node {
    * @param {number} count - Size of the array.
    * @param {?Array<Node>} [values=null] - Array default values.
    */
-  constructor(nodeType, count, values = null) {
+  constructor(nodeType, count2, values = null) {
     super(nodeType);
-    this.count = count;
+    this.count = count2;
     this.values = values;
     this.isArrayNode = true;
   }
@@ -23811,12 +24146,12 @@ var array = (...params) => {
     node = new ArrayNode(null, values.length, values);
   } else {
     const nodeType = params[0];
-    const count = params[1];
-    node = new ArrayNode(nodeType, count);
+    const count2 = params[1];
+    node = new ArrayNode(nodeType, count2);
   }
   return node;
 };
-addMethodChaining("toArray", (node, count) => array(Array(count).fill(node)));
+addMethodChaining("toArray", (node, count2) => array(Array(count2).fill(node)));
 var UniformGroupNode = class extends Node {
   static get type() {
     return "UniformGroupNode";
@@ -24794,7 +25129,7 @@ var mix = /* @__PURE__ */ nodeProxyAssignable(MathNode, MathNode.MIX).setParamet
 var clamp2 = (value, low = 0, high = 1) => new MathNode(MathNode.CLAMP, nodeObject(value), nodeObject(low), nodeObject(high));
 var saturate = (value) => clamp2(value);
 var refract = /* @__PURE__ */ nodeProxyAssignable(MathNode, MathNode.REFRACT).setParameterLength(3);
-var smoothstep = /* @__PURE__ */ nodeProxyAssignable(MathNode, MathNode.SMOOTHSTEP).setParameterLength(3);
+var smoothstep2 = /* @__PURE__ */ nodeProxyAssignable(MathNode, MathNode.SMOOTHSTEP).setParameterLength(3);
 var faceForward = /* @__PURE__ */ nodeProxyAssignable(MathNode, MathNode.FACEFORWARD).setParameterLength(3);
 var rand = /* @__PURE__ */ Fn(([uv3]) => {
   const a = 12.9898, b = 78.233, c = 43758.5453;
@@ -24802,7 +25137,7 @@ var rand = /* @__PURE__ */ Fn(([uv3]) => {
   return fract(sin(sn).mul(c));
 }, { uv: "vec2", return: "float" });
 var mixElement = (t, e1, e2) => mix(e1, e2, t);
-var smoothstepElement = (x, low, high) => smoothstep(low, high, x);
+var smoothstepElement = (x, low, high) => smoothstep2(low, high, x);
 var stepElement = (x, edge) => step(edge, x);
 var faceforward = faceForward;
 var inversesqrt = inverseSqrt;
@@ -25245,8 +25580,8 @@ var VarNode = class extends Node {
     const propertyName = builder.getPropertyName(nodeVar);
     let declarationPrefix = propertyName;
     if (nodeVar.readOnly) {
-      const count = node.getArrayCount(builder);
-      declarationPrefix = builder.isDeterministic(node) ? builder.generateConstStatement(nodeVar.type, propertyName, count) : builder.generateLetStatement(nodeVar.type, propertyName, count);
+      const count2 = node.getArrayCount(builder);
+      declarationPrefix = builder.isDeterministic(node) ? builder.generateConstStatement(nodeVar.type, propertyName, count2) : builder.generateLetStatement(nodeVar.type, propertyName, count2);
     } else if (nodeVar.local) {
       declarationPrefix = builder.generateVarStatement(nodeVar.type, propertyName, nodeVar.count);
     }
@@ -25508,12 +25843,12 @@ var ReferenceBaseNode = class extends Node {
    * @param {?Object} [object=null] - The object the property belongs to.
    * @param {?number} [count=null] - When the linked property is an array-like, this parameter defines its length.
    */
-  constructor(property2, uniformType, object = null, count = null) {
+  constructor(property2, uniformType, object = null, count2 = null) {
     super();
     this.property = property2;
     this.uniformType = uniformType;
     this.object = object;
-    this.count = count;
+    this.count = count2;
     this.properties = property2.split(".");
     this.reference = object;
     this.node = null;
@@ -26093,12 +26428,12 @@ var computeKernel = (node, workgroupSize = [64]) => {
   while (workgroupSize.length < 3) workgroupSize.push(1);
   return new ComputeNode(nodeObject(node), workgroupSize);
 };
-var compute = (node, count, workgroupSize) => {
+var compute = (node, count2, workgroupSize) => {
   const computeNode = computeKernel(node, workgroupSize);
-  if (typeof count === "number") {
-    computeNode.count = count;
+  if (typeof count2 === "number") {
+    computeNode.count = count2;
   } else {
-    computeNode.dispatchSize = count;
+    computeNode.dispatchSize = count2;
   }
   return computeNode;
 };
@@ -26125,8 +26460,8 @@ var IsolateNode = class extends Node {
   }
   generateNodeType(builder) {
     const previousCache = builder.getCache();
-    const cache3 = builder.getCacheFromNode(this, this.parent);
-    builder.setCache(cache3);
+    const cache4 = builder.getCacheFromNode(this, this.parent);
+    builder.setCache(cache4);
     const nodeType = this.node.getNodeType(builder);
     builder.setCache(previousCache);
     return nodeType;
@@ -26134,8 +26469,8 @@ var IsolateNode = class extends Node {
   build(builder, ...params) {
     this._setupInspector(builder);
     const previousCache = builder.getCache();
-    const cache3 = builder.getCacheFromNode(this, this.parent);
-    builder.setCache(cache3);
+    const cache4 = builder.getCacheFromNode(this, this.parent);
+    builder.setCache(cache4);
     const data = this.node.build(builder, ...params);
     builder.setCache(previousCache);
     return data;
@@ -28170,8 +28505,8 @@ var BufferNode = class extends UniformNode {
    * @param {number} start - Position at which to start update.
    * @param {number} count - The number of components to update.
    */
-  addUpdateRange(start, count) {
-    this.updateRanges.push({ start, count });
+  addUpdateRange(start, count2) {
+    this.updateRanges.push({ start, count: count2 });
   }
   /**
    * Clears the update ranges.
@@ -28198,7 +28533,7 @@ var BufferNode = class extends UniformNode {
     return "buffer";
   }
 };
-var buffer = (value, type, count) => new BufferNode(value, type, count);
+var buffer = (value, type, count2) => new BufferNode(value, type, count2);
 var UniformArrayElementNode = class extends ArrayElementNode {
   static get type() {
     return "UniformArrayElementNode";
@@ -30519,12 +30854,12 @@ var ReferenceNode = class extends Node {
    * @param {?Object} [object=null] - The object the property belongs to.
    * @param {?number} [count=null] - When the linked property is an array-like, this parameter defines its length.
    */
-  constructor(property2, uniformType, object = null, count = null) {
+  constructor(property2, uniformType, object = null, count2 = null) {
     super();
     this.property = property2;
     this.uniformType = uniformType;
     this.object = object;
-    this.count = count;
+    this.count = count2;
     this.properties = property2.split(".");
     this.reference = object;
     this.node = null;
@@ -30674,7 +31009,7 @@ var ReferenceNode = class extends Node {
   }
 };
 var reference = (name, type, object) => new ReferenceNode(name, type, object);
-var referenceBuffer = (name, type, count, object) => new ReferenceNode(name, type, object, count);
+var referenceBuffer = (name, type, count2, object) => new ReferenceNode(name, type, object, count2);
 var MaterialReferenceNode = class extends ReferenceNode {
   static get type() {
     return "MaterialReferenceNode";
@@ -31514,7 +31849,7 @@ var StorageBufferNode = class extends BufferNode {
     return builder.format(output2, attribute3.getNodeType(builder), this.getNodeType(builder));
   }
 };
-var storage = (value, type = null, count = 0) => new StorageBufferNode(value, type, count);
+var storage = (value, type = null, count2 = 0) => new StorageBufferNode(value, type, count2);
 var _columns = /* @__PURE__ */ new WeakMap();
 function getAttributeColumn(attribute3, type, offset) {
   let columns = _columns.get(attribute3);
@@ -32359,7 +32694,7 @@ var ClippingNode = class _ClippingNode extends Node {
           const plane = clippingPlanes.element(i);
           distanceToPlane.assign(this.position.dot(plane.xyz).negate().add(plane.w));
           distanceGradient.assign(distanceToPlane.fwidth().div(2));
-          clipOpacity.mulAssign(smoothstep(distanceGradient.negate(), distanceGradient, distanceToPlane));
+          clipOpacity.mulAssign(smoothstep2(distanceGradient.negate(), distanceGradient, distanceToPlane));
         });
       }
       const numIntersectionPlanes = intersectionPlanes.length;
@@ -32370,7 +32705,7 @@ var ClippingNode = class _ClippingNode extends Node {
           const plane = clippingPlanes.element(i);
           distanceToPlane.assign(this.position.dot(plane.xyz).negate().add(plane.w));
           distanceGradient.assign(distanceToPlane.fwidth().div(2));
-          intersectionClipOpacity.mulAssign(smoothstep(distanceGradient.negate(), distanceGradient, distanceToPlane).oneMinus());
+          intersectionClipOpacity.mulAssign(smoothstep2(distanceGradient.negate(), distanceGradient, distanceToPlane).oneMinus());
         });
         clipOpacity.mulAssign(intersectionClipOpacity.oneMinus());
       }
@@ -33468,7 +33803,7 @@ var NodeMaterial = class extends Material {
     if (this.alphaTestNode !== null || this.alphaTest > 0) {
       alphaTestNode = this.alphaTestNode !== null ? float(this.alphaTestNode) : materialAlphaTest;
       if (this.alphaToCoverage === true) {
-        diffuseColor.a = smoothstep(alphaTestNode, alphaTestNode.add(fwidth(diffuseColor.a)), diffuseColor.a);
+        diffuseColor.a = smoothstep2(alphaTestNode, alphaTestNode.add(fwidth(diffuseColor.a)), diffuseColor.a);
         diffuseColor.a.lessThanEqual(0).discard();
       } else {
         diffuseColor.a.lessThanEqual(alphaTestNode).discard();
@@ -33719,10 +34054,10 @@ var NodeMaterial = class extends Material {
     for (const { property: property2, childNode } of this._getNodeChildren()) {
       data.inputNodes[property2] = childNode.toJSON(meta).uuid;
     }
-    function extractFromCache(cache3) {
+    function extractFromCache(cache4) {
       const values = [];
-      for (const key in cache3) {
-        const data2 = cache3[key];
+      for (const key in cache4) {
+        const data2 = cache4[key];
         delete data2.metadata;
         values.push(data2);
       }
@@ -34190,8 +34525,8 @@ var StorageInstancedBufferAttribute = class extends InstancedBufferAttribute {
    * @param {number} itemSize - The item size.
    * @param {TypedArray.constructor} [typeClass=Float32Array] - A typed array constructor.
    */
-  constructor(count, itemSize, typeClass = Float32Array) {
-    const array2 = ArrayBuffer.isView(count) ? count : new typeClass(count * itemSize);
+  constructor(count2, itemSize, typeClass = Float32Array) {
+    const array2 = ArrayBuffer.isView(count2) ? count2 : new typeClass(count2 * itemSize);
     super(array2, itemSize);
     this.isStorageInstancedBufferAttribute = true;
   }
@@ -34205,13 +34540,13 @@ var StorageBufferAttribute = class extends BufferAttribute {
    * @param {number} itemSize - The item size.
    * @param {TypedArray.constructor} [typeClass=Float32Array] - A typed array constructor.
    */
-  constructor(count, itemSize, typeClass = Float32Array) {
-    const array2 = ArrayBuffer.isView(count) ? count : new typeClass(count * itemSize);
+  constructor(count2, itemSize, typeClass = Float32Array) {
+    const array2 = ArrayBuffer.isView(count2) ? count2 : new typeClass(count2 * itemSize);
     super(array2, itemSize);
     this.isStorageBufferAttribute = true;
   }
 };
-var attributeArray = (count, type = "float") => {
+var attributeArray = (count2, type = "float") => {
   let itemSize, typedArray;
   if (type.isStructTypeNode === true) {
     itemSize = type.getLength();
@@ -34220,11 +34555,11 @@ var attributeArray = (count, type = "float") => {
     itemSize = getLengthFromType(type);
     typedArray = getTypedArrayFromType(type);
   }
-  const buffer2 = new StorageBufferAttribute(count, itemSize, typedArray);
+  const buffer2 = new StorageBufferAttribute(count2, itemSize, typedArray);
   const node = storage(buffer2, type, buffer2.count);
   return node;
 };
-var instancedArray = (count, type = "float") => {
+var instancedArray = (count2, type = "float") => {
   let itemSize, typedArray;
   if (type.isStructTypeNode === true) {
     itemSize = type.getLength();
@@ -34233,7 +34568,7 @@ var instancedArray = (count, type = "float") => {
     itemSize = getLengthFromType(type);
     typedArray = getTypedArrayFromType(type);
   }
-  const buffer2 = new StorageInstancedBufferAttribute(count, itemSize, typedArray);
+  const buffer2 = new StorageInstancedBufferAttribute(count2, itemSize, typedArray);
   const node = storage(buffer2, type, buffer2.count);
   return node;
 };
@@ -34762,21 +35097,21 @@ function getPreviousMatrix(object, index = 0) {
   return matrix;
 }
 var velocity = /* @__PURE__ */ nodeImmutable(VelocityNode);
-var blendBurn = /* @__PURE__ */ Fn(([base, blend]) => {
-  return min(1, base.oneMinus().div(blend)).oneMinus();
+var blendBurn = /* @__PURE__ */ Fn(([base2, blend]) => {
+  return min(1, base2.oneMinus().div(blend)).oneMinus();
 }, { base: "vec3", blend: "vec3", return: "vec3" });
-var blendDodge = /* @__PURE__ */ Fn(([base, blend]) => {
-  return min(base.div(blend.oneMinus()), 1);
+var blendDodge = /* @__PURE__ */ Fn(([base2, blend]) => {
+  return min(base2.div(blend.oneMinus()), 1);
 }, { base: "vec3", blend: "vec3", return: "vec3" });
-var blendScreen = /* @__PURE__ */ Fn(([base, blend]) => {
-  return base.oneMinus().mul(blend.oneMinus()).oneMinus();
+var blendScreen = /* @__PURE__ */ Fn(([base2, blend]) => {
+  return base2.oneMinus().mul(blend.oneMinus()).oneMinus();
 }, { base: "vec3", blend: "vec3", return: "vec3" });
-var blendOverlay = /* @__PURE__ */ Fn(([base, blend]) => {
-  return mix(base.mul(2).mul(blend), base.oneMinus().mul(2).mul(blend.oneMinus()).oneMinus(), step(0.5, base));
+var blendOverlay = /* @__PURE__ */ Fn(([base2, blend]) => {
+  return mix(base2.mul(2).mul(blend), base2.oneMinus().mul(2).mul(blend.oneMinus()).oneMinus(), step(0.5, base2));
 }, { base: "vec3", blend: "vec3", return: "vec3" });
-var blendColor = /* @__PURE__ */ Fn(([base, blend]) => {
-  const outAlpha = blend.a.add(base.a.mul(blend.a.oneMinus()));
-  return vec4(blend.rgb.mul(blend.a).add(base.rgb.mul(base.a).mul(blend.a.oneMinus())).div(outAlpha), outAlpha);
+var blendColor = /* @__PURE__ */ Fn(([base2, blend]) => {
+  const outAlpha = blend.a.add(base2.a.mul(blend.a.oneMinus()));
+  return vec4(blend.rgb.mul(blend.a).add(base2.rgb.mul(base2.a).mul(blend.a.oneMinus())).div(outAlpha), outAlpha);
 }, { base: "vec4", blend: "vec4", return: "vec4" });
 var workingLuminanceCoefficients = /* @__PURE__ */ Fn(() => vec3(ColorManagement.getLuminanceCoefficients(new Vector3()))).once()().toVar("workingLuminanceCoefficients");
 var grayscale = /* @__PURE__ */ Fn(([color2, luminanceCoefficients = workingLuminanceCoefficients]) => {
@@ -35299,8 +35634,8 @@ var PassNode = class _PassNode extends Node {
    */
   _getContextNode(renderer) {
     const rendererContextNode = renderer.contextNode;
-    const cache3 = this._contextNodeCache;
-    if (cache3 === null || cache3.version !== this.version || cache3.rendererContextNode !== rendererContextNode || cache3.rendererVersion !== rendererContextNode.version) {
+    const cache4 = this._contextNodeCache;
+    if (cache4 === null || cache4.version !== this.version || cache4.rendererContextNode !== rendererContextNode || cache4.rendererVersion !== rendererContextNode.version) {
       this._contextNodeCache = {
         version: this.version,
         rendererContextNode,
@@ -35764,7 +36099,7 @@ function getViewZNode(builder) {
 }
 var rangeFogFactor = /* @__PURE__ */ Fn(([near, far], builder) => {
   const viewZ = getViewZNode(builder);
-  return smoothstep(near, far, viewZ);
+  return smoothstep2(near, far, viewZ);
 });
 var densityFogFactor = /* @__PURE__ */ Fn(([density], builder) => {
   const viewZ = getViewZNode(builder);
@@ -36119,7 +36454,7 @@ var WorkgroupInfoNode = class extends Node {
     return builder.getScopedArray(name, this.scope.toLowerCase(), this.bufferType, this.bufferCount, this.isAtomic);
   }
 };
-var workgroupArray = (type, count) => new WorkgroupInfoNode("Workgroup", type, count);
+var workgroupArray = (type, count2) => new WorkgroupInfoNode("Workgroup", type, count2);
 var AtomicFunctionNode = class extends Node {
   static get type() {
     return "AtomicFunctionNode";
@@ -38324,8 +38659,8 @@ function _getEquirectMaterial() {
 }
 var _cache2 = /* @__PURE__ */ new WeakMap();
 function _getPMREMFromTexture(texture4, renderer, generator) {
-  const cache3 = _getCache(renderer);
-  let renderTarget = cache3.get(texture4);
+  const cache4 = _getCache(renderer);
+  let renderTarget = cache4.get(texture4);
   const pmremVersion = renderTarget !== void 0 ? renderTarget.texture.pmremVersion : -1;
   if (pmremVersion !== texture4.pmremVersion) {
     const image = texture4.image;
@@ -38343,19 +38678,19 @@ function _getPMREMFromTexture(texture4, renderer, generator) {
       }
     }
     renderTarget.texture.pmremVersion = texture4.pmremVersion;
-    if (cache3.has(texture4) === false) {
+    if (cache4.has(texture4) === false) {
       const onDispose = () => {
         texture4.removeEventListener("dispose", onDispose);
-        const pmrem = cache3.get(texture4);
+        const pmrem = cache4.get(texture4);
         if (pmrem !== void 0) {
           pmrem.texture.pmremVersion = -1;
           pmrem.dispose();
-          cache3.delete(texture4);
+          cache4.delete(texture4);
         }
       };
       texture4.addEventListener("dispose", onDispose);
     }
-    cache3.set(texture4, renderTarget);
+    cache4.set(texture4, renderTarget);
   }
   return renderTarget.texture;
 }
@@ -38453,12 +38788,12 @@ var PMREMNode = class extends Node {
 };
 function isCubeMapReady(image) {
   if (image === null || image === void 0) return false;
-  let count = 0;
+  let count2 = 0;
   const length4 = 6;
   for (let i = 0; i < length4; i++) {
-    if (image[i] !== void 0) count++;
+    if (image[i] !== void 0) count2++;
   }
-  return count === length4;
+  return count2 === length4;
 }
 function isEquirectangularMapReady(image) {
   if (image === null || image === void 0) return false;
@@ -38477,7 +38812,7 @@ var shapeCircle = /* @__PURE__ */ Fn(([coord = uv$1()], { renderer, material }) 
   let alpha;
   if (material.alphaToCoverage && renderer.currentSamples > 0) {
     const dlen = float(len2.fwidth()).toVar();
-    alpha = smoothstep(dlen.oneMinus(), dlen.add(1), len2).oneMinus();
+    alpha = smoothstep2(dlen.oneMinus(), dlen.add(1), len2).oneMinus();
   } else {
     alpha = select(len2.greaterThan(1), 0, 1);
   }
@@ -39609,7 +39944,7 @@ var mx_aastep = (threshold, value) => {
   threshold = float(threshold);
   value = float(value);
   const afwidth = vec2(value.dFdx(), value.dFdy()).length().mul(0.7071067811865476);
-  return smoothstep(threshold.sub(afwidth), threshold.add(afwidth), value);
+  return smoothstep2(threshold.sub(afwidth), threshold.add(afwidth), value);
 };
 var _ramp = (a, b, uv3, p) => mix(a, b, uv3[p].clamp());
 var mx_ramplr = (valuel, valuer, texcoord = uv$1()) => _ramp(valuel, valuer, texcoord, "x");
@@ -39807,7 +40142,7 @@ var BRDF_GGX = /* @__PURE__ */ Fn(({ lightDirection, f0, f90, roughness: roughne
   const dotNH = normalView$1.dot(halfDir).clamp();
   const dotVH = viewDirection.dot(halfDir).clamp();
   let F = F_Schlick({ f0, f90, dotVH });
-  let V2, D;
+  let V6, D;
   if (defined(USE_IRIDESCENCE)) {
     F = iridescence.mix(F, f);
   }
@@ -39819,13 +40154,13 @@ var BRDF_GGX = /* @__PURE__ */ Fn(({ lightDirection, f0, f90, roughness: roughne
     const dotBV = anisotropyB.dot(viewDirection);
     const dotBH = anisotropyB.dot(halfDir);
     const clampedAlphaT = alphaT.max(alpha);
-    V2 = V_GGX_SmithCorrelated_Anisotropic({ alphaT: clampedAlphaT, alphaB: alpha, dotTV, dotBV, dotTL, dotBL, dotNV, dotNL });
+    V6 = V_GGX_SmithCorrelated_Anisotropic({ alphaT: clampedAlphaT, alphaB: alpha, dotTV, dotBV, dotTL, dotBL, dotNV, dotNL });
     D = D_GGX_Anisotropic({ alphaT: clampedAlphaT, alphaB: alpha, dotNH, dotTH, dotBH });
   } else {
-    V2 = V_GGX_SmithCorrelated({ alpha, dotNL, dotNV });
+    V6 = V_GGX_SmithCorrelated({ alpha, dotNL, dotNV });
     D = D_GGX({ alpha, dotNH });
   }
-  return F.mul(V2).mul(D);
+  return F.mul(V6).mul(D);
 });
 var BRDF_Lambert = /* @__PURE__ */ Fn((inputs) => {
   return inputs.diffuseColor.mul(1 / Math.PI);
@@ -39846,8 +40181,8 @@ var BRDF_Sheen = /* @__PURE__ */ Fn(({ lightDirection }) => {
   const dotNV = normalView.dot(positionViewDirection).clamp();
   const dotNH = normalView.dot(halfDir).clamp();
   const D = D_Charlie({ roughness: sheenRoughness, dotNH });
-  const V2 = V_Neubelt({ dotNV, dotNL });
-  return sheen.mul(D).mul(V2);
+  const V6 = V_Neubelt({ dotNV, dotNL });
+  return sheen.mul(D).mul(V6);
 });
 var DATA = new Uint16Array([
   12469,
@@ -40389,11 +40724,11 @@ var Schlick_to_F0 = /* @__PURE__ */ Fn(({ f, f90, dotVH }) => {
   const x5 = x.mul(x2, x2).clamp(0, 0.9999);
   return f.sub(vec3(f90).mul(x5)).div(x5.oneMinus());
 }, { f: "vec3", f90: "float", dotVH: "float", return: "vec3" });
-var LTC_Uv = /* @__PURE__ */ Fn(({ N: N2, V: V2, roughness: roughness2 }) => {
+var LTC_Uv = /* @__PURE__ */ Fn(({ N: N2, V: V6, roughness: roughness2 }) => {
   const LUT_SIZE = 64;
   const LUT_SCALE = (LUT_SIZE - 1) / LUT_SIZE;
   const LUT_BIAS = 0.5 / LUT_SIZE;
-  const dotNV = N2.dot(V2).saturate();
+  const dotNV = N2.dot(V6).saturate();
   const uv3 = vec2(roughness2, dotNV.oneMinus().sqrt());
   uv3.assign(uv3.mul(LUT_SCALE).add(LUT_BIAS));
   return uv3;
@@ -40411,13 +40746,13 @@ var LTC_EdgeVectorFormFactor = /* @__PURE__ */ Fn(({ v1, v2 }) => {
   const theta_sintheta = x.greaterThan(0).select(v, max(x.mul(x).oneMinus(), 1e-7).inverseSqrt().mul(0.5).sub(v));
   return v1.cross(v2).mul(theta_sintheta);
 }, { v1: "vec3", v2: "vec3", return: "vec3" });
-var LTC_Evaluate = /* @__PURE__ */ Fn(({ N: N2, V: V2, P, mInv, p0, p1, p2, p3 }) => {
+var LTC_Evaluate = /* @__PURE__ */ Fn(({ N: N2, V: V6, P, mInv, p0, p1, p2, p3 }) => {
   const v1 = p1.sub(p0).toVar();
   const v2 = p3.sub(p0).toVar();
   const lightNormal = v1.cross(v2);
   const result = vec3().toVar();
   If(lightNormal.dot(P.sub(p0)).greaterThanEqual(0), () => {
-    const T1 = V2.sub(N2.mul(V2.dot(N2))).normalize();
+    const T1 = V6.sub(N2.mul(V6.dot(N2))).normalize();
     const T2 = N2.cross(T1).negate();
     const mat = mInv.mul(mat3(T1, T2, N2).transpose()).toVar();
     const coords0 = mat.mul(p0.sub(P)).normalize().toVar();
@@ -41060,7 +41395,7 @@ var Three_TSL = /* @__PURE__ */ Object.freeze({
   sinc,
   sinh,
   skinning,
-  smoothstep,
+  smoothstep: smoothstep2,
   smoothstepElement,
   specularColor,
   specularColorBlended,
@@ -41198,7 +41533,7 @@ var Three_TSL = /* @__PURE__ */ Object.freeze({
   xor
 });
 
-// node_modules/three/build/three.webgpu.js
+// ../../node_modules/three/build/three.webgpu.js
 var _defaultValues$d = /* @__PURE__ */ new LineBasicMaterial();
 var LineBasicNodeMaterial = class extends NodeMaterial {
   static get type() {
@@ -41400,7 +41735,7 @@ var alphaLine = Fn(({ material, renderer }) => {
     if (!useDash) {
       if (useAlphaToCoverage && renderer.currentSamples > 0) {
         const dnorm = norm.fwidth();
-        alpha.assign(smoothstep(dnorm.negate().add(0.5), dnorm.add(0.5), norm).oneMinus());
+        alpha.assign(smoothstep2(dnorm.negate().add(0.5), dnorm.add(0.5), norm).oneMinus());
       } else {
         norm.greaterThan(0.5).discard();
       }
@@ -41412,7 +41747,7 @@ var alphaLine = Fn(({ material, renderer }) => {
       const len2 = a.mul(a).add(b.mul(b));
       const dlen = float(len2.fwidth()).toVar("dlen");
       If(vUv.y.abs().greaterThan(1), () => {
-        alpha.assign(smoothstep(dlen.oneMinus(), dlen.add(1), len2).oneMinus());
+        alpha.assign(smoothstep2(dlen.oneMinus(), dlen.add(1), len2).oneMinus());
       });
     } else {
       If(vUv.y.abs().greaterThan(1), () => {
@@ -41994,7 +42329,7 @@ var evalSensitivity = (OPD, shift) => {
   return rgb;
 };
 var evalIridescence = /* @__PURE__ */ Fn(({ outsideIOR, eta2, cosTheta1, thinFilmThickness, baseF0 }) => {
-  const iridescenceIOR2 = mix(outsideIOR, eta2, smoothstep(0, 0.03, thinFilmThickness));
+  const iridescenceIOR2 = mix(outsideIOR, eta2, smoothstep2(0, 0.03, thinFilmThickness));
   const sinTheta2Sq = outsideIOR.div(iridescenceIOR2).pow2().mul(cosTheta1.pow2().oneMinus());
   const cosTheta2Sq = sinTheta2Sq.oneMinus();
   If(cosTheta2Sq.lessThan(0), () => {
@@ -42227,9 +42562,9 @@ var PhysicalLightingModel = class extends LightingModel {
     const p2 = lightPosition2.sub(halfWidth).add(halfHeight);
     const p3 = lightPosition2.add(halfWidth).add(halfHeight);
     const N2 = normalView;
-    const V2 = positionViewDirection;
+    const V6 = positionViewDirection;
     const P = positionView.toVar();
-    const uv3 = LTC_Uv({ N: N2, V: V2, roughness });
+    const uv3 = LTC_Uv({ N: N2, V: V6, roughness });
     const t1 = ltc_1.sample(uv3).toVar();
     const t2 = ltc_2.sample(uv3).toVar();
     const mInv = mat3(
@@ -42238,11 +42573,11 @@ var PhysicalLightingModel = class extends LightingModel {
       vec3(t1.z, 0, t1.w)
     ).toVar();
     const fresnel = specularColorBlended.mul(t2.x).add(specularF90.sub(specularColorBlended).mul(t2.y)).toVar();
-    reflectedLight.directSpecular.addAssign(lightColor.mul(fresnel).mul(LTC_Evaluate({ N: N2, V: V2, P, mInv, p0, p1, p2, p3 })));
-    reflectedLight.directDiffuse.addAssign(lightColor.mul(diffuseContribution).mul(LTC_Evaluate({ N: N2, V: V2, P, mInv: mat3(1, 0, 0, 0, 1, 0, 0, 0, 1), p0, p1, p2, p3 })));
+    reflectedLight.directSpecular.addAssign(lightColor.mul(fresnel).mul(LTC_Evaluate({ N: N2, V: V6, P, mInv, p0, p1, p2, p3 })));
+    reflectedLight.directDiffuse.addAssign(lightColor.mul(diffuseContribution).mul(LTC_Evaluate({ N: N2, V: V6, P, mInv: mat3(1, 0, 0, 0, 1, 0, 0, 0, 1), p0, p1, p2, p3 })));
     if (this.clearcoat === true) {
       const Ncc = clearcoatNormalView;
-      const uvClearcoat = LTC_Uv({ N: Ncc, V: V2, roughness: clearcoatRoughness });
+      const uvClearcoat = LTC_Uv({ N: Ncc, V: V6, roughness: clearcoatRoughness });
       const t1Clearcoat = ltc_1.sample(uvClearcoat);
       const t2Clearcoat = ltc_2.sample(uvClearcoat);
       const mInvClearcoat = mat3(
@@ -42251,7 +42586,7 @@ var PhysicalLightingModel = class extends LightingModel {
         vec3(t1Clearcoat.z, 0, t1Clearcoat.w)
       );
       const fresnelClearcoat = clearcoatF0.mul(t2Clearcoat.x).add(clearcoatF90.sub(clearcoatF0).mul(t2Clearcoat.y));
-      this.clearcoatSpecularDirect.addAssign(lightColor.mul(fresnelClearcoat).mul(LTC_Evaluate({ N: Ncc, V: V2, P, mInv: mInvClearcoat, p0, p1, p2, p3 })));
+      this.clearcoatSpecularDirect.addAssign(lightColor.mul(fresnelClearcoat).mul(LTC_Evaluate({ N: Ncc, V: V6, P, mInv: mInvClearcoat, p0, p1, p2, p3 })));
     }
   }
   /**
@@ -42395,11 +42730,11 @@ var EnvironmentNode = class extends LightingNode {
     const { material } = builder;
     let envNode = this.envNode;
     if (envNode.isTextureNode || envNode.isMaterialReferenceNode) {
-      const cache3 = this._getPMREMNodeCache(builder.renderer);
-      let pmremNode = cache3.get(envNode);
+      const cache4 = this._getPMREMNodeCache(builder.renderer);
+      let pmremNode = cache4.get(envNode);
       if (pmremNode === void 0) {
         pmremNode = pmremTexture(this._getEnvTexture(builder));
-        cache3.set(envNode, pmremNode);
+        cache4.set(envNode, pmremNode);
       }
       this._pmremNode = pmremNode;
       this.updateBeforeType = envNode.isMaterialReferenceNode ? NodeUpdateType.OBJECT : NodeUpdateType.RENDER;
@@ -42780,7 +43115,7 @@ var getGradientIrradiance = /* @__PURE__ */ Fn(({ normal: normal2, lightDirectio
     return vec3(gradientMap.r);
   } else {
     const fw = coord.fwidth().mul(0.5);
-    return mix(vec3(0.7), vec3(1), smoothstep(float(0.7).sub(fw.x), float(0.7).add(fw.x), coord.x));
+    return mix(vec3(0.7), vec3(1), smoothstep2(float(0.7).sub(fw.x), float(0.7).add(fw.x), coord.x));
   }
 });
 var ToonLightingModel = class extends LightingModel {
@@ -43451,9 +43786,9 @@ var RenderObject = class {
     }
     firstVertex = Math.max(firstVertex, 0);
     lastVertex = Math.min(lastVertex, itemCount);
-    const count = lastVertex - firstVertex;
-    if (count < 0 || count === Infinity) return null;
-    drawParams.vertexCount = count;
+    const count2 = lastVertex - firstVertex;
+    if (count2 < 0 || count2 === Infinity) return null;
+    drawParams.vertexCount = count2;
     drawParams.firstVertex = firstVertex;
     return drawParams;
   }
@@ -43921,13 +44256,13 @@ function getWireframeId(geometry) {
 function getWireframeIndex(geometry) {
   const geometryIndex = geometry.index;
   const geometryPosition = geometry.attributes.position;
-  const count = geometryIndex !== null ? geometryIndex.array.length : geometryPosition.array.length / 3 - 1;
+  const count2 = geometryIndex !== null ? geometryIndex.array.length : geometryPosition.array.length / 3 - 1;
   const IndexBufferAttribute = geometryPosition.count >= 65535 ? Uint32BufferAttribute : Uint16BufferAttribute;
-  const attribute3 = new IndexBufferAttribute(Math.ceil(count / 3) * 6, 1);
+  const attribute3 = new IndexBufferAttribute(Math.ceil(count2 / 3) * 6, 1);
   const indices = attribute3.array;
   if (geometryIndex !== null) {
     const array2 = geometryIndex.array;
-    for (let i = 0, j = 0; i < count; i += 3) {
+    for (let i = 0, j = 0; i < count2; i += 3) {
       const a = array2[i + 0];
       const b = array2[i + 1];
       const c = array2[i + 2];
@@ -43939,7 +44274,7 @@ function getWireframeIndex(geometry) {
       indices[j++] = a;
     }
   } else {
-    for (let i = 0, j = 0; i < count; i += 3) {
+    for (let i = 0, j = 0; i < count2; i += 3) {
       const a = i + 0;
       const b = i + 1;
       const c = i + 2;
@@ -44191,16 +44526,16 @@ var Info = class {
    * @param {number} count - The vertex or index count.
    * @param {number} instanceCount - The instance count.
    */
-  update(object, count, instanceCount) {
+  update(object, count2, instanceCount) {
     this.render.drawCalls++;
     if (object.isMesh || object.isSprite) {
-      this.render.triangles += instanceCount * (count / 3);
+      this.render.triangles += instanceCount * (count2 / 3);
     } else if (object.isPoints) {
-      this.render.points += instanceCount * count;
+      this.render.points += instanceCount * count2;
     } else if (object.isLineSegments) {
-      this.render.lines += instanceCount * (count / 2);
+      this.render.lines += instanceCount * (count2 / 2);
     } else if (object.isLine) {
-      this.render.lines += instanceCount * (count - 1);
+      this.render.lines += instanceCount * (count2 - 1);
     } else {
       error("WebGPUInfo: Unknown object type.");
     }
@@ -45471,8 +45806,8 @@ var RenderContexts = class {
     } else {
       const format = renderTarget.texture?.format;
       const type = renderTarget.texture?.type;
-      const count = renderTarget.textures.length;
-      attachmentState = `${count}:${format}:${type}:${renderTarget.samples}:${renderTarget.depthBuffer}:${renderTarget.stencilBuffer}`;
+      const count2 = renderTarget.textures.length;
+      attachmentState = `${count2}:${format}:${type}:${renderTarget.samples}:${renderTarget.depthBuffer}:${renderTarget.stencilBuffer}`;
     }
     const mrtState = mrt2 !== null ? mrt2.id : "default";
     const cameraState = camera?.isOrthographicCamera === true ? "orthographic" : "perspective";
@@ -46138,13 +46473,13 @@ var NodeVar = class {
    * @param {?number} [count=null] - The size.
    * @param {boolean} [local=false] - Whether the variable is declared locally in the flow.
    */
-  constructor(name, type, readOnly = false, count = null, local = false) {
+  constructor(name, type, readOnly = false, count2 = null, local = false) {
     this.isNodeVar = true;
     this.name = name;
     this.type = type;
     this.readOnly = readOnly;
     this.local = local;
-    this.count = count;
+    this.count = count2;
   }
 };
 var NodeVarying = class extends NodeVar {
@@ -47109,8 +47444,8 @@ var NodeBuilder = class {
    *
    * @param {NodeCache} cache - The cache to set.
    */
-  setCache(cache3) {
-    this.cache = cache3;
+  setCache(cache4) {
+    this.cache = cache4;
   }
   /**
    * Returns the builder's current cache.
@@ -47282,8 +47617,8 @@ var NodeBuilder = class {
    */
   hasWriteUsage(node) {
     const refNode = node.getShared(this);
-    const cache3 = refNode.isGlobal(this) ? this.globalCache : this.cache;
-    const nodeData = cache3.getData(refNode);
+    const cache4 = refNode.isGlobal(this) ? this.globalCache : this.cache;
+    const nodeData = cache4.getData(refNode);
     if (nodeData !== void 0) {
       for (const shaderStage in nodeData) {
         if (_checkWriteUsage(nodeData[shaderStage])) {
@@ -47338,8 +47673,8 @@ var NodeBuilder = class {
    * @param {?number} [count] - The count.
    * @return {string} The generated value as a shader string.
    */
-  generateArrayDeclaration(type, count) {
-    return this.getType(type) + "[ " + count + " ]";
+  generateArrayDeclaration(type, count2) {
+    return this.getType(type) + "[ " + count2 + " ]";
   }
   /**
    * Generates the array shader string for the given type and value.
@@ -47349,16 +47684,16 @@ var NodeBuilder = class {
    * @param {?Array<Node>} [values=null] - The default values.
    * @return {string} The generated value as a shader string.
    */
-  generateArray(type, count, values = null) {
-    let snippet = this.generateArrayDeclaration(type, count) + "( ";
-    for (let i = 0; i < count; i++) {
+  generateArray(type, count2, values = null) {
+    let snippet = this.generateArrayDeclaration(type, count2) + "( ";
+    for (let i = 0; i < count2; i++) {
       const value = values ? values[i] : null;
       if (value !== null) {
         snippet += value.build(this, type);
       } else {
         snippet += this.generateConst(type);
       }
-      if (i < count - 1) snippet += ", ";
+      if (i < count2 - 1) snippet += ", ";
     }
     snippet += " )";
     return snippet;
@@ -47835,12 +48170,12 @@ var NodeBuilder = class {
    * @param {?NodeCache} cache - An optional cache.
    * @return {Object} The node data.
    */
-  getDataFromNode(node, shaderStage = this.shaderStage, cache3 = null) {
-    cache3 = cache3 === null ? node.isGlobal(this) ? this.globalCache : this.cache : cache3;
-    let nodeData = cache3.getData(node);
+  getDataFromNode(node, shaderStage = this.shaderStage, cache4 = null) {
+    cache4 = cache4 === null ? node.isGlobal(this) ? this.globalCache : this.cache : cache4;
+    let nodeData = cache4.getData(node);
     if (nodeData === void 0) {
       nodeData = {};
-      cache3.setData(node, nodeData);
+      cache4.setData(node, nodeData);
     }
     if (nodeData[shaderStage] === void 0) nodeData[shaderStage] = new NodeData();
     let data = nodeData[shaderStage];
@@ -47986,8 +48321,8 @@ var NodeBuilder = class {
       if (subBuildVariable !== property2) {
         name = this.getSubBuildProperty(name, nodeData.subBuilds);
       }
-      const count = node.getArrayCount(this);
-      nodeVar = new NodeVar(name, type, readOnly, count, local);
+      const count2 = node.getArrayCount(this);
+      nodeVar = new NodeVar(name, type, readOnly, count2, local);
       if (!readOnly && !local) {
         vars.push(nodeVar);
       }
@@ -48192,19 +48527,19 @@ var NodeBuilder = class {
    */
   buildFunctionNode(shaderNode) {
     const backend = this.renderer.backend;
-    let cache3 = _functionNodeCache.get(backend);
-    if (cache3 === void 0) {
-      cache3 = /* @__PURE__ */ new WeakMap();
-      _functionNodeCache.set(backend, cache3);
+    let cache4 = _functionNodeCache.get(backend);
+    if (cache4 === void 0) {
+      cache4 = /* @__PURE__ */ new WeakMap();
+      _functionNodeCache.set(backend, cache4);
     }
-    let fn = cache3.get(shaderNode);
+    let fn = cache4.get(shaderNode);
     if (fn === void 0) {
       fn = new FunctionNode();
       const previous = this.currentFunctionNode;
       this.currentFunctionNode = fn;
       fn.code = this.buildFunctionCode(shaderNode);
       this.currentFunctionNode = previous;
-      cache3.set(shaderNode, fn);
+      cache4.set(shaderNode, fn);
     }
     return fn;
   }
@@ -48240,16 +48575,16 @@ var NodeBuilder = class {
     const provided = inputs.map((input, i) => object !== null ? object[input.name] !== void 0 : rawInputs !== null && rawInputs[i] !== void 0);
     if (provided.every(Boolean)) return rawInputs !== null ? rawInputs : [];
     if (shaderNode.once) return null;
-    let cache3 = _layoutDefaultsCache.get(shaderNode);
-    if (cache3 === void 0) {
-      cache3 = /* @__PURE__ */ new Map();
-      _layoutDefaultsCache.set(shaderNode, cache3);
+    let cache4 = _layoutDefaultsCache.get(shaderNode);
+    if (cache4 === void 0) {
+      cache4 = /* @__PURE__ */ new Map();
+      _layoutDefaultsCache.set(shaderNode, cache4);
     }
     const key = provided.map(Number).join("");
-    let defaults = cache3.get(key);
+    let defaults = cache4.get(key);
     if (defaults === void 0) {
       defaults = this._resolveLayoutDefaults(shaderNode, provided);
-      cache3.set(key, defaults);
+      cache4.set(key, defaults);
     }
     if (defaults === null) return null;
     if (object !== null) {
@@ -48520,8 +48855,8 @@ var NodeBuilder = class {
    * @param {?number} [count=null] - The array length.
    * @return {string} The shader string.
    */
-  getVar(type, name, count = null) {
-    return `${count !== null ? this.generateArrayDeclaration(type, count) : this.getType(type)} ${name}`;
+  getVar(type, name, count2 = null) {
+    return `${count2 !== null ? this.generateArrayDeclaration(type, count2) : this.getType(type)} ${name}`;
   }
   /**
    * Returns a single const variable statement as a shader string for the given variable type and name.
@@ -48531,8 +48866,8 @@ var NodeBuilder = class {
    * @param {?number} [count=null] - The array length.
    * @return {string} The shader string.
    */
-  generateConstStatement(type, name, count = null) {
-    return `const ${this.getVar(type, name, count)}`;
+  generateConstStatement(type, name, count2 = null) {
+    return `const ${this.getVar(type, name, count2)}`;
   }
   /**
    * Returns a single variable statement as a shader string for the given variable type and name.
@@ -48542,8 +48877,8 @@ var NodeBuilder = class {
    * @param {?number} [count=null] - The array length.
    * @return {string} The shader string.
    */
-  generateVarStatement(type, name, count = null) {
-    return this.getVar(type, name, count);
+  generateVarStatement(type, name, count2 = null) {
+    return this.getVar(type, name, count2);
   }
   /**
    * Returns a runtime read-only variable statement as a shader string.
@@ -48554,8 +48889,8 @@ var NodeBuilder = class {
    * @param {?number} [count=null] - The array length.
    * @return {string} The shader string.
    */
-  generateLetStatement(type, name, count = null) {
-    return this.generateVarStatement(type, name, count);
+  generateLetStatement(type, name, count2 = null) {
+    return this.generateVarStatement(type, name, count2);
   }
   /**
    * Returns the variable definitions as a shader string for the given shader stage.
@@ -49067,10 +49402,10 @@ var NodeFunctionInput = class {
    * @param {('in'|'out'|'inout')} [qualifier=''] - The parameter qualifier (only relevant for GLSL).
    * @param {boolean} [isConst=false] - Whether the input uses a const qualifier or not (only relevant for GLSL).
    */
-  constructor(type, name, count = null, qualifier = "", isConst = false) {
+  constructor(type, name, count2 = null, qualifier = "", isConst = false) {
     this.type = type;
     this.name = name;
-    this.count = count;
+    this.count = count2;
     this.qualifier = qualifier;
     this.isConst = isConst;
   }
@@ -49183,7 +49518,7 @@ var SpotLightNode = class extends AnalyticLightNode {
    */
   getSpotAttenuation(builder, angleCosine) {
     const { coneCosNode, penumbraCosNode } = this;
-    return smoothstep(coneCosNode, penumbraCosNode, angleCosine);
+    return smoothstep2(coneCosNode, penumbraCosNode, angleCosine);
   }
   getLightCoord(builder) {
     const properties = builder.getNodeProperties(this);
@@ -49472,11 +49807,11 @@ var parse$1 = (source) => {
         qualifier = "";
       }
       const type2 = propsMatches[i++][0];
-      let count = Number.parseInt(propsMatches[i][0]);
-      if (Number.isNaN(count) === false) i++;
-      else count = null;
+      let count2 = Number.parseInt(propsMatches[i][0]);
+      if (Number.isNaN(count2) === false) i++;
+      else count2 = null;
       const name2 = propsMatches[i++][0];
-      inputs.push(new NodeFunctionInput(type2, name2, count, qualifier, isConst));
+      inputs.push(new NodeFunctionInput(type2, name2, count2, qualifier, isConst));
     }
     const blockCode = mainCode.substring(declaration[0].length);
     const name = declaration[3] !== void 0 ? declaration[3] : "";
@@ -53196,7 +53531,7 @@ Reason: ${info.reason}`;
    * @param {number} [count=-1] - The number of bytes to read. Must be a multiple of 4, or `-1` to read to the end of the buffer.
    * @return {Promise<ArrayBuffer|ReadbackBuffer>} A promise that resolves with the buffer data when the data are ready.
    */
-  async getArrayBufferAsync(attribute3, target = null, offset = 0, count = -1) {
+  async getArrayBufferAsync(attribute3, target = null, offset = 0, count2 = -1) {
     if (target !== null && target.isReadbackBuffer) {
       if (this.info.memoryMap.has(target) === false) {
         this.info.createReadbackBuffer(target);
@@ -53207,10 +53542,10 @@ Reason: ${info.reason}`;
         target.addEventListener("dispose", disposeInfo);
       }
     }
-    if (offset % 4 !== 0 || count > 0 && count % 4 !== 0) {
+    if (offset % 4 !== 0 || count2 > 0 && count2 % 4 !== 0) {
       throw new Error('THREE.Renderer: "getArrayBufferAsync()" offset and count must be a multiple of 4.');
     }
-    return await this.backend.getArrayBufferAsync(attribute3, target, offset, count);
+    return await this.backend.getArrayBufferAsync(attribute3, target, offset, count2);
   }
   /**
    * Returns the rendering context.
@@ -54056,8 +54391,8 @@ Reason: ${info.reason}`;
    */
   _getShadowNodes(material) {
     const version = material.version;
-    let cache3 = this._cacheShadowNodes.get(material);
-    if (cache3 === void 0 || cache3.version !== version) {
+    let cache4 = this._cacheShadowNodes.get(material);
+    if (cache4 === void 0 || cache4.version !== version) {
       const hasMap = material.map && material.map.isTexture;
       const hasColorNode = material.colorNode && material.colorNode.isNode;
       const hasCastShadowNode = material.castShadowNode && material.castShadowNode.isNode;
@@ -54101,15 +54436,15 @@ Reason: ${info.reason}`;
       } else if (material.positionNode && material.positionNode.isNode) {
         positionNode = material.positionNode;
       }
-      cache3 = {
+      cache4 = {
         version,
         colorNode,
         depthNode,
         positionNode
       };
-      this._cacheShadowNodes.set(material, cache3);
+      this._cacheShadowNodes.set(material, cache4);
     }
-    return cache3;
+    return cache4;
   }
   /**
    * Updates the camera so it's prepared for rendering operations.
@@ -54452,8 +54787,8 @@ var Buffer2 = class extends Binding {
    * @param {number} start - The start index.
    * @param {number} count - The number of elements.
    */
-  addUpdateRange(start, count) {
-    this.updateRanges.push({ start, count });
+  addUpdateRange(start, count2) {
+    this.updateRanges.push({ start, count: count2 });
   }
   /**
    * Clears all update ranges.
@@ -54544,8 +54879,8 @@ var NodeUniformBuffer = class extends UniformBuffer {
    * @param {number} start - Position at which to start update.
    * @param {number} count - The number of components to update.
    */
-  addUpdateRange(start, count) {
-    this.nodeUniform.addUpdateRange(start, count);
+  addUpdateRange(start, count2) {
+    this.nodeUniform.addUpdateRange(start, count2);
   }
   /**
    * Clears all update ranges.
@@ -56030,8 +56365,8 @@ ${flowData.code}
    * @param {?number} [count=null] - The array length.
    * @return {string} The GLSL snippet that defines a const variable.
    */
-  generateConstStatement(type, name, count = null) {
-    return `const ${this.getVar(type, name, count)}`;
+  generateConstStatement(type, name, count2 = null) {
+    return `const ${this.getVar(type, name, count2)}`;
   }
   /**
    * Returns a single variable statement as a GLSL string for the given variable type and name.
@@ -56041,8 +56376,8 @@ ${flowData.code}
    * @param {?number} [count=null] - The array length.
    * @return {string} The GLSL snippet that defines a variable.
    */
-  generateVarStatement(type, name, count = null) {
-    return this.getVar(type, name, count);
+  generateVarStatement(type, name, count2 = null) {
+    return this.getVar(type, name, count2);
   }
   /**
    * Returns the varyings of the given shader stage as a GLSL string.
@@ -57434,13 +57769,13 @@ var WebGLAttributeUtils = class {
    * @param {number} [count=-1] - The number of bytes to read. Must be a multiple of 4, or `-1` to read to the end of the buffer.
    * @return {Promise<ArrayBuffer|ReadbackBuffer>} A promise that resolves with the buffer data when the data are ready.
    */
-  async getArrayBufferAsync(attribute3, target = null, offset = 0, count = -1) {
+  async getArrayBufferAsync(attribute3, target = null, offset = 0, count2 = -1) {
     const backend = this.backend;
     const { gl } = backend;
     const bufferAttribute2 = backend.getBufferAttribute(attribute3);
     const attributeInfo = backend.get(bufferAttribute2);
     const { bufferGPU } = attributeInfo;
-    const byteLength = count === -1 ? attributeInfo.byteLength - offset : count;
+    const byteLength = count2 === -1 ? attributeInfo.byteLength - offset : count2;
     let dstBuffer;
     if (target === null) {
       dstBuffer = new Uint8Array(new ArrayBuffer(byteLength));
@@ -59785,24 +60120,24 @@ var WebGLBufferRenderer = class {
     this.type = null;
     this.object = null;
   }
-  render(start, count) {
+  render(start, count2) {
     const { gl, mode, object, type, info, index } = this;
     if (index !== 0) {
-      gl.drawElements(mode, count, type, start);
+      gl.drawElements(mode, count2, type, start);
     } else {
-      gl.drawArrays(mode, start, count);
+      gl.drawArrays(mode, start, count2);
     }
-    info.update(object, count, 1);
+    info.update(object, count2, 1);
   }
-  renderInstances(start, count, primcount) {
+  renderInstances(start, count2, primcount) {
     const { gl, mode, type, index, object, info } = this;
     if (primcount === 0) return;
     if (index !== 0) {
-      gl.drawElementsInstanced(mode, count, type, start, primcount);
+      gl.drawElementsInstanced(mode, count2, type, start, primcount);
     } else {
-      gl.drawArraysInstanced(mode, start, count, primcount);
+      gl.drawArraysInstanced(mode, start, count2, primcount);
     }
-    info.update(object, count, primcount);
+    info.update(object, count2, primcount);
   }
   renderMultiDraw(starts, counts, drawCount) {
     const { extensions, mode, object, info } = this;
@@ -60267,8 +60602,8 @@ var WebGLBackend = class extends Backend {
    * @param {number} [count=-1] - The number of bytes to read. Must be a multiple of 4, or `-1` to read to the end of the buffer.
    * @return {Promise<ArrayBuffer|ReadbackBuffer>} A promise that resolves with the buffer data when the data are ready.
    */
-  async getArrayBufferAsync(attribute3, target = null, offset = 0, count = -1) {
-    return await this.attributeUtils.getArrayBufferAsync(attribute3, target, offset, count);
+  async getArrayBufferAsync(attribute3, target = null, offset = 0, count2 = -1) {
+    return await this.attributeUtils.getArrayBufferAsync(attribute3, target, offset, count2);
   }
   /**
    * Ensures the backend is XR compatible.
@@ -60630,7 +60965,7 @@ var WebGLBackend = class extends Backend {
    * @param {ComputePipeline} pipeline - The compute pipeline.
    * @param {?number} [count=null] - The count of compute invocations. If `null`, the count is determined by the compute node.
    */
-  compute(computeGroup, computeNode, bindings, pipeline, count = null) {
+  compute(computeGroup, computeNode, bindings, pipeline, count2 = null) {
     const { state, gl } = this;
     if (this.discard === false) {
       state.enable(gl.RASTERIZER_DISCARD);
@@ -60647,18 +60982,18 @@ var WebGLBackend = class extends Backend {
       gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, i, this.get(transformAttributes[i]).transformBuffer);
     }
     gl.beginTransformFeedback(gl.POINTS);
-    count = count !== null ? count : computeNode.count;
-    if (Array.isArray(count)) {
+    count2 = count2 !== null ? count2 : computeNode.count;
+    if (Array.isArray(count2)) {
       warnOnce("WebGLBackend.compute(): The count parameter must be a single number, not an array.");
-      count = count[0];
-    } else if (count && typeof count === "object" && count.isIndirectStorageBufferAttribute) {
+      count2 = count2[0];
+    } else if (count2 && typeof count2 === "object" && count2.isIndirectStorageBufferAttribute) {
       warnOnce("WebGLBackend.compute(): The count parameter must be a single number, not IndirectStorageBufferAttribute");
-      count = computeNode.count;
+      count2 = computeNode.count;
     }
     if (attributes[0].isStorageInstancedBufferAttribute) {
-      gl.drawArraysInstanced(gl.POINTS, 0, 1, count);
+      gl.drawArraysInstanced(gl.POINTS, 0, 1, count2);
     } else {
-      gl.drawArrays(gl.POINTS, 0, count);
+      gl.drawArrays(gl.POINTS, 0, count2);
     }
     gl.endTransformFeedback();
     for (let i = 0; i < transformAttributes.length; i++) {
@@ -64807,8 +65142,8 @@ var WGSLNodeBuilder = class extends NodeBuilder {
    * @param {?number} [count] - The count.
    * @return {string} The generated value as a shader string.
    */
-  generateArrayDeclaration(type, count) {
-    return `array< ${this.getType(type)}, ${count} >`;
+  generateArrayDeclaration(type, count2) {
+    return `array< ${this.getType(type)}, ${count2} >`;
   }
   /**
    * Generates a WGSL variable that holds the texture dimension of the given texture.
@@ -65762,10 +66097,10 @@ ${flowData.code}
    * @param {string} [qualifier=''] - The variable's qualifier.
    * @return {string} The WGSL snippet that defines a variable.
    */
-  getVar(type, name, count = null, qualifier = "") {
+  getVar(type, name, count2 = null, qualifier = "") {
     let snippet = `var${qualifier} ${name} : `;
-    if (count !== null) {
-      snippet += this.generateArrayDeclaration(type, count);
+    if (count2 !== null) {
+      snippet += this.generateArrayDeclaration(type, count2);
     } else {
       snippet += this.getType(type);
     }
@@ -65790,8 +66125,8 @@ ${flowData.code}
    * @param {?number} [count=null] - The array length.
    * @return {string} The WGSL snippet that defines a variable.
    */
-  generateVarStatement(type, name, count = null) {
-    return this.getVar(type, name, count);
+  generateVarStatement(type, name, count2 = null) {
+    return this.getVar(type, name, count2);
   }
   /**
    * Returns a runtime read-only variable statement as a WGSL string.
@@ -66330,10 +66665,10 @@ var typeArraysToVertexFormatPrefixForItemSize1 = /* @__PURE__ */ new Map([
   [Float32Array, "float32"]
 ]);
 var _tail = new Uint8Array(4);
-function writeBufferAligned(device, buffer2, array2, start, count) {
+function writeBufferAligned(device, buffer2, array2, start, count2) {
   const bytes = new Uint8Array(array2.buffer, array2.byteOffset, array2.byteLength);
   const byteStart = Math.floor(start * array2.BYTES_PER_ELEMENT / 4) * 4;
-  const byteEnd = (start + count) * array2.BYTES_PER_ELEMENT;
+  const byteEnd = (start + count2) * array2.BYTES_PER_ELEMENT;
   const alignedEnd = Math.floor(byteEnd / 4) * 4;
   if (alignedEnd > byteStart) device.queue.writeBuffer(buffer2, byteStart, bytes, byteStart, alignedEnd - byteStart);
   if (byteEnd > alignedEnd) {
@@ -66560,12 +66895,12 @@ var WebGPUAttributeUtils = class {
    * @param {number} [count=-1] - The number of bytes to read. Must be a multiple of 4, or `-1` to read to the end of the buffer.
    * @return {Promise<ArrayBuffer|ReadbackBuffer>} A promise that resolves with the buffer data when the data are ready.
    */
-  async getArrayBufferAsync(attribute3, target = null, offset = 0, count = -1) {
+  async getArrayBufferAsync(attribute3, target = null, offset = 0, count2 = -1) {
     const backend = this.backend;
     const device = backend.device;
     const data = backend.get(backend.getBufferAttribute(attribute3));
     const bufferGPU = data.buffer;
-    const byteLength = count === -1 ? bufferGPU.size - offset : count;
+    const byteLength = count2 === -1 ? bufferGPU.size - offset : count2;
     let readBufferGPU;
     if (target !== null && target.isReadbackBuffer) {
       const readbackInfo = backend.get(target);
@@ -68146,8 +68481,8 @@ var WebGPUBackend = class extends Backend {
    * @param {number} [count=-1] - The number of bytes to read. Must be a multiple of 4, or `-1` to read to the end of the buffer.
    * @return {Promise<ArrayBuffer|ReadbackBuffer>} A promise that resolves with the buffer data when the data are ready.
    */
-  async getArrayBufferAsync(attribute3, target = null, offset = 0, count = -1) {
-    return await this.attributeUtils.getArrayBufferAsync(attribute3, target, offset, count);
+  async getArrayBufferAsync(attribute3, target = null, offset = 0, count2 = -1) {
+    return await this.attributeUtils.getArrayBufferAsync(attribute3, target, offset, count2);
   }
   /**
    * Returns the backend's rendering context.
@@ -68236,7 +68571,7 @@ var WebGPUBackend = class extends Backend {
    * @param {number} count - The number of textures to create.
    * @return {?Array<GPUTexture>} The multisampled textures.
    */
-  _getExternalMSAATextures(renderContext, textureData, count) {
+  _getExternalMSAATextures(renderContext, textureData, count2) {
     const samples = this.utils.getSampleCount(renderContext.sampleCount);
     if (samples === 1) {
       if (textureData.msaaTextures !== void 0) {
@@ -68249,7 +68584,7 @@ var WebGPUBackend = class extends Backend {
     const width = renderTarget.width;
     const height = renderTarget.height;
     const format = textureData.format;
-    if (textureData.msaaTextures === void 0 || textureData.msaaTextures.length !== count || textureData.msaaWidth !== width || textureData.msaaHeight !== height || textureData.msaaSamples !== samples || textureData.msaaFormat !== format) {
+    if (textureData.msaaTextures === void 0 || textureData.msaaTextures.length !== count2 || textureData.msaaWidth !== width || textureData.msaaHeight !== height || textureData.msaaSamples !== samples || textureData.msaaFormat !== format) {
       if (textureData.msaaTextures !== void 0) {
         for (const texture4 of textureData.msaaTextures) texture4.destroy();
       }
@@ -68259,7 +68594,7 @@ var WebGPUBackend = class extends Backend {
       _textureDescriptor.format = format;
       _textureDescriptor.usage = GPUTextureUsage.RENDER_ATTACHMENT;
       textureData.msaaTextures = [];
-      for (let i = 0; i < count; i++) {
+      for (let i = 0; i < count2; i++) {
         _textureDescriptor.label = renderTarget.texture.name + "-msaa-" + i;
         textureData.msaaTextures.push(this.device.createTexture(_textureDescriptor));
       }
@@ -69089,15 +69424,15 @@ var WebGPUBackend = class extends Backend {
       return;
     }
     if (typeof dispatchSize === "number") {
-      const count = dispatchSize;
-      if (computeNodeData.dispatchSize === void 0 || computeNodeData.count !== count) {
+      const count2 = dispatchSize;
+      if (computeNodeData.dispatchSize === void 0 || computeNodeData.count !== count2) {
         computeNodeData.dispatchSize = [0, 1, 1];
-        computeNodeData.count = count;
+        computeNodeData.count = count2;
         const workgroupSize = computeNode.workgroupSize;
         let size = workgroupSize[0];
         for (let i = 1; i < workgroupSize.length; i++)
           size *= workgroupSize[i];
-        const dispatchCount = Math.ceil(count / size);
+        const dispatchCount = Math.ceil(count2 / size);
         const maxComputeWorkgroupsPerDimension = this.device.limits.maxComputeWorkgroupsPerDimension;
         dispatchSize = [dispatchCount, 1, 1];
         if (dispatchCount > maxComputeWorkgroupsPerDimension) {
@@ -70129,19 +70464,25 @@ LightProbe.registerNode(LightProbeNode);
 IESSpotLight.registerNode(IESSpotLightNode);
 ProjectorLight.registerNode(ProjectorLightNode);
 
-// src/game/data.ts
+// ../../src/game/data.ts
+var STAT_KEYS = ["topSpeed", "accel", "turn", "traction", "airbrake", "cooling", "repair"];
 var PILOTS = [
-  { id: "kai", name: "Kai Varrin", species: "Mensch", skill: 0.9, aggression: 0.4, color: "#4aa3ff" },
-  { id: "zeb", name: "Zebulox Vrak", species: "Dugkin", skill: 0.95, aggression: 0.95, color: "#ff9a2e" },
-  { id: "gas", name: "Gasvaro Ten", species: "Xantori", skill: 0.8, aggression: 0.3, color: "#3fe0a0" },
-  { id: "bom", name: "Bomquad Rii", species: "Lurbani", skill: 0.55, aggression: 0.2, color: "#e3e04a" },
-  { id: "mav", name: "Mavik Hollo", species: "Gurrani", skill: 0.75, aggression: 0.6, color: "#ff4a6e" },
-  { id: "rat", name: "Rattis Tyr", species: "Aleeni", skill: 0.7, aggression: 0.8, color: "#b46bff" },
-  { id: "ald", name: "Aldo Beerak", species: "Kraveen", skill: 0.85, aggression: 0.7, color: "#7fd3ff" },
-  { id: "tee", name: "Teemo Pagali", species: "Vexi", skill: 0.65, aggression: 0.5, color: "#ff7b2e" },
-  { id: "ela", name: "Elana Mak", species: "Mensch", skill: 0.78, aggression: 0.35, color: "#ff5ad1" },
-  { id: "ody", name: "Odo Mandrel", species: "Erriton", skill: 0.6, aggression: 0.55, color: "#9fff5a" },
-  { id: "cle", name: "Clegg Halden", species: "Mensch", skill: 0.68, aggression: 0.45, color: "#ffd27a" }
+  { id: "kai", name: "Kai Varrin", species: "Mensch", head: "goggles", skin: "#b98c68", skill: 0.9, aggression: 0.4, color: "#4aa3ff" },
+  { id: "zeb", name: "Zebulox Vrak", species: "Dugkin", head: "snout", skin: "#b5673a", skill: 0.95, aggression: 0.95, color: "#ff9a2e" },
+  { id: "gas", name: "Gasvaro Ten", species: "Xantori", head: "crest", skin: "#7fb6a8", skill: 0.8, aggression: 0.3, color: "#3fe0a0" },
+  { id: "bom", name: "Bomquad Rii", species: "Lurbani", head: "dome", skin: "#8fa3b5", skill: 0.55, aggression: 0.2, color: "#e3e04a" },
+  { id: "mav", name: "Mavik Hollo", species: "Gurrani", head: "aero", skin: "#a4b06a", skill: 0.75, aggression: 0.6, color: "#ff4a6e" },
+  { id: "rat", name: "Rattis Tyr", species: "Aleeni", head: "crest", skin: "#a99bc0", skill: 0.7, aggression: 0.8, color: "#b46bff" },
+  { id: "ald", name: "Aldo Beerak", species: "Kraveen", head: "aero", skin: "#c9a15a", skill: 0.85, aggression: 0.7, color: "#7fd3ff" },
+  { id: "tee", name: "Teemo Pagali", species: "Vexi", head: "dome", skin: "#b8795a", skill: 0.65, aggression: 0.5, color: "#ff7b2e" },
+  { id: "ela", name: "Elana Mak", species: "Mensch", head: "goggles", skin: "#b98c68", skill: 0.78, aggression: 0.35, color: "#ff5ad1" },
+  { id: "ody", name: "Odo Mandrel", species: "Erriton", head: "aero", skin: "#8f9a8a", skill: 0.6, aggression: 0.55, color: "#9fff5a" },
+  { id: "cle", name: "Clegg Halden", species: "Mensch", head: "goggles", skin: "#b98c68", skill: 0.68, aggression: 0.45, color: "#ffd27a" },
+  // Session 20: the pilots of the four new pods
+  { id: "bra", name: "Brask Tarn", species: "Ursk", head: "maul", skin: "#7b5a3c", skill: 0.72, aggression: 0.65, color: "#c8743a" },
+  { id: "sir", name: "Sira Lyss", species: "Nerai", head: "veil", skin: "#8fc9cf", skill: 0.88, aggression: 0.3, color: "#7af0e0" },
+  { id: "hav", name: "Havo Dorn", species: "Brakkan", head: "horn", skin: "#8a7361", skill: 0.8, aggression: 0.85, color: "#d1a43a" },
+  { id: "ixo", name: "Ixo Quill", species: "Synth", head: "optic", skin: "#9aa3ad", skill: 0.82, aggression: 0.5, color: "#8f7bd6" }
 ];
 var PODS = [
   {
@@ -70150,12 +70491,6 @@ var PODS = [
     pilotId: "kai",
     desc: "Ausgewogener Allrounder mit gro\xDFen Turbinen-Triebwerken.",
     stats: { topSpeed: 0.7, accel: 0.75, turn: 0.75, traction: 0.65, airbrake: 0.7, cooling: 0.7, repair: 0.6 },
-    engine: "turbine",
-    engineLen: 7,
-    engineRad: 1.15,
-    spread: 4.2,
-    cable: 9,
-    cockpit: "pod",
     colors: ["#2d6fd6", "#d9dde3", "#4ad2ff"]
   },
   {
@@ -70164,12 +70499,6 @@ var PODS = [
     pilotId: "zeb",
     desc: "Riesige Split-X Triebwerke \u2013 brutale Geschwindigkeit.",
     stats: { topSpeed: 0.95, accel: 0.8, turn: 0.45, traction: 0.55, airbrake: 0.5, cooling: 0.55, repair: 0.5 },
-    engine: "split",
-    engineLen: 10,
-    engineRad: 1.25,
-    spread: 5.2,
-    cable: 10,
-    cockpit: "wedge",
     colors: ["#d07a1c", "#3a3a3a", "#ffb347"]
   },
   {
@@ -70178,12 +70507,6 @@ var PODS = [
     pilotId: "gas",
     desc: "Sechs Triebwerke, extreme Beschleunigung, empfindlich.",
     stats: { topSpeed: 0.8, accel: 0.95, turn: 0.6, traction: 0.6, airbrake: 0.65, cooling: 0.45, repair: 0.45 },
-    engine: "quad",
-    engineLen: 8.5,
-    engineRad: 0.9,
-    spread: 4.8,
-    cable: 11,
-    cockpit: "long",
     colors: ["#27a36d", "#e8d27a", "#5affb4"]
   },
   {
@@ -70192,12 +70515,6 @@ var PODS = [
     pilotId: "bom",
     desc: "Vier schlanke Triebwerke im Quadrat, gekoppelt \xFCber ein X aus Energieblitzen. Wild, aber schnell.",
     stats: { topSpeed: 0.85, accel: 0.55, turn: 0.4, traction: 0.4, airbrake: 0.45, cooling: 0.8, repair: 0.7 },
-    engine: "ring",
-    engineLen: 7.6,
-    engineRad: 0.7,
-    spread: 4.6,
-    cable: 12,
-    cockpit: "saucer",
     colors: ["#c9b23a", "#5d4a2c", "#fff07a"]
   },
   {
@@ -70206,12 +70523,6 @@ var PODS = [
     pilotId: "mav",
     desc: "Schlanke Nadel-Triebwerke f\xFCr maximale Wendigkeit.",
     stats: { topSpeed: 0.6, accel: 0.7, turn: 0.95, traction: 0.85, airbrake: 0.85, cooling: 0.65, repair: 0.6 },
-    engine: "needle",
-    engineLen: 8,
-    engineRad: 0.75,
-    spread: 3.6,
-    cable: 8,
-    cockpit: "pod",
     colors: ["#c2263f", "#efe9e1", "#ff5a7a"]
   },
   {
@@ -70220,12 +70531,6 @@ var PODS = [
     pilotId: "rat",
     desc: "Klein, leicht und agil \u2013 hohe Traktion.",
     stats: { topSpeed: 0.65, accel: 0.85, turn: 0.85, traction: 0.9, airbrake: 0.75, cooling: 0.6, repair: 0.55 },
-    engine: "blade",
-    engineLen: 6.5,
-    engineRad: 0.85,
-    spread: 3.4,
-    cable: 7.5,
-    cockpit: "wedge",
     colors: ["#8a3ad6", "#20212a", "#c48bff"]
   },
   {
@@ -70234,12 +70539,6 @@ var PODS = [
     pilotId: "ald",
     desc: "Hochleistungsk\xFChlung \u2013 Dauer-Boost-Spezialist.",
     stats: { topSpeed: 0.75, accel: 0.65, turn: 0.6, traction: 0.7, airbrake: 0.6, cooling: 0.95, repair: 0.75 },
-    engine: "long",
-    engineLen: 9.5,
-    engineRad: 1,
-    spread: 4.4,
-    cable: 9.5,
-    cockpit: "long",
     colors: ["#2a8fb5", "#c7c2b8", "#7fe8ff"]
   },
   {
@@ -70248,12 +70547,6 @@ var PODS = [
     pilotId: "tee",
     desc: "Schwer gepanzert \u2013 steckt Kollisionen weg.",
     stats: { topSpeed: 0.7, accel: 0.5, turn: 0.5, traction: 0.75, airbrake: 0.55, cooling: 0.7, repair: 0.95 },
-    engine: "heavy",
-    engineLen: 7.5,
-    engineRad: 1.45,
-    spread: 5,
-    cable: 9,
-    cockpit: "saucer",
     colors: ["#7a4a2a", "#b5b5b5", "#ff8c3a"]
   },
   {
@@ -70262,12 +70555,6 @@ var PODS = [
     pilotId: "ela",
     desc: "Elegant und pr\xE4zise \u2013 perfekte Luftbremse.",
     stats: { topSpeed: 0.72, accel: 0.72, turn: 0.8, traction: 0.75, airbrake: 0.95, cooling: 0.6, repair: 0.6 },
-    engine: "needle",
-    engineLen: 9,
-    engineRad: 0.85,
-    spread: 4,
-    cable: 9,
-    cockpit: "long",
     colors: ["#e6e6ee", "#d63aa8", "#ff7ae0"]
   },
   {
@@ -70276,13 +70563,40 @@ var PODS = [
     pilotId: "ody",
     desc: "Rammbock mit Turbinen \u2013 aggressive Rennen.",
     stats: { topSpeed: 0.78, accel: 0.6, turn: 0.55, traction: 0.6, airbrake: 0.5, cooling: 0.75, repair: 0.85 },
-    engine: "heavy",
-    engineLen: 8,
-    engineRad: 1.3,
-    spread: 4.6,
-    cable: 8.5,
-    cockpit: "wedge",
     colors: ["#4c7a1e", "#2b2b2b", "#b4ff5a"]
+  },
+  // ---- Session 20: four new pods (keep the ten above first – the old CI grid and saved profiles count on their order) ----
+  {
+    id: "cyclone",
+    name: "Tarn Cyclone",
+    pilotId: "bra",
+    desc: "Zwei offene Riesenrotoren in Schutzringen \u2013 saugt sich f\xF6rmlich an der Piste fest.",
+    stats: { topSpeed: 0.64, accel: 0.88, turn: 0.7, traction: 0.92, airbrake: 0.72, cooling: 0.62, repair: 0.6 },
+    colors: ["#b08d57", "#3b4032", "#ffc94a"]
+  },
+  {
+    id: "halo",
+    name: "Lyss Halo-9",
+    pilotId: "sir",
+    desc: "Schlanke Kerntriebwerke in gro\xDFen Ringfl\xFCgeln \u2013 tanzt durch jede Kurve und steht auf der Bremse.",
+    stats: { topSpeed: 0.68, accel: 0.68, turn: 0.9, traction: 0.74, airbrake: 0.9, cooling: 0.66, repair: 0.55 },
+    colors: ["#cfeee6", "#1c3558", "#9bfff0"]
+  },
+  {
+    id: "manta",
+    name: "Dorn Manta",
+    pilotId: "hav",
+    desc: "Flache Triebwerksplatten mit Schlitzd\xFCsen \u2013 auf der Geraden kaum zu halten, in Kurven tr\xE4ge.",
+    stats: { topSpeed: 0.97, accel: 0.72, turn: 0.42, traction: 0.58, airbrake: 0.55, cooling: 0.6, repair: 0.55 },
+    colors: ["#26282e", "#c99a2e", "#ff5f2e"]
+  },
+  {
+    id: "volt",
+    name: "Quill Voltspire",
+    pilotId: "ixo",
+    desc: "Reaktor-Triebwerke mit vergittertem Plasmafenster und drei Energieb\xF6gen \u2013 rei\xDFt aus dem Stand davon, vertr\xE4gt aber wenig.",
+    stats: { topSpeed: 0.74, accel: 0.92, turn: 0.66, traction: 0.62, airbrake: 0.6, cooling: 0.9, repair: 0.4 },
+    colors: ["#34407a", "#c7ccd4", "#b79bff"]
   }
 ];
 var THEMES = {
@@ -70408,19 +70722,20 @@ var THEMES = {
     barrierColor: "#3ad8ff"
   },
   oovo: {
+    // Session 20: the sun stands higher (8° → 19°) and the fill light is a little stronger – the track now runs over a real moon surface
     id: "oovo",
     name: "Oovo IV",
     skyTop: "#02030a",
     skyHorizon: "#1a2440",
     sunColor: "#e8e0d0",
-    sunElev: 8,
+    sunElev: 19,
     sunAz: 200,
     clouds: 0,
     fogColor: "#0a0e18",
     fogDensity: 35e-5,
-    sunIntensity: 2.2,
-    hemiSky: "#2a3355",
-    hemiGround: "#0a0c12",
+    sunIntensity: 2.6,
+    hemiSky: "#3a4468",
+    hemiGround: "#14161c",
     exposure: 1.05,
     road: "oovoRoad",
     wall: "oovoWall",
@@ -70506,7 +70821,7 @@ var THEMES = {
   }
 };
 
-// node_modules/three/build/three.module.js
+// ../../node_modules/three/build/three.module.js
 var alphahash_fragment = "#ifdef USE_ALPHAHASH\n	if ( diffuseColor.a < getAlphaHashThreshold( vPosition ) ) discard;\n#endif";
 var alphahash_pars_fragment = "#ifdef USE_ALPHAHASH\n	const float ALPHA_HASH_SCALE = 0.05;\n	float hash2D( vec2 value ) {\n		return fract( 1.0e4 * sin( 17.0 * value.x + 0.1 * value.y ) * ( 0.1 + abs( sin( 13.0 * value.y + value.x ) ) ) );\n	}\n	float hash3D( vec3 value ) {\n		return hash2D( vec2( hash2D( value.xy ), value.z ) );\n	}\n	float getAlphaHashThreshold( vec3 position ) {\n		float maxDeriv = max(\n			length( dFdx( position.xyz ) ),\n			length( dFdy( position.xyz ) )\n		);\n		float pixScale = 1.0 / ( ALPHA_HASH_SCALE * maxDeriv );\n		vec2 pixScales = vec2(\n			exp2( floor( log2( pixScale ) ) ),\n			exp2( ceil( log2( pixScale ) ) )\n		);\n		vec2 alpha = vec2(\n			hash3D( floor( pixScales.x * position.xyz ) ),\n			hash3D( floor( pixScales.y * position.xyz ) )\n		);\n		float lerpFactor = fract( log2( pixScale ) );\n		float x = ( 1.0 - lerpFactor ) * alpha.x + lerpFactor * alpha.y;\n		float a = min( lerpFactor, 1.0 - lerpFactor );\n		vec3 cases = vec3(\n			x * x / ( 2.0 * a * ( 1.0 - a ) ),\n			( x - 0.5 * a ) / ( 1.0 - a ),\n			1.0 - ( ( 1.0 - x ) * ( 1.0 - x ) / ( 2.0 * a * ( 1.0 - a ) ) )\n		);\n		float threshold = ( x < ( 1.0 - a ) )\n			? ( ( x < a ) ? cases.x : cases.y )\n			: cases.z;\n		return clamp( threshold , 1.0e-6, 1.0 );\n	}\n#endif";
 var alphamap_fragment = "#ifdef USE_ALPHAMAP\n	diffuseColor.a *= texture2D( alphaMap, vAlphaMapUv ).g;\n#endif";
@@ -71802,7 +72117,7 @@ var DATA2 = new Uint16Array([
   1183
 ]);
 
-// node_modules/three/examples/jsm/utils/BufferGeometryUtils.js
+// ../../node_modules/three/examples/jsm/utils/BufferGeometryUtils.js
 function mergeGeometries(geometries, useGroups = false) {
   const isIndexed = geometries[0].index !== null;
   const attributesUsed = new Set(Object.keys(geometries[0].attributes));
@@ -71856,17 +72171,17 @@ function mergeGeometries(geometries, useGroups = false) {
       return null;
     }
     if (useGroups) {
-      let count;
+      let count2;
       if (isIndexed) {
-        count = geometry.index.count;
+        count2 = geometry.index.count;
       } else if (geometry.attributes.position !== void 0) {
-        count = geometry.attributes.position.count;
+        count2 = geometry.attributes.position.count;
       } else {
         console.error("THREE.BufferGeometryUtils: .mergeGeometries() failed with geometry at index " + i + ". The geometry must have either an index or a position attribute");
         return null;
       }
-      mergedGeometry.addGroup(offset, count, i);
-      offset += count;
+      mergedGeometry.addGroup(offset, count2, i);
+      offset += count2;
     }
   }
   if (isIndexed) {
@@ -71963,7 +72278,7 @@ function mergeAttributes(attributes) {
   return result;
 }
 
-// node_modules/three/examples/jsm/geometries/RoundedBoxGeometry.js
+// ../../node_modules/three/examples/jsm/geometries/RoundedBoxGeometry.js
 var _tempNormal = new Vector3();
 function getUv(faceDirVector, normal2, uvAxis, projectionAxis, radius, sideLength) {
   const totArcLength = 2 * Math.PI * radius / 4;
@@ -72084,7 +72399,7 @@ var RoundedBoxGeometry = class _RoundedBoxGeometry extends BoxGeometry {
   }
 };
 
-// src/game/podKit.ts
+// ../../src/game/podKit.ts
 var TILE = 2.4;
 var V3 = Vector3;
 function ensureAttrs(g, liv) {
@@ -72120,9 +72435,46 @@ function flipWinding(g) {
   }
   idx.needsUpdate = true;
 }
-var PartBuilder = class {
+var PartBuilder = class _PartBuilder {
   buckets = /* @__PURE__ */ new Map();
+  /** Bruchteile: geometry added inside `brk(id, …)` goes into a set of its own (`buildBreaks`), never into `build()` */
+  breaks = /* @__PURE__ */ new Map();
+  into = null;
+  /** Everything `make` adds becomes part of the Bruchteil `id` (several calls with one id add up).
+   *  Engine builders: an id ending in '-' / '+' sits on the engine's left / right flank – it is a Bruchteil only on the pod's outer flank. */
+  brk(id, make) {
+    const was = this.into;
+    let sub2 = this.breaks.get(id);
+    if (!sub2) {
+      sub2 = new _PartBuilder();
+      this.breaks.set(id, sub2);
+    }
+    this.into = sub2;
+    try {
+      make();
+    } finally {
+      this.into = was;
+    }
+    return this;
+  }
+  /** The Bruchteile collected by `brk`: one geometry set each, with the centre of its bounding box. Call once, like `build`. */
+  buildBreaks() {
+    const out = [];
+    for (const [id, sub2] of this.breaks) {
+      const parts = sub2.build();
+      if (!parts.size) continue;
+      const box = new Box3();
+      for (const g of parts.values()) box.union(g.boundingBox);
+      out.push({ id, parts, center: box.getCenter(new Vector3()) });
+    }
+    this.breaks.clear();
+    return out;
+  }
   add(key, g, m, liv = [0, 0, 0]) {
+    if (this.into) {
+      this.into.add(key, g, m, liv);
+      return this;
+    }
     const geo = ensureAttrs(g, liv);
     if (m) {
       geo.applyMatrix4(m);
@@ -72299,17 +72651,17 @@ function sectionPoint(s, phi) {
   }
   return [x, y + (s.y ?? 0)];
 }
-function loft(sections2, seg, mode = 0, caps = [true, true], inward = false) {
-  const R = sections2.length, cols = seg + 1;
+function loft(sections, seg, mode = 0, caps = [true, true], inward = false) {
+  const R = sections.length, cols = seg + 1;
   const pos = new Float32Array(R * cols * 3), uv3 = new Float32Array(R * cols * 2), liv = new Float32Array(R * cols * 3);
-  const z0 = sections2[0].z, z1 = sections2[R - 1].z;
+  const z0 = sections[0].z, z1 = sections[R - 1].z;
   const zr = Math.max(1e-4, z1 - z0);
   let vAcc = 0;
   for (let j = 0; j < R; j++) {
-    const s = sections2[j];
+    const s = sections[j];
     const gap = (s.open ?? 0) * Math.PI;
     if (j > 0) {
-      const p = sections2[j - 1];
+      const p = sections[j - 1];
       vAcc += Math.hypot(s.z - p.z, (s.y ?? 0) - (p.y ?? 0), (s.hT - p.hT) * 0.5);
     }
     let uAcc = 0;
@@ -72345,7 +72697,7 @@ function loft(sections2, seg, mode = 0, caps = [true, true], inward = false) {
   g.computeVertexNormals();
   const nrm = g.attributes.normal;
   for (let j = 0; j < R; j++) {
-    if ((sections2[j].open ?? 0) > 0) continue;
+    if ((sections[j].open ?? 0) > 0) continue;
     const a = j * cols, b = j * cols + seg;
     const nx = nrm.getX(a) + nrm.getX(b), ny = nrm.getY(a) + nrm.getY(b), nz = nrm.getZ(a) + nrm.getZ(b);
     const l = Math.hypot(nx, ny, nz) || 1;
@@ -72355,7 +72707,7 @@ function loft(sections2, seg, mode = 0, caps = [true, true], inward = false) {
   const parts = [g];
   caps.forEach((on, ci) => {
     if (!on) return;
-    const s = sections2[ci === 0 ? 0 : R - 1];
+    const s = sections[ci === 0 ? 0 : R - 1];
     if (s.w < 0.01 && s.hT < 0.01) return;
     const cp = [], cu = [], ci2 = [], cn = [], cl = [];
     const dir = (ci === 0 ? -1 : 1) * (inward ? -1 : 1);
@@ -72438,20 +72790,16 @@ function radial(make, n, phase = 0) {
   list.forEach((g) => g.dispose());
   return m;
 }
-function boltRing(R, count, r2, z, radialOut = false) {
-  return radial(() => {
-    const g = cyl(r2, r2, r2 * 0.7, 6);
-    if (radialOut) g.translate(0, R + r2 * 0.25, z);
-    else {
-      g.rotateX(Math.PI / 2);
-      g.translate(0, R, z + r2 * 0.3);
-    }
-    return g;
-  }, count, Math.PI / count);
+function heatAlong(g, z0, len, dz = 0) {
+  const liv = g.attributes.aLiv, pos = g.attributes.position;
+  if (!liv || !(len > 0)) return g;
+  for (let i = 0; i < liv.count; i++) {
+    const mode = liv.getZ(i);
+    if (mode > 0.5 && mode < 2.5) continue;
+    liv.setY(i, Math.max(0, Math.min(1, (pos.getZ(i) + dz - z0) / len)));
+  }
+  return g;
 }
-
-// src/game/podParts.ts
-var cache2 = /* @__PURE__ */ new Map();
 function flameGeo(rn, len, seg) {
   const pts = [];
   for (let i = 0; i <= 12; i++) {
@@ -72461,11 +72809,608 @@ function flameGeo(rn, len, seg) {
   }
   return lathe(prof(pts), seg, 0);
 }
+function boltRing(R, count2, r2, z, radialOut = false) {
+  return radial(() => {
+    const g = cyl(r2, r2, r2 * 0.7, 6);
+    if (radialOut) g.translate(0, R + r2 * 0.25, z);
+    else {
+      g.rotateX(Math.PI / 2);
+      g.translate(0, R, z + r2 * 0.3);
+    }
+    return g;
+  }, count2, Math.PI / count2);
+}
+
+// ../../src/game/podEngines.ts
+var V = (x, y, z) => new Vector3(x, y, z);
+var HALF = Math.PI / 2;
+var SEC = [0, 0, 3];
+function petalsFrom(pos, pet, idx) {
+  const g = new BufferGeometry();
+  g.setAttribute("position", new Float32BufferAttribute(pos, 3));
+  g.setAttribute("aPet", new Float32BufferAttribute(pet, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  const out = g.toNonIndexed();
+  g.dispose();
+  return out;
+}
+function irisPetals(np, rH, rT, zH, zT, swing) {
+  const pos = [], pet = [], idx = [];
+  for (let q = 0; q < np; q++) {
+    const a0 = (q + 0.05) / np * Math.PI * 2, a1 = (q + 0.95) / np * Math.PI * 2, am = (a0 + a1) / 2, b = pos.length / 3;
+    for (const [a, z, r2, d] of [[a0, zH, rH, 0], [a1, zH, rH, 0], [a0, zT, rT, swing], [a1, zT, rT, swing]]) {
+      pos.push(Math.cos(a) * r2, Math.sin(a) * r2, z);
+      pet.push(Math.cos(am), Math.sin(am), d);
+    }
+    idx.push(b, b + 2, b + 1, b + 1, b + 2, b + 3);
+  }
+  return petalsFrom(pos, pet, idx);
+}
+function roundNozzle(pb, rN, z0, L, seg, hi) {
+  const zi = z0 + 0.07 * L;
+  pb.add("dark", lathe(prof([[0, zi], [rN * 0.78, zi, 1], [rN * 0.81, zi - 0.01 * L], [rN * 0.89, z0, 1], [rN, z0]]), seg, 0));
+  pb.add("glow", new CircleGeometry(rN * 0.68, seg).rotateY(Math.PI).translate(0, 0, zi - 0.01));
+  pb.add("glow", torus(rN * 0.81, rN * 0.024, 6, seg), M4.t(0, 0, z0 + 0.035 * L));
+  pb.add("steel", torus(rN * 1.01, rN * 0.04, 6, seg), M4.t(0, 0, z0 + 5e-3 * L));
+  if (hi) {
+    pb.add("copper", torus(rN * 1.04, rN * 0.03, 6, seg), M4.t(0, 0, z0 + 0.055 * L));
+    pb.add("copper", radial(() => cyl(rN * 0.02, rN * 0.03, rN * 0.1, 6).rotateX(HALF).translate(0, rN * 0.95, z0 + 0.085 * L), 12));
+  }
+  const rn = rN * 0.68;
+  return {
+    petals: irisPetals(Math.max(10, Math.round(seg * 0.35)), rN * 1.007, rN * 0.81, z0 + 0.012 * L, z0 - 0.085 * L, rN * 0.57),
+    flameOuter: flameGeo(rn, L * 0.75, Math.max(12, Math.round(seg * 0.5))),
+    flameCore: flameGeo(rn * 0.42, L * 0.38, 12),
+    flameZ: zi - 0.02,
+    exhaustZ: z0 - 0.12 * L
+  };
+}
+function cablePylon(pb, topR, z) {
+  const py2 = topR + 0.42;
+  pb.add("steel", rbox(0.16, 0.46, 0.34, 0.04), M4.t(0, topR + 0.2, z));
+  pb.add("chrome", torus(0.1, 0.03, 8, 16), M4.trs(0, py2 + 0.06, z, 0, HALF, 0));
+  return { py: py2, pylon: V(0, py2 + 0.06, z) };
+}
+function couplers(pb, x, y, z, s) {
+  for (const sd of [-1, 1]) {
+    pb.add("dark", cyl(0.15 * s, 0.19 * s, 0.1 * s, 10), M4.trs(sd * (x + 0.02 * s), y, z, 0, 0, sd * -HALF));
+    pb.add("copper", torus(0.13 * s, 0.024 * s, 5, 12), M4.trs(sd * (x + 0.06 * s), y, z, 0, HALF, 0));
+    pb.add("glow", sphere(0.075 * s, 8, 6), M4.t(sd * (x + 0.075 * s), y, z));
+  }
+}
+function sideFlap(w, h, len, pivot, sign3) {
+  const g = rbox(w, h, len, 0.015).translate(0, 0, -len / 2);
+  return { geo: new PartBuilder().add("hull", g, void 0, SEC).build().get("hull"), pivot, sign: sign3 };
+}
+function bellyStrip(pb, w, len, y, z) {
+  pb.add("dark", rbox(w, 0.1, len, 0.03), M4.t(0, y - 0.03, z));
+  pb.add("glow", rbox(w * 0.6, 0.035, len * 0.88, 0.01), M4.t(0, y - 0.09, z));
+}
+var HOOP = 1.42;
+function rotorExtent({ R, L }) {
+  const Rh = HOOP * R;
+  return { coll: Rh + 0.04, bottom: Rh + 0.07, side: Rh + 0.07, top: R, halfL: L * 0.5 };
+}
+function rotorEngine(spec2, seg) {
+  const { L, R } = spec2;
+  const pb = new PartBuilder();
+  const Z = (t) => -L / 2 + t * L;
+  const hi = seg >= 24, ultra = seg >= 40;
+  const Rh = HOOP * R, zR = Z(0.88), th = 0.036;
+  const bodyR = (t) => t < 0.12 ? 0.7 + 0.3 * Math.sin(t / 0.12 * HALF) : t < 0.58 ? 1 : 1 - 0.52 * Math.pow((t - 0.58) / 0.24, 1.6);
+  const pts = [[0.66 * R, Z(0), 1]];
+  for (let t = 0.02; t < 0.815; t += 0.04) pts.push([bodyR(t) * R, Z(t)]);
+  pts.push([bodyR(0.82) * R, Z(0.82), 1]);
+  pb.add("hull", lathe(prof(pts), seg, 1));
+  const rHub = bodyR(0.82) * R;
+  pb.add("steel", lathe(prof([[rHub, Z(0.82), 1], [rHub * 1.04, Z(0.835)], [rHub * 0.98, zR - 0.09, 1], [rHub * 0.7, zR - 0.09]]), seg, 0));
+  pb.add("chrome", lathe(prof([[0.4 * R, zR + 0.08, 1], [0.37 * R, zR + 0.2], [0.24 * R, Z(0.97)], [0.1 * R, Z(1) + 0.02 * L], [0, Z(1) + 0.045 * L]]), Math.max(10, Math.round(seg * 0.5)), 0));
+  const fpb = new PartBuilder();
+  fpb.add("steel", radial(() => blade(0.36 * R, Rh - 0.13, 0.46 * R, 0.05 * R, 0.95, 0.3, 3), Math.max(3, spec2.blades)));
+  fpb.add("steel", cyl(0.42 * R, 0.44 * R, 0.17, Math.max(12, Math.round(seg * 0.6))).rotateX(HALF));
+  const fan = fpb.build().get("steel");
+  fan.computeBoundingSphere();
+  const nBl = Math.max(3, spec2.blades);
+  for (let i = 1; i < nBl; i++) fpb.add("steel", blade(0.36 * R, Rh - 0.13, 0.46 * R, 0.05 * R, 0.95, 0.3, 3), new Matrix4().makeRotationZ(i / nBl * Math.PI * 2));
+  fpb.add("steel", cyl(0.42 * R, 0.44 * R, 0.17, Math.max(12, Math.round(seg * 0.6))).rotateX(HALF));
+  const fanLost = fpb.build().get("steel");
+  fanLost.computeBoundingSphere();
+  const zf = zR + 0.2, zb = zR - 0.52;
+  pb.add("hull", lathe(prof([[Rh, zb, 1], [Rh + th, zb + 0.16], [Rh + th * 1.1, zf - 0.14], [Rh, zf], [Rh - th, zf - 0.1], [Rh - th * 0.85, zb + 0.14], [Rh, zb]]), seg, 3));
+  pb.add("glow", torus(Rh, 0.017, 5, seg), M4.t(0, 0, zf + 4e-3));
+  pb.add("hazard", torus(Rh + th * 1.05, 0.018, 5, seg), M4.t(0, 0, zb + 0.22));
+  {
+    const ri = bodyR(0.7) * R - 0.05, zi = Z(0.7), ro = Rh - th * 0.5, zo = zb + 0.12, len = Math.hypot(ro - ri, zo - zi), a = Math.atan2(zo - zi, ro - ri);
+    pb.add("steel", radial(() => rbox(0.07, len, 0.2, 0.02).rotateX(a).translate(0, (ri + ro) / 2, (zi + zo) / 2), 4, Math.PI / 4));
+    if (hi) pb.add("dark", radial(() => sphere(0.085, 8, 6).translate(0, ri + 0.03, zi), 4, Math.PI / 4));
+  }
+  for (const tb of [0.2, 0.36, 0.52]) {
+    pb.add("steel", torus(R * 1.012, 0.034 * R, 6, seg), M4.t(0, 0, Z(tb)));
+    if (hi) pb.add("chrome", boltRing(R * 1.045, Math.round(seg * 0.45), 0.018 * R, Z(tb), true));
+  }
+  {
+    const r0 = R + 0.012, r1 = r0 + 0.04 * R, plate2 = prof([[r1, Z(0.31), 1], [r1, Z(0.57), 1], [r0, Z(0.57), 1], [r0, Z(0.31), 1], [r1, Z(0.31)]]);
+    for (const c of [HALF, HALF * 3]) pb.add("hull", lathe(plate2, Math.max(6, Math.round(seg * 0.2)), 3, c - 0.45, 0.9));
+  }
+  for (const sd of [-1, 1]) for (let i = 0; i < 4; i++) {
+    const phi = sd * 0.92, m = M4.trs(Math.sin(phi) * R * 1.06, Math.cos(phi) * R * 1.06, Z(0.3 + i * 0.075) - 0.05, -0.55, 0, -phi);
+    pb.add("dark", cyl(0.05 * R, 0.062 * R, 0.36 * R, 8), m);
+    if (hi) pb.add("copper", torus(0.066 * R, 0.014 * R, 5, 10), m.clone().multiply(M4.trs(0, -0.1 * R, 0, HALF, 0, 0)));
+  }
+  for (let i = 0; i < 5; i++) {
+    const tt = 0.07 + i * 0.03;
+    pb.add("dark", rbox(0.5 * R, 0.03 * R, 0.018 * L, 6e-3), M4.t(0, bodyR(tt) * R + 4e-3, Z(tt)));
+  }
+  {
+    const pp = [];
+    for (let k = 0; k <= 8; k++) {
+      const tt = 0.1 + 0.5 * (k / 8), rr = bodyR(tt) * R * (1 + 0.07 * Math.sin(k / 8 * Math.PI)) + 0.05 * R;
+      pp.push(V(Math.sin(0.42) * rr, Math.cos(0.42) * rr, Z(tt)));
+    }
+    pb.add("copper", tube(pp, 0.034 * R, Math.max(12, Math.round(seg * 0.55)), 6));
+    if (hi) for (let k = 1; k < 8; k += 2) pb.add("dark", torus(0.05 * R, 0.016 * R, 5, 10), M4.t(pp[k].x, pp[k].y, pp[k].z));
+  }
+  bellyStrip(pb, 0.36 * R, 0.44 * L, -R, Z(0.34));
+  const { py: py2, pylon } = cablePylon(pb, R, Z(0.42));
+  pb.add("dark", cyl(0.025, 0.025, 0.5, 6), M4.trs(-0.2 * R, R * 0.98 + 0.22, Z(0.6), 0.25, 0, 0));
+  pb.add("glow", sphere(0.045, 8, 6), M4.t(-0.2 * R, R * 0.98 + 0.47, Z(0.6) + 0.06));
+  couplers(pb, R * 0.985, 0.2 * R, Z(0.45), R * 0.8);
+  if (hi) {
+    pb.add("chrome", boltRing(rHub * 0.86, 10, 0.02 * R, zR - 0.09));
+    pb.add("chrome", boltRing(Rh + th * 1.1 + 4e-3, Math.round(seg * 0.9), 0.014 * R, zb + 0.36, true));
+    for (const sd of [-1, 1]) {
+      const h = sd * 0.5;
+      pb.add("chrome", torus(0.05 * R + 0.03, 8e-3 * R + 5e-3, 5, 8, Math.PI), M4.trs(Math.sin(h) * R, Math.cos(h) * R, Z(0.24), 0, HALF, -h));
+    }
+    for (const sd of [-1, 1]) pb.add("chrome", cyl(0.018 * R, 0.018 * R, 0.1 * L, 5).rotateX(HALF), M4.t(sd * (R + 0.03 * R), -0.24 * R, Z(0.3)));
+    if (ultra) {
+      pb.add("glow", radial(() => sphere(0.03, 6, 4).translate(0, Rh + th * 1.1, zb + 0.5), 4));
+      pb.add("chrome", boltRing(Rh - th - 4e-3, Math.round(seg * 0.6), 0.012 * R, zf - 0.16, true));
+      pb.add("dark", radial(() => cyl(5e-3 * R + 3e-3, 5e-3 * R + 3e-3, 0.12 * R + 0.05, 4).rotateX(HALF).translate(0, 0.67 * R, Z(0) - 0.05 * R), 6, 0.4));
+    }
+  }
+  const flaps = [-1, 1].map((sd) => sideFlap(0.05 * R, 0.6 * R, 0.2 * L, V(sd * (R + 0.075 * R), 0.05 * R, Z(0.28)), -sd));
+  const nz = roundNozzle(pb, 0.66 * R, Z(0), L, seg, hi);
+  return {
+    parts: pb.build(),
+    fan,
+    fanLost,
+    fanZ: zR,
+    fanMat: "steel",
+    fanSpin: 0.36,
+    openRotor: true,
+    flaps,
+    ...nz,
+    pylon,
+    frontZ: Z(1) + 0.045 * L,
+    top: py2,
+    R,
+    L,
+    binder: V(R * 0.97, R * 0.2, Z(0.45)),
+    breakParts: pb.buildBreaks(),
+    hard: {
+      nozzle: { z: Z(0), r0: 0.7 * R, r1: bodyR(0.3 / L) * R, open: 0.92 * R, tipZ: Z(0) - 0.085 * L },
+      mouth: { z: zf + 0.07, r: Rh + th * 1.1, ri: Rh - th },
+      spikeZ: Z(1) + 0.045 * L,
+      body: { zA: Z(0.14), zB: Z(0.56), r: R },
+      spine: { zA: Z(0.42) + 0.28, zB: Z(0.64), y: R * 0.99 },
+      tail: { z: Z(0.1), y: bodyR(0.12) * R },
+      sideMax: Rh + 0.07,
+      bottomMax: Rh + 0.07
+    }
+  };
+}
+var RING = 3.4;
+var RING_CHORD = 0.2;
+function hoopExtent({ R, L }) {
+  const Rw = RING * R;
+  return { coll: Rw + 0.06, bottom: Rw + 0.09, side: Rw + 0.12, top: R, halfL: L * 0.5 };
+}
+function hoopEngine(spec2, seg) {
+  const { L, R } = spec2;
+  const pb = new PartBuilder();
+  const Z = (t) => -L / 2 + t * L;
+  const hi = seg >= 24, ultra = seg >= 40, segS = Math.max(10, Math.round(seg * 0.5));
+  const Rw = RING * R, c = RING_CHORD * L, zc = Z(0.56), zLE = zc + c / 2, zTE = zc - c / 2;
+  const bodyR = (t) => t < 0.25 ? 0.72 + 0.28 * Math.sin(t / 0.25 * HALF) : t < 0.78 ? 1 : 1 - 0.14 * ((t - 0.78) / 0.22);
+  const rf = bodyR(0.93), faceZ = Z(0.915);
+  const pts = [[0.74 * R, Z(0), 1]];
+  for (let t = 0.03; t < 0.9; t += 0.05) pts.push([bodyR(t) * R, Z(t)]);
+  pts.push([rf * R, Z(0.92)], [rf * 1.035 * R, Z(0.955)], [rf * 1.02 * R, Z(0.985)], [rf * 0.95 * R, Z(1), 1]);
+  pb.add("hull", lathe(prof(pts), seg, 1));
+  pb.add("steel", lathe(prof([[rf * 0.95 * R, Z(1)], [rf * 0.885 * R, Z(0.992)], [rf * 0.86 * R, Z(0.97)], [rf * 0.86 * R, faceZ, 1], [rf * 0.6 * R, faceZ]]), seg, 0));
+  pb.add("dark", lathe(prof([[rf * 0.6 * R, faceZ], [0.2 * R, faceZ]]), seg, 0));
+  pb.add("chrome", lathe(prof([[0.22 * R, faceZ, 1], [0.2 * R, faceZ + 0.03 * L], [0.12 * R, Z(1)], [0.02 * R, Z(1) + 0.14 * L], [0, Z(1) + 0.16 * L]]), segS, 0));
+  const nb = hi ? spec2.blades : Math.max(8, Math.round(spec2.blades * 0.65));
+  const fan = radial(() => blade(0.21 * R, 0.83 * rf * R, Math.PI * 2 * 0.52 * R / nb * 1.25, 0.03 * R, 1, 0.38, 3), nb);
+  fan.computeBoundingSphere();
+  for (const tb of [0.14, 0.3, 0.74, 0.86]) pb.add("steel", torus(bodyR(tb) * R + 0.01, 0.028 * R + 6e-3, 6, seg), M4.t(0, 0, Z(tb)));
+  const wingProf = prof([
+    [Rw, zTE, 1],
+    [Rw + 0.03, zTE + 0.25 * c],
+    [Rw + 0.05, zTE + 0.6 * c],
+    [Rw + 0.045, zLE - 0.12 * c],
+    [Rw, zLE],
+    [Rw - 0.045, zLE - 0.12 * c],
+    [Rw - 0.05, zTE + 0.6 * c],
+    [Rw - 0.03, zTE + 0.25 * c],
+    [Rw, zTE]
+  ]);
+  const strip = (r2, z, t) => prof([[r2 + t, z], [r2, z + t], [r2 - t, z], [r2, z - t], [r2 + t, z]]);
+  const TAU = Math.PI * 2, onRing = (phi, r2, z) => M4.trs(Math.sin(phi) * r2, Math.cos(phi) * r2, z, 0, 0, -phi);
+  const ringArc = (p0, p1) => {
+    const len = p1 - p0, n = Math.max(2, Math.round(seg * len / TAU)), inside = (a) => ((a - p0) % TAU + TAU) % TAU < len;
+    pb.add("hull", lathe(wingProf, n, 3, p0, len));
+    pb.add("glow", lathe(strip(Rw, zLE + 6e-3, 0.02), n, 0, p0, len));
+    pb.add("glow", lathe(strip(Rw + 0.054, zc + 0.1 * c, 0.011), n, 0, p0, len));
+    pb.add("glow", lathe(strip(Rw - 0.054, zc + 0.1 * c, 0.011), n, 0, p0, len));
+    pb.add("chrome", lathe(strip(Rw, zTE - 4e-3, 0.014), n, 0, p0, len));
+    for (let q = 0; q < 4; q++) {
+      const a = Math.PI / 4 + q * HALF;
+      if (inside(a)) pb.add("dark", rbox(0.03, 0.2, 0.26, 8e-3), onRing(a, Rw + 0.02, zTE - 0.05));
+    }
+    if (hi) {
+      const nb2 = Math.round(seg * 0.9), bolt = (a, r2) => pb.add("chrome", cyl(0.012, 0.012, 84e-4, 6), onRing(a, r2 + 3e-3, zTE + 0.3 * c));
+      for (let i = 0; i < nb2; i++) {
+        const a = i / nb2 * TAU;
+        if (!inside(a)) continue;
+        bolt(a, Rw + 0.052);
+        if (ultra) bolt(a, Rw - 0.052);
+      }
+      if (ultra) for (let i = 0; i < 12; i++) {
+        const a = 0.2 + i / 12 * TAU;
+        if (inside(a)) pb.add("dark", cyl(6e-3, 6e-3, 0.16, 4).rotateX(HALF), onRing(a, Rw, zTE - 0.1));
+      }
+    }
+  };
+  const A0 = 0.17, A1 = 0.96, B0 = 2.18, B1 = 2.97;
+  ringArc(-A0, A0);
+  ringArc(A1, B0);
+  ringArc(-B0, -A1);
+  ringArc(B1, TAU - B1);
+  for (const sd of [-1, 1]) {
+    const f = sd < 0 ? "-" : "+";
+    pb.brk("ringA" + f, () => sd > 0 ? ringArc(A0, A1) : ringArc(-A1, -A0));
+    pb.brk("ringB" + f, () => sd > 0 ? ringArc(B0, B1) : ringArc(-B1, -B0));
+    for (const a of [A0, A1, B0, B1]) pb.add("dark", rbox(0.012, 0.09, 0.94 * c, 4e-3), onRing(sd * a, Rw, zc));
+  }
+  {
+    const ri = R * 0.96, ro = Rw - 0.035;
+    pb.add("steel", radial(() => rbox(0.055, ro - ri, 0.4 * c, 0.02).translate(0, (ri + ro) / 2, zc - 0.04 * c), 3, Math.PI / 3));
+    pb.add("dark", radial(() => rbox(0.14, 0.12, 0.5 * c, 0.03).translate(0, ri + 0.03, zc - 0.04 * c), 3, Math.PI / 3));
+    if (hi) pb.add("chrome", radial(() => rbox(0.1, 0.05, 0.34 * c, 0.012).translate(0, ro - 0.03, zc - 0.04 * c), 3, Math.PI / 3));
+  }
+  {
+    const pp = [];
+    for (let k = 0; k <= 6; k++) {
+      const tt = 0.08 + 0.3 * (k / 6), rr = bodyR(tt) * R * (1 + 0.08 * Math.sin(k / 6 * Math.PI)) + 0.04;
+      pp.push(V(Math.sin(0.7) * rr, Math.cos(0.7) * rr, Z(tt)));
+    }
+    pb.add("copper", tube(pp, 0.022, Math.max(10, Math.round(seg * 0.4)), 5));
+  }
+  bellyStrip(pb, 0.3 * R + 0.06, 0.3 * L, -R, Z(0.24));
+  const { py: py2, pylon } = cablePylon(pb, R, Z(0.34));
+  pb.add("dark", cyl(0.02, 0.02, 0.4, 6), M4.trs(0.1, R + 0.17, Z(0.8), 0.25, 0, 0));
+  pb.add("glow", sphere(0.035, 8, 6), M4.t(0.1, R + 0.37, Z(0.8) + 0.05));
+  const zB = zc + 0.18 * c;
+  couplers(pb, Rw + 0.03, 0, zB, 0.55);
+  if (hi) {
+    pb.add("chrome", boltRing(rf * 0.985 * R, Math.round(seg * 0.5), 0.02 * R, Z(1) - 0.01));
+    for (const tb of [0.3, 0.74]) pb.add("chrome", boltRing(bodyR(tb) * R + 0.03, Math.round(seg * 0.45), 0.012, Z(tb), true));
+  }
+  const zH = zTE + 0.38 * c;
+  for (const sd of [-1, 1]) pb.add("dark", rbox(0.07, 0.32 * Rw, 0.08, 0.02), M4.t(sd * (Rw + 0.05), 0, zH + 0.02));
+  const flaps = [-1, 1].map((sd) => sideFlap(0.04, 0.3 * Rw, 0.36 * c, V(sd * (Rw + 0.068), 0, zH), -sd));
+  const nz = roundNozzle(pb, 0.74 * R, Z(0), L, seg, hi);
+  return {
+    parts: pb.build(),
+    fan,
+    fanZ: faceZ + 0.03 * L,
+    flaps,
+    ...nz,
+    pylon,
+    frontZ: Z(1),
+    top: py2,
+    R,
+    L,
+    binder: V(Rw + 0.07, 0, zB),
+    breakParts: pb.buildBreaks(),
+    hard: {
+      nozzle: { z: Z(0), r0: 0.78 * R, r1: bodyR(0.3 / L) * R, open: 1.03 * R, tipZ: Z(0) - 0.085 * L },
+      mouth: { z: Z(1), r: rf * 1.035 * R, ri: rf * 0.86 * R },
+      spikeZ: Z(1) + 0.16 * L,
+      body: { zA: Z(0.1), zB: Z(0.42), r: R },
+      spine: { zA: Z(0.68), zB: Z(0.88), y: R * 0.96 },
+      tail: { z: Z(0.08), y: bodyR(0.12) * R },
+      sideMax: Rw + 0.12,
+      bottomMax: Rw + 0.09
+    }
+  };
+}
+var SLAB_W = 3;
+function slabExtent({ R, L }) {
+  const W2 = SLAB_W * R;
+  return { coll: W2 + 0.12, bottom: R + 0.14, side: W2 + 0.56, top: R + 0.05, halfL: L * 0.5 };
+}
+var plateYZ = (pts, t) => {
+  const g = extrude(pts, t, Math.min(0.012, t * 0.3));
+  g.rotateY(-HALF);
+  return g;
+};
+function slotPetals(ws, hs, zH, zT, swing, n) {
+  const pos = [], pet = [], idx = [];
+  for (const sy of [-1, 1]) for (let q = 0; q < n; q++) {
+    const x0 = -ws + (q + 0.04) / n * 2 * ws, x1 = -ws + (q + 0.96) / n * 2 * ws, b = pos.length / 3;
+    for (const [x, z, y, d] of [[x0, zH, hs, 0], [x1, zH, hs, 0], [x0, zT, hs * 0.82, swing], [x1, zT, hs * 0.82, swing]]) {
+      pos.push(x, sy * y, z);
+      pet.push(0, sy, d);
+    }
+    if (sy > 0) idx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2);
+    else idx.push(b, b + 2, b + 1, b + 1, b + 2, b + 3);
+  }
+  return petalsFrom(pos, pet, idx);
+}
+function slabEngine(spec2, seg) {
+  const { L, R } = spec2;
+  const pb = new PartBuilder();
+  const Z = (t) => -L / 2 + t * L;
+  const hi = seg >= 24, ultra = seg >= 40, W2 = SLAB_W * R, segL = Math.max(20, seg);
+  const rows = [[0, 0.9, 0.62, 0.62, 6], [0.06, 0.96, 0.86, 0.82, 5], [0.2, 1, 1, 0.9, 4.5], [0.5, 1, 1, 0.9, 4.5], [0.72, 0.94, 0.92, 0.84, 4.2], [0.9, 0.8, 0.74, 0.7, 4], [1, 0.72, 0.6, 0.56, 5]];
+  const secs = rows.map(([t, w, hT, hB, n]) => ({ z: Z(t), w: w * W2, hT: hT * R, hB: hB * R, n }));
+  const at = (t, grow = 1) => {
+    let i = 0;
+    while (i < rows.length - 2 && rows[i + 1][0] < t) i++;
+    const a = rows[i], b = rows[i + 1], f = (t - a[0]) / (b[0] - a[0]), m = (k) => a[k] + (b[k] - a[k]) * f;
+    return { z: Z(t), w: m(1) * W2 * grow + (grow - 1) * 0.4, hT: m(2) * R * grow + (grow - 1) * 0.4, hB: m(3) * R * grow + (grow - 1) * 0.4, n: m(4) };
+  };
+  pb.add("hull", loft(secs, segL, 1));
+  for (const tb of [0.14, 0.42, 0.66].slice(0, Math.max(1, spec2.bands))) pb.add("steel", loft([at(tb - 6e-3, 1.012), at(tb + 6e-3, 1.012)], segL, 0, [false, false]));
+  const mw = 0.72 * W2 * 0.88, mh = 0.58 * R * 0.66, zF = Z(1);
+  pb.add("dark", rbox(mw * 2, mh * 2, 0.06, 0.02), M4.t(0, 0.01 * R, zF));
+  for (const sy of [-1, 1]) pb.add("steel", rbox(mw * 2 + 0.08, 0.05, 0.12, 0.015), M4.t(0, 0.01 * R + sy * (mh + 0.02), zF + 0.01));
+  for (const sx of [-1, 1]) pb.add("steel", rbox(0.05, mh * 2 + 0.08, 0.12, 0.015), M4.t(sx * (mw + 0.02), 0.01 * R, zF + 0.01));
+  const rFan = Math.min(mh * 0.94, 0.3), nv = hi ? 4 : 2;
+  for (const sx of [-1, 1]) for (let i = 0; i < nv; i++) pb.add("steel", rbox(0.022, mh * 1.9, 0.07, 6e-3), M4.trs(sx * (rFan + 0.14 + i / nv * (mw - rFan - 0.2)), 0.01 * R, zF + 0.035, 0, sx * 0.3, 0));
+  pb.add("chrome", lathe(prof([[0.09, zF + 0.05, 1], [0.07, zF + 0.12], [0, zF + 0.3]]), 10, 0), M4.t(0, 0.01 * R, 0));
+  pb.add("glow", rbox(mw * 1.7, 0.016, 0.02, 4e-3), M4.t(0, 0.01 * R + mh * 0.82, zF + 0.035));
+  const nb = Math.max(6, Math.round(spec2.blades * (hi ? 1 : 0.7)));
+  const fan = radial(() => blade(0.08, rFan, Math.PI * 2 * 0.6 * rFan / nb * 1.2, 0.012, 1, 0.4, 3), nb);
+  fan.computeBoundingSphere();
+  const ws = 0.9 * W2 * 0.9, hs = 0.62 * R * 0.6, z0 = Z(0);
+  pb.add("dark", rbox(ws * 2, hs * 2, 0.06, 0.02), M4.t(0, 0, z0));
+  pb.add("glow", rbox(ws * 1.9, hs * 1.3, 0.02, 6e-3), M4.t(0, 0, z0 - 0.035));
+  for (const sy of [-1, 1]) pb.add("steel", rbox(ws * 2 + 0.1, 0.05, 0.16, 0.015), M4.t(0, sy * (hs + 0.03), z0 + 0.02));
+  if (hi) {
+    pb.add("copper", cyl(0.03, 0.03, ws * 2, 8).rotateZ(HALF), M4.t(0, hs + 0.1, z0 + 0.3));
+    for (let i = -3; i <= 3; i++) pb.add("copper", cyl(0.014, 0.02, 0.1, 5), M4.trs(i * ws * 0.28, hs + 0.06, z0 + 0.26, 0.6, 0, 0));
+  }
+  const petals = slotPetals(ws, hs + 0.03, z0 + 0.03, z0 - 0.045 * L, 0.5 * hs + 0.06, Math.max(4, Math.round(seg * 0.22)));
+  const fsx = ws * 0.94 / 0.3, fsy = hs * 1.25 / 0.3;
+  const flameOuter = flameGeo(0.3, L * 0.62, Math.max(12, Math.round(seg * 0.5))).scale(fsx, fsy, 1), flameCore = flameGeo(0.126, L * 0.32, 12).scale(fsx, fsy, 1);
+  pb.add("hull", loft([{ z: Z(0.1), w: 0.05, hT: 0.02, hB: 0.01 }, { z: Z(0.24), w: 0.3, hT: 0.2, hB: 0.02 }, { z: Z(0.6), w: 0.34, hT: 0.24, hB: 0.02 }, { z: Z(0.84), w: 0.2, hT: 0.1, hB: 0.02 }, { z: Z(0.93), w: 0.04, hT: 0.02, hB: 0.01 }], hi ? 12 : 8, 3), M4.t(0, R * 0.96, 0));
+  const { py: py2, pylon } = cablePylon(pb, R * 0.96 + 0.22, Z(0.5));
+  for (const sd of [-1, 1]) for (let i = 0; i < (hi ? 8 : 4); i++) pb.add("dark", rbox(0.56 * W2 - 0.3, 0.03, 0.05, 8e-3), M4.t(sd * (0.3 + (0.56 * W2 - 0.3) / 2 + 0.1), R + 4e-3, Z(0.3 + i * (hi ? 0.035 : 0.07))));
+  pb.add("dark", cyl(0.022, 0.022, 0.44, 6), M4.trs(-0.5 * W2, R * 0.95 + 0.2, Z(0.8), 0.25, 0, 0));
+  pb.add("glow", sphere(0.04, 8, 6), M4.t(-0.5 * W2, R * 0.95 + 0.42, Z(0.8) + 0.055));
+  const finX = 0.62 * W2, finY = R * 0.84;
+  for (const sd of [-1, 1]) {
+    pb.add("hull", plateYZ([[Z(0.27), 0], [Z(0.04), 0], [Z(0) - 0.12, 0.98], [Z(0.11), 1.06]], 0.07), M4.t(sd * finX, finY, 0), SEC);
+    pb.add("dark", rbox(0.11, 0.07, 0.24 * L, 0.02), M4.t(sd * finX, finY + 0.02, Z(0.155)));
+    if (hi) pb.add("glow", sphere(0.03, 6, 4), M4.t(sd * finX, finY + 1.04, Z(0.07)));
+  }
+  for (const sd of [-1, 1]) {
+    pb.brk("winglet" + (sd < 0 ? "-" : "+"), () => {
+      pb.add("hull", rbox(0.62, 0.045, 0.3 * L, 0.015), M4.trs(sd * (W2 + 0.24), -0.14 * R - 0.06, Z(0.32), 0, 0, sd * -0.36), SEC);
+      pb.add("steel", rbox(0.07, 0.07, 0.3 * L + 0.1, 0.02), M4.t(sd * (W2 + 0.52), -0.14 * R - 0.165, Z(0.32)));
+      pb.add("glow", sphere(0.035, 6, 4), M4.t(sd * (W2 + 0.52), -0.14 * R - 0.165, Z(0.32) + 0.15 * L + 0.07));
+    });
+    pb.add("dark", rbox(0.05, 0.5 * R, 0.24 * L, 0.012), M4.t(sd * (W2 * 0.985), 0.02, Z(0.62)));
+  }
+  for (const sd of [-1, 1]) {
+    pb.add("dark", rbox(0.5, 0.09, 0.46 * L, 0.03), M4.t(sd * 0.5 * W2, -R * 0.9 - 0.02, Z(0.42)));
+    pb.add("glow", rbox(0.3, 0.035, 0.4 * L, 0.01), M4.t(sd * 0.5 * W2, -R * 0.9 - 0.075, Z(0.42)));
+  }
+  couplers(pb, W2 * 0.985, 0, Z(0.6), 0.62);
+  if (hi) {
+    for (const sd of [-1, 1]) for (let i = 0; i < 12; i++) pb.add("chrome", cyl(0.012, 0.012, 0.012, 6), M4.t(sd * 0.84 * W2, R * 0.985, Z(0.2 + i * 0.045)));
+    for (const sd of [-1, 1]) {
+      pb.add("copper", tube([V(sd * 0.76 * W2, R + 0.03, Z(0.56)), V(sd * 0.78 * W2, R * 0.98 + 0.03, Z(0.3)), V(sd * 0.74 * W2, R * 0.9 + 0.03, Z(0.1)), V(sd * 0.6 * W2, hs + 0.1, z0 + 0.32)], 0.024, 14, 5));
+      pb.add("chrome", cyl(0.06, 0.06, 0.02, 12), M4.t(sd * 0.3 * W2, R * 0.99, Z(0.78)));
+      pb.add("dark", cyl(0.03, 0.03, 0.024, 8), M4.t(sd * 0.3 * W2, R * 0.99, Z(0.78)));
+      for (let i = 0; i < 3; i++) pb.add("steel", rbox(0.02, 0.07, 0.5, 6e-3), M4.t(sd * (0.22 + i * 0.2) * W2, R * 0.86 + 0.03, Z(0.9)));
+      for (let i = 0; i < 5; i++) pb.add("dark", rbox(0.2, 0.02, 0.035, 5e-3), M4.t(sd * 0.36 * W2, R + 4e-3, Z(0.2 + i * 0.016)));
+    }
+    for (const ts of [0.33, 0.6, 0.76]) pb.add("dark", rbox(1.8 * W2 * (ts > 0.7 ? 0.92 : 1), 8e-3, 0.02, 2e-3), M4.t(0, R * (ts > 0.7 ? 0.94 : 1) + 2e-3, Z(ts)));
+    for (const sd of [-1, 1]) pb.add("hull", rbox(0.5 * W2, 0.016, 0.16 * L, 4e-3), M4.t(sd * 0.5 * W2, R * 1, Z(0.7)), SEC);
+    if (ultra) {
+      for (const sd of [-1, 1]) for (let i = 0; i < 6; i++) pb.add("chrome", cyl(0.01, 0.01, 0.012, 5), M4.t(sd * (0.26 + i * 0.07 * W2), R * 1.005, Z(0.78)));
+      for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) pb.add("dark", cyl(5e-3, 5e-3, 0.16, 4).rotateX(HALF), M4.t(sx * (0.2 + i * 0.3) * ws, hs + 0.07, z0 - 0.06));
+    }
+  }
+  const flaps = [-1, 1].map((sd) => sideFlap(0.04, 0.6, 0.11 * L, V(sd * (finX + 0.058), finY + 0.42, Z(0.15)), -sd));
+  return {
+    parts: pb.build(),
+    fan,
+    fanZ: zF + 0.06,
+    flaps,
+    petals,
+    flameOuter,
+    flameCore,
+    flameZ: z0 - 0.05,
+    exhaustZ: z0 - 0.12 * L,
+    pylon,
+    frontZ: zF,
+    top: py2,
+    R,
+    L,
+    binder: V(W2 + 0.05, 0, Z(0.6)),
+    breakParts: pb.buildBreaks(),
+    hard: {
+      nozzle: { z: z0, r0: hs + 0.06, r1: 0.9 * R, open: 1.5 * hs + 0.09, tipZ: z0 - 0.045 * L, slot: [ws, hs] },
+      mouth: { z: zF, r: mh + 0.06, ri: mh, slot: [mw, mh] },
+      spikeZ: zF + 0.3,
+      body: { zA: Z(0.2), zB: Z(0.72), r: R, slot: [W2, R] },
+      spine: { zA: Z(0.5) + 0.3, zB: Z(0.82), y: R * 0.96 + 0.2 },
+      tail: { z: Z(0.05), y: R * 0.84 },
+      sideMax: W2 + 0.56,
+      bottomMax: R + 0.14
+    }
+  };
+}
+var CAGE_ARC_STEP = 1.3;
+function cageExtent({ R, L }) {
+  return { coll: R * 1.08, bottom: R * 1.06 + 0.16, side: R + 0.36, top: R * 1.06, halfL: L * 0.5 };
+}
+function cageEngine(spec2, seg) {
+  const { L, R } = spec2;
+  const pb = new PartBuilder();
+  const Z = (t) => -L / 2 + t * L;
+  const hi = seg >= 24, ultra = seg >= 40, segC = Math.max(10, Math.round(seg * 0.6));
+  const tA = 0.33, tB = 0.67, Rc = R * 1.04, wl = (tB - tA) * L;
+  pb.add("hull", lathe(prof([[0.62 * R, Z(0), 1], [0.8 * R, Z(0.035)], [0.97 * R, Z(0.09)], [Rc, Z(0.15)], [Rc, Z(tA - 0.02)], [R * 0.99, Z(tA), 1]]), seg, 1));
+  pb.add("dark", lathe(prof([[R * 0.99, Z(tA)], [0.36 * R, Z(tA)]]), seg, 0));
+  for (const tb of [0.165, 0.295]) pb.add("steel", torus(Rc + 0.012, 0.03, 6, seg), M4.t(0, 0, Z(tb)));
+  pb.add("dark", radial(() => rbox(0.02, 0.13, 0.5, 6e-3).translate(0, Rc + 0.06, Z(0.23)), hi ? 18 : 9, 0.1));
+  pb.add("hull", lathe(prof([[R * 0.99, Z(tB), 1], [Rc, Z(tB + 0.02)], [Rc, Z(0.88)], [R + 0.02, Z(0.9), 1]]), seg, 1));
+  pb.add("dark", lathe(prof([[0.36 * R, Z(tB)], [R * 0.99, Z(tB)]]), seg, 0));
+  pb.add("hull", lathe(prof([[R + 0.02, Z(0.9), 1], [R + 0.07, Z(0.93)], [R + 0.06, Z(0.985)], [R - 0.02, Z(1), 1], [R - 0.09, Z(0.985), 1], [R - 0.05, Z(0.9), 1]]), seg, 3));
+  pb.add("dark", lathe(prof([[R - 0.05, Z(0.9)], [R - 0.12, Z(0.84)], [0.62 * R, Z(0.76), 1], [0.14 * R, Z(0.76)]]), seg, 0));
+  pb.add("glow", torus(R - 0.03, 0.02, 5, seg), M4.t(0, 0, Z(1) + 5e-3));
+  pb.add("glow", torus(0.6 * R, 0.014, 5, segC), M4.t(0, 0, Z(0.762)));
+  pb.add("chrome", lathe(prof([[0.16 * R, Z(0.76), 1], [0.14 * R, Z(0.93)], [0.05 * R, Z(1) + 0.04 * L], [0, Z(1) + 0.1 * L]]), segC, 0));
+  pb.add("steel", radial(() => rbox(0.03, 0.8 * R, 0.16, 8e-3).translate(0, 0.56 * R, Z(0.93)), 3));
+  pb.add("steel", torus(Rc + 0.012, 0.03, 6, seg), M4.t(0, 0, Z(0.7)));
+  pb.add("glow", cyl(0.1 * R, 0.1 * R, wl, 10).rotateX(HALF), M4.t(0, 0, Z(0.5)));
+  const nW = ultra ? 20 : hi ? 14 : 7;
+  for (let i = 0; i < nW; i++) pb.add("copper", torus(0.3 * R, 0.03 * R, 5, segC), M4.t(0, 0, Z(tA + 0.035 + (tB - tA - 0.07) * (i / (nW - 1)))));
+  for (const [tt, sg] of [[tA, 1], [tB, -1]]) {
+    pb.add("dark", cyl(0.44 * R, 0.44 * R, 0.03 * L, segC).rotateX(HALF), M4.t(0, 0, Z(tt) + sg * 0.015 * L));
+    pb.add("glow", torus(0.445 * R, 0.02 * R, 5, segC), M4.t(0, 0, Z(tt) + sg * 0.03 * L));
+  }
+  const fpb = new PartBuilder();
+  fpb.add("copper", radial(() => cyl(0.028, 0.028, 0.8 * wl, 5).rotateX(HALF).translate(0, 0.62 * R, 0), 8));
+  for (const sg of [-1, 1]) {
+    fpb.add("copper", torus(0.62 * R, 0.036, 5, segC), M4.t(0, 0, sg * 0.4 * wl));
+    fpb.add("copper", radial(() => rbox(0.04, 0.2 * R, 0.04, 8e-3).translate(0, 0.52 * R, sg * 0.4 * wl), 4, Math.PI / 4));
+  }
+  const fan = fpb.build().get("copper");
+  fan.computeBoundingSphere();
+  for (let q = 0; q < 4; q++) {
+    const a = Math.PI / 4 + q * HALF;
+    pb.add("hull", rbox(0.2, 0.1, wl + 0.12, 0.02), M4.trs(Math.sin(a) * R, Math.cos(a) * R, Z(0.5), 0, 0, -a), SEC);
+  }
+  for (const tf of [tA + 0.012, 0.5, tB - 0.012]) pb.add("steel", torus(R, 0.04, 6, seg), M4.t(0, 0, Z(tf)));
+  pb.add("steel", radial(() => cyl(0.03, 0.03, wl, 6).rotateX(HALF).translate(0, R, Z(0.5)), 4));
+  if (hi) for (const tf of [(tA + 0.5) / 2, (tB + 0.5) / 2]) pb.add("steel", torus(R, 0.018, 4, seg), M4.t(0, 0, Z(tf)));
+  for (let b = 0; b < 2; b++) for (let q = 0; q < 8; q++) {
+    const z0 = Z(b === 0 ? tA + 0.012 : 0.5), z1 = Z(b === 0 ? 0.5 : tB - 0.012), a0 = q * Math.PI / 4, a1 = a0 + Math.PI / 4;
+    const P = (a, z) => V(Math.sin(a) * R, Math.cos(a) * R, z);
+    pb.add("steel", tube([P((q + b) % 2 ? a0 : a1, z0), P((q + b) % 2 ? a1 : a0, z1)], 0.014, 1, 4));
+    if (hi) pb.add("steel", tube([P((q + b) % 2 ? a1 : a0, z0), P((q + b) % 2 ? a0 : a1, z1)], 0.014, 1, 4));
+  }
+  {
+    const r0 = Rc + 5e-3, r1 = Rc + 0.05, cover = prof([[r1, Z(tA - 0.035), 1], [r1, Z(tB + 0.035), 1], [r0, Z(tB + 0.035), 1], [r0, Z(tA - 0.035), 1], [r1, Z(tA - 0.035)]]);
+    for (const c of [0, Math.PI]) pb.add("hull", lathe(cover, Math.max(4, Math.round(seg * 0.14)), 3, c - 0.35, 0.7));
+  }
+  bellyStrip(pb, 0.34 * R, 0.38 * L, -(Rc + 0.05), Z(0.5));
+  const { py: py2, pylon } = cablePylon(pb, Rc + 0.05, Z(0.56));
+  const zB = -0.3;
+  for (const sd of [-1, 1]) for (const k of [-1, 0, 1]) {
+    const z = zB + k * CAGE_ARC_STEP, m = (x) => M4.trs(sd * (R + x), 0, z, 0, 0, sd * -HALF);
+    pb.add("dark", cyl(0.085, 0.1, 0.08, 10), m(0.04));
+    pb.add("dark", cyl(0.07, 0.085, 0.07, 10), m(0.115));
+    pb.add("dark", cyl(0.055, 0.07, 0.06, 10), m(0.18));
+    pb.add("copper", torus(0.06, 0.016, 5, 10), M4.trs(sd * (R + 0.225), 0, z, 0, HALF, 0));
+    pb.add("glow", sphere(0.05, 8, 6), M4.t(sd * (R + 0.27), 0, z));
+    if (hi && k >= 0) pb.add("copper", tube([V(sd * 0.44 * R, 0.1, z), V(sd * 0.74 * R, 0.2, z), V(sd * R, 0.03, z)], 0.014, 4, 4));
+  }
+  for (let q = 0; q < 4; q++) {
+    const a = Math.PI / 4 + q * HALF, m = M4.trs(Math.sin(a) * (Rc + 0.05), Math.cos(a) * (Rc + 0.05), Z(0.79), 0, 0, -a);
+    pb.add("dark", rbox(0.3, 0.12, 0.52, 0.03), m);
+    if (hi) {
+      pb.add("glow", rbox(0.05, 0.02, 0.05, 6e-3), m.clone().multiply(M4.t(0.08, 0.062, 0.14)));
+      pb.add("copper", rbox(0.2, 0.03, 0.06, 8e-3), m.clone().multiply(M4.t(0, 0.065, -0.14)));
+    }
+  }
+  if (hi) {
+    for (const sd of [-1, 1]) {
+      const a = sd * 0.62, P = (z, lift) => V(Math.sin(a) * (R + lift), Math.cos(a) * (R + lift), z);
+      pb.add("rubber", tube([P(Z(tA - 0.04), 0.08), P(Z(0.42), 0.13), P(Z(0.58), 0.13), P(Z(tB + 0.04), 0.08)], 0.032, 12, 6));
+    }
+    for (const tf of [tA - 0.03, tB + 0.03, 0.885]) pb.add("chrome", boltRing(Rc + 8e-3, Math.round(seg * 0.6), 0.014, Z(tf), true));
+    if (ultra) {
+      for (const tf of [tA + 0.012, 0.5, tB - 0.012]) pb.add("glow", radial(() => sphere(0.016, 5, 4).translate(0, R + 0.05, Z(tf)), 8, Math.PI / 8));
+      pb.add("chrome", boltRing(Rc + 8e-3, Math.round(seg * 0.6), 0.014, Z(0.1), true));
+    }
+  }
+  const flaps = [-1, 1].map((sd) => sideFlap(0.04, 0.5 * R, 0.18 * L, V(sd * (Rc + 0.035), 0, Z(0.87)), -sd));
+  const nz = roundNozzle(pb, 0.6 * R, Z(0), L, seg, hi);
+  return {
+    parts: pb.build(),
+    fan,
+    fanZ: Z(0.5),
+    fanMat: "copper",
+    fanSpin: 0.6,
+    flaps,
+    ...nz,
+    pylon,
+    frontZ: Z(1) + 0.1 * L,
+    top: py2,
+    R,
+    L,
+    binder: V(R + 0.3, 0, zB),
+    breakParts: [],
+    hard: {
+      nozzle: { z: Z(0), r0: 0.64 * R, r1: 0.83 * R, open: 0.83 * R, tipZ: Z(0) - 0.085 * L },
+      mouth: { z: Z(1), r: R + 0.07, ri: R - 0.09 },
+      spikeZ: Z(1) + 0.1 * L,
+      body: { zA: Z(0.12), zB: Z(0.31), r: Rc },
+      spine: { zA: Z(0.7), zB: Z(0.88), y: Rc },
+      tail: { z: Z(0.1), y: R * 0.98 },
+      sideMax: R + 0.36,
+      bottomMax: R * 1.06 + 0.16
+    }
+  };
+}
+var OWN_ENGINES = { rotor: rotorEngine, hoop: hoopEngine, slab: slabEngine, cage: cageEngine };
+var OWN_EXTENTS = { rotor: rotorExtent, hoop: hoopExtent, slab: slabExtent, cage: cageExtent };
+
+// ../../src/game/podParts.ts
+function engineExtent(spec2) {
+  const { R, L, style } = spec2;
+  const own = OWN_EXTENTS[style];
+  if (own) return own(spec2);
+  return {
+    coll: R * 1.05 + (style === "blade" ? 0.45 : 0) + (style === "ring" ? 0.3 : 0),
+    bottom: R * (style === "ring" ? 1.36 : 1.12) + 0.1,
+    side: R * (style === "blade" ? 2.1 : 1.1),
+    top: R,
+    halfL: L * 0.5
+  };
+}
+var cache2 = /* @__PURE__ */ new Map();
+function placeHeat(eg, L) {
+  const hull = eg.parts.get("hull");
+  if (hull) heatAlong(hull, -L / 2, L);
+  for (const bp of eg.breakParts) {
+    const g = bp.parts.get("hull");
+    if (g) heatAlong(g, -L / 2, L);
+  }
+  for (const f of eg.flaps) heatAlong(f.geo, -L / 2, L, f.pivot.z);
+  return eg;
+}
 function engineGeo(spec2, seg) {
   const key = `${spec2.L}|${spec2.R}|${spec2.style}|${spec2.bands}|${spec2.blades}|${spec2.spike}|${spec2.fins}|${seg}`;
   const hit = cache2.get(key);
   if (hit) return hit;
   const { L, R, style } = spec2;
+  const own = OWN_ENGINES[style];
+  if (own) {
+    const made = placeHeat(own(spec2, seg), L);
+    cache2.set(key, made);
+    return made;
+  }
   const pb = new PartBuilder();
   const Z = (t) => -L / 2 + t * L;
   const segS = Math.max(10, Math.round(seg * 0.5));
@@ -72574,9 +73519,9 @@ function engineGeo(spec2, seg) {
     let rmax = 0;
     for (let s = a0; s <= a1; s += 0.02) rmax = Math.max(rmax, bodyR(s));
     const r0 = rmax * R + 0.01, r1 = r0 + (style === "heavy" ? 0.06 : 0.035) * R;
-    const plate = prof([[r1, Z(a0), 1], [r1, Z(a1), 1], [r0, Z(a1), 1], [r0, Z(a0), 1], [r1, Z(a0), 1]]);
+    const plate2 = prof([[r1, Z(a0), 1], [r1, Z(a1), 1], [r0, Z(a1), 1], [r0, Z(a0), 1], [r1, Z(a0), 1]]);
     const span = style === "heavy" ? 1.1 : 0.8;
-    for (const c of [Math.PI / 2, Math.PI * 1.5]) pb.add("hull", lathe(plate, Math.max(6, Math.round(seg * 0.2)), 3, c - span / 2, span));
+    for (const c of [Math.PI / 2, Math.PI * 1.5]) pb.add("hull", lathe(plate2, Math.max(6, Math.round(seg * 0.2)), 3, c - span / 2, span));
     if (detailHi) for (const sd of [-1, 1]) for (let s = a0 + 0.04; s < a1 - 0.01; s += 0.08) for (const dy of [-0.3, 0.3]) {
       pb.add("chrome", cyl(0.018 * R, 0.018 * R, 0.02 * R, 6), M4.trs(sd * (r1 + 5e-3) * Math.cos(dy), r1 * Math.sin(dy), Z(s), 0, 0, Math.PI / 2));
     }
@@ -72624,6 +73569,35 @@ function engineGeo(spec2, seg) {
     pb.add("copper", torus(0.13 * R, 0.024 * R, 5, 12), M4.trs(sd * (cR + 0.06 * R), 0.2 * R, Z(0.62), 0, Math.PI / 2, 0));
     pb.add("glow", sphere(0.075 * R, 8, 6), M4.t(sd * (cR + 0.075 * R), 0.2 * R, Z(0.62)));
   }
+  if (detailHi) {
+    pb.add("copper", radial(() => cyl(0.014 * R, 0.022 * R, 0.07 * R, 6).rotateX(Math.PI / 2).translate(0, 0.705 * R, Z(0.085)), 12));
+    for (const tt of [0.3, 0.76]) {
+      const r2 = bodyR(tt) * R;
+      pb.add("steel", rbox(0.2 * R, 0.07 * R, 0.16 * R + 0.06, 0.012), M4.t(0, r2 + 0.03 * R, Z(tt)));
+      pb.add("glow", sphere(0.018 * R + 8e-3, 6, 4), M4.t(0.06 * R, r2 + 0.075 * R, Z(tt)));
+    }
+    pb.add("dark", tube([new Vector3(0, bodyR(0.3) * R + 0.05 * R, Z(0.3)), new Vector3(0.06 * R, bodyR(0.45) * R + 0.07 * R, Z(0.45)), new Vector3(0, topR + 0.06, Z(0.56))], 0.014 * R + 6e-3, 8, 5));
+    for (const sd of [-1, 1]) {
+      const a = sd * 2.25, r2 = bodyR(0.45) * R + 0.035 * R;
+      pb.add("hull", rbox(0.02 * R + 8e-3, 0.09 * R, 0.36 * L, 4e-3), M4.trs(Math.sin(a) * r2, Math.cos(a) * r2, Z(0.47), 0, 0, -a), [0, 0, 3]);
+      const h = sd * 0.52, rh = bodyR(0.42) * R;
+      pb.add("chrome", torus(0.05 * R + 0.03, 8e-3 * R + 5e-3, 5, 8, Math.PI), M4.trs(Math.sin(h) * rh, Math.cos(h) * rh, Z(0.42), 0, Math.PI / 2, -h));
+    }
+    {
+      const fr = bodyR(0.5) * R;
+      for (const sd of [-1, 1]) {
+        pb.add("dark", cyl(0.03 * R, 0.03 * R, 0.13 * L, 6).rotateX(Math.PI / 2), M4.t(sd * (fr + 0.02 * R), -0.2 * R, Z(0.55)));
+        pb.add("chrome", cyl(0.015 * R, 0.015 * R, 0.1 * L, 5).rotateX(Math.PI / 2), M4.t(sd * (fr + 0.02 * R), -0.2 * R, Z(0.45)));
+      }
+    }
+    if (seg >= 40) {
+      pb.add("dark", radial(() => cyl(4e-3 * R + 3e-3, 4e-3 * R + 3e-3, 0.12 * R + 0.05, 4).rotateX(Math.PI / 2).translate(0, 0.76 * R, Z(0) - 0.05 * R), 6, 0.4));
+      bandTs.forEach((tb, i) => {
+        if (tb > bodyEnd - 0.04 || i % 2 === 0) return;
+        pb.add("chrome", boltRing(bodyR(tb) * 0.955 * R + 0.035 * R, Math.round(seg * 0.45), 0.018 * R, Z(tb), true));
+      });
+    }
+  }
   if (split2) {
     const petal = prof([[rf * 1.02 * R, Z(bodyEnd), 1], [rf * 1.06 * R, Z(0.9)], [rf * 1.05 * R, Z(0.98)], [rf * 0.98 * R, Z(1), 1], [rf * 0.93 * R, Z(1), 1], [rf * 0.95 * R, Z(bodyEnd), 1], [rf * 1.02 * R, Z(bodyEnd)]]);
     for (let q = 0; q < 4; q++) {
@@ -72633,27 +73607,31 @@ function engineGeo(spec2, seg) {
       const hinge = new Vector3(Math.sin(c) * rf * R, Math.cos(c) * rf * R, Z(bodyEnd));
       const axis = new Vector3(Math.cos(c), -Math.sin(c), 0);
       const m = new Matrix4().makeTranslation(hinge.x, hinge.y, hinge.z).multiply(new Matrix4().makeRotationAxis(axis, -0.22)).multiply(new Matrix4().makeTranslation(-hinge.x, -hinge.y, -hinge.z));
-      pb.add("hull", g, m);
+      pb.brk("petals", () => pb.add("hull", g, m));
       pb.add("steel", rbox(0.12 * R, 0.12 * R, 0.08 * L, 0.02), new Matrix4().makeTranslation(hinge.x * 1.02, hinge.y * 1.02, hinge.z));
     }
-    for (let i = 0; i < 9; i++) pb.add("steel", rbox(0.035 * R, 0.32 * R, 0.4 * L, 0.01), M4.t((i - 4) * 0.11 * R, R * 1.08, Z(0.45)));
+    pb.brk("slats", () => {
+      for (let i = 0; i < 9; i++) pb.add("steel", rbox(0.035 * R, 0.32 * R, 0.4 * L, 0.01), M4.t((i - 4) * 0.11 * R, R * 1.08, Z(0.45)));
+    });
   }
   if (style === "ring") {
     const rr = 1.24 * R;
-    pb.add("hull", torus(rr, 0.11 * R, 12, seg), M4.t(0, 0, Z(0.95)), [0, 0, 3]);
-    pb.add("chrome", torus(rr - 0.11 * R, 0.025 * R, 6, seg), M4.t(0, 0, Z(0.95) + 0.06 * R));
-    for (let q = 0; q < 4; q++) {
-      const a = Math.PI / 4 + q * Math.PI / 2;
-      const mid = (rr + rf * R) / 2;
-      pb.add("steel", rbox(0.08 * R, rr - rf * R + 0.1 * R, 0.1 * R, 0.02), M4.trs(Math.sin(a) * mid, Math.cos(a) * mid, Z(0.95), 0, 0, -a));
-    }
+    pb.brk("shroud", () => {
+      pb.add("hull", torus(rr, 0.11 * R, 12, seg), M4.t(0, 0, Z(0.95)), [0, 0, 3]);
+      pb.add("chrome", torus(rr - 0.11 * R, 0.025 * R, 6, seg), M4.t(0, 0, Z(0.95) + 0.06 * R));
+      for (let q = 0; q < 4; q++) {
+        const a = Math.PI / 4 + q * Math.PI / 2;
+        const mid = (rr + rf * R) / 2;
+        pb.add("steel", rbox(0.08 * R, rr - rf * R + 0.1 * R, 0.1 * R, 0.02), M4.trs(Math.sin(a) * mid, Math.cos(a) * mid, Z(0.95), 0, 0, -a));
+      }
+    });
   }
   if (style === "blade") {
     for (const sd of [-1, 1]) {
       const g = extrude([[0, 0], [1.25 * R, -0.25 * L], [1.3 * R, -0.42 * L], [0, -0.6 * L]], 0.05 * R, 0.015);
       g.rotateX(-Math.PI / 2);
       if (sd < 0) g.scale(-1, 1, 1);
-      pb.add("hull", g, M4.t(sd * bodyR(0.6) * R * 0.9, 0, Z(0.8)), [0, 0, 3]);
+      pb.brk("blade" + (sd < 0 ? "-" : "+"), () => pb.add("hull", g, M4.t(sd * bodyR(0.6) * R * 0.9, 0, Z(0.8)), [0, 0, 3]));
     }
   }
   if (style === "needle") pb.add("chrome", torus(rf * 0.75 * R, 0.02 * R, 6, seg), M4.t(0, 0, Z(0.97)));
@@ -72682,146 +73660,275 @@ function engineGeo(spec2, seg) {
     frontZ: Z(1),
     top: py2,
     R,
-    L
+    L,
+    binder: new Vector3(R * 0.97, R * 0.2, L * 0.12),
+    breakParts: pb.buildBreaks(),
+    hard: (() => {
+      const ext = engineExtent(spec2), t3 = 0.3 / L;
+      const skin3 = (t3 < 0.025 ? 0.74 + 0.06 * (t3 / 0.025) : t3 < 0.08 ? 0.8 + (bodyR(0.08) * 0.94 - 0.8) * ((t3 - 0.025) / 0.055) : bodyR(t3)) * R;
+      return {
+        nozzle: { z: Z(0), r0: 0.75 * R, r1: skin3, open: 1.02 * R, tipZ: Z(0) - 0.085 * L },
+        mouth: { z: Z(1), r: rf * (split2 ? 1.06 : 1.035) * R, ri: rf * (split2 ? 0.93 : 0.86) * R },
+        spikeZ: spec2.spike ? Z(1) + L * 0.26 : faceZ + L * 0.085,
+        body: { zA: Z(0.2), zB: Z(bodyEnd - 0.12), r: bodyR(0.45) * R },
+        spine: { zA: Z(0.58) + 0.3, zB: Z(bodyEnd - 0.1), y: bodyR(0.75) * R },
+        tail: { z: Z(0.13), y: bodyR(0.2) * R },
+        sideMax: ext.side,
+        bottomMax: ext.bottom
+      };
+    })()
   };
-  cache2.set(key, out);
+  cache2.set(key, placeHeat(out, L));
   return out;
 }
 
-// src/game/podDesigns.ts
-var V = (x, y, z) => new Vector3(x, y, z);
-var spec = (L, R, style, bands, blades, spike = true, fins = 0) => ({ L, R, style, bands, blades, spike, fins });
-function podLayout(def) {
-  const pair = (s, sp, y, z) => [{ spec: s, x: -sp, y, z }, { spec: s, x: sp, y, z }];
-  switch (def.id) {
-    case "aurora": {
-      const s = spec(9, 1.15, "turbine", 6, 18);
-      return {
-        engines: pair(s, 2.5, 0, 4),
-        cockpit: { style: "pod", hw: 0.95, len: 3.4, y: 0.1, z: -6, pilot: 1 },
-        binder: [0, 1],
-        livery: 0,
-        extras: (pb) => {
-          for (const sd of [-1, 1]) for (const s2 of [-1, 1]) {
-            pb.add("hull", rbox(0.95, 0.08, 8.2, 0.03), M4.trs(sd * 2.5 + s2 * 1.5, -0.32, 4, 0, 0, s2 * -0.12), [0, 0, 3]);
-            pb.add("steel", rbox(0.06, 0.12, 8.3, 0.02), M4.trs(sd * 2.5 + s2 * 1.97, -0.38, 4, 0, 0, s2 * -0.12));
-          }
+// ../../src/game/podKitParts.ts
+var NO_TUNE = Object.freeze(Object.fromEntries(STAT_KEYS.map((k) => [k, 0])));
+var NO_KIT = { fins: 0, intake: 0, nozzle: 0, tune: NO_TUNE };
+function tuneTiers(tuning) {
+  return Object.fromEntries(STAT_KEYS.map((k) => {
+    const s = tuning?.[k] ?? 0;
+    return [k, s >= 4 ? 2 : s >= 2 ? 1 : 0];
+  }));
+}
+var kitKey = (k) => `${k.fins}${k.intake}${k.nozzle}|${STAT_KEYS.map((s) => k.tune[s] ?? 0).join("")}`;
+var isWerk = (k) => !k.fins && !k.intake && !k.nozzle && STAT_KEYS.every((s) => !k.tune[s]);
+var V2 = (x, y, z) => new Vector3(x, y, z);
+var HALF2 = Math.PI / 2;
+var SEC2 = [0, 0, 3];
+var clamp3 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+var plateYZ2 = (pts, t) => extrude(pts, t, Math.min(0.012, t * 0.3)).rotateY(-HALF2);
+var onBody = (a, r2, z) => M4.trs(Math.sin(a) * r2, Math.cos(a) * r2, z, 0, 0, -a);
+var wing = (cr, ct, span, sweep, t) => extrude([[0, 0], [cr, 0], [sweep + ct, span], [sweep, span]], t, Math.min(0.01, t * 0.3)).rotateY(HALF2);
+var EMPTY = /* @__PURE__ */ new Map();
+var cache3 = /* @__PURE__ */ new Map();
+function engineKit(spec2, seg, kit) {
+  const eg = engineGeo(spec2, seg);
+  if (isWerk(kit)) return { parts: EMPTY, flaps: eg.flaps };
+  const key = `${spec2.L}|${spec2.R}|${spec2.style}|${spec2.bands}|${spec2.blades}|${spec2.spike}|${spec2.fins}|${seg}|${kitKey(kit)}`;
+  const hit = cache3.get(key);
+  if (hit) return hit;
+  const hp = eg.hard, { nozzle: nz, mouth: mo, body: bd, spine: sp, tail: tl } = hp, T2 = kit.tune, hi = seg >= 24;
+  const pb = new PartBuilder(), len = bd.zB - bd.zA, zm = (bd.zA + bd.zB) / 2, s = clamp3(bd.r, 0.45, 1.3);
+  const flat = bd.slot, W2 = flat ? flat[0] : 0;
+  const P = (a, r2, z) => V2(Math.sin(a) * r2, Math.cos(a) * r2, z);
+  if (T2.topSpeed >= 1) {
+    const big = T2.topSpeed >= 2;
+    if (nz.slot) {
+      const [w, h] = nz.slot;
+      for (const sy of [-1, 1]) {
+        pb.add("steel", rbox(w * 2 + 0.16, big ? 0.1 : 0.06, 0.26, 0.02), M4.t(0, sy * (h + 0.12), nz.z + 0.17));
+        pb.add("copper", rbox(w * 2 + 0.1, 0.025, 0.03, 8e-3), M4.t(0, sy * (h + 0.11), nz.z + 0.02));
+        if (big) {
+          for (let i = -5; i <= 5; i++) pb.add("dark", rbox(0.03, 0.1, 0.3, 8e-3), M4.t(i * w * 0.18, sy * (h + 0.22), nz.z + 0.2));
+          pb.add("glow", rbox(w * 1.9, 0.02, 0.02, 6e-3), M4.t(0, sy * (h + 0.065), nz.z - 0.012));
         }
-      };
-    }
-    case "brute": {
-      const s = spec(8, 1.5, "split", 7, 20, false);
-      return {
-        engines: pair(s, 2.4, 0, 2),
-        cockpit: { style: "wedge", hw: 1.1, len: 3, y: 0.25, z: -9, pilot: 1.05 },
-        binder: [0, 1],
-        livery: 2,
-        extras: (pb) => {
-          const fin = extrude([[0, 0], [2.2, 0], [2.7, 2.7], [1.6, 2.7]], 0.12, 0.03);
-          fin.rotateY(Math.PI / 2);
-          pb.add("hull", fin, M4.t(-2.4, 1.45, 1.2), [0, 0, 3]);
-          pb.add("steel", rbox(0.3, 0.4, 1.6, 0.05), M4.t(-2.4, 1.6, 0.2));
-        }
-      };
-    }
-    case "gasvaro": {
-      const s = spec(6, 0.8, "quad", 4, 12);
-      return {
-        engines: [...pair(s, 1.6, 0, 3), ...pair(s, 3.4, 0, 3), ...pair(s, 2.5, 1.55, 4)],
-        cockpit: { style: "long", hw: 0.75, len: 3.6, y: 0, z: -7, pilot: 0.95 },
-        binder: [0, 1],
-        livery: 1,
-        extras: (pb) => {
-          for (const sd of [-1, 1]) {
-            pb.add("steel", tube([V(sd * 1.6, 0.7, 3.4), V(sd * 2.05, 1.3, 3.7), V(sd * 2.5, 2.1, 4)], 0.07, 12, 8));
-            pb.add("steel", tube([V(sd * 3.4, 0.7, 3.4), V(sd * 2.95, 1.3, 3.7), V(sd * 2.5, 2.1, 4)], 0.07, 12, 8));
-          }
-        }
-      };
-    }
-    case "bomquad": {
-      const s = spec(7.6, 0.66, "ring", 5, 12);
-      return {
-        engines: [{ spec: s, x: -2.3, y: -0.35, z: 3 }, { spec: s, x: 2.3, y: -0.35, z: 3 }, { spec: s, x: -2.3, y: 2.05, z: 3 }, { spec: s, x: 2.3, y: 2.05, z: 3 }],
-        cockpit: { style: "saucer", hw: 1, len: 2.4, y: 0.2, z: -6, pilot: 0.95 },
-        binder: [0, 3],
-        binders: [[0, 3], [2, 1]],
-        livery: 3,
-        extras: (pb) => {
-          for (const sd of [-1, 1]) for (const z of [1, 4.8]) pb.add("steel", tube([V(sd * 2.3, 0.35, z), V(sd * 2.3, 1.35, z)], 0.08, 4, 6));
-        }
-      };
-    }
-    case "mavik": {
-      const s = spec(8, 0.62, "needle", 6, 10);
-      return { engines: pair(s, 1.7, 0, 3), cockpit: { style: "pod", hw: 0.72, len: 2.5, y: -0.05, z: -5.5, pilot: 0.92 }, binder: [0, 1], livery: 1 };
-    }
-    case "rattis": {
-      const s = spec(6, 0.85, "blade", 4, 14);
-      return { engines: pair(s, 1.7, 0, 2.5), cockpit: { style: "wedge", hw: 0.78, len: 2.6, y: -0.1, z: -3.2, pilot: 0.92 }, binder: [0, 1], livery: 2 };
-    }
-    case "aldo": {
-      const s = spec(9, 1, "long", 7, 16, true, 6);
-      return { engines: pair(s, 2.3, 0, 3.5), cockpit: { style: "long", hw: 0.85, len: 3.2, y: 0, z: -6, pilot: 1 }, binder: [0, 1], livery: 0 };
-    }
-    case "teemo": {
-      const s = spec(5, 1.25, "heavy", 4, 20, true);
-      return {
-        engines: [{ spec: s, x: -2.3, y: -0.4, z: 0 }, { spec: s, x: 2.3, y: -0.4, z: 0 }, { spec: s, x: -2.3, y: 1.45, z: 6 }, { spec: s, x: 2.3, y: 1.45, z: 6 }],
-        cockpit: { style: "saucer", hw: 0.82, len: 2.2, y: 0.35, z: -5.5, pilot: 0.95 },
-        binder: [0, 1],
-        livery: 3,
-        extras: (pb) => {
-          for (const sd of [-1, 1]) {
-            pb.add("dark", rbox(0.3, 0.3, 3.6, 0.06), M4.trs(sd * 2.3, 0.55, 3, -0.31, 0, 0));
-            pb.add("hazard", rbox(0.32, 0.06, 1.2, 0.02), M4.trs(sd * 2.3, 0.73, 3, -0.31, 0, 0));
-          }
-        }
-      };
-    }
-    case "elana": {
-      const s = spec(8.5, 0.78, "needle", 6, 12);
-      return {
-        engines: pair(s, 2, 0, 3),
-        cockpit: { style: "long", hw: 0.8, len: 3.3, y: 0, z: -6, pilot: 0.95 },
-        binder: [0, 1],
-        livery: 1,
-        extras: (pb, L) => {
-          const fin = extrude([[0, 0], [1.1, 0], [1.4, 1.3], [0.9, 1.3]], 0.07, 0.02);
-          fin.rotateY(Math.PI / 2);
-          pb.add("hull", fin, M4.t(0, L.cockpit.y + 0.3, L.cockpit.z - 0.7), [0, 0, 3]);
-        }
-      };
-    }
-    default: {
-      const s = spec(7, 1.3, "heavy", 5, 16, false);
-      return {
-        engines: pair(s, 2.4, 0, 3),
-        cockpit: { style: "wedge", hw: 1, len: 2.8, y: 0, z: -5.5, pilot: 1 },
-        binder: [0, 1],
-        livery: 2,
-        extras: (pb, L) => {
-          const z = L.cockpit.z + L.cockpit.len * 0.5 + 0.35;
-          pb.add("steel", rbox(3, 0.5, 0.35, 0.06), M4.trs(0, L.cockpit.y - 0.25, z, 0.35, 0, 0));
-          pb.add("hazard", rbox(3.02, 0.16, 0.37, 0.03), M4.trs(0, L.cockpit.y - 0.08, z + 0.06, 0.35, 0, 0));
-          for (const sd of [-1, 1]) pb.add("dark", rbox(0.12, 0.12, 0.9, 0.03), M4.t(sd * 0.9, L.cockpit.y - 0.3, z - 0.45));
-        }
-      };
+      }
+    } else {
+      const th = big ? 0.07 : 0.035, r0 = nz.r0 + 0.012, r1 = nz.r1 + 0.012, zA = nz.z + 0.03, zB = nz.z + 0.27;
+      pb.add("steel", lathe(prof([[r0, zA, 1], [r0 + th, zA + 0.02], [r1 + th, zB - 0.02], [r1, zB, 1]]), seg, 0));
+      pb.add("copper", torus(r0 + th * 0.55, 0.016, 5, seg), M4.t(0, 0, zA - 4e-3));
+      if (big) {
+        pb.add("dark", radial(() => rbox(0.022, 0.1, 0.2, 6e-3).translate(0, (r0 + r1) / 2 + th + 0.035, (zA + zB) / 2), 14));
+        pb.add("glow", torus(r0 + th + 0.012, 0.018, 5, seg), M4.t(0, 0, zA + 0.03));
+      }
     }
   }
+  if (T2.accel >= 1) {
+    const big = T2.accel >= 2;
+    const scoop = (m, k) => {
+      pb.add("steel", rbox(0.2 * k, 0.11 * k, 0.4 * k, 0.03), m);
+      pb.add("dark", rbox(0.15 * k, 0.07 * k, 0.02, 4e-3), m.clone().multiply(M4.t(0, 4e-3, 0.2 * k)));
+    };
+    if (mo.slot) {
+      const [w, h] = mo.slot;
+      for (const fx of [-0.7, -0.25, 0.25, 0.7]) scoop(M4.t(fx * w, h + 0.15, mo.z - 0.24), 1);
+      if (big) for (const fx of [-0.5, 0.5]) {
+        scoop(M4.t(fx * w, h + 0.3, mo.z - 0.75), 1.6);
+        pb.add("copper", tube([V2(fx * w, h + 0.3, mo.z - 1.1), V2(fx * w * 1.1, bd.r + 0.07, mo.z - 1.7), V2(fx * w * 0.9, bd.r, bd.zB - 0.2)], 0.035, 8, 5));
+      }
+    } else {
+      for (const a of [-1.2, -0.6, 0.6, 1.2]) scoop(onBody(a, mo.r + 0.045 * s, mo.z - 0.24 * s), s);
+      if (big) for (const a of [-0.9, 0.9]) {
+        const k = 1.7 * s, z0 = mo.z - 0.5 * s - 0.22 * k;
+        scoop(onBody(a, mo.r + 0.11 * k, z0), k);
+        pb.add("copper", tube([P(a, mo.r + 0.08 * k, z0 - 0.2 * k), P(a, Math.max(mo.r, bd.r) + 0.1 * s, (z0 + bd.zB) / 2), P(a, bd.r + 0.03, bd.zB)], 0.03 * s + 8e-3, 8, 5));
+      }
+    }
+  }
+  if (T2.cooling >= 1) {
+    const big = T2.cooling >= 2;
+    if (flat) {
+      for (const sd of [-1, 1]) {
+        for (let i = 0; i < 9; i++) pb.add("dark", rbox(0.02, 0.1, 0.34, 6e-3), M4.t(sd * (0.36 + i * 0.065) * W2, bd.r + 0.05, bd.zA + len * 0.86));
+        if (big) {
+          const m = M4.t(sd * 0.62 * W2, bd.r * 0.93 + 0.07, bd.zB + 0.1 * len);
+          pb.add("dark", rbox(0.44 * W2, 0.09, 0.8, 0.02), m);
+          for (let i = 0; i < 6; i++) pb.add("steel", rbox(0.46 * W2, 0.03, 0.016, 4e-3), m.clone().multiply(M4.t(0, 0.05, (i - 2.5) * 0.12)));
+          pb.add("copper", tube([V2(sd * 0.62 * W2, bd.r + 0.1, bd.zB - 0.3), V2(sd * 0.75 * W2, bd.r + 0.08, zm), V2(sd * 0.78 * W2, bd.r + 0.03, bd.zA + 0.3 * len)], 0.024, 8, 5));
+        }
+      }
+    } else {
+      const zc = bd.zA + 0.16 * len, fl = Math.min(0.42, len * 0.3);
+      pb.add("dark", radial(() => rbox(0.02, 0.13 * s, fl, 6e-3).translate(0, bd.r + 0.055 * s, zc), 16, 0.2));
+      if (big) for (const sd of [-1, 1]) {
+        const a = sd * 0.56, m = onBody(a, bd.r + 0.17 * s, zm), pl = Math.max(0.5, len * 0.5);
+        pb.add("dark", rbox(0.44 * s, 0.05, pl, 0.02), m);
+        for (let i = 0; i < 6; i++) pb.add("steel", rbox(0.46 * s, 0.03, 0.016, 4e-3), m.clone().multiply(M4.t(0, 0.03, (i - 2.5) * pl * 0.16)));
+        for (const dz of [-0.36, 0.36]) pb.add("steel", cyl(0.024, 0.024, 0.17 * s, 5), onBody(a, bd.r + 0.085 * s, zm + dz * pl));
+        pb.add("copper", tube([P(a, bd.r + 0.15 * s, zm - 0.5 * pl), P(a * 1.5, bd.r + 0.1 * s, zm - 0.5 * pl - 0.15), P(a * 1.9, bd.r + 0.03, zm - 0.5 * pl - 0.28)], 0.02 * s + 6e-3, 8, 5));
+      }
+    }
+  }
+  if (T2.turn >= 1) {
+    const c = clamp3(0.45 * bd.r + 0.15, 0.3, 0.6);
+    for (const sd of [-1, 1]) pb.add("hull", wing(0.5, 0.3, c, 0.22, 0.035), mo.slot ? M4.trs(sd * (mo.slot[0] + 0.1), 0, mo.z - 0.5, 0, 0, -sd * 1.25) : onBody(sd * 0.96, mo.r - 0.03, mo.z - 0.4), SEC2);
+    if (T2.turn >= 2) for (const sd of [-1, 1]) for (const up of [1, -1]) {
+      const m = flat ? M4.trs(sd * 0.4 * W2, up * bd.r * 0.84, nz.z + 0.95, 0, 0, up > 0 ? 0 : Math.PI) : onBody(sd * (up > 0 ? 0.785 : 2.356), nz.r1 - 0.015, nz.z + 0.62);
+      pb.add("hull", wing(0.42, 0.26, flat ? 0.18 : 0.32 * s + 0.06, 0.16, 0.03), m, SEC2);
+      pb.add("chrome", cyl(0.014, 0.014, 0.3, 5).rotateX(HALF2), m.clone().multiply(M4.t(0.03, 0.05, 0.12)));
+    }
+  }
+  if (T2.traction >= 1) {
+    const w = flat ? W2 * 1.1 : 0.5 * bd.r, yb = -(bd.r * (flat ? 0.9 : 1)) - 0.05 * s - 0.03;
+    pb.add("dark", rbox(w, 0.06, len * 0.8, 0.02), M4.t(0, yb, zm));
+    pb.add("glow", rbox(w * 0.66, 0.03, len * 0.72, 8e-3), M4.t(0, yb - 0.04, zm));
+    for (const sd of [-1, 1]) pb.add("steel", tube([V2(sd * w * 0.6, yb + 0.012, zm - len * 0.43), V2(sd * w * 0.6, yb + 0.012, zm + len * 0.43)], 0.022, 1, 5));
+    if (T2.traction >= 2) for (const sd of [-1, 1]) for (const fz of [-0.27, 0.27]) {
+      const a = sd * (Math.PI - 0.72), m = flat ? M4.trs(sd * W2 * 0.82, yb + 0.03, zm + fz * len, 0, 0, Math.PI) : onBody(a, bd.r + 0.17 * s, zm + fz * len);
+      pb.add("dark", sphere(0.19 * s + 0.04, 10, 5, 0, Math.PI * 2, 0, HALF2), m.clone().multiply(M4.trs(0, -0.02, 0, 0, 0, 0, 1, 0.45, 1.5)));
+      pb.add("glow", cyl(0.11 * s + 0.02, 0.11 * s + 0.02, 0.02, 10), m.clone().multiply(M4.t(0, 0.075 * s + 0.012, 0)));
+      if (!flat) pb.add("steel", cyl(0.03, 0.03, 0.2 * s, 5), onBody(a, bd.r + 0.07 * s, zm + fz * len));
+    }
+  }
+  let flaps = eg.flaps;
+  if (T2.airbrake >= 1) {
+    flaps = eg.flaps.map((f) => ({ ...f, geo: f.geo.clone().scale(1, 1.25, 1.25) }));
+    if (T2.airbrake >= 2) for (const f of eg.flaps) {
+      f.geo.computeBoundingBox();
+      const bb = f.geo.boundingBox, th = bb.max.x - bb.min.x, h = bb.max.y - bb.min.y, out2 = -f.sign;
+      flaps.push({ geo: f.geo.clone().scale(1, 0.9, 0.7).translate(out2 * (th + 0.012), 0, 0), pivot: f.pivot, sign: f.sign, gain: 1.6 });
+      pb.add("chrome", cyl(0.02, 0.02, h * 1.1, 6), M4.t(f.pivot.x + out2 * (th + 0.03), f.pivot.y, f.pivot.z + 0.02));
+      pb.add("chrome", cyl(0.016, 0.016, 0.3, 5).rotateX(HALF2), M4.t(f.pivot.x + out2 * (th * 0.5 + 0.02), f.pivot.y + h * 0.62, f.pivot.z - 0.2));
+    }
+  }
+  if (T2.repair >= 1) {
+    for (const sd of [-1, 1]) {
+      if (flat) pb.add("hull", rbox(0.5 * W2, 0.03, len * 0.42, 8e-3), M4.t(sd * 0.56 * W2, bd.r + 0.012, zm - 0.05 * len), SEC2);
+      else {
+        const r0 = bd.r + 0.05 * s + 0.012, r1 = r0 + 0.035, zA = zm - 0.24 * len, zB = zm + 0.24 * len;
+        pb.add("hull", lathe(prof([[r1, zA, 1], [r1, zB, 1], [r0, zB, 1], [r0, zA, 1], [r1, zA]]), Math.max(4, Math.round(seg * 0.12)), 3, sd * 1.2 - 0.22, 0.44));
+      }
+      if (hi) for (const fz of [-0.2, 0.2]) pb.add("chrome", cyl(0.016, 0.016, 0.014, 6), flat ? M4.t(sd * 0.56 * W2, bd.r + 0.03, zm + fz * len) : onBody(sd * 1.2, bd.r + 0.05 * s + 0.05, zm + fz * len));
+    }
+    if (T2.repair >= 2) {
+      const p = eg.pylon;
+      pb.add("dark", rbox(0.2, 0.22, 0.3, 0.03), M4.t(-0.19, p.y - 0.26, p.z));
+      pb.add("glow", sphere(0.025, 6, 4), M4.t(-0.3, p.y - 0.2, p.z + 0.1));
+      pb.add("chrome", tube([V2(-0.19, p.y - 0.15, p.z), V2(-0.24, p.y + 0.12, p.z - 0.06), V2(-0.12, p.y + 0.2, p.z - 0.3), V2(-0.1, p.y + 0.08, p.z - 0.42)], 0.02, 10, 5));
+      pb.add("steel", torus(0.04, 0.012, 4, 8, Math.PI * 1.4), M4.trs(-0.1, p.y + 0.05, p.z - 0.44, 0, HALF2, 0));
+    }
+  }
+  if (kit.fins === 1) {
+    const h = clamp3(0.9 * bd.r + 0.3, 0.5, 1.25), a = sp.zA, b = Math.max(sp.zB, sp.zA + 0.5);
+    pb.add("hull", plateYZ2([[b, 0], [a, 0], [a + 0.05, h], [a + 0.32 * (b - a), h * 1.04]], 0.06), M4.t(0, sp.y - 0.04, 0), SEC2);
+    if (hi) pb.add("glow", sphere(0.03, 6, 4), M4.t(0, sp.y + h * 1.02, a + 0.1));
+  } else if (kit.fins === 2) {
+    const h = clamp3(0.8 * bd.r + 0.3, 0.45, 1.1);
+    for (const sd of [-1, 1]) pb.add("hull", plateYZ2([[0.9, 0], [0, 0], [-0.3, h], [0.18, h * 1.03]], 0.05), flat ? M4.trs(sd * 0.3 * W2, tl.y - 0.03, tl.z + 0.5, 0, 0, -sd * 0.3) : onBody(sd * 0.56, tl.y - 0.03, tl.z), SEC2);
+  } else if (kit.fins === 3) {
+    const a0 = 0.87, span = clamp3(Math.min(0.6 * bd.r + 0.25, (hp.sideMax + 0.12) / Math.sin(a0) - bd.r), 0.3, 0.95), cr = clamp3(len * 0.5, 0.8, 1.8);
+    for (const sd of [-1, 1]) {
+      const m = flat ? M4.trs(sd * W2 * 0.92, 0.12, zm + cr * 0.45, 0, 0, -sd * a0) : onBody(sd * a0, bd.r - 0.03, zm + cr * 0.45);
+      pb.add("hull", wing(cr, cr * 0.38, span, cr * 0.62, 0.045), m, SEC2);
+      pb.add("steel", rbox(0.06, 0.05, cr * 0.42, 0.012), m.clone().multiply(M4.t(0, span, -cr * 0.81)));
+    }
+  }
+  if (kit.intake === 1) {
+    if (mo.slot) {
+      const [w, h] = mo.slot, z = mo.z + 0.1;
+      for (let i = -4; i <= 4; i++) pb.add("steel", rbox(0.025, h * 2 + 0.06, 0.03, 6e-3), M4.t(i * w * 0.22, 0, z));
+      for (const fy of [-0.5, 0, 0.5]) pb.add("steel", rbox(w * 2 + 0.06, 0.02, 0.03, 6e-3), M4.t(0, fy * h * 1.3, z + 0.012));
+    } else {
+      const z = mo.z + 0.06, r2 = mo.ri * 1.03, tb = 0.012 * s + 7e-3;
+      for (const f of [1, 0.66, 0.36]) pb.add("steel", torus(r2 * f, f === 1 ? tb * 1.8 : tb, 5, seg), M4.t(0, 0, z));
+      pb.add("steel", radial(() => cyl(tb, tb, r2 * 0.66, 5).translate(0, r2 * 0.67, z), 8));
+    }
+  } else if (kit.intake === 2) {
+    const z = hp.spikeZ, r2 = 0.05 * s + 0.012;
+    pb.add("chrome", lathe(prof([[r2, z - 0.3, 1], [r2 * 0.62, z + 0.25], [0.012, z + 1], [0, z + 1.15]]), 8, 0));
+    pb.add("dark", torus(r2 * 0.95, 0.014, 5, 10), M4.t(0, 0, z - 0.05));
+    pb.add("glow", sphere(0.022, 6, 4), M4.t(0, 0, z + 1.14));
+  } else if (kit.intake === 3) {
+    if (mo.slot) {
+      const [w, h] = mo.slot, z = mo.z + 0.09;
+      for (const sy of [-1, 1]) pb.add("dark", rbox(w * 2 + 0.04, h * 0.62, 0.025, 6e-3), M4.trs(0, sy * h * 0.72, z, sy * 0.18, 0, 0));
+      pb.add("steel", rbox(w * 2 + 0.1, 0.03, 0.04, 8e-3), M4.t(0, 0, z + 0.01));
+    } else {
+      const z = mo.z + 0.05, ro = mo.ri * 1.03, n = 8, w = ro * Math.sin(Math.PI / n), d = ro * 0.42, sh = w * 0.34, tw = 0.16;
+      pb.add("steel", torus(ro, 0.022 * s + 0.01, 5, seg), M4.t(0, 0, z));
+      pb.add("steel", radial(() => extrude([[-w, 0], [w, 0], [w * 0.4 + sh, -d], [-w * 0.9 + sh, -d]], 0.014, 0).rotateY(tw).translate(0, ro * Math.cos(Math.PI / n), z + w * Math.sin(tw)), n));
+      pb.add("dark", radial(() => rbox(w * 1.5, 0.02, 0.012, 4e-3).rotateY(tw).translate(sh * 0.5, ro * Math.cos(Math.PI / n) - d, z + w * Math.sin(tw) + 0.012), n));
+      if (hi) pb.add("chrome", radial(() => cyl(0.018 * s + 8e-3, 0.018 * s + 8e-3, 0.035, 6).rotateX(HALF2).translate(0, ro, z + 0.024), n, Math.PI / n));
+    }
+  }
+  if (kit.nozzle === 1) {
+    if (nz.slot) {
+      const [w] = nz.slot, ho = nz.open + 0.07, zA = nz.z + 0.1, zE = nz.tipZ - 0.5, dz = zA - zE;
+      for (const sy of [-1, 1]) {
+        pb.add("steel", rbox(w * 2 + 0.3, 0.04, dz, 0.012), M4.t(0, sy * ho, (zA + zE) / 2));
+        pb.add("glow", rbox(w * 2 + 0.2, 0.02, 0.02, 6e-3), M4.t(0, sy * (ho - 0.04), zE + 0.03));
+      }
+      for (const sx of [-1, 1]) pb.add("steel", rbox(0.04, ho * 2, dz, 0.012), M4.t(sx * (w + 0.15), 0, (zA + zE) / 2));
+    } else {
+      const ro = nz.open + 0.08, zA = nz.z + 0.1, zE = nz.tipZ - 0.55;
+      pb.add("steel", lathe(prof([[ro - 0.04, zE, 1], [ro - 0.01, zE + 0.5], [ro, zA - 0.06], [ro - 0.03, zA, 1]]), seg, 0));
+      pb.add("dark", lathe(prof([[ro - 0.06, zA], [ro - 0.04, zA - 0.06], [ro - 0.05, zE + 0.5], [ro - 0.08, zE, 1], [ro - 0.04, zE]]), seg, 0));
+      pb.add("glow", torus(ro - 0.075, 0.018, 5, seg), M4.t(0, 0, zE + 0.03));
+      pb.add("steel", radial(() => rbox(0.05, ro - nz.r1 + 0.03, 0.1, 0.012).translate(0, (ro + nz.r1) / 2 - 0.03, zA + 0.05), 4, Math.PI / 4));
+    }
+  } else if (kit.nozzle === 2) {
+    const rp = nz.open + 0.1, zP = nz.tipZ - 0.32, pw = nz.slot ? nz.slot[0] * 1.5 : 0.5 * s + 0.12;
+    for (const a of nz.slot ? [0, Math.PI] : [0, 2.094, -2.094]) {
+      pb.add("dark", rbox(pw, 0.04, 0.62, 0.015), onBody(a, rp, zP));
+      pb.add("steel", rbox(0.07, 0.06, nz.z + 0.22 - zP, 0.015), onBody(a, rp + 0.045, (nz.z + 0.22 + zP) / 2));
+      pb.add("steel", rbox(0.07, Math.max(0.05, rp + 0.04 - nz.r1), 0.07, 0.015), onBody(a, (rp + 0.04 + nz.r1) / 2, nz.z + 0.2));
+      pb.add("chrome", cyl(0.02, 0.02, pw * 0.8, 6).rotateZ(HALF2), onBody(a, rp + 0.03, zP + 0.3));
+    }
+  } else if (kit.nozzle === 3) {
+    const rc = nz.open + 0.07, zA = nz.z + 0.06, tl2 = zA - (nz.tipZ - 0.2);
+    if (nz.slot) {
+      const [w] = nz.slot, n = 7;
+      for (const sy of [-1, 1]) {
+        pb.add("steel", rbox(w * 2 + 0.1, 0.03, 0.08, 8e-3), M4.t(0, sy * rc, zA));
+        for (let i = 0; i < n; i++) pb.add("steel", extrude([[-w / n, 0], [w / n, 0], [0, tl2]], 0.025, 6e-3).rotateX(-HALF2), M4.t((i - (n - 1) / 2) * 2 * w / n, sy * rc, zA));
+      }
+    } else {
+      const n = 12, tw = rc * Math.tan(Math.PI / n) * 0.96;
+      pb.add("steel", torus(rc, 0.03, 5, seg), M4.t(0, 0, zA));
+      pb.add("steel", radial(() => extrude([[-tw, 0], [tw, 0], [0, tl2]], 0.025, 6e-3).rotateX(-HALF2).translate(0, rc, zA), n));
+      pb.add("steel", radial(() => rbox(0.05, Math.max(0.05, rc - nz.r1 + 0.02), 0.08, 0.012).translate(0, (rc + nz.r1) / 2 - 0.02, zA + 0.04), 4, Math.PI / 4));
+    }
+  }
+  const out = { parts: pb.build(), flaps };
+  {
+    const hull = out.parts.get("hull");
+    if (hull) heatAlong(hull, -spec2.L / 2, spec2.L);
+  }
+  if (flaps !== eg.flaps) for (const f of flaps) heatAlong(f.geo, -spec2.L / 2, spec2.L, f.pivot.z);
+  cache3.set(key, out);
+  return out;
 }
-var TEMPLATES = {
-  pod: [[-0.5, 0.3, 0.26, 0.26, 2.2, 0], [-0.45, 0.7, 0.46, 0.44, 2.4, 0], [-0.36, 0.9, 0.46, 0.52, 2.6, 0], [-0.24, 0.98, 0.4, 0.55, 2.6, 0.5], [-0.08, 1, 0.36, 0.56, 2.6, 0.6], [0.06, 0.96, 0.36, 0.54, 2.6, 0.5], [0.18, 0.86, 0.42, 0.48, 2.4, 0], [0.32, 0.64, 0.38, 0.38, 2.3, 0], [0.44, 0.34, 0.24, 0.24, 2.2, 0], [0.5, 0.08, 0.07, 0.08, 2, 0]],
-  wedge: [[-0.5, 0.55, 0.3, 0.3, 4, 0], [-0.44, 0.92, 0.38, 0.4, 4, 0], [-0.3, 1, 0.34, 0.42, 4, 0.5], [-0.1, 1, 0.3, 0.4, 4, 0.58], [0.06, 0.96, 0.28, 0.36, 4, 0.5], [0.18, 0.88, 0.3, 0.3, 3.6, 0], [0.34, 0.66, 0.2, 0.22, 3.2, 0], [0.5, 0.3, 0.05, 0.08, 3, 0]],
-  saucer: [[-0.5, 0.4, 0.3, 0.3, 2, 0], [-0.4, 0.85, 0.5, 0.5, 2.1, 0], [-0.25, 1, 0.46, 0.58, 2.2, 0.5], [-0.05, 1.04, 0.42, 0.6, 2.2, 0.6], [0.12, 0.98, 0.42, 0.58, 2.2, 0.5], [0.26, 0.84, 0.48, 0.5, 2.1, 0], [0.4, 0.58, 0.4, 0.4, 2, 0], [0.5, 0.2, 0.16, 0.16, 2, 0]],
-  long: [[-0.5, 0.3, 0.24, 0.24, 2.4, 0], [-0.44, 0.74, 0.4, 0.4, 2.5, 0], [-0.32, 0.9, 0.36, 0.46, 2.6, 0.5], [-0.16, 0.92, 0.32, 0.48, 2.6, 0.58], [-0.02, 0.88, 0.32, 0.46, 2.6, 0.5], [0.1, 0.78, 0.36, 0.42, 2.5, 0], [0.26, 0.58, 0.32, 0.34, 2.4, 0], [0.4, 0.36, 0.22, 0.22, 2.2, 0], [0.5, 0.08, 0.06, 0.07, 2, 0]]
-};
+
+// ../../src/game/podCockpits.ts
+var LAMP_VERTS = 12;
+var V4 = (x, y, z) => new Vector3(x, y, z);
+var HALF3 = Math.PI / 2;
 function catmull(p0, p1, p2, p3, t) {
   const t2 = t * t, t3 = t2 * t;
   return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
 }
-function sections(style, hw, len, perSpan) {
-  const T2 = TEMPLATES[style];
+function resample(T2, hw, len, perSpan) {
   const out = [];
   for (let i = 0; i < T2.length - 1; i++) for (let k = 0; k < perSpan; k++) {
     const t = k / perSpan;
@@ -72835,149 +73942,1819 @@ function sections(style, hw, len, perSpan) {
   out.push({ z: l[0] * len, w: l[1] * hw, hT: l[2] * hw, hB: l[3] * hw, n: l[4], open: 0 });
   return out;
 }
-function pilotParts(pb, s, hip, species = "Mensch") {
-  const base = new Matrix4().compose(hip, new Quaternion(), V(s, s, s));
-  const at = (m) => base.clone().multiply(m);
-  const torso = lathe(prof([[0, 0], [0.16, 0, 1], [0.19, 0.12], [0.21, 0.32], [0.19, 0.44], [0.12, 0.52], [0.06, 0.56], [0, 0.57]]), 18, 0);
-  torso.rotateX(-Math.PI / 2);
-  torso.scale(1.15, 1, 0.82);
-  pb.add("suit", torso, at(M4.trs(0, 0, 0, 0.22, 0, 0)));
-  for (const sd of [-1, 1]) pb.add("leather", rbox(0.05, 0.5, 0.02, 0.01), at(M4.trs(sd * 0.09, 0.27, 0.19, 0.22, 0, sd * 0.12)));
-  pb.add("chrome", cyl(0.035, 0.035, 0.02, 10), at(M4.trs(0, 0.25, 0.205, Math.PI / 2 + 0.22, 0, 0)));
-  const head = V(0, 0.71, 0.17);
-  if (species === "Dugkin") {
-    pb.add("skin", sphere(0.115, 16, 12), at(M4.trs(head.x, head.y, head.z + 0.03, 0.18, 0, 0, 0.88, 0.92, 1.38)));
-    pb.add("leather", sphere(0.124, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), at(M4.trs(head.x, head.y + 0.02, head.z - 0.02, -0.3, 0, 0, 0.94, 0.95, 1.15)));
-    for (const sd of [-1, 1]) {
-      pb.add("leather", cyl(0.012, 0.032, 0.14, 7), at(M4.trs(head.x + sd * 0.085, head.y + 0.09, head.z - 0.06, -0.75, 0, sd * -0.35)));
-      pb.add("chrome", cyl(0.048, 0.052, 0.05, 12), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.13, Math.PI / 2, 0, 0)));
-      pb.add("glow", sphere(0.038, 10, 8), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.15, 0, 0, 0, 1, 0.8, 0.45)));
-    }
-  } else if (species === "Xantori" || species === "Aleeni") {
-    pb.add("skin", sphere(0.112, 16, 12), at(M4.trs(head.x, head.y, head.z, -0.25, 0, 0, 0.9, 1.15, 1.25)));
-    pb.add("suit", rbox(0.045, 0.14, 0.24, 0.018), at(M4.trs(head.x, head.y + 0.11, head.z - 0.06, -0.35, 0, 0)));
-    for (const sd of [-1, 1]) pb.add("skin", tube([V(head.x + sd * 0.08, head.y + 0.02, head.z - 0.06), V(head.x + sd * 0.11, head.y - 0.1, head.z - 0.18), V(head.x + sd * 0.09, head.y - 0.24, head.z - 0.22)], 0.032, 8, 7), base);
-    pb.add("visor", sphere(0.118, 16, 8, 0, Math.PI, Math.PI * 0.25, Math.PI * 0.32), at(M4.trs(head.x, head.y + 0.02, head.z + 0.02, 0, 0, 0, 1.02, 0.9, 1.05)));
-  } else if (species === "Gurrani" || species === "Kraveen" || species === "Erriton") {
-    pb.add("suit", sphere(0.138, 18, 14), at(M4.trs(head.x, head.y + 0.015, head.z, 0, 0, 0, 0.98, 1.06, 1.22)));
-    pb.add("dark", rbox(0.04, 0.09, 0.26, 0.012), at(M4.trs(head.x, head.y + 0.13, head.z - 0.05, -0.2, 0, 0)));
-    pb.add("visor", sphere(0.141, 18, 8, 0, Math.PI, Math.PI * 0.28, Math.PI * 0.34), at(M4.trs(head.x, head.y + 0.015, head.z + 0.015, 0, 0, 0, 1, 0.95, 1.2)));
-    pb.add("glow", rbox(0.16, 0.016, 0.02, 4e-3), at(M4.t(head.x, head.y + 0.02, head.z + 0.165)));
-  } else if (species === "Lurbani" || species === "Vexi") {
-    pb.add("chrome", sphere(0.136, 18, 12), at(M4.trs(head.x, head.y + 0.01, head.z, 0, 0, 0, 1.12, 0.96, 1.08)));
-    pb.add("dark", rbox(0.24, 0.065, 0.09, 0.016), at(M4.t(head.x, head.y + 0.025, head.z + 0.11)));
-    pb.add("glow", rbox(0.2, 0.026, 0.02, 5e-3), at(M4.t(head.x, head.y + 0.025, head.z + 0.156)));
-    for (const sd of [-1, 1]) pb.add("steel", cyl(8e-3, 0.012, 0.16, 6), at(M4.trs(head.x + sd * 0.13, head.y + 0.11, head.z - 0.02, -0.3, 0, sd * -0.2)));
-  } else {
-    pb.add("skin", sphere(0.112, 18, 14), at(M4.trs(head.x, head.y - 0.015, head.z + 0.02, 0, 0, 0, 0.95, 1.05, 1)));
-    pb.add("leather", sphere(0.13, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.64), at(M4.trs(head.x, head.y + 0.012, head.z - 0.015, -0.25, 0, 0, 1, 1.05, 1.1)));
-    pb.add("chrome", rbox(0.032, 0.04, 0.22, 8e-3), at(M4.trs(head.x, head.y + 0.135, head.z - 0.02, -0.18, 0, 0)));
-    pb.add("rubber", torus(0.122, 0.013, 6, 24), at(M4.trs(head.x, head.y + 0.035, head.z, Math.PI / 2 - 0.2, 0, 0)));
-    for (const sd of [-1, 1]) {
-      pb.add("chrome", cyl(0.046, 0.05, 0.046, 14), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.105, Math.PI / 2, 0, 0)));
-      pb.add("visor", sphere(0.041, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.128, Math.PI / 2, 0, 0, 1, 0.45, 1)));
-    }
-  }
-  pb.add("leather", torus(0.075, 0.03, 8, 18), at(M4.trs(0, 0.56, 0.12, Math.PI / 2 - 0.25, 0, 0)));
-  const hands = [];
-  for (const sd of [-1, 1]) {
-    const sh = V(sd * 0.22, 0.46, 0.09), el = V(sd * 0.3, 0.27, 0.3), hd = V(sd * 0.21, 0.31, 0.5);
-    pb.add("suit", sphere(0.085, 12, 10), at(M4.t(sh.x, sh.y, sh.z)));
-    pb.add("suit", tube([sh, el, hd], 0.055, 14, 10), base);
-    pb.add("leather", sphere(0.062, 12, 10), at(M4.trs(hd.x, hd.y, hd.z + 0.02, 0, 0, 0, 1, 0.9, 1.2)));
-    hands.push(hd.clone().multiplyScalar(s).add(hip));
-  }
-  return { head: head.clone().multiplyScalar(s).add(hip), hands };
-}
-var cockpitCache = /* @__PURE__ */ new Map();
-function cockpitGeo(L, seg, species = "Mensch") {
-  const c = L.cockpit;
-  const key = `${c.style}|${c.hw}|${c.len}|${c.pilot}|${species}|${seg}`;
-  const hit = cockpitCache.get(key);
-  if (hit) return hit;
-  const pb = new PartBuilder();
-  const hw = c.hw, len = c.len;
-  const secs = sections(c.style, hw, len, seg >= 40 ? 6 : seg >= 28 ? 4 : 3);
-  const segC = Math.max(24, seg);
-  pb.add("hull", loft(secs, segC, 2));
-  let iA = secs.findIndex((s) => (s.open ?? 0) > 1e-3) - 1;
-  let iB = secs.length - 1;
+function shell(k, rows) {
+  const { hw, len } = k;
+  const secs = resample(rows, hw, len, k.d === 0 ? 2 : k.seg >= 40 ? 6 : k.seg >= 28 ? 4 : 3);
+  const segC = k.d === 0 ? 14 : Math.max(24, k.seg);
+  k.pb.add("hull", loft(secs, segC, 2));
+  let iA = secs.findIndex((s) => (s.open ?? 0) > 1e-3) - 1, iB = secs.length - 1;
   for (let j = secs.length - 1; j >= 0; j--) if ((secs[j].open ?? 0) > 1e-3) {
     iB = j + 1;
     break;
   }
+  const hasOpen = iA >= -1 && secs.some((s) => (s.open ?? 0) > 1e-3);
   iA = Math.max(0, iA);
   iB = Math.min(secs.length - 1, iB);
   const th = 0.05 * hw + 0.02;
-  const outerSub = secs.slice(iA, iB + 1);
-  const inner = outerSub.map((s) => ({ ...s, w: s.w - th, hT: s.hT - th, hB: s.hB - th }));
-  pb.add("interior", loft(inner, segC, 0, [true, true], true));
-  pb.add("chrome", loftRim(outerSub, inner, segC));
-  const zA = secs[iA].z, zB = secs[iB].z;
+  const sub2 = hasOpen ? secs.slice(iA, iB + 1) : secs.slice(Math.floor(secs.length * 0.3), Math.floor(secs.length * 0.7) + 1);
+  if (hasOpen) {
+    const inner = sub2.map((s) => ({ ...s, w: s.w - th, hT: s.hT - th, hB: s.hB - th }));
+    k.pb.add("interior", loft(inner, segC, 0, [true, true], true));
+    if (k.hi) k.pb.add("chrome", loftRim(sub2, inner, segC));
+  }
+  const zA = sub2[0].z, zB = sub2[sub2.length - 1].z;
   let wMax = 0, hBm = 0;
-  for (const s of outerSub) {
+  for (const s of sub2) {
     wMax = Math.max(wMax, s.w);
     hBm = Math.max(hBm, s.hB);
   }
-  const mid = outerSub[Math.floor(outerSub.length / 2)];
+  const mid = sub2[Math.floor(sub2.length / 2)];
   const rimY = mid.hT * Math.pow(Math.cos((mid.open ?? 0.5) * Math.PI / 2), 2 / (mid.n ?? 2.4));
   const floorY = -(mid.hB - th);
-  const hipZ = zA + (zB - zA) * 0.4, hipY = floorY * 0.5;
-  pb.add("leather", rbox(0.56, 0.12, 0.5, 0.05), M4.t(0, hipY - 0.06, hipZ + 0.08));
-  pb.add("leather", rbox(0.56, 0.7, 0.12, 0.06), M4.trs(0, hipY + 0.3, hipZ - 0.2, -0.15, 0, 0));
-  pb.add("leather", rbox(0.3, 0.2, 0.12, 0.05), M4.trs(0, hipY + 0.78, hipZ - 0.27, -0.15, 0, 0));
-  const pil = pilotParts(pb, c.pilot, V(0, hipY, hipZ), species);
-  pb.add("chrome", torus(0.24 * c.pilot, 0.022, 7, 18, Math.PI), M4.t(0, hipY + 0.78 * c.pilot, hipZ - 0.34));
-  pb.add("glow", torus(0.055, 6e-3, 5, 16), M4.t(0, rimY + 0.11, zB - 0.34 * (zB - zA)));
-  for (const hd of pil.hands) {
-    const base = V(hd.x, floorY + 0.05, hd.z + 0.1);
-    pb.add("steel", tube([base, V(hd.x, (base.y + hd.y) / 2, hd.z + 0.08), V(hd.x, hd.y - 0.07, hd.z)], 0.022, 8, 6));
-    pb.add("rubber", cyl(0.032, 0.032, 0.12, 10), M4.t(hd.x, hd.y - 0.06, hd.z));
-    pb.add("glow", sphere(0.018, 8, 6), M4.t(hd.x, hd.y + 0.01, hd.z + 0.03));
+  return { secs, zA, zB, wMax, hBm, rimY, floorY, hip: V4(0, floorY * 0.5, zA + (zB - zA) * 0.4), iB };
+}
+function seat(k, hip, lean = 0) {
+  const m = (x, y, z, rx) => M4.trs(hip.x + x, hip.y + y, hip.z + z, rx - lean, 0, 0);
+  k.pb.add("leather", rbox(0.56, 0.12, 0.5, 0.05), m(0, -0.06, 0.08, 0));
+  k.pb.add("leather", rbox(0.56, 0.7, 0.12, 0.06), m(0, 0.3 * Math.cos(lean), -0.2 - 0.3 * Math.sin(lean), -0.15));
+  if (k.hi) k.pb.add("leather", rbox(0.3, 0.2, 0.12, 0.05), m(0, 0.78 * Math.cos(lean), -0.27 - 0.78 * Math.sin(lean), -0.15));
+}
+function pilot(k, hip, lean = 0, reach) {
+  const s = k.s, lite = k.d === 0, pp = k.pp;
+  const base2 = new Matrix4().compose(hip, new Quaternion().setFromEuler(new Euler(-lean, 0, 0)), V4(s, s, s));
+  const at = (m) => base2.clone().multiply(m);
+  const W2 = (p) => p.clone().applyMatrix4(base2);
+  const torso = lathe(prof([[0, 0], [0.16, 0, 1], [0.19, 0.12], [0.21, 0.32], [0.19, 0.44], [0.12, 0.52], [0.06, 0.56], [0, 0.57]]), lite ? 8 : 18, 0);
+  torso.rotateX(-HALF3);
+  torso.scale(1.15, 1, 0.82);
+  pp.add("suit", torso, at(M4.trs(0, 0, 0, 0.22, 0, 0)));
+  if (!lite) {
+    for (const sd of [-1, 1]) pp.add("leather", rbox(0.05, 0.5, 0.02, 0.01), at(M4.trs(sd * 0.09, 0.27, 0.19, 0.22, 0, sd * 0.12)));
+    pp.add("chrome", cyl(0.035, 0.035, 0.02, 10), at(M4.trs(0, 0.25, 0.205, HALF3 + 0.22, 0, 0)));
+    pp.add("leather", torus(0.075, 0.03, 8, 18), at(M4.trs(0, 0.56, 0.12, HALF3 - 0.25, 0, 0)));
+    for (const sd of [-1, 1]) pp.add("dark", sphere(0.1, 10, 6, 0, Math.PI * 2, 0, HALF3), at(M4.trs(sd * 0.225, 0.47, 0.085, 0, 0, sd * -0.5, 1.1, 0.7, 1.2)));
+    pp.add("dark", rbox(0.15, 0.1, 0.04, 0.012), at(M4.trs(0, 0.4, 0.2, 0.22, 0, 0)));
+    pp.add("glow", rbox(0.05, 0.02, 0.012, 4e-3), at(M4.trs(-0.03, 0.42, 0.224, 0.22, 0, 0)));
   }
-  const D = new Matrix4().compose(V(0, rimY - 0.06, zB - 0.16 * len * 0.3 - 0.12), new Quaternion().setFromEuler(new Euler(-0.65, 0, 0)), V(1, 1, 1));
-  const dw = Math.min(wMax * 1.3, 1.5);
-  pb.add("interior", rbox(dw, 0.06, 0.34, 0.03), D);
-  for (let i = 0; i < 5; i++) {
-    const gx = (i - 2) * dw * 0.18;
-    const m = D.clone().multiply(M4.trs(gx, 0.032, 0.02 * (i % 2), -Math.PI / 2, 0, 0));
-    pb.add("glow", new CircleGeometry(0.04, 16), m);
-    pb.add("chrome", torus(0.045, 8e-3, 6, 18), m);
+  const head = V4(0, 0.71, 0.17), kind = k.head, hs = lite ? 8 : 16, hr = lite ? 6 : 12;
+  if (kind === "snout") {
+    pp.add("skin", sphere(0.115, hs, hr), at(M4.trs(head.x, head.y, head.z + 0.03, 0.18, 0, 0, 0.88, 0.92, 1.38)));
+    pp.add("leather", sphere(0.124, hs, lite ? 5 : 10, 0, Math.PI * 2, 0, Math.PI * 0.55), at(M4.trs(head.x, head.y + 0.02, head.z - 0.02, -0.3, 0, 0, 0.94, 0.95, 1.15)));
+    for (const sd of [-1, 1]) {
+      pp.add("leather", cyl(0.012, 0.032, 0.14, lite ? 5 : 7), at(M4.trs(head.x + sd * 0.085, head.y + 0.09, head.z - 0.06, -0.75, 0, sd * -0.35)));
+      if (!lite) pp.add("chrome", cyl(0.048, 0.052, 0.05, 12), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.13, HALF3, 0, 0)));
+      pp.add("glow", sphere(0.038, lite ? 6 : 10, lite ? 4 : 8), at(M4.trs(head.x + sd * 0.058, head.y + 0.035, head.z + 0.15, 0, 0, 0, 1, 0.8, 0.45)));
+    }
+  } else if (kind === "crest") {
+    pp.add("skin", sphere(0.112, hs, hr), at(M4.trs(head.x, head.y, head.z, -0.25, 0, 0, 0.9, 1.15, 1.25)));
+    pp.add("suit", rbox(0.045, 0.14, 0.24, 0.018), at(M4.trs(head.x, head.y + 0.11, head.z - 0.06, -0.35, 0, 0)));
+    for (const sd of [-1, 1]) pp.add("skin", tube([V4(head.x + sd * 0.08, head.y + 0.02, head.z - 0.06), V4(head.x + sd * 0.11, head.y - 0.1, head.z - 0.18), V4(head.x + sd * 0.09, head.y - 0.24, head.z - 0.22)], 0.032, lite ? 4 : 8, lite ? 5 : 7), base2);
+    pp.add("visor", sphere(0.118, hs, lite ? 4 : 8, 0, Math.PI, Math.PI * 0.25, Math.PI * 0.32), at(M4.trs(head.x, head.y + 0.02, head.z + 0.02, 0, 0, 0, 1.02, 0.9, 1.05)));
+  } else if (kind === "aero") {
+    pp.add("suit", sphere(0.138, hs, hr), at(M4.trs(head.x, head.y + 0.015, head.z, 0, 0, 0, 0.98, 1.06, 1.22)));
+    pp.add("dark", rbox(0.04, 0.09, 0.26, 0.012), at(M4.trs(head.x, head.y + 0.13, head.z - 0.05, -0.2, 0, 0)));
+    pp.add("visor", sphere(0.141, hs, lite ? 4 : 8, 0, Math.PI, Math.PI * 0.28, Math.PI * 0.34), at(M4.trs(head.x, head.y + 0.015, head.z + 0.015, 0, 0, 0, 1, 0.95, 1.2)));
+    pp.add("glow", rbox(0.16, 0.016, 0.02, 4e-3), at(M4.t(head.x, head.y + 0.02, head.z + 0.165)));
+  } else if (kind === "dome") {
+    pp.add("chrome", sphere(0.136, hs, hr), at(M4.trs(head.x, head.y + 0.01, head.z, 0, 0, 0, 1.12, 0.96, 1.08)));
+    pp.add("dark", rbox(0.24, 0.065, 0.09, 0.016), at(M4.t(head.x, head.y + 0.025, head.z + 0.11)));
+    pp.add("glow", rbox(0.2, 0.026, 0.02, 5e-3), at(M4.t(head.x, head.y + 0.025, head.z + 0.156)));
+    if (!lite) for (const sd of [-1, 1]) pp.add("steel", cyl(8e-3, 0.012, 0.16, 6), at(M4.trs(head.x + sd * 0.13, head.y + 0.11, head.z - 0.02, -0.3, 0, sd * -0.2)));
+  } else if (kind === "maul") {
+    pp.add("skin", sphere(0.135, hs, hr), at(M4.trs(head.x, head.y, head.z, 0, 0, 0, 1.1, 1, 1.05)));
+    pp.add("skin", sphere(0.07, lite ? 6 : 10, lite ? 4 : 8), at(M4.trs(head.x, head.y - 0.04, head.z + 0.115, 0, 0, 0, 1, 0.8, 1)));
+    pp.add("dark", sphere(0.022, 6, 4), at(M4.t(head.x, head.y - 0.025, head.z + 0.185)));
+    pp.add("leather", sphere(0.142, hs, lite ? 5 : 10, 0, Math.PI * 2, 0, Math.PI * 0.42), at(M4.trs(head.x, head.y + 5e-3, head.z - 0.01, -0.3, 0, 0, 1.1, 1.02, 1.08)));
+    for (const sd of [-1, 1]) {
+      pp.add("skin", sphere(0.045, lite ? 6 : 8, lite ? 4 : 6), at(M4.trs(head.x + sd * 0.11, head.y + 0.105, head.z - 0.01, 0, 0, 0, 1, 1, 0.5)));
+      pp.add("visor", sphere(0.034, lite ? 6 : 10, lite ? 4 : 8, 0, Math.PI * 2, 0, HALF3), at(M4.trs(head.x + sd * 0.056, head.y + 0.04, head.z + 0.122, HALF3, 0, 0, 1, 0.5, 1)));
+      if (!lite) pp.add("chrome", torus(0.036, 8e-3, 5, 12), at(M4.t(head.x + sd * 0.056, head.y + 0.04, head.z + 0.128)));
+    }
+  } else if (kind === "veil") {
+    pp.add("skin", sphere(0.108, hs, hr), at(M4.trs(head.x, head.y + 0.02, head.z, -0.15, 0, 0, 0.86, 1.28, 1.05)));
+    pp.add("visor", sphere(0.112, hs, lite ? 4 : 8, 0, Math.PI, Math.PI * 0.32, Math.PI * 0.2), at(M4.trs(head.x, head.y + 0.03, head.z + 0.012, 0, 0, 0, 0.9, 1.1, 1.08)));
+    pp.add("glass", fin([[-0.02, 0], [0.16, 0], [0.02, 0.24], [-0.2, 0.2]], 0.012), at(M4.t(head.x, head.y + 0.12, head.z - 0.04)));
+    for (const sd of [-1, 1]) pp.add("skin", tube([V4(head.x + sd * 0.07, head.y + 0.06, head.z - 0.07), V4(head.x + sd * 0.1, head.y - 0.08, head.z - 0.2), V4(head.x + sd * 0.07, head.y - 0.3, head.z - 0.26)], 0.02, lite ? 4 : 8, lite ? 4 : 6), base2);
+    if (!lite) pp.add("chrome", torus(0.085, 0.01, 5, 16), at(M4.trs(head.x, head.y - 0.1, head.z, HALF3, 0, 0)));
+  } else if (kind === "horn") {
+    pp.add("skin", sphere(0.125, hs, hr), at(M4.trs(head.x, head.y, head.z, 0, 0, 0, 1.16, 0.96, 1.08)));
+    pp.add("leather", rbox(0.24, 0.05, 0.14, 0.02), at(M4.trs(head.x, head.y + 0.085, head.z + 0.06, 0.25, 0, 0)));
+    pp.add("steel", sphere(0.118, hs, lite ? 4 : 8, 0, Math.PI, Math.PI * 0.56, Math.PI * 0.3), at(M4.trs(head.x, head.y - 5e-3, head.z + 0.015, 0, 0, 0, 1.14, 1, 1.12)));
+    for (const sd of [-1, 1]) {
+      pp.add("leather", tube([V4(head.x + sd * 0.11, head.y + 0.06, head.z - 0.01), V4(head.x + sd * 0.21, head.y + 0.1, head.z + 0.02), V4(head.x + sd * 0.25, head.y + 0.2, head.z + 0.1)], 0.028, lite ? 4 : 8, lite ? 5 : 7), base2);
+      if (!lite) pp.add("leather", lathe(prof([[0.028, 0], [0, 0.09]]), 7, 0), at(M4.trs(head.x + sd * 0.25, head.y + 0.2, head.z + 0.1, -0.9, sd * 0.3, 0)));
+      pp.add("glow", sphere(0.02, 6, 4), at(M4.t(head.x + sd * 0.05, head.y + 0.035, head.z + 0.125)));
+    }
+  } else if (kind === "optic") {
+    pp.add("steel", cyl(0.105, 0.115, 0.2, lite ? 8 : 16), at(M4.t(head.x, head.y + 5e-3, head.z)));
+    pp.add("dark", sphere(0.106, hs, lite ? 4 : 8, 0, Math.PI * 2, 0, HALF3), at(M4.trs(head.x, head.y + 0.1, head.z, 0, 0, 0, 1, 0.5, 1)));
+    pp.add("dark", cyl(0.062, 0.07, 0.05, lite ? 8 : 14), at(M4.trs(head.x, head.y + 0.02, head.z + 0.105, HALF3, 0, 0)));
+    pp.add("glow", sphere(0.046, lite ? 6 : 12, lite ? 4 : 8), at(M4.trs(head.x, head.y + 0.02, head.z + 0.125, 0, 0, 0, 1, 1, 0.5)));
+    if (!lite) {
+      pp.add("chrome", torus(0.064, 0.01, 5, 14), at(M4.t(head.x, head.y + 0.02, head.z + 0.132)));
+      for (const sd of [-1, 1]) pp.add("steel", cyl(6e-3, 0.01, 0.2, 5), at(M4.trs(head.x + sd * 0.11, head.y + 0.16, head.z - 0.03, -0.25, 0, sd * -0.3)));
+      pp.add("copper", torus(0.07, 0.016, 5, 14), at(M4.trs(head.x, head.y - 0.11, head.z, HALF3, 0, 0)));
+    }
+  } else {
+    pp.add("skin", sphere(0.112, hs, hr), at(M4.trs(head.x, head.y - 0.015, head.z + 0.02, 0, 0, 0, 0.95, 1.05, 1)));
+    pp.add("leather", sphere(0.13, hs, lite ? 5 : 12, 0, Math.PI * 2, 0, Math.PI * 0.64), at(M4.trs(head.x, head.y + 0.012, head.z - 0.015, -0.25, 0, 0, 1, 1.05, 1.1)));
+    if (!lite) {
+      pp.add("chrome", rbox(0.032, 0.04, 0.22, 8e-3), at(M4.trs(head.x, head.y + 0.135, head.z - 0.02, -0.18, 0, 0)));
+      pp.add("rubber", torus(0.122, 0.013, 6, 24), at(M4.trs(head.x, head.y + 0.035, head.z, HALF3 - 0.2, 0, 0)));
+    }
+    for (const sd of [-1, 1]) {
+      if (!lite) pp.add("chrome", cyl(0.046, 0.05, 0.046, 14), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.105, HALF3, 0, 0)));
+      pp.add("visor", sphere(0.041, lite ? 6 : 12, lite ? 4 : 8, 0, Math.PI * 2, 0, HALF3), at(M4.trs(head.x + sd * 0.052, head.y + 0.03, head.z + 0.128, HALF3, 0, 0, 1, 0.45, 1)));
+    }
   }
-  const ws = c.style === "wedge" ? [0.85, 0.2, 0.42] : c.style === "saucer" ? [1, 0.45, 0.7] : c.style === "long" ? [0.72, 0.34, 0.58] : [0.9, 0.32, 0.48];
-  const wsM = M4.trs(0, rimY - 0.02, zB - 0.42 * (zB - zA), 0, 0, 0, wMax * ws[0], ws[1], ws[2]);
-  pb.add("glass", sphere(1, 28, 10, 0, Math.PI, 0, Math.PI / 2), wsM);
-  pb.add("chrome", torus(1, 0.022, 6, 28, Math.PI), wsM.clone().multiply(new Matrix4().makeRotationX(Math.PI / 2)));
-  const spZ = zA + (zB - zA) * 0.25;
+  const hands = [];
+  [-1, 1].forEach((sd, i) => {
+    const sh = W2(V4(sd * 0.22, 0.46, 0.09)), hd = reach ? reach[i].clone() : W2(V4(sd * 0.21, 0.31, 0.5));
+    const el = sh.clone().lerp(hd, 0.5).add(V4(sd * 0.09 * s, -0.11 * s, -0.02 * s));
+    if (!lite) pp.add("suit", sphere(0.085 * s, 12, 10), M4.t(sh.x, sh.y, sh.z));
+    pp.add("suit", tube([sh, sh.clone().lerp(el, 0.55), el], 0.055 * s, lite ? 3 : 8, lite ? 5 : 10));
+    k.pb.add("suit", tube([el, el.clone().lerp(hd, 0.55), hd], 0.05 * s, lite ? 3 : 8, lite ? 5 : 10));
+    k.pb.add("leather", sphere(0.062 * s, lite ? 6 : 12, lite ? 5 : 10), M4.trs(hd.x, hd.y, hd.z + 0.02 * s, 0, 0, 0, 1, 0.9, 1.2));
+    hands.push(hd);
+  });
+  return { head: W2(head), eye: W2(V4(0, head.y + 0.03, head.z + 0.03)), hands };
+}
+function levers(k, hands, floorY) {
+  if (!k.hi) return;
+  for (const hd of hands) {
+    const b = V4(hd.x, floorY + 0.05, hd.z + 0.1);
+    k.pb.add("steel", tube([b, V4(hd.x, (b.y + hd.y) / 2, hd.z + 0.08), V4(hd.x, hd.y - 0.07, hd.z)], 0.022, 8, 6));
+    k.pb.add("rubber", cyl(0.032, 0.032, 0.12, 10), M4.t(hd.x, hd.y - 0.06, hd.z));
+    k.pb.add("glow", sphere(0.018, 8, 6), M4.t(hd.x, hd.y + 0.01, hd.z + 0.03));
+  }
+}
+function dash(k, pos, dw, gauges, screens = 0, tilt = -0.65) {
+  const D = new Matrix4().compose(pos, new Quaternion().setFromEuler(new Euler(tilt, 0, 0)), V4(1, 1, 1));
+  k.pb.add("dark", rbox(dw, 0.06, 0.34, 0.03), D);
+  if (k.hi) {
+    const slots = gauges + screens * 2, step4 = dw / (slots + 0.5);
+    let x = -(slots - 1) / 2 * step4;
+    const dial = (gx, i) => {
+      const m = D.clone().multiply(M4.trs(gx, 0.032, 0.03 + 0.02 * (i % 2), -HALF3, 0, 0)), r2 = Math.min(0.04, step4 * 0.4);
+      k.pb.add("glow", new CircleGeometry(r2, 16), m);
+      k.pb.add("chrome", torus(r2 * 1.12, 8e-3, 6, 18), m);
+      k.pb.add("dark", rbox(6e-3, r2 * 0.9, 4e-3, 1e-3), m.clone().multiply(M4.trs(0, r2 * 0.4, 4e-3, 0, 0, i * 1.9 % 2.4 - 1.2)));
+    };
+    const left = Math.ceil(gauges / 2);
+    for (let i = 0; i < left; i++) {
+      dial(x, i);
+      x += step4;
+    }
+    for (let s = 0; s < screens; s++) {
+      const cx = x + step4 * 0.5, sw = step4 * 1.7;
+      x += step4 * 2;
+      k.pb.add("steel", rbox(sw, 0.016, 0.17, 4e-3), D.clone().multiply(M4.t(cx, 0.032, 0)));
+      const nB = 7;
+      for (let b = 0; b < nB; b++) {
+        const h = 0.03 + 0.1 * Math.abs(Math.sin((b + 1) * (2.1 + s * 1.3)));
+        k.pb.add("glow", rbox(sw / (nB * 1.7), 6e-3, h, 1e-3), D.clone().multiply(M4.t(cx + (b - (nB - 1) / 2) * (sw * 0.86 / nB), 0.043, 0.07 - h / 2)));
+      }
+    }
+    for (let i = left; i < gauges; i++) {
+      dial(x, i);
+      x += step4;
+    }
+    k.pb.add("chrome", rbox(dw + 0.03, 0.02, 0.02, 6e-3), D.clone().multiply(M4.t(0, 0.03, -0.165)));
+    if (k.ultra) {
+      const nT = Math.max(4, Math.round(dw / 0.07));
+      for (let i = 0; i < nT; i++) {
+        const tx = (i - (nT - 1) / 2) * (dw * 0.86 / nT);
+        k.pb.add("chrome", rbox(0.012, 0.03, 0.012, 2e-3), D.clone().multiply(M4.trs(tx, 0.044, 0.14, (i % 3 - 1) * 0.35, 0, 0)));
+        if (i % 2 === 0) k.pb.add("glow", rbox(0.014, 6e-3, 0.014, 1e-3), D.clone().multiply(M4.t(tx, 0.034, 0.115)));
+      }
+      for (const sd of [-1, 1]) k.pb.add("chrome", tube([V4(sd * dw * 0.52, 0, -0.14).applyMatrix4(D), V4(sd * dw * 0.56, 0.06, 0).applyMatrix4(D), V4(sd * dw * 0.52, 0, 0.14).applyMatrix4(D)], 0.012, 8, 5));
+    }
+  }
+  k.lampN.set(0, 1, 0).transformDirection(D);
+  k.lampAt = [-1, 0, 1].map((i) => V4(i * dw * 0.3, 0.036, -0.125).applyMatrix4(D));
+}
+function windscreen(k, kind, pos, sx, sy, sz) {
+  const m = M4.trs(pos.x, pos.y, pos.z, 0, 0, 0, sx, sy, sz), ws = k.d === 0 ? 12 : 28, hs = k.d === 0 ? 5 : 10;
+  if (kind === "bubble") {
+    k.pb.add("glass", sphere(1, ws, hs, 0, Math.PI * 2, 0, HALF3), m);
+    if (k.hi) {
+      k.pb.add("chrome", torus(1, 0.02, 6, 28), m.clone().multiply(new Matrix4().makeRotationX(HALF3)));
+      k.pb.add("chrome", torus(1, 0.014, 5, 20, Math.PI), m);
+    }
+  } else if (kind === "wrap") {
+    k.pb.add("glass", sphere(1, ws, hs, 0, Math.PI, Math.PI * 0.18, Math.PI * 0.32), m);
+    if (k.hi) {
+      k.pb.add("chrome", torus(1, 0.02, 6, 28, Math.PI), m.clone().multiply(new Matrix4().makeRotationX(HALF3)));
+      k.pb.add("chrome", torus(Math.sin(Math.PI * 0.18), 0.016, 5, 20, Math.PI), m.clone().multiply(M4.trs(0, Math.cos(Math.PI * 0.18), 0, HALF3, 0, 0)));
+    }
+  } else if (kind === "fly") {
+    k.pb.add("glass", sphere(1, ws, hs, Math.PI * 0.2, Math.PI * 0.6, Math.PI * 0.1, Math.PI * 0.4), m);
+    if (k.hi) k.pb.add("chrome", torus(1, 0.03, 5, 16, Math.PI * 0.6), m.clone().multiply(M4.trs(0, 0, 0, HALF3, 0, Math.PI * 0.2)));
+  } else {
+    k.pb.add("glass", sphere(1, ws, hs, 0, Math.PI, 0, HALF3), m);
+    if (k.hi) k.pb.add("chrome", torus(1, 0.022, 6, 28, Math.PI), m.clone().multiply(new Matrix4().makeRotationX(HALF3)));
+  }
+}
+function anchors(k, a) {
+  for (const p of a) {
+    k.pb.add("chrome", torus(0.06, 0.02, 6, k.hi ? 14 : 8), M4.trs(p.x, p.y, p.z, 0, HALF3, 0));
+    k.pb.add("steel", rbox(0.1, 0.1, 0.16, 0.02), M4.t(p.x, p.y - 0.07, p.z));
+  }
+  return a;
+}
+function tubAnchors(k, T2) {
+  const fr = T2.secs[Math.min(T2.secs.length - 1, T2.iB + 2)];
+  return anchors(k, [V4(-fr.w * 0.45, fr.hT * 0.75 + 0.06, fr.z), V4(fr.w * 0.45, fr.hT * 0.75 + 0.06, fr.z)]);
+}
+function belly(k, w, l, y, z) {
+  k.pb.add("dark", rbox(w, 0.07, l, 0.03), M4.t(0, y, z));
+  k.pb.add("glow", rbox(w * 0.64, 0.025, l * 0.84, 0.01), M4.t(0, y - 0.045, z));
+  if (k.ultra) for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) k.pb.add("chrome", cyl(0.022, 0.022, 0.016, 6), M4.t(sx * w * 0.42, y - 0.04, z + (i - 1.5) * l * 0.26));
+}
+function fin(pts, t) {
+  const g = extrude(pts, t, Math.min(0.012, t * 0.3));
+  g.rotateY(-HALF3);
+  return g;
+}
+var SEC3 = [0, 0, 3];
+function part(k, id, center, build2) {
+  const pb = new PartBuilder();
+  build2(pb);
+  k.breaks.push({ id, parts: pb.build(), center });
+}
+var aurora = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.12, 0.1, 0.1, 2.2, 0], [-0.44, 0.5, 0.34, 0.34, 2.3, 0], [-0.34, 0.84, 0.44, 0.5, 2.5, 0], [-0.22, 0.98, 0.4, 0.56, 2.6, 0.5], [-0.06, 1, 0.36, 0.57, 2.6, 0.6], [0.08, 0.95, 0.36, 0.54, 2.6, 0.5], [0.2, 0.82, 0.42, 0.47, 2.4, 0], [0.34, 0.56, 0.36, 0.36, 2.3, 0], [0.45, 0.26, 0.2, 0.2, 2.2, 0], [0.5, 0.05, 0.05, 0.05, 2, 0]]);
+  seat(k, T2.hip);
+  const P = pilot(k, T2.hip);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V4(0, T2.rimY - 0.06, T2.zB - 0.2), Math.min(T2.wMax * 1.3, 1.4), 5);
+  windscreen(k, "wrap", V4(0, T2.rimY - 0.2, T2.zB - 0.38 * (T2.zB - T2.zA)), T2.wMax * 0.95, 0.72, 0.78);
+  for (const sd of [-1, 1]) pb.add("hull", loft([{ z: -0.62, w: 0.02, hT: 0.02, hB: 0.02 }, { z: -0.4, w: 0.13, hT: 0.2, hB: 0.1 }, { z: -0.1, w: 0.17, hT: 0.3, hB: 0.12 }, { z: 0.16, w: 0.13, hT: 0.2, hB: 0.1 }, { z: 0.3, w: 0.03, hT: 0.04, hB: 0.03 }], k.hi ? 12 : 6, 3), M4.t(sd * hw * 0.42, T2.rimY + 0.06, T2.zA + 0.1));
   for (const sd of [-1, 1]) {
-    pb.add("hull", rbox(0.3 * hw, 0.34 * hw, 0.42 * len, 0.06), M4.t(sd * wMax * 0.97, -0.08 * hw, spZ), [0, 0, 3]);
-    for (let i = 0; i < 5; i++) pb.add("dark", rbox(0.02, 0.22 * hw, 0.03, 6e-3), M4.trs(sd * (wMax * 0.97 + 0.15 * hw + 0.01), -0.08 * hw, spZ - 0.12 * len + i * 0.06 * len, 0, sd * 0.6, 0));
-    pb.add("dark", lathe(prof([[0.11 * hw, -0.1, 1], [0.11 * hw, 0.05, 1], [0.08 * hw, 0.05, 1], [0, -0.05]]), 16, 0), M4.t(sd * wMax * 0.97, -0.08 * hw, spZ + 0.21 * len + 0.02));
+    pb.add("hull", rbox(hw * 0.75, 0.04, 0.5, 0.015), M4.trs(sd * hw * 0.92, -0.04, len * 0.3, 0, sd * -0.32, sd * -0.1), SEC3);
+    if (k.hi) pb.add("steel", rbox(hw * 0.78, 0.05, 0.04, 0.01), M4.trs(sd * hw * 0.96, -0.04, len * 0.3 + 0.27, 0, sd * -0.32, sd * -0.1));
   }
-  pb.add("dark", rbox(wMax * 1.1, 0.07, len * 0.5, 0.03), M4.t(0, -hBm - 0.03, zA + (zB - zA) * 0.5));
-  pb.add("glow", rbox(wMax * 0.7, 0.025, len * 0.42, 0.01), M4.t(0, -hBm - 0.075, zA + (zB - zA) * 0.5));
-  const rear = secs[1];
+  const gz = -len * 0.5 - 0.42;
+  pb.add("steel", tube([V4(0, 0.1, -len * 0.5 + 0.2), V4(0, 0.16, gz + 0.2)], 0.045, 4, 6));
+  part(k, "gyro", V4(0, 0.16, gz), (g) => {
+    g.add("chrome", torus(0.26, 0.022, 6, k.hi ? 22 : 10), M4.t(0, 0.16, gz));
+    g.add("chrome", torus(0.2, 0.02, 6, k.hi ? 20 : 10), M4.trs(0, 0.16, gz, 0, HALF3, 0));
+    g.add("dark", sphere(0.11, k.hi ? 12 : 6, k.hi ? 8 : 4), M4.t(0, 0.16, gz));
+    g.add("glow", torus(0.115, 0.012, 5, k.hi ? 16 : 8), M4.trs(0, 0.16, gz, HALF3, 0, 0));
+  });
+  belly(k, T2.wMax * 1.05, len * 0.5, -T2.hBm - 0.03, 0);
+  if (k.hi) for (const sd of [-1, 1]) pb.add("glow", sphere(0.04, 8, 6), M4.t(sd * hw * 0.5, 0, -len * 0.47));
+  pb.add("chrome", lathe(prof([[0.05 * hw, 0], [0.035 * hw, 0.14], [0, 0.34]]), k.hi ? 14 : 6, 0), M4.t(0, 0, len * 0.5 - 0.02));
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T2) };
+};
+var mavik = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.1, 0.1, 0.1, 2.2, 0], [-0.42, 0.52, 0.34, 0.3, 2.4, 0], [-0.3, 0.84, 0.44, 0.46, 2.6, 0], [-0.2, 0.96, 0.42, 0.52, 2.6, 0.42], [-0.04, 1, 0.38, 0.54, 2.6, 0.5], [0.1, 0.92, 0.38, 0.5, 2.6, 0.4], [0.2, 0.76, 0.4, 0.42, 2.4, 0], [0.34, 0.46, 0.3, 0.3, 2.3, 0], [0.45, 0.2, 0.15, 0.15, 2.2, 0], [0.5, 0.06, 0.05, 0.05, 2, 0]]);
+  const hip = V4(0, T2.floorY * 0.42, T2.hip.z - 0.06), lean = 0.5;
+  seat(k, hip, lean);
+  const P = pilot(k, hip, lean, [V4(-0.2 * k.s, hip.y + 0.26, hip.z + 0.62), V4(0.2 * k.s, hip.y + 0.26, hip.z + 0.62)]);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V4(0, T2.rimY - 0.05, T2.zB - 0.12), Math.min(T2.wMax * 1.2, 1), 3, 0, -0.75);
+  windscreen(k, "bubble", V4(0, T2.rimY - 0.04, (T2.zA + T2.zB) * 0.5 - 0.02), T2.wMax * 0.8, 0.5, (T2.zB - T2.zA) * 0.56);
+  part(k, "probe", V4(0, 0, len * 0.5 + 0.5), (g) => {
+    g.add("chrome", lathe(prof([[0.05, 0], [0.032, 0.25], [0.02, 0.9], [0, 1.15]]), k.hi ? 12 : 6, 0), M4.t(0, 0, len * 0.5 - 0.04));
+    g.add("dark", torus(0.05, 0.016, 5, k.hi ? 12 : 6), M4.t(0, 0, len * 0.5 + 0.2));
+    g.add("glow", sphere(0.022, 6, 4), M4.t(0, 0, len * 0.5 + 1.1));
+  });
+  part(k, "fin", V4(0, T2.rimY + 0.5, -len * 0.3), (g) => {
+    g.add("hull", fin([[0, 0], [0.95, 0], [0.4, 0.95], [0.08, 0.98]], 0.05), M4.t(0, 0.28 * hw, -len * 0.5 + 0.12), SEC3);
+    if (k.hi) g.add("glow", sphere(0.03, 6, 4), M4.t(0, 0.28 * hw + 0.98, -len * 0.5 + 0.22));
+  });
+  if (k.hi) for (const sd of [-1, 1]) for (let i = 0; i < 3; i++) pb.add("dark", rbox(0.02, 0.12 * hw, 0.16, 6e-3), M4.trs(sd * hw * 0.97, -0.02, -len * 0.16 + i * 0.2, 0, sd * 0.5, 0));
+  belly(k, T2.wMax * 0.9, len * 0.5, -T2.hBm - 0.02, 0);
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T2) };
+};
+var rattis = (k) => {
+  const { hw, len, pb } = k;
+  const body = [
+    { z: -0.5 * len, w: 0.03, hT: 0.03, hB: 0.03 },
+    { z: -0.4 * len, w: 0.26 * hw, hT: 0.2 * hw, hB: 0.22 * hw },
+    { z: -0.22 * len, w: 0.5 * hw, hT: 0.3 * hw, hB: 0.4 * hw },
+    { z: -0.06 * len, w: 0.36 * hw, hT: 0.2 * hw, hB: 0.34 * hw },
+    { z: 0.1 * len, w: 0.52 * hw, hT: 0.26 * hw, hB: 0.44 * hw },
+    { z: 0.3 * len, w: 0.46 * hw, hT: 0.3 * hw, hB: 0.36 * hw },
+    { z: 0.44 * len, w: 0.24 * hw, hT: 0.2 * hw, hB: 0.2 * hw },
+    { z: 0.5 * len, w: 0.05, hT: 0.05, hB: 0.05 }
+  ];
+  const bSeg = k.d === 0 ? 10 : Math.max(20, k.seg);
+  pb.add("hull", loft(body.map((s) => ({ ...s, n: 2.3 })), bSeg, 2));
+  const bodyAt = (z) => {
+    let i = 0;
+    while (i < body.length - 2 && body[i + 1].z < z) i++;
+    const a = body[i], b = body[i + 1], t = (z - a.z) / (b.z - a.z), m = (p, q) => (p + (q - p) * t) * 1.045;
+    return { z, w: m(a.w, b.w), hT: m(a.hT, b.hT), hB: m(a.hB, b.hB), n: 2.3 };
+  };
+  for (const z of [-0.36, -0.29, -0.22, -0.15]) pb.add("hull", loft([bodyAt(z * len), bodyAt((z + 0.035) * len)], bSeg, 3, [false, false]));
+  const hip = V4(0, 0.3 * hw + 0.02, -0.02 * len);
   for (const sd of [-1, 1]) {
-    const fin = extrude([[0, 0], [0.55, 0], [0.75, 0.55 * hw], [0.45, 0.55 * hw]], 0.04, 0.012);
-    fin.rotateY(Math.PI / 2);
-    pb.add("hull", fin, M4.trs(sd * rear.w * 0.45, rear.hT * 0.6, secs[2].z, 0, 0, sd * -0.35), [0, 0, 3]);
-    pb.add("glow", sphere(0.045, 10, 8), M4.t(sd * rear.w * 0.62, 0, secs[0].z + 0.06));
+    pb.add("steel", tube([V4(sd * 0.3 * hw, 0.16 * hw, -0.3 * len), V4(sd * 0.42 * hw, 0.36 * hw, -0.1 * len), V4(sd * 0.36 * hw, 0.3 * hw, 0.2 * len), V4(sd * 0.16 * hw, 0.2 * hw, 0.4 * len)], 0.035, k.hi ? 14 : 6, 6));
+    if (k.hi) pb.add("steel", tube([V4(sd * 0.42 * hw, 0.36 * hw, -0.1 * len), V4(sd * 0.3 * hw, -0.1 * hw, 0.02 * len)], 0.028, 4, 6));
   }
-  pb.add("dark", cyl(0.012, 0.016, 0.9, 6), M4.t(-rear.w * 0.3, rear.hT + 0.45, rear.z + 0.15));
-  pb.add("glow", sphere(0.03, 8, 6), M4.t(-rear.w * 0.3, rear.hT + 0.92, rear.z + 0.15));
-  pb.add("chrome", lathe(prof([[0.07 * hw, 0], [0.05 * hw, 0.12], [0, 0.3]]), 16, 0), M4.t(0, 0, len * 0.5 - 0.02));
-  const fr = secs[Math.min(secs.length - 1, iB + 2)];
-  const anchors = [V(-fr.w * 0.45, fr.hT * 0.75 + 0.06, fr.z), V(fr.w * 0.45, fr.hT * 0.75 + 0.06, fr.z)];
-  for (const a of anchors) {
-    pb.add("chrome", torus(0.06, 0.02, 6, 14), M4.trs(a.x, a.y, a.z, 0, Math.PI / 2, 0));
-    pb.add("steel", rbox(0.1, 0.1, 0.16, 0.02), M4.t(a.x, a.y - 0.07, a.z));
+  pb.add("leather", rbox(0.34, 0.1, 0.62, 0.045), M4.t(0, hip.y - 0.05, hip.z + 0.02));
+  pb.add("leather", rbox(0.3, 0.2, 0.1, 0.04), M4.trs(0, hip.y + 0.07, hip.z - 0.32, -0.3, 0, 0));
+  const hb = V4(0, hip.y + 0.36 * k.s, hip.z + 0.56 * k.s), grip = [V4(-0.27, hb.y, hb.z - 0.05), V4(0.27, hb.y, hb.z - 0.05)];
+  pb.add("steel", tube([V4(0, 0.22 * hw, hb.z + 0.12), V4(0, hb.y - 0.1, hb.z + 0.04), hb], 0.03, 6, 6));
+  pb.add("chrome", tube([grip[0], V4(-0.12, hb.y + 0.03, hb.z + 0.02), hb, V4(0.12, hb.y + 0.03, hb.z + 0.02), grip[1]], 0.022, k.hi ? 14 : 6, 6));
+  for (const g of grip) pb.add("rubber", cyl(0.03, 0.03, 0.14, k.hi ? 10 : 6), M4.trs(g.x, g.y, g.z, 0, 0, HALF3));
+  const P = pilot(k, hip, -0.42, grip);
+  dash(k, V4(0, hb.y - 0.06, hb.z + 0.16), 0.26, 2, 0, -1.1);
+  windscreen(k, "fly", V4(0, hb.y - 0.12, hb.z + 0.02), 0.34, 0.42, 0.36);
+  part(k, "stinger", V4(0, 0, -0.5 * len - 0.3), (g) => {
+    g.add("chrome", lathe(prof([[0, -0.72], [0.045, -0.25], [0.07, 0]]), k.hi ? 12 : 6, 0), M4.t(0, 0, -0.5 * len + 0.04));
+    g.add("dark", torus(0.07, 0.02, 5, k.hi ? 12 : 6), M4.t(0, 0, -0.5 * len + 0.02));
+  });
+  for (const sd of [-1, 1]) pb.add("hull", fin([[0, 0], [0.5, 0], [0.16, 0.34]], 0.03), M4.trs(sd * 0.2 * hw, 0.1 * hw, -0.47 * len, 0, 0, sd * -1), SEC3);
+  belly(k, 0.6 * hw, len * 0.5, -0.44 * hw - 0.02, 0.05 * len);
+  if (k.hi) {
+    pb.add("glow", sphere(0.05, 8, 6), M4.t(0, 0.04, 0.5 * len + 0.02));
+    for (const sd of [-1, 1]) pb.add("glow", sphere(0.03, 6, 4), M4.t(sd * 0.2 * hw, 0.05, -0.46 * len));
   }
-  const out = { parts: pb.build(), info: { head: pil.head, anchors } };
+  return { head: P.head, eye: P.eye, anchors: anchors(k, [V4(-0.3 * hw, 0.24 * hw, 0.36 * len), V4(0.3 * hw, 0.24 * hw, 0.36 * len)]) };
+};
+var elana = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.16, 0.12, 0.12, 2.3, 0], [-0.44, 0.56, 0.34, 0.32, 2.4, 0], [-0.32, 0.86, 0.38, 0.44, 2.6, 0.45], [-0.16, 0.94, 0.33, 0.48, 2.6, 0.58], [-0.02, 0.9, 0.32, 0.46, 2.6, 0.5], [0.1, 0.78, 0.36, 0.42, 2.5, 0], [0.26, 0.54, 0.34, 0.32, 2.4, 0], [0.4, 0.3, 0.26, 0.18, 2.2, 0], [0.5, 0.06, 0.08, 0.05, 2, 0]]);
+  seat(k, T2.hip);
+  const P = pilot(k, T2.hip);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V4(0, T2.rimY - 0.06, T2.zB - 0.16), Math.min(T2.wMax * 1.25, 1.2), 3, 1);
+  windscreen(k, "dome", V4(0, T2.rimY - 0.02, T2.zB - 0.42 * (T2.zB - T2.zA)), T2.wMax * 0.7, 0.36, 0.62);
+  pb.add("chrome", lathe(prof([[0.07, 0], [0.05, 0.16], [0.012, 0.42], [0, 0.46]]), k.hi ? 12 : 6, 0), M4.trs(0, -0.03, len * 0.5 - 0.03, 0.2, 0, 0));
+  for (const sd of [-1, 1]) part(k, sd < 0 ? "wingL" : "wingR", V4(sd * hw * 1.3, 0, -0.1 * len), (g) => {
+    const w = extrude([[0, 0], [0.78, 0.62], [0.86, 0.92], [0.52, 0.86], [0, 0.46]], 0.035, 0.01);
+    w.rotateX(-HALF3);
+    const m = M4.trs(sd * hw * 0.9, 0.02, 0.12 * len, 0, 0, sd * 0.14);
+    if (sd < 0) m.multiply(M4.mirrorX());
+    g.add("hull", w, m, SEC3);
+    if (k.hi) g.add("glow", sphere(0.028, 6, 4), M4.t(sd * (hw * 0.9 + 0.84), 0.13, 0.12 * len - 0.9));
+  });
+  part(k, "fin", V4(0, 0.9, -0.3 * len), (g) => g.add("hull", fin([[0, 0], [1.25, 0], [0.5, 1.12], [0.1, 1.18]], 0.06), M4.t(0, 0.3 * hw, -0.5 * len + 0.06), SEC3));
+  for (const sd of [-1, 1]) part(k, sd < 0 ? "petalL" : "petalR", V4(sd * 0.3, 0, -0.5 * len - 0.2), (g) => g.add("hull", rbox(0.04, 0.42 * hw, 0.5, 0.012), M4.trs(sd * 0.3 * hw, 0, -0.5 * len - 0.14, 0, sd * -0.42, 0), SEC3));
+  if (k.hi) for (const sd of [-1, 1]) pb.add("chrome", tube([V4(sd * hw * 0.5, T2.rimY + 0.02, T2.zA), V4(sd * hw * 0.92, T2.rimY - 0.02, (T2.zA + T2.zB) / 2), V4(sd * hw * 0.52, T2.rimY + 0.03, T2.zB + 0.1), V4(sd * 0.08, 0.2 * hw, len * 0.44)], 0.016, 20, 5));
+  belly(k, T2.wMax, len * 0.46, -T2.hBm - 0.03, -0.04 * len);
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T2) };
+};
+var gasvaro = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.05, 0.05, 0.05, 2.2, 0], [-0.4, 0.44, 0.3, 0.3, 2.3, 0], [-0.28, 0.82, 0.38, 0.44, 2.5, 0.4], [-0.14, 0.96, 0.34, 0.5, 2.6, 0.56], [0, 0.94, 0.34, 0.5, 2.6, 0.5], [0.12, 0.8, 0.38, 0.44, 2.5, 0], [0.26, 0.56, 0.34, 0.34, 2.3, 0], [0.4, 0.3, 0.2, 0.2, 2.2, 0], [0.5, 0.05, 0.05, 0.05, 2, 0]]);
+  seat(k, T2.hip);
+  const P = pilot(k, T2.hip);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V4(0, T2.rimY - 0.06, T2.zB - 0.14), Math.min(T2.wMax * 1.2, 1.1), 2, 2);
+  windscreen(k, "bubble", V4(0, T2.rimY - 0.05, (T2.zA + T2.zB) * 0.5), T2.wMax * 0.86, 0.64, (T2.zB - T2.zA) * 0.5);
+  const hz = 0.3 * len, hy = 0.26 * hw + 0.1;
+  pb.add("steel", torus(0.2, 0.035, 6, k.hi ? 18 : 8), M4.trs(0, hy, hz, HALF3, 0, 0));
+  pb.add("dark", cyl(0.12, 0.15, 0.12, k.hi ? 12 : 6), M4.t(0, hy - 0.02, hz));
+  if (k.hi) pb.add("glow", torus(0.1, 0.012, 5, 14), M4.trs(0, hy + 0.05, hz, HALF3, 0, 0));
+  const A = [V4(-0.76, hy + 0.24, hz + 0.34), V4(0.76, hy + 0.24, hz + 0.34)];
+  for (const sd of [-1, 1]) for (let i = 0; i < 3; i++) {
+    const tip = V4(sd * (0.36 + i * 0.2), hy + 0.1 + i * 0.07, hz + 0.34 - (2 - i) * 0.2);
+    pb.add("steel", tube([V4(sd * 0.16, hy, hz), V4(sd * (0.2 + i * 0.1), hy + 0.12, hz + 0.1), tip], 0.026, k.hi ? 8 : 4, 5));
+    pb.add("copper", sphere(0.05, k.hi ? 8 : 5, k.hi ? 6 : 4), M4.t(tip.x, tip.y, tip.z));
+  }
+  for (const sd of [-1, 1]) for (const up of [0, 1]) {
+    pb.add("dark", tube([V4(sd * 0.08, 0.02, len * 0.46), V4(sd * (0.3 + up * 0.14), 0.16 + up * 0.26, len * 0.5 + 0.34), V4(sd * (0.44 + up * 0.2), 0.2 + up * 0.44, len * 0.5 + 0.86)], 0.011, k.hi ? 8 : 4, 4));
+    if (k.hi) pb.add("glow", sphere(0.02, 6, 4), M4.t(sd * (0.44 + up * 0.2), 0.2 + up * 0.44, len * 0.5 + 0.86));
+  }
+  for (const sd of [-1, 1]) pb.add("hull", fin([[0, 0], [0.6, 0], [0.24, 0.5]], 0.035), M4.trs(sd * 0.1, 0.12 * hw, -0.48 * len, 0, 0, sd * -0.6), SEC3);
+  belly(k, T2.wMax, len * 0.44, -T2.hBm - 0.03, -0.02 * len);
+  return { head: P.head, eye: P.eye, anchors: anchors(k, A) };
+};
+var brute = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.62, 0.34, 0.34, 4.5, 0], [-0.44, 0.94, 0.4, 0.42, 4.5, 0], [-0.3, 1, 0.36, 0.44, 4.5, 0.5], [-0.1, 1, 0.32, 0.42, 4.5, 0.58], [0.06, 0.96, 0.3, 0.38, 4.5, 0.5], [0.18, 0.9, 0.3, 0.32, 4, 0], [0.34, 0.7, 0.2, 0.24, 3.6, 0], [0.5, 0.36, 0.06, 0.1, 3.2, 0]]);
+  seat(k, T2.hip);
+  const P = pilot(k, T2.hip);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V4(0, T2.rimY - 0.05, T2.zB - 0.12), Math.min(T2.wMax * 1.2, 1.5), 3, 1);
+  const sz = T2.zB - 0.06, eyeY = P.eye.y, loH = eyeY - 0.2 - T2.rimY;
+  pb.add("dark", rbox(T2.wMax * 1.5, loH, 0.07, 0.02), M4.trs(0, T2.rimY + loH / 2 - 0.02, sz, -0.3, 0, 0));
+  pb.add("dark", rbox(T2.wMax * 1.5, 0.08, 0.09, 0.02), M4.trs(0, eyeY + 0.24, sz - 0.2, -0.3, 0, 0));
+  pb.add("glass", rbox(T2.wMax * 1.4, 0.42, 0.02, 6e-3), M4.trs(0, eyeY + 0.01, sz - 0.11, -0.3, 0, 0));
+  for (const sd of [-1, 1]) pb.add("steel", rbox(0.06, 0.5, 0.08, 0.02), M4.trs(sd * T2.wMax * 0.74, eyeY + 0.01, sz - 0.11, -0.3, 0, 0));
+  for (let i = 0; i < 3; i++) pb.add("steel", rbox(hw * (1.5 - i * 0.34), 0.05, 0.42, 0.015), M4.trs(0, 0.2 * hw - i * 0.045, len * (0.24 + i * 0.09), 0.2, 0, 0));
+  if (k.hi) pb.add("chrome", boltRing(0.3, 8, 0.022, 0), M4.trs(0, 0.2 * hw + 0.03, len * 0.24, -HALF3 + 0.2, 0, 0));
+  for (const sd of [-1, 1]) part(k, sd < 0 ? "tuskL" : "tuskR", V4(sd * hw * 0.8, 0, len * 0.5 + 0.3), (g) => {
+    g.add("chrome", tube([V4(sd * hw * 0.62, -0.1, len * 0.36), V4(sd * hw * 0.86, -0.06, len * 0.5 + 0.1), V4(sd * hw * 0.74, 0.1, len * 0.5 + 0.62)], 0.06, k.hi ? 10 : 5, 6));
+    g.add("chrome", lathe(prof([[0.06, 0], [0, 0.26]]), 6, 0), M4.trs(sd * hw * 0.74, 0.1, len * 0.5 + 0.6, -0.32, sd * -0.2, 0));
+  });
+  const cz0 = T2.hip.z - 0.42, cz1 = T2.zB - 0.2, cy = T2.rimY + 0.86 * k.s;
+  for (const sd of [-1, 1]) pb.add("steel", tube([V4(sd * T2.wMax * 0.92, T2.rimY, cz0), V4(sd * T2.wMax * 0.7, cy, cz0 + 0.08), V4(sd * T2.wMax * 0.62, cy - 0.04, (cz0 + cz1) / 2), V4(sd * T2.wMax * 0.86, T2.rimY + 0.06, cz1)], 0.04, k.hi ? 16 : 6, 6));
+  pb.add("steel", tube([V4(-T2.wMax * 0.7, cy, cz0 + 0.08), V4(0, cy + 0.05, cz0 + 0.06), V4(T2.wMax * 0.7, cy, cz0 + 0.08)], 0.04, k.hi ? 8 : 4, 6));
+  for (const sd of [-1, 1]) {
+    pb.add("dark", cyl(0.09, 0.11, 0.7, k.hi ? 12 : 6), M4.trs(sd * hw * 0.62, 0.36, -len * 0.42, -0.26, 0, 0));
+    pb.add("copper", torus(0.095, 0.02, 5, k.hi ? 12 : 6), M4.trs(sd * hw * 0.62, 0.69, -len * 0.42 - 0.09, HALF3 - 0.26, 0, 0));
+    if (k.hi) pb.add("glow", new CircleGeometry(0.075, 10), M4.trs(sd * hw * 0.62, 0.66, -len * 0.42 - 0.08, -HALF3 - 0.26, 0, 0));
+  }
+  belly(k, T2.wMax * 1.1, len * 0.5, -T2.hBm - 0.03, -0.02 * len);
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T2) };
+};
+var bomquad = (k) => {
+  const { hw, pb } = k;
+  const R = hw * 1.02, n = k.d === 0 ? 14 : Math.max(28, k.seg);
+  const disc = lathe(prof([[0, -0.5 * hw], [0.5 * R, -0.5 * hw, 1], [0.86 * R, -0.3 * hw], [R, -0.1 * hw, 1], [R, -0.02 * hw, 1], [0.84 * R, 0.14 * hw], [0.62 * R, 0.2 * hw, 1]]), n, 2);
+  disc.rotateX(-HALF3);
+  pb.add("hull", disc);
+  const tub = lathe(prof([[0.62 * R, 0.2 * hw], [0.56 * R, 0.1 * hw], [0.5 * R, -0.36 * hw, 1], [0, -0.36 * hw]]), n, 0);
+  tub.rotateX(-HALF3);
+  pb.add("interior", tub);
+  if (k.hi) {
+    pb.add("chrome", torus(0.62 * R, 0.022, 6, n), M4.trs(0, 0.2 * hw, 0, HALF3, 0, 0));
+    pb.add("hazard", torus(R, 0.035, 5, n), M4.trs(0, -0.06 * hw, 0, HALF3, 0, 0));
+    pb.add("chrome", boltRing(0.92 * R, 16, 0.02, 0), M4.trs(0, -0.02 * hw, 0, -HALF3, 0, 0));
+  }
+  const hip = V4(0, -0.3 * hw, -0.12);
+  seat(k, hip);
+  const P = pilot(k, hip);
+  levers(k, P.hands, -0.36 * hw);
+  dash(k, V4(0, -0.02 * hw, 0.5 * R - 0.1), 0.7, 2, 2, -0.95);
+  windscreen(k, "bubble", V4(0, 0.2 * hw, 0), 0.6 * R, 0.62 * R, 0.6 * R);
+  [[-1, 1], [1, 1], [-1, -1], [1, -1]].forEach(([sx, sz]) => part(k, sx < 0 ? "armL" : "armR", V4(sx * R, 0.2, sz * R), (g) => {
+    const tip = V4(sx * R * 1.16, 0.3 * hw, sz * R * 0.96);
+    g.add("steel", tube([V4(sx * R * 0.56, 0.02, sz * R * 0.5), V4(sx * R * 0.9, 0.24 * hw, sz * R * 0.78), tip], 0.045, k.hi ? 8 : 4, 6));
+    g.add("dark", sphere(0.1, k.hi ? 10 : 6, k.hi ? 8 : 4), M4.trs(tip.x, tip.y, tip.z, 0, 0, 0, 1, 0.8, 1.3));
+    g.add("glow", sphere(0.05, 6, 4), M4.t(tip.x, tip.y, tip.z + sz * 0.11));
+  }));
+  pb.add("glow", torus(0.66 * R, 0.03, 5, n), M4.trs(0, -0.42 * hw, 0, HALF3, 0, 0));
+  for (let i = 0; i < 3; i++) {
+    const a = i / 3 * Math.PI * 2;
+    pb.add("dark", sphere(0.14, k.hi ? 10 : 6, k.hi ? 5 : 3, 0, Math.PI * 2, HALF3, HALF3), M4.t(Math.sin(a) * 0.34 * R, -0.5 * hw, Math.cos(a) * 0.34 * R));
+  }
+  if (k.hi) pb.add("dark", cyl(0.012, 0.016, 0.7, 6), M4.t(-0.5 * R, 0.5, -0.5 * R));
+  return { head: P.head, eye: P.eye, anchors: anchors(k, [V4(-0.5 * R, 0.2 * hw + 0.02, 0.6 * R), V4(0.5 * R, 0.2 * hw + 0.02, 0.6 * R)]) };
+};
+var aldo = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.4, 0.3, 0.3, 3, 0], [-0.44, 0.78, 0.42, 0.42, 3, 0], [-0.32, 0.92, 0.38, 0.48, 3, 0.5], [-0.16, 0.94, 0.33, 0.5, 2.8, 0.58], [-0.02, 0.9, 0.33, 0.48, 2.8, 0.5], [0.1, 0.8, 0.37, 0.43, 2.6, 0], [0.26, 0.6, 0.33, 0.35, 2.5, 0], [0.4, 0.38, 0.23, 0.23, 2.3, 0], [0.5, 0.1, 0.07, 0.08, 2, 0]]);
+  seat(k, T2.hip);
+  const P = pilot(k, T2.hip);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V4(0, T2.rimY - 0.06, T2.zB - 0.16), Math.min(T2.wMax * 1.25, 1.25), 4, 1);
+  windscreen(k, "dome", V4(0, T2.rimY - 0.02, T2.zB - 0.42 * (T2.zB - T2.zA)), T2.wMax * 0.74, 0.34, 0.58);
+  for (const sd of [-1, 1]) part(k, sd < 0 ? "radL" : "radR", V4(sd * hw * 1.1, 0, -0.05 * len), (g) => {
+    g.add("dark", rbox(0.1, 0.5 * hw, 0.36 * len, 0.03), M4.trs(sd * (T2.wMax + 0.06), -0.04 * hw, -0.06 * len, 0, 0, sd * -0.12));
+    const nF = k.hi ? 11 : 4;
+    for (let i = 0; i < nF; i++) g.add("steel", rbox(0.2, 0.46 * hw, 0.014, 4e-3), M4.trs(sd * (T2.wMax + 0.16), -0.04 * hw, -0.06 * len + (i / (nF - 1) - 0.5) * 0.32 * len, 0, sd * 0.42, sd * -0.12));
+    g.add("glow", rbox(0.02, 0.03, 0.34 * len, 6e-3), M4.trs(sd * (T2.wMax + 0.12), 0.23 * hw, -0.06 * len, 0, 0, sd * -0.12));
+  });
+  for (const sd of [-1, 1]) pb.add("copper", tube([V4(sd * 0.3, 0.3 * hw, -0.44 * len), V4(sd * T2.wMax * 0.95, 0.24 * hw, -0.26 * len), V4(sd * (T2.wMax + 0.04), 0.26 * hw, 0.1 * len), V4(sd * hw * 0.5, 0.2 * hw, 0.3 * len)], 0.032, k.hi ? 18 : 6, 6));
+  for (const sd of [-1, 1]) {
+    pb.add("steel", cyl(0.15, 0.15, 0.56, k.hi ? 14 : 7), M4.trs(sd * 0.22, 0.34 * hw + 0.08, -0.43 * len, HALF3, 0, 0));
+    if (k.hi) for (const z of [-0.18, 0.18]) pb.add("copper", torus(0.155, 0.016, 5, 14), M4.t(sd * 0.22, 0.34 * hw + 0.08, -0.43 * len + z));
+    pb.add("dark", cyl(0.05, 0.07, 0.4, k.hi ? 10 : 5), M4.t(sd * 0.5 * hw, 0.4 * hw + 0.16, -0.36 * len));
+    if (k.hi) pb.add("glow", new CircleGeometry(0.04, 8), M4.trs(sd * 0.5 * hw, 0.4 * hw + 0.365, -0.36 * len, -HALF3, 0, 0));
+  }
+  belly(k, T2.wMax, len * 0.48, -T2.hBm - 0.03, -0.02 * len);
+  pb.add("chrome", lathe(prof([[0.06 * hw, 0], [0.04 * hw, 0.12], [0, 0.3]]), k.hi ? 12 : 6, 0), M4.t(0, 0, len * 0.5 - 0.02));
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T2) };
+};
+var teemo = (k) => {
+  const { hw, len, pb } = k;
+  const R = hw, n = k.d === 0 ? 12 : Math.max(24, k.seg);
+  const drum = lathe(prof([[0, -0.54 * hw], [0.7 * R, -0.54 * hw, 1], [0.98 * R, -0.3 * hw, 1], [0.98 * R, 0.2 * hw, 1], [0.8 * R, 0.4 * hw, 1], [0.56 * R, 0.4 * hw, 1]]), n, 2);
+  drum.rotateX(-HALF3);
+  pb.add("hull", drum, M4.trs(0, 0, 0, 0, 0, 0, 1, 1, len / (2 * hw) * 0.9));
+  const sz = len / (2 * hw) * 0.9;
+  const well = lathe(prof([[0.56 * R, 0.4 * hw], [0.52 * R, 0.3 * hw], [0.5 * R, -0.4 * hw, 1], [0, -0.4 * hw]]), n, 0);
+  well.rotateX(-HALF3);
+  pb.add("interior", well, M4.trs(0, 0, 0, 0, 0, 0, 1, 1, sz));
+  for (const sd of [-1, 1]) part(k, sd < 0 ? "plateL" : "plateR", V4(sd * R, 0, 0), (g) => {
+    const a0 = sd > 0 ? 0.25 : Math.PI + 0.25;
+    g.add("steel", lathe(prof([[R + 0.05, -0.24 * hw, 1], [R + 0.05, 0.14 * hw, 1], [R, 0.14 * hw, 1], [R, -0.24 * hw, 1], [R + 0.05, -0.24 * hw]]), k.hi ? 10 : 4, 0, a0, Math.PI - 0.5).rotateX(-HALF3), M4.trs(0, 0, 0, 0, 0, 0, 1, 1, sz));
+    if (k.hi) for (let i = 0; i < 6; i++) {
+      const a = a0 + 0.2 + i * 0.44;
+      g.add("chrome", cyl(0.024, 0.024, 0.02, 6), M4.trs(Math.sin(a) * (R + 0.055), -0.05 * hw, Math.cos(a) * (R + 0.055) * sz, 0, a, HALF3));
+    }
+  });
+  for (const a of [0, 0.62, -0.62]) {
+    pb.add("dark", rbox(0.34, 0.09, 0.05, 0.012), M4.trs(Math.sin(a) * 0.985 * R, 0.27 * hw, Math.cos(a) * 0.985 * R * sz, 0, a, 0));
+    pb.add("glass", rbox(0.28, 0.045, 0.02, 6e-3), M4.trs(Math.sin(a) * R, 0.27 * hw, Math.cos(a) * R * sz, 0, a, 0));
+  }
+  const hip = V4(0, -0.36 * hw, -0.06);
+  seat(k, hip);
+  const P = pilot(k, hip);
+  levers(k, P.hands, -0.4 * hw);
+  dash(k, V4(0, 0.08 * hw, 0.4 * R * sz), 0.52, 2, 1, -1);
+  pb.add("steel", cyl(0.56 * R, 0.56 * R, 0.05, k.hi ? 20 : 10), M4.trs(0, 0.4 * hw + 0.44, -0.56 * R * sz - 0.12, 1.2, 0, 0, 1, 1, 0.92));
+  if (k.hi) {
+    pb.add("chrome", torus(0.09, 0.016, 5, 12, Math.PI), M4.trs(0, 0.4 * hw + 0.5, -0.56 * R * sz - 0.06, 1.2 - HALF3, 0, 0));
+    pb.add("steel", tube([V4(0.3, 0.42 * hw, -0.3 * R * sz), V4(0.34, 0.4 * hw + 0.36, -0.56 * R * sz - 0.04)], 0.018, 4, 5));
+    pb.add("chrome", boltRing(0.5 * R, 10, 0.02, 0), M4.trs(0, 0.4 * hw + 0.46, -0.56 * R * sz - 0.1, 1.2 - HALF3, 0, 0, 1, 1, 1));
+  }
+  for (const sg of [-1, 1]) pb.add("steel", tube([V4(-0.8 * R, -0.2 * hw, sg * 0.66 * R * sz), V4(-0.42 * R, -0.22 * hw, sg * (R * sz + 0.12)), V4(0.42 * R, -0.22 * hw, sg * (R * sz + 0.12)), V4(0.8 * R, -0.2 * hw, sg * 0.66 * R * sz)], 0.05, k.hi ? 12 : 5, 6));
+  pb.add("glow", torus(0.52 * R, 0.026, 5, n), M4.trs(0, -0.56 * hw, 0, HALF3, 0, 0));
+  return { head: P.head, eye: P.eye, anchors: anchors(k, [V4(-0.56 * R, 0.4 * hw + 0.04, 0.5 * R * sz), V4(0.56 * R, 0.4 * hw + 0.04, 0.5 * R * sz)]) };
+};
+var odo = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.7, 0.36, 0.36, 4.2, 0], [-0.44, 0.96, 0.42, 0.42, 4.2, 0], [-0.3, 1, 0.36, 0.44, 4.2, 0.5], [-0.1, 1, 0.32, 0.42, 4.2, 0.58], [0.06, 0.98, 0.3, 0.4, 4.2, 0.5], [0.2, 0.94, 0.34, 0.36, 4, 0], [0.38, 0.86, 0.3, 0.32, 3.8, 0], [0.5, 0.72, 0.2, 0.26, 3.6, 0]]);
+  seat(k, T2.hip);
+  const P = pilot(k, T2.hip);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V4(0, T2.rimY - 0.05, T2.zB - 0.12), Math.min(T2.wMax * 1.2, 1.4), 2, 2);
+  windscreen(k, "wrap", V4(0, T2.rimY - 0.16, T2.zB - 0.36 * (T2.zB - T2.zA)), T2.wMax * 0.9, 0.56, 0.6);
+  const z0 = len * 0.5 + 0.34;
+  part(k, "ram", V4(0, -0.1, z0), (g) => {
+    for (const sd of [-1, 1]) {
+      g.add("steel", rbox(1.5 * hw, 0.46, 0.14, 0.04), M4.trs(sd * 0.7 * hw, -0.16, z0 - 0.16, 0.25, sd * -0.42, 0));
+      g.add("hazard", rbox(1.5 * hw, 0.14, 0.15, 0.03), M4.trs(sd * 0.7 * hw, 0, z0 - 0.13, 0.25, sd * -0.42, 0));
+      const nS = k.hi ? 5 : 2;
+      for (let i = 0; i < nS; i++) g.add("dark", rbox(0.05, 0.05, 0.5, 0.012), M4.trs(sd * (0.2 + i * 1.2 / nS) * hw, -0.36, z0 + 0.14 - i / nS * 0.5, 0.5, 0, 0));
+    }
+    g.add("steel", rbox(0.16, 0.5, 0.2, 0.04), M4.trs(0, -0.14, z0 + 0.14, 0.25, 0, 0));
+  });
+  for (const sd of [-1, 1]) {
+    pb.add("dark", cyl(0.07, 0.07, 0.5, k.hi ? 10 : 6), M4.trs(sd * 0.56 * hw, -0.02, len * 0.5 - 0.16, HALF3, sd * -0.22, 0));
+    pb.add("chrome", cyl(0.04, 0.04, 0.52, k.hi ? 8 : 5), M4.trs(sd * 0.47 * hw, -0.02, len * 0.5 + 0.22, HALF3, sd * -0.22, 0));
+  }
+  const cz0 = T2.hip.z - 0.4, cz1 = T2.zB - 0.16, cy = T2.rimY + 0.84 * k.s;
+  for (const sd of [-1, 1]) {
+    pb.add("steel", tube([V4(sd * T2.wMax * 0.94, T2.rimY, cz0), V4(sd * T2.wMax * 0.78, cy, cz0 + 0.04), V4(sd * T2.wMax * 0.78, cy, cz1 - 0.2), V4(sd * T2.wMax * 0.92, T2.rimY + 0.04, cz1)], 0.045, k.hi ? 14 : 6, 6));
+    pb.add("hazard", rbox(0.03, 0.2 * hw, 0.3 * len, 8e-3), M4.t(sd * (T2.wMax + 0.012), -0.06 * hw, -0.1 * len));
+  }
+  for (const z of [cz0 + 0.04, cz1 - 0.2]) pb.add("steel", tube([V4(-T2.wMax * 0.78, cy, z), V4(T2.wMax * 0.78, cy, z)], 0.04, 2, 6));
+  pb.add("steel", rbox(1.9 * hw, 0.16, 0.14, 0.04), M4.t(0, -0.2 * hw, -len * 0.5 - 0.08));
+  if (k.hi) for (const sd of [-1, 1]) pb.add("glow", rbox(0.2, 0.06, 0.03, 0.01), M4.t(sd * 0.7 * hw, -0.2 * hw, -len * 0.5 - 0.16));
+  belly(k, T2.wMax * 1.1, len * 0.5, -T2.hBm - 0.03, -0.02 * len);
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T2) };
+};
+var cyclone = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.62, 0.36, 0.4, 3.6, 0], [-0.42, 0.9, 0.42, 0.5, 3.6, 0], [-0.3, 1, 0.4, 0.56, 3.6, 0.5], [-0.1, 1, 0.36, 0.57, 3.6, 0.6], [0.08, 0.96, 0.36, 0.55, 3.4, 0.5], [0.22, 0.86, 0.42, 0.5, 3, 0], [0.38, 0.62, 0.36, 0.4, 2.6, 0], [0.5, 0.3, 0.2, 0.22, 2.3, 0]]);
+  seat(k, T2.hip);
+  const P = pilot(k, T2.hip);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V4(0, T2.rimY - 0.05, T2.zB - 0.14), Math.min(T2.wMax * 1.25, 1.4), 4, 1);
+  windscreen(k, "dome", V4(0, T2.rimY - 0.02, T2.zB - 0.4 * (T2.zB - T2.zA)), T2.wMax * 0.8, 0.4, 0.62);
+  const hz = T2.hip.z - 0.46, hy = T2.rimY + 0.82 * k.s;
+  pb.add("steel", tube([V4(-T2.wMax * 0.9, T2.rimY - 0.04, hz), V4(-T2.wMax * 0.66, hy, hz), V4(0, hy + 0.07, hz), V4(T2.wMax * 0.66, hy, hz), V4(T2.wMax * 0.9, T2.rimY - 0.04, hz)], 0.045, k.hi ? 18 : 6, 6));
+  if (k.hi) {
+    pb.add("dark", cyl(0.05, 0.06, 0.08, 8), M4.t(0, hy + 0.13, hz));
+    pb.add("glow", sphere(0.045, 8, 6), M4.t(0, hy + 0.2, hz));
+  }
+  const bz0 = -len * 0.4, bz1 = -len * 0.5 - 1.3, by = 0.1 * hw;
+  for (const sd of [-1, 1]) {
+    pb.add("steel", tube([V4(sd * hw * 0.6, by, bz0), V4(sd * hw * 0.68, by + 0.16, (bz0 + bz1) / 2), V4(sd * hw * 0.68, by + 0.24, bz1)], 0.06, k.hi ? 10 : 4, 6));
+    if (k.hi) pb.add("steel", tube([V4(sd * hw * 0.66, by + 0.12, (bz0 + bz1) / 2 + 0.1), V4(sd * hw * 0.4, T2.rimY, -len * 0.47)], 0.025, 2, 5));
+  }
+  part(k, "tail", V4(0, by + 0.3, bz1), (g) => {
+    g.add("hull", rbox(hw * 1.72, 0.05, 0.44, 0.015), M4.t(0, by + 0.26, bz1 - 0.05), SEC3);
+    for (const sd of [-1, 1]) g.add("hull", fin([[0, 0], [0.52, 0], [0.3, 0.54], [0.06, 0.58]], 0.04), M4.t(sd * hw * 0.68, by + 0.27, bz1 - 0.3), SEC3);
+    if (k.hi) for (const sd of [-1, 1]) g.add("glow", sphere(0.03, 6, 4), M4.t(sd * hw * 0.68, by + 0.86, bz1 - 0.2));
+  });
+  for (const sd of [-1, 1]) {
+    pb.add("steel", tube([V4(sd * hw * 0.62, -T2.hBm - 0.02, len * 0.34), V4(sd * hw * 0.66, -T2.hBm - 0.09, len * 0.24), V4(sd * hw * 0.66, -T2.hBm - 0.09, -len * 0.3), V4(sd * hw * 0.62, -T2.hBm - 0.03, -len * 0.38)], 0.032, k.hi ? 12 : 5, 5));
+    if (k.hi) for (const z of [0.16, -0.2]) pb.add("steel", cyl(0.022, 0.022, 0.14, 5), M4.t(sd * hw * 0.64, -T2.hBm - 0.02, len * z));
+  }
+  belly(k, T2.wMax * 0.9, len * 0.44, -T2.hBm - 0.03, -0.02 * len);
+  if (k.hi) for (const sd of [-1, 1]) pb.add("glow", rbox(0.16, 0.05, 0.03, 0.01), M4.t(sd * hw * 0.34, 0.02, len * 0.49));
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T2) };
+};
+var halo = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.04, 0.04, 0.04, 2.2, 0], [-0.4, 0.4, 0.2, 0.3, 2.3, 0], [-0.26, 0.78, 0.22, 0.48, 2.4, 0.62], [-0.08, 0.94, 0.2, 0.54, 2.5, 0.7], [0.1, 0.9, 0.2, 0.52, 2.5, 0.66], [0.26, 0.66, 0.22, 0.42, 2.4, 0], [0.4, 0.34, 0.18, 0.26, 2.2, 0], [0.5, 0.05, 0.05, 0.05, 2, 0]]);
+  const lean = 0.22;
+  seat(k, T2.hip, lean);
+  const P = pilot(k, T2.hip, lean);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V4(0, T2.rimY - 0.04, T2.zB - 0.14), Math.min(T2.wMax * 1.2, 1), 2, 2);
+  windscreen(k, "bubble", V4(0, T2.rimY - 0.03, (T2.zA + T2.zB) * 0.5 - 0.04), T2.wMax * 0.94, 0.8 * k.s, (T2.zB - T2.zA) * 0.57);
+  const ax = hw * 1.26, az = len * 0.57, ry = T2.rimY - 0.02, n = k.hi ? 40 : 14;
+  const ring = (r2, y) => M4.trs(0, y, 0, HALF3, 0, 0, ax * r2, az * r2, 1);
+  pb.add("hull", torus(1, 0.036, 6, n), ring(1, ry), SEC3);
+  pb.add("glow", torus(1, 0.011, 4, n), ring(1, ry + 0.04));
+  for (const sd of [-1, 1]) {
+    pb.add("steel", rbox(ax - T2.wMax + 0.1, 0.05, 0.14, 0.015), M4.t(sd * (ax + T2.wMax) / 2, ry, 0));
+    pb.add("steel", rbox(0.1, 0.05, 0.2, 0.015), M4.t(0, ry, sd * (az - 0.08)));
+  }
+  part(k, "arch", V4(0, ry + 1, T2.hip.z), (g) => {
+    g.add("chrome", torus(1, 0.03, 6, k.hi ? 28 : 10, Math.PI), M4.trs(0, ry, T2.hip.z - 0.08, 0, 0, 0, ax, 1.06 * k.s + 0.1, 1));
+    if (k.hi) g.add("glow", sphere(0.035, 8, 6), M4.t(0, ry + 1.06 * k.s + 0.14, T2.hip.z - 0.08));
+  });
+  pb.add("chrome", lathe(prof([[0, -0.6], [0.03, -0.2], [0.05, 0]]), k.hi ? 10 : 6, 0), M4.t(0, 0, -len * 0.5 + 0.03));
+  for (const sd of [-1, 1]) pb.add("hull", fin([[0, 0], [0.4, 0], [0.12, 0.3]], 0.03), M4.trs(sd * 0.06, 0.04, -len * 0.47, 0, 0, sd * -0.9), SEC3);
+  belly(k, T2.wMax * 0.8, len * 0.42, -T2.hBm - 0.03, 0);
+  const a = 0.62;
+  return { head: P.head, eye: P.eye, anchors: anchors(k, [V4(-Math.sin(a) * ax, ry + 0.07, Math.cos(a) * az), V4(Math.sin(a) * ax, ry + 0.07, Math.cos(a) * az)]) };
+};
+var manta = (k) => {
+  const { hw, len, pb } = k;
+  const T2 = shell(k, [[-0.5, 0.86, 0.2, 0.3, 3.4, 0], [-0.42, 1, 0.26, 0.4, 3.4, 0], [-0.26, 0.98, 0.26, 0.46, 3.2, 0.56], [-0.06, 0.86, 0.24, 0.48, 3, 0.62], [0.12, 0.66, 0.24, 0.44, 2.8, 0.5], [0.26, 0.46, 0.26, 0.36, 2.6, 0], [0.4, 0.24, 0.16, 0.22, 2.4, 0], [0.5, 0.04, 0.04, 0.05, 2, 0]]);
+  const hip = V4(0, T2.floorY * 0.42, T2.hip.z - 0.08), lean = 0.42;
+  seat(k, hip, lean);
+  const P = pilot(k, hip, lean);
+  levers(k, P.hands, T2.floorY);
+  dash(k, V4(0, T2.rimY - 0.04, T2.zB - 0.12), Math.min(T2.wMax * 1.1, 1.3), 4, 1, -0.8);
+  windscreen(k, "wrap", V4(0, T2.rimY - 0.2, T2.zB - 0.36 * (T2.zB - T2.zA)), T2.wMax * 0.9, 0.66, 0.86);
+  for (const sd of [-1, 1]) part(k, sd < 0 ? "deltaL" : "deltaR", V4(sd * hw * 1.1, 0, -0.2 * len), (g) => {
+    const w = extrude([[0, 0], [0.62 * hw, 0.74 * len], [0.7 * hw, 0.9 * len], [0, 0.82 * len]], 0.04, 0.012);
+    w.rotateX(-HALF3);
+    const m = M4.trs(sd * hw * 0.5, -0.06, 0.4 * len, 0, 0, sd * -0.07);
+    if (sd < 0) m.multiply(M4.mirrorX());
+    g.add("hull", w, m, SEC3);
+    if (k.hi) g.add("glow", sphere(0.03, 6, 4), M4.t(sd * hw * 1.18, -0.11, -0.47 * len));
+  });
+  for (const sd of [-1, 1]) part(k, sd < 0 ? "finL" : "finR", V4(sd * hw * 0.62, 0.4, -0.4 * len), (g) => g.add("hull", fin([[0, 0], [0.74, 0], [0.2, 0.52], [0.02, 0.55]], 0.04), M4.t(sd * hw * 0.62, 0.2 * hw, -0.5 * len + 0.02), SEC3));
+  pb.add("dark", rbox(hw * 1.5, 0.1, 0.05, 0.015), M4.t(0, 0, -len * 0.5 - 0.01));
+  pb.add("glow", rbox(hw * 1.36, 0.04, 0.03, 8e-3), M4.t(0, 0, -len * 0.5 - 0.03));
+  pb.add("chrome", lathe(prof([[0.04, 0], [0.026, 0.2], [0, 0.5]]), k.hi ? 10 : 6, 0), M4.t(0, 0, len * 0.5 - 0.03));
+  pb.add("hull", loft([{ z: -0.5, w: 0.03, hT: 0.02, hB: 0.02 }, { z: -0.3, w: 0.2, hT: 0.2, hB: 0.06 }, { z: 0, w: 0.24, hT: 0.26, hB: 0.06 }, { z: 0.2, w: 0.06, hT: 0.05, hB: 0.03 }], k.hi ? 12 : 6, 3), M4.t(0, T2.rimY + 0.02, T2.zA + 0.34));
+  belly(k, T2.wMax * 0.9, len * 0.5, -T2.hBm - 0.03, -0.08 * len);
+  return { head: P.head, eye: P.eye, anchors: tubAnchors(k, T2) };
+};
+var volt = (k) => {
+  const { hw, pb } = k;
+  const r2 = hw * 0.86, cy = 0.06, n = k.hi ? 36 : 12, tr = 0.028, yaw = 0.72, ri = r2 - 0.05, m = k.hi ? 8 : 4;
+  const bowl = [];
+  for (let i = 0; i <= m; i++) {
+    const a = i / m * HALF3;
+    bowl.push([r2 * Math.sin(a), cy - r2 * Math.cos(a)]);
+  }
+  bowl[m][2] = 1;
+  bowl.push([ri, cy, 1]);
+  const aF = Math.acos(Math.min(0.99, (cy + 0.5 * hw) / ri));
+  for (let i = m - 1; i >= 1; i--) {
+    const a = aF + (HALF3 - aF) * (i / m);
+    bowl.push([ri * Math.sin(a), cy - ri * Math.cos(a)]);
+  }
+  bowl.push([ri * Math.sin(aF), -0.5 * hw, 1], [0, -0.5 * hw]);
+  pb.add("hull", lathe(prof(bowl), n, 2).rotateX(-HALF3));
+  pb.add("steel", torus(r2, tr * 1.2, 6, n), M4.trs(0, cy, 0, HALF3, 0, 0));
+  pb.add("glass", sphere(r2 * 0.985, n, k.hi ? 10 : 5, 0, Math.PI * 2, 0, HALF3), M4.t(0, cy, 0));
+  pb.add("hull", sphere(r2 * 0.995, k.hi ? 14 : 6, k.hi ? 4 : 2, Math.PI * 1.5 - 0.9, 1.8, Math.acos(0.4), HALF3 - Math.acos(0.4)), M4.t(0, cy, 0), SEC3);
+  const arc = (ry, a = Math.PI) => pb.add("steel", torus(r2, tr, 6, Math.max(6, Math.round(n * a / (Math.PI * 2))), a), M4.trs(0, cy, 0, 0, ry, 0));
+  arc(0);
+  for (const sd of [-1, 1]) arc(HALF3 + sd * yaw);
+  for (const b of k.hi ? [-0.5, 0, 0.5] : [0]) arc(HALF3 + b, HALF3);
+  pb.add("steel", torus(r2 * Math.sqrt(1 - 0.72 * 0.72), tr * 0.8, 5, n), M4.trs(0, cy + 0.72 * r2, 0, HALF3, 0, 0));
+  pb.add("steel", torus(r2 * Math.sqrt(1 - 0.4 * 0.4), tr * 0.8, 5, Math.max(6, n >> 1), Math.PI), M4.trs(0, cy + 0.4 * r2, 0, -HALF3, 0, 0));
+  if (k.hi) for (const a of [yaw, -yaw, HALF3, -HALF3, Math.PI - yaw, yaw - Math.PI]) pb.add("copper", sphere(0.05, 8, 6), M4.t(Math.sin(a) * r2, cy, Math.cos(a) * r2));
+  const hip = V4(0, -0.3 * hw, -0.1);
+  seat(k, hip);
+  const P = pilot(k, hip);
+  levers(k, P.hands, -0.5 * hw);
+  pb.add("dark", rbox(0.5, 0.3, 0.16, 0.03), M4.t(0, hip.y + 0.2, hip.z - 0.36));
+  if (k.hi) {
+    for (const sd of [-1, 1]) {
+      pb.add("copper", torus(0.07, 0.02, 5, 10), M4.trs(sd * 0.14, hip.y + 0.42, hip.z - 0.36, HALF3, 0, 0));
+      pb.add("glow", sphere(0.022, 6, 4), M4.t(sd * 0.2, hip.y + 0.26, hip.z - 0.27));
+    }
+    pb.add("rubber", tube([V4(0, hip.y + 0.36, hip.z - 0.4), V4(0, cy + 0.5 * r2, -0.8 * r2), V4(0, cy + 0.9 * r2, -0.36 * r2), V4(0, cy + r2 - 0.02, -0.04)], 0.022, 10, 5));
+  }
+  dash(k, V4(0, cy + 0.01, r2 * 0.68), 0.46, 2, 1, -1.05);
+  pb.add("steel", tube([V4(0, -0.5 * hw, r2 * 0.36), V4(0, cy - 0.2, r2 * 0.6), V4(0, cy - 0.03, r2 * 0.68)], 0.03, 6, 6));
+  pb.add("dark", cyl(0.07, 0.09, 0.08, 10), M4.t(0, cy + r2 + 0.02, 0));
+  part(k, "mast", V4(0, cy + r2 + 0.7, 0), (g) => {
+    g.add("chrome", cyl(0.012, 0.028, 1.3, 6), M4.t(0, cy + r2 + 0.68, 0));
+    for (let i = 0; i < 3; i++) g.add("dark", torus(0.07 - i * 0.015, 0.014, 5, k.hi ? 12 : 6), M4.trs(0, cy + r2 + 0.32 + i * 0.3, 0, HALF3, 0, 0));
+    g.add("glow", sphere(0.04, 8, 6), M4.t(0, cy + r2 + 1.35, 0));
+  });
+  {
+    const rg = 0.34 * hw, a = Math.asin(rg / r2);
+    pb.add("glow", torus(rg, 0.02, 5, n), M4.trs(0, cy - r2 * Math.cos(a) - 0.012, 0, HALF3, 0, 0));
+  }
+  return { head: P.head, eye: P.eye, anchors: anchors(k, [V4(-Math.sin(yaw) * r2, cy + 0.07, Math.cos(yaw) * r2), V4(Math.sin(yaw) * r2, cy + 0.07, Math.cos(yaw) * r2)]) };
+};
+var DESIGNS = { aurora, mavik, rattis, elana, gasvaro, brute, bomquad, aldo, teemo, odo, cyclone, halo, manta, volt };
+function lampGeo(at, n) {
+  const q = new Quaternion().setFromUnitVectors(V4(0, 0, 1), n.clone().normalize());
+  const list = at.map((p) => {
+    const g = new CircleGeometry(0.024, LAMP_VERTS - 2);
+    g.deleteAttribute("uv");
+    g.applyMatrix4(new Matrix4().compose(p.clone().addScaledVector(n, 4e-3), q, V4(1, 1, 1)));
+    return g;
+  });
+  const mg = mergeGeometries(list, false);
+  list.forEach((g) => g.dispose());
+  mg.setAttribute("color", new BufferAttribute(new Float32Array(mg.attributes.position.count * 3).fill(0.05), 3));
+  mg.computeBoundingSphere();
+  return mg;
+}
+var cockpitCache = /* @__PURE__ */ new Map();
+function cockpitGeo(L, seg, head = "goggles", detail = 1) {
+  const c = L.cockpit, id = c.design ?? "";
+  const key = `${id}|${c.hw}|${c.len}|${c.pilot}|${head}|${seg}|${detail}`;
+  const hit = cockpitCache.get(key);
+  if (hit) return hit;
+  const design = DESIGNS[id];
+  if (!design) throw new Error(`No cockpit design "${id}" \u2013 add it to DESIGNS in src/game/podCockpits.ts and name it in the pod's layout`);
+  const k = { pb: new PartBuilder(), pp: new PartBuilder(), hw: c.hw, len: c.len, s: c.pilot, seg, d: detail, head, hi: detail >= 1, ultra: detail >= 2, lampAt: [], lampN: V4(0, 1, 0), breaks: [] };
+  const info = design(k);
+  if (k.lampAt.length !== 3) throw new Error(`cockpit design "${id}" has no dashboard (three live lamps are required)`);
+  const out = { parts: k.pb.build(), pilot: k.pp.build(), lamps: lampGeo(k.lampAt, k.lampN), lampCount: 3, breakParts: k.breaks, info };
   cockpitCache.set(key, out);
   return out;
 }
 
-// src/game/podTextures.ts
+// ../../src/game/podLayouts.ts
+var V5 = (x, y, z) => new Vector3(x, y, z);
+var spec = (L, R, style, bands, blades, spike = true, fins = 0) => ({ L, R, style, bands, blades, spike, fins });
+var pair = (s, sp, y, z) => [{ spec: s, x: -sp, y, z }, { spec: s, x: sp, y, z }];
+var MAIN = [{ a: 0, b: 1 }];
+var raised = (y, up) => ({ y: y + up, keel: up });
+var SEC4 = [0, 0, 3];
+var SIDES = [-1, 1];
+var LR = (sd) => sd < 0 ? "L" : "R";
+var plate = (pts, t) => {
+  const g = extrude(pts, t, Math.min(0.012, t * 0.3));
+  g.rotateY(-Math.PI / 2);
+  return g;
+};
+var LAYOUTS = {
+  aurora: () => {
+    const s = spec(9, 1.15, "turbine", 6, 18);
+    return {
+      engines: pair(s, 2.5, 0, 4),
+      cockpit: { style: "pod", hw: 0.95, len: 3.4, ...raised(0.1, 0.9), z: -6, pilot: 1 },
+      binders: MAIN,
+      livery: 0,
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) for (const s2 of SIDES) {
+          const cx = sd * 2.5 + s2 * 1.5, tip = sd * 2.5 + s2 * 1.97;
+          pb.brk((s2 === sd ? "wing" : "inner") + LR(sd), () => {
+            pb.add("hull", rbox(0.95, 0.08, 8.2, 0.03), M4.trs(cx, -0.32, 4, 0, 0, s2 * -0.12), SEC4);
+            pb.add("steel", rbox(0.06, 0.12, 8.3, 0.02), M4.trs(tip, -0.38, 4, 0, 0, s2 * -0.12));
+            pb.add("dark", lathe(prof([[0, -0.5], [0.07, -0.3], [0.08, 0.3], [0, 0.56]]), hi ? 10 : 6, 0), M4.t(tip, -0.34, 7.9));
+            pb.add("glow", sphere(0.05, 6, 4), M4.t(tip, -0.34, 8.47));
+            if (hi) {
+              for (let i = 0; i < 5; i++) pb.add("steel", rbox(0.016, 0.07, 0.2, 4e-3), M4.trs(cx, -0.25, 1.4 + i * 1.3, 0, s2 * 0.3, s2 * -0.12));
+              for (const z of [1.6, 6.4]) pb.add("steel", tube([V5(sd * 2.5 + s2 * 0.86, -0.72, z), V5(cx, -0.38, z)], 0.035, 2, 5));
+            }
+          });
+        }
+      },
+      // the wing plates reach further out and lower than the turbines
+      extraCircles: SIDES.flatMap((sd) => [2.5, -2.5].map((f) => ({ x: sd * 4, z: 4 + f, r: 0.6, side: sd }))),
+      envelope: { outerX: 4.45, minY: -0.62 }
+    };
+  },
+  brute: () => {
+    const s = spec(8, 1.5, "split", 7, 20, false);
+    return {
+      engines: pair(s, 2.4, 0, 2),
+      cockpit: { style: "wedge", hw: 1.1, len: 3, ...raised(0.25, 1), z: -9, pilot: 1.05, far: "cage" },
+      binders: MAIN,
+      livery: 2,
+      engineExtras: (pb, _L, hi) => {
+        const fin2 = extrude([[0, 0], [2.2, 0], [2.7, 2.7], [1.6, 2.7]], 0.12, 0.03);
+        fin2.rotateY(Math.PI / 2);
+        pb.brk("fin", () => {
+          pb.add("hull", fin2, M4.t(-2.4, 1.45, 1.2), SEC4);
+          pb.add("steel", rbox(0.3, 0.4, 1.6, 0.05), M4.t(-2.4, 1.6, 0.2));
+        });
+        for (const sd of SIDES) {
+          for (const [ax, ay] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) pb.add("chrome", lathe(prof([[0.085, 0], [0.05, 0.35], [0, 0.9]]), hi ? 8 : 5, 0), M4.trs(sd * 2.4 + ax * 1, ay * 1, 5.25, ay * -0.16, ax * 0.16, 0));
+          pb.add("dark", rbox(1.5, 0.07, 3, 0.025), M4.t(sd * 2.4, -1.6, 1.6));
+          if (hi) for (const z of [0.4, 2.8]) pb.add("steel", rbox(1.56, 0.1, 0.12, 0.02), M4.t(sd * 2.4, -1.61, z));
+        }
+        pb.brk("stub", () => pb.add("hull", plate([[0, 0], [1.3, 0], [0.5, 0.8], [0.1, 0.84]], 0.08), M4.t(2.4, 1.46, 0.2), SEC4));
+      }
+    };
+  },
+  gasvaro: () => {
+    const s = spec(6, 0.8, "quad", 4, 12);
+    return {
+      engines: [...pair(s, 1.6, 0, 3), ...pair(s, 3.4, 0, 3), ...pair(s, 2.5, 1.55, 4)],
+      cockpit: { style: "long", hw: 0.75, len: 3.6, ...raised(0, 0.8), z: -7, pilot: 0.95 },
+      binders: MAIN,
+      livery: 1,
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
+          pb.add("steel", tube([V5(sd * 1.6, 0.7, 3.4), V5(sd * 2.05, 1.3, 3.7), V5(sd * 2.5, 2.1, 4)], 0.07, 12, 8));
+          pb.add("steel", tube([V5(sd * 3.4, 0.7, 3.4), V5(sd * 2.95, 1.3, 3.7), V5(sd * 2.5, 2.1, 4)], 0.07, 12, 8));
+          pb.add("steel", tube([V5(sd * 1.6, 0.7, 1.2), V5(sd * 2.5, 1, 1.7), V5(sd * 3.4, 0.7, 1.2)], 0.06, hi ? 10 : 5, 6));
+          pb.brk("manifold" + LR(sd), () => {
+            pb.add("copper", tube([V5(sd * 1.6, 0.86, 0.5), V5(sd * 2.5, 1.26, 0.9), V5(sd * 2.5, 2.3, 1.5)], 0.05, hi ? 12 : 6, 6));
+            pb.add("copper", tube([V5(sd * 3.4, 0.86, 0.5), V5(sd * 2.9, 1.1, 0.75), V5(sd * 2.5, 1.26, 0.9)], 0.05, hi ? 8 : 4, 6));
+            pb.add("dark", sphere(0.14, hi ? 10 : 6, hi ? 8 : 4), M4.t(sd * 2.5, 1.26, 0.9));
+            if (hi) for (const x of [1.6, 3.4]) pb.add("chrome", torus(0.09, 0.02, 5, 10), M4.trs(sd * x, 0.82, 0.5, Math.PI / 2, 0, 0));
+          });
+          pb.add("steel", tube([V5(sd * 1.6, -0.2, 5), V5(sd * 3.4, -0.2, 5)], 0.05, 2, 6));
+        }
+      },
+      flameOut: { engCL: [4], engCR: [5], engBL: [2], engBR: [3] }
+      // first the upper engine of a side goes out, then the outer one
+    };
+  },
+  bomquad: () => {
+    const s = spec(7.6, 0.66, "ring", 5, 12);
+    return {
+      engines: [{ spec: s, x: -2.3, y: -0.35, z: 3 }, { spec: s, x: 2.3, y: -0.35, z: 3 }, { spec: s, x: -2.3, y: 2.05, z: 3 }, { spec: s, x: 2.3, y: 2.05, z: 3 }],
+      cockpit: { style: "saucer", hw: 1, len: 2.4, ...raised(0.2, 0.65), z: -6, pilot: 0.95, far: "disc" },
+      binders: [{ a: 0, b: 3 }, { a: 2, b: 1 }],
+      arcLoss: { arcL: [0], arcR: [1] },
+      livery: 3,
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
+          for (const z of [1, 4.8]) pb.add("steel", tube([V5(sd * 2.3, 0.35, z), V5(sd * 2.3, 1.35, z)], 0.08, 4, 6));
+          pb.add("steel", tube([V5(sd * 2.3, 0.34, 1), V5(sd * 2.3, 1.36, 4.8)], 0.035, 2, 5));
+          pb.add("steel", tube([V5(sd * 2.3, 1.36, 1), V5(sd * 2.3, 0.34, 4.8)], 0.035, 2, 5));
+          for (const y of [-0.35, 2.05]) {
+            pb.add("chrome", lathe(prof([[0.06, 0], [0.035, 0.3], [0, 0.62]]), hi ? 8 : 5, 0), M4.trs(sd * (2.3 - 0.6), y + 0.13, 3.91, 0, sd * -Math.PI / 2, 0));
+            if (hi) pb.add("copper", torus(0.1, 0.022, 5, 12), M4.trs(sd * (2.3 - 0.7), y + 0.13, 3.91, 0, Math.PI / 2, 0));
+          }
+        }
+      }
+    };
+  },
+  mavik: () => {
+    const s = spec(8, 0.62, "needle", 6, 10);
+    return {
+      engines: pair(s, 1.7, 0, 3),
+      cockpit: { style: "pod", hw: 0.72, len: 2.5, ...raised(-0.05, 0.8), z: -5.5, pilot: 0.92, far: "fin" },
+      binders: MAIN,
+      livery: 1,
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
+          pb.brk("canard" + LR(sd), () => {
+            for (const a of [1.05, -1.05]) pb.add("hull", plate([[0, 0], [0.9, 0], [0.1, 0.5], [-0.12, 0.5]], 0.035), M4.trs(sd * 1.7 + Math.sin(a) * 0.56, Math.cos(a) * 0.56, 5.3, 0, 0, -a), SEC4);
+          });
+          pb.add("chrome", tube([V5(sd * 2.34, 0.06, 4.6), V5(sd * 2.36, 0.06, 8.2)], 0.018, 2, 5));
+          pb.add("dark", cyl(0.04, 0.04, 0.2, 6), M4.trs(sd * 2.3, 0.06, 4.7, 0, 0, Math.PI / 2));
+          pb.add("hull", plate([[0, 0], [1.7, 0], [1.3, -0.16], [0.2, -0.16]], 0.03), M4.t(sd * 1.7, -0.6, 0.6), SEC4);
+          if (hi) pb.add("glow", sphere(0.03, 6, 4), M4.t(sd * 2.36, 0.06, 8.24));
+        }
+      }
+    };
+  },
+  rattis: () => {
+    const s = spec(6, 0.85, "blade", 4, 14);
+    return {
+      engines: pair(s, 1.7, 0, 2.5),
+      cockpit: { style: "wedge", hw: 0.78, len: 2.6, ...raised(-0.1, 0.85), z: -3.2, pilot: 0.92, viewScale: 1.9 },
+      binders: MAIN,
+      livery: 2,
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
+          for (const a of SIDES) {
+            pb.brk("feeler" + LR(sd), () => {
+              pb.add("dark", tube([V5(sd * 1.7 + a * 0.2, 0.86, 4.6), V5(sd * 1.7 + a * 0.42, 1.3, 5.3), V5(sd * 1.7 + a * 0.56, 1.42, 6.1)], 0.018, hi ? 8 : 4, 4));
+              pb.add("glow", sphere(0.035, 6, 4), M4.t(sd * 1.7 + a * 0.56, 1.42, 6.1));
+            });
+            pb.add("steel", tube([V5(sd * 1.7 + a * 0.42, -0.86, 0.6), V5(sd * 1.7 + a * 0.46, -1, 1.4), V5(sd * 1.7 + a * 0.46, -1, 3.6), V5(sd * 1.7 + a * 0.42, -0.86, 4.4)], 0.035, hi ? 10 : 5, 5));
+          }
+          if (hi) for (const z of [0.9, 1.4]) pb.add("hazard", torus(0.86, 0.035, 5, 20), M4.t(sd * 1.7, 0, z));
+        }
+      }
+    };
+  },
+  aldo: () => {
+    const s = spec(9, 1, "long", 7, 16, true, 6);
+    return {
+      engines: pair(s, 2.3, 0, 3.5),
+      cockpit: { style: "long", hw: 0.85, len: 3.2, ...raised(0, 0.9), z: -6, pilot: 1 },
+      binders: MAIN,
+      livery: 0,
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
+          const x = sd * 2.3;
+          pb.brk("loop" + LR(sd), () => {
+            pb.add("copper", tube([V5(x, 1.02, 0.4), V5(x + 0.34, 1.4, 1.1), V5(x, 1.5, 1.9), V5(x - 0.34, 1.4, 2.7), V5(x, 1.5, 3.5), V5(x + 0.34, 1.4, 4.3), V5(x, 1.02, 5)], 0.055, hi ? 26 : 10, 6));
+            if (hi) for (const z of [1.1, 2.7, 4.3]) pb.add("dark", torus(0.075, 0.02, 5, 10), M4.trs(x + (z === 2.7 ? -0.34 : 0.34), 1.4, z, 0, 0, 0));
+          });
+          pb.add("steel", cyl(0.17, 0.17, 2.2, hi ? 12 : 6).rotateX(Math.PI / 2), M4.t(x, -1, 3.2));
+          for (const z of [2.2, 4.2]) pb.add("dark", sphere(0.17, hi ? 10 : 6, hi ? 6 : 3), M4.t(x, -1, z));
+          pb.brk("vane" + LR(sd), () => {
+            for (const a of SIDES) pb.add("hull", plate([[0, 0], [1.4, 0], [1.2, 0.5], [0.1, 0.42]], 0.035), M4.trs(x + a * 0.72, 0.72, -0.9, 0, 0, a * -0.75), SEC4);
+          });
+          if (hi) pb.add("glow", rbox(0.03, 0.03, 1.8, 8e-3), M4.t(x, -1.18, 3.2));
+        }
+      }
+    };
+  },
+  teemo: () => {
+    const s = spec(5, 1.25, "heavy", 4, 20, true);
+    return {
+      engines: [{ spec: s, x: -2.3, y: -0.4, z: 0 }, { spec: s, x: 2.3, y: -0.4, z: 0 }, { spec: s, x: -2.3, y: 1.45, z: 6 }, { spec: s, x: 2.3, y: 1.45, z: 6 }],
+      cockpit: { style: "saucer", hw: 0.82, len: 2.2, ...raised(0.35, 0.6), z: -5.5, pilot: 0.95, far: "disc" },
+      binders: MAIN,
+      livery: 3,
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
+          pb.add("dark", rbox(0.3, 0.3, 3.6, 0.06), M4.trs(sd * 2.3, 0.55, 3, -0.31, 0, 0));
+          pb.add("hazard", rbox(0.32, 0.06, 1.2, 0.02), M4.trs(sd * 2.3, 0.73, 3, -0.31, 0, 0));
+          pb.brk("skirt" + LR(sd), () => {
+            pb.add("steel", rbox(0.07, 1.5, 3.4, 0.025), M4.trs(sd * 3.6, -0.5, 0, 0, 0, sd * 0.08));
+            if (hi) for (let i = 0; i < 5; i++) pb.add("chrome", cyl(0.035, 0.035, 0.03, 6), M4.trs(sd * 3.645, -0.1, -1.4 + i * 0.7, 0, 0, Math.PI / 2));
+          });
+          pb.add("dark", rbox(0.22, 0.22, 3.2, 0.05), M4.trs(sd * 2.3 + sd * 0.7, 0.2, 2.6, -0.31, 0, 0));
+          for (const a of SIDES) pb.add("chrome", lathe(prof([[0.09, 0], [0.05, 0.3], [0, 0.7]]), hi ? 8 : 5, 0), M4.t(sd * 2.3 + a * 0.8, 1.45 + 0.8, 8.3));
+        }
+      },
+      flameOut: { engUL: [2], engUR: [3] }
+      // the upper engine of a side goes out late
+    };
+  },
+  elana: () => {
+    const s = spec(8.5, 0.78, "needle", 6, 12);
+    return {
+      engines: pair(s, 2, 0, 3),
+      cockpit: { style: "long", hw: 0.8, len: 3.3, ...raised(0, 0.8), z: -6, pilot: 0.95, topY: 1.42, far: "fin" },
+      binders: MAIN,
+      livery: 1,
+      // (dorsal fin = part of the cockpit design)
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
+          for (const a of [0, 2.1, -2.1]) pb.add("hull", plate([[0, 0], [0.95, 0], [0.1, 0.42], [-0.3, 0.4]], 0.03), M4.trs(sd * 2 + Math.sin(a) * 0.62, Math.cos(a) * 0.62, -0.9, 0, 0, -a), SEC4);
+          const w = extrude([[0, 0], [0.5, 0.42], [0.54, 0.66], [0.34, 0.62], [0, 0.32]], 0.03, 0.01);
+          w.rotateX(-Math.PI / 2);
+          const m = M4.trs(sd * 2.7, 0, 4.4, 0, 0, sd * 0.1);
+          if (sd < 0) m.multiply(M4.mirrorX());
+          pb.add("hull", w, m, SEC4);
+          if (hi) pb.add("chrome", torus(0.8, 0.02, 5, 22), M4.t(sd * 2, 0, 4.9));
+        }
+      }
+    };
+  },
+  odo: () => {
+    const s = spec(7, 1.3, "heavy", 5, 16, false);
+    return {
+      engines: pair(s, 2.4, 0, 3),
+      cockpit: { style: "wedge", hw: 1, len: 2.8, ...raised(0, 1.05), z: -5.5, pilot: 1, far: "cage" },
+      binders: MAIN,
+      livery: 2,
+      // (ram prow = part of the cockpit design)
+      engineExtras: (pb, _L, hi) => {
+        for (const sd of SIDES) {
+          const x = sd * 2.4;
+          pb.brk("hoop" + LR(sd), () => {
+            pb.add("steel", torus(0.86, 0.07, 6, hi ? 20 : 10), M4.t(x, 0, 7));
+            for (let i = 0; i < 3; i++) {
+              const a = i * 2.094 + 0.5;
+              pb.add("steel", tube([V5(x + Math.sin(a) * 1.22, Math.cos(a) * 1.22, 6.3), V5(x + Math.sin(a) * 0.86, Math.cos(a) * 0.86, 7)], 0.045, 2, 5));
+            }
+          });
+          pb.add("hazard", torus(1.32, 0.05, 5, hi ? 24 : 12), M4.t(x, 0, 5.2));
+          pb.brk("skid" + LR(sd), () => pb.add("dark", rbox(1.2, 0.08, 2.6, 0.03), M4.t(x, -1.5, 2.4)));
+        }
+      }
+    };
+  }
+};
+var rail = (pb, pts, r2) => {
+  for (let i = 0; i < pts.length - 1; i++) pb.add("steel", tube([pts[i], pts[i + 1]], r2, 1, 5));
+  for (let i = 1; i < pts.length - 1; i++) pb.add("steel", sphere(r2 * 1.03, 6, 4), M4.t(pts[i].x, pts[i].y, pts[i].z));
+};
+LAYOUTS.cyclone = () => {
+  const s = spec(5.2, 1.25, "rotor", 3, 5), ex = 2.7, ez = 3.2, R = s.R, Rh = 1.42 * R;
+  return {
+    engines: pair(s, ex, 0, ez),
+    cockpit: { style: "wedge", hw: 1, len: 3, y: 1.02, z: -5.4, pilot: 1.08, far: "fin" },
+    binders: MAIN,
+    livery: 3,
+    fanLoss: { bladeL: [0], bladeR: [1] },
+    engineExtras: (pb, _L, hi) => {
+      for (const sd of SIDES) {
+        pb.brk("fin" + LR(sd), () => {
+          pb.add("hull", plate([[ez + 2.08, Rh + 0.02], [ez + 1.5, Rh + 0.02], [ez + 1.26, Rh + 0.56], [ez + 1.5, Rh + 0.6]], 0.05), M4.t(sd * ex, 0, 0), SEC4);
+          if (hi) pb.add("glow", sphere(0.035, 6, 4), M4.t(sd * ex, Rh + 0.6, ez + 1.42));
+        });
+        for (const o of [-0.5, 0.5]) {
+          const x = sd * ex + o;
+          rail(pb, [V5(x, -R * 0.86, ez + 0.5), V5(x, -R - 0.15, ez + 0.1), V5(x, -R - 0.15, ez - 1.7), V5(x, -R * 0.86, ez - 2.1)], 0.04);
+          if (hi) for (const z of [ez - 0.2, ez - 1.4]) pb.add("steel", cyl(0.026, 0.026, 0.22, 5), M4.t(x, -R - 0.02, z));
+        }
+        if (hi) pb.add("steel", tube([V5(sd * ex, R + 0.06, ez + 0.5), V5(sd * ex, Rh - 0.02, ez + 1.52)], 0.03, 2, 5));
+      }
+    }
+  };
+};
+LAYOUTS.halo = () => {
+  const s = spec(7.5, 0.5, "hoop", 4, 10), ex = 2.75, ez = 3, Rw = 3.4 * s.R;
+  return {
+    engines: pair(s, ex, 0, ez),
+    cockpit: { style: "pod", hw: 0.8, len: 2.6, y: 0.8, z: -5.2, pilot: 0.95, far: "ring" },
+    binders: MAIN,
+    livery: 1,
+    engineExtras: (pb, _L, hi) => {
+      for (const sd of SIDES) {
+        pb.add("chrome", lathe(prof([[0, -1.5], [0.05, -0.5], [0.07, 0]]), hi ? 10 : 6, 0), M4.t(sd * ex, 0.43, ez - 3.1));
+        pb.add("hull", plate([[ez + 1.1, -Rw + 0.04], [ez + 0.3, -Rw + 0.04], [ez + 0.16, -Rw - 0.08], [ez + 0.7, -Rw - 0.085]], 0.04), M4.t(sd * ex, 0, 0), SEC4);
+        if (hi) {
+          for (const a of [0.9, 2.24]) pb.add("glow", sphere(0.032, 6, 4), M4.t(sd * (ex + Math.sin(a) * (Rw + 0.06)), Math.cos(a) * (Rw + 0.06), ez + 0.45));
+        }
+      }
+    }
+  };
+};
+LAYOUTS.manta = () => {
+  const s = spec(8.6, 0.5, "slab", 3, 9), ex = 2.5, ez = 3.4, W2 = 3 * s.R;
+  return {
+    engines: pair(s, ex, 0, ez),
+    cockpit: { style: "wedge", hw: 1.05, len: 3.4, y: 0.92, z: -6.2, pilot: 1, far: "box" },
+    binders: MAIN,
+    livery: 4,
+    engineExtras: (pb, _L, hi) => {
+      for (const sd of SIDES) {
+        pb.add("chrome", lathe(prof([[0.03, 0], [0.018, 0.9], [0, 1.25]]), hi ? 8 : 5, 0), M4.t(sd * (ex + 0.66 * W2), 0.02, ez + 4.2));
+        pb.add("dark", rbox(1.5 * W2, 0.04, 0.5, 0.012), M4.t(sd * ex, -0.285, ez + 4.3));
+        if (hi) {
+          pb.add("hull", rbox(1.5 * W2, 0.03, 0.5, 8e-3), M4.trs(sd * ex, 0.4, ez - 4.44, -0.12, 0, 0), SEC4);
+          pb.add("glow", rbox(1.4 * W2, 0.016, 0.02, 4e-3), M4.t(sd * ex, 0.37, ez - 4.68));
+        }
+      }
+    }
+  };
+};
+LAYOUTS.volt = () => {
+  const s = spec(7, 0.95, "cage", 5, 6), ex = 2.35, ez = 3, R = s.R;
+  return {
+    engines: pair(s, ex, 0, ez),
+    cockpit: { style: "saucer", hw: 0.9, len: 2.2, y: 0.9, z: -5.4, pilot: 0.92, topY: 0.95, far: "cage" },
+    binders: [{ a: 0, b: 1, zOff: -CAGE_ARC_STEP }, { a: 0, b: 1 }, { a: 0, b: 1, zOff: CAGE_ARC_STEP }],
+    livery: 5,
+    arcLoss: { arcA: [0], arcB: [2] },
+    // the rear arc dies first, then the front one – the middle one holds
+    engineExtras: (pb, _L, hi) => {
+      for (const sd of SIDES) {
+        pb.add("chrome", cyl(0.012, 0.03, 1.1, 6), M4.t(sd * ex, R + 0.6, ez + 2.8));
+        pb.add("glow", sphere(0.04, 6, 4), M4.t(sd * ex, R + 1.17, ez + 2.8));
+        if (hi) for (const h of [0.42, 0.74]) pb.add("dark", torus(0.085 - h * 0.04, 0.014, 5, 10), M4.trs(sd * ex, R + h, ez + 2.8, Math.PI / 2, 0, 0));
+        for (const o of [-0.42, 0.42]) rail(pb, [V5(sd * ex + o, -R * 0.84, ez + 2.4), V5(sd * ex + o, -R - 0.14, ez + 1.9), V5(sd * ex + o, -R - 0.14, ez - 1.9), V5(sd * ex + o, -R * 0.84, ez - 2.4)], 0.035);
+      }
+    }
+  };
+};
+function podLayout(def) {
+  const make = LAYOUTS[def.id];
+  if (!make) throw new Error(`No layout for pod "${def.id}" \u2013 add it to LAYOUTS in src/game/podLayouts.ts`);
+  const L = make(def);
+  L.cockpit.design ??= def.id;
+  return L;
+}
+
+// ../../src/game/podDamage.ts
+var FX_NONE = { vmax: 1, accel: 1, turn: 1, grip: 1, abDecel: 1, cool: 1, heatRate: 1 };
+var FX_KEYS = Object.keys(FX_NONE);
+var armor = (front, side, top, belly2, heat) => ({ front, side, top, belly: belly2, heat });
+var pair2 = (step4, id, label2, fx, x = {}) => [-1, 1].map((side) => ({ id: id + (side < 0 ? "L" : "R"), label: label2, side, step: step4, ...fx ? { fx } : {}, ...x }));
+var one = (side, step4, id, label2, fx, x = {}) => ({ id, label: label2, side, step: step4, ...fx ? { fx } : {}, ...x });
+var OUT = "ausgefallen";
+var DEAD = "erloschen";
+var MODELS = {
+  // ---- light twin-engine racers: thin skin on the flanks, wings and fins go first
+  aurora: { armor: armor(1, 1.15, 1, 0.9, 0.95), parts: [
+    // wing plates tear off (grip), the tail gyro fails (turn)
+    ...pair2(50, "wing", "Fl\xFCgelplatte", { grip: 0.93 }),
+    one(0, 35, "gyro", "Kreisel-Stabilisator", { turn: 0.92 }, { lost: OUT }),
+    ...pair2(20, "inner", "Innenfl\xFCgel", { grip: 0.94 })
+  ] },
+  mavik: { armor: armor(1.2, 1, 1, 0.9, 0.9), parts: [
+    // Hollo Needle: the nose probe bends (turn), canards and fin snap
+    one(0, 50, "probe", "Nasensonde", { turn: 0.94 }),
+    ...pair2(35, "canard", "Canards", { grip: 0.94 }),
+    one(0, 20, "fin", "Heckfinne", { turn: 0.92 })
+  ] },
+  rattis: { armor: armor(0.95, 1.2, 1, 0.95, 0.9), parts: [
+    // Tyr Vespa: a blade wing shears off (grip)
+    ...pair2(50, "blade", "Klingenfl\xFCgel", { grip: 0.92 }),
+    ...pair2(35, "feeler", "F\xFChler", { turn: 0.95 }),
+    one(0, 20, "stinger", "Stachel", { grip: 0.95 })
+  ] },
+  elana: { armor: armor(1, 1.1, 1.1, 0.9, 0.9), parts: [
+    // Mak Starling: wings, an air-brake feather (braking), the dorsal fin (turn)
+    ...pair2(50, "wing", "Schwinge", { grip: 0.94 }),
+    ...pair2(35, "petal", "Bremsfeder", { abDecel: 0.9 }),
+    one(0, 20, "fin", "R\xFCckenfinne", { turn: 0.92 })
+  ] },
+  halo: { armor: armor(0.9, 1.2, 1, 1, 0.9), parts: [
+    // Lyss Halo-9: the ring wings crack, then a segment goes (turn, grip)
+    ...pair2(50, "ringA", "Ringfl\xFCgel-Segment", { turn: 0.94 }),
+    one(0, 35, "arch", "Kuppelbogen", { turn: 0.95 }),
+    ...pair2(20, "ringB", "Ringfl\xFCgel-Segment", { grip: 0.93 })
+  ] },
+  // ---- heavy twin-engine racers
+  brute: { armor: armor(0.75, 0.95, 1.15, 1, 1.15), parts: [
+    // Vrak Splitter-X: hard nose; top slats rip (cooling), intake petals jam (accel)
+    ...pair2(50, "slats", "K\xFChllamellen", { cool: 0.92 }),
+    ...pair2(35, "petals", "Ansaugklappen", { accel: 0.93 }, { lost: "verklemmt" }),
+    one(-1, 20, "fin", "Haifinne", { turn: 0.93 }),
+    one(1, 20, "stub", "Stummelfinne", { turn: 0.95 })
+  ] },
+  aldo: { armor: armor(1, 1.1, 1.05, 1.05, 0.8), parts: [
+    // Beerak Fireflare: built for heat; radiators leak (cooling, more heat)
+    ...pair2(50, "rad", "Radiator", { cool: 0.92, heatRate: 1.06 }, { lost: "leck" }),
+    ...pair2(35, "loop", "K\xFChlschleife", { cool: 0.93, heatRate: 1.05 }, { lost: "geplatzt" }),
+    ...pair2(20, "vane", "Radiatorfl\xFCgel", { grip: 0.95 })
+  ] },
+  odo: { armor: armor(1.15, 1.05, 1.2, 1, 1.2), parts: [
+    // Mandrel Ram: ram rings and ram bar eat front hits until they drop
+    ...pair2(50, "hoop", "Rammring", void 0, { guard: { front: 0.85 } }),
+    one(0, 35, "ram", "Rammbug", void 0, { guard: { front: 0.55 } }),
+    ...pair2(20, "skid", "Kufenplatte", void 0, { guard: { belly: 0.8 } })
+  ] },
+  manta: { armor: armor(0.9, 1.1, 0.9, 1.2, 0.9), parts: [
+    // Dorn Manta: flat and low – soft belly; wing tips (grip), fins (turn)
+    ...pair2(50, "winglet", "Fl\xFCgelspitze", { grip: 0.93 }),
+    ...pair2(35, "fin", "Seitenleitwerk", { turn: 0.94 }),
+    ...pair2(20, "delta", "Deltafl\xE4che", { grip: 0.94 })
+  ] },
+  cyclone: { armor: armor(1.2, 0.9, 0.95, 0.95, 1), parts: [
+    // Tarn Cyclone: open rotors up front; a rotor blade goes (speed), the ring fin (turn)
+    ...pair2(50, "blade", "Rotorblatt", { vmax: 0.95, accel: 0.95 }),
+    ...pair2(35, "fin", "Ringfinne", { turn: 0.94 }),
+    one(0, 20, "tail", "Leitwerkstr\xE4ger", { grip: 0.92 })
+  ] },
+  // ---- multi-engine racers and the special one
+  gasvaro: { armor: armor(1.1, 1.1, 1.05, 1.05, 1.1), parts: [
+    // Tenroc 6-Fach: thin skin; single engines flame out one by one (speed, accel)
+    ...pair2(50, "engC", "Oberes Triebwerk", { vmax: 0.95, accel: 0.95 }, { lost: OUT }),
+    ...pair2(35, "engB", "\xC4u\xDFeres Triebwerk", { vmax: 0.95, accel: 0.95 }, { lost: OUT }),
+    ...pair2(20, "manifold", "Verteilerrohr", { accel: 0.95 }, { lost: "geplatzt" })
+  ] },
+  bomquad: { armor: armor(1.1, 1, 0.9, 1, 1), parts: [
+    // Quadra Lumber: a ring shroud cracks (turn), one arc of the X dies (accel)
+    ...pair2(50, "shroud", "Ringsch\xFCrze", { turn: 0.94 }),
+    ...pair2(35, "arc", "Energieblitz", { accel: 0.93 }, { lost: DEAD }),
+    ...pair2(20, "arm", "Ausleger", { grip: 0.95 })
+  ] },
+  teemo: { armor: armor(1, 1.25, 1, 1, 1.1), parts: [
+    // Pagali Ironclad: skirts and plates take the first hits, then fall; an upper engine goes late
+    ...pair2(50, "skirt", "Panzersch\xFCrze", void 0, { guard: { side: 0.7 } }),
+    ...pair2(35, "plate", "Panzerplatte", void 0, { guard: { side: 0.85, front: 0.9 } }),
+    ...pair2(20, "engU", "Oberes Triebwerk", { vmax: 0.95, accel: 0.93 }, { lost: OUT })
+  ] },
+  volt: { armor: armor(1.15, 1.2, 1.05, 1.05, 0.55), parts: [
+    // Quill Voltspire: weak hull that shrugs off heat; its arcs die 3 → 2 → 1 (accel)
+    one(0, 50, "arcA", "Energiebogen", { accel: 0.95 }, { lost: DEAD }),
+    one(0, 35, "arcB", "Energiebogen", { accel: 0.95 }, { lost: DEAD }),
+    one(0, 20, "mast", "Entladungsmast", { cool: 0.9 })
+  ] }
+};
+function damageModel(podId) {
+  const m = MODELS[podId];
+  if (!m) throw new Error(`No Schadensmodell for pod "${podId}" \u2013 add it to MODELS in src/game/podDamage.ts`);
+  return m;
+}
+function partsDue(m, hpL, hpR) {
+  let mask = 0;
+  m.parts.forEach((b, i) => {
+    if ((b.side < 0 ? hpL : b.side > 0 ? hpR : Math.min(hpL, hpR)) < b.step) mask |= 1 << i;
+  });
+  return mask;
+}
+
+// ../../src/game/podAssembly.ts
+var BINDER_PTS = 18;
+function segFor(quality, isOpponent) {
+  return isOpponent ? quality >= 3 ? 28 : 14 : quality >= 3 ? 40 : quality === 2 ? 28 : 20;
+}
+function detailFor(seg, isOpponent) {
+  return isOpponent ? seg >= 24 ? 1 : 0 : seg >= 40 ? 2 : 1;
+}
+function push(lists, k, g) {
+  let l = lists.get(k);
+  if (!l) {
+    l = [];
+    lists.set(k, l);
+  }
+  l.push(g);
+}
+function mergeAll(lists, owned, where, each) {
+  const out = /* @__PURE__ */ new Map();
+  for (const [k, list] of lists) {
+    const mg = mergeGeometries(list, false);
+    list.forEach((x) => x.dispose());
+    if (!mg) throw new Error(`pod assembly: bucket "${k}" of ${where} could not be merged (parts with different vertex attributes)`);
+    each?.(k, mg);
+    mg.computeBoundingSphere();
+    out.set(k, mg);
+    owned.push(mg);
+  }
+  return out;
+}
+function buildFlexCables(L, seg, anchors2) {
+  const cp = new Vector3(0, L.cockpit.y, L.cockpit.z);
+  const up = new Vector3(0, 1, 0);
+  const list = [];
+  const tagFlex = (g, isR, pA, pB) => {
+    const p = g.attributes.position;
+    const n = p.count;
+    const liv = new Float32Array(n * 3);
+    const dz = pA.z - pB.z || 1;
+    for (let i = 0; i < n; i++) {
+      const w = Math.max(0, Math.min(1, (p.getZ(i) - pB.z) / dz));
+      liv[i * 3] = isR;
+      liv[i * 3 + 1] = w;
+      liv[i * 3 + 2] = 0;
+    }
+    g.setAttribute("aLiv", new BufferAttribute(liv, 3));
+    if (!g.attributes.normal) g.computeVertexNormals();
+    if (!g.attributes.uv) g.setAttribute("uv", new BufferAttribute(new Float32Array(n * 2), 2));
+    list.push(g);
+  };
+  for (const em of L.engines) {
+    const eg = engineGeo(em.spec, seg);
+    const isR = em.x >= 0 ? 1 : 0;
+    const a = eg.pylon.clone().add(new Vector3(em.x, em.y, em.z));
+    const b = anchors2[isR].clone().add(cp);
+    const rearZ = eg.exhaustZ + 0.12 * eg.L, topY = Math.max(eg.top, engineExtent(em.spec).top) + 0.14;
+    const v1 = new Vector3(em.x, em.y + topY + 0.1, em.z + rearZ - 0.3);
+    const v2 = new Vector3(em.x, em.y + topY, em.z + rearZ + (eg.pylon.z - rearZ) * 0.5);
+    const dist = v1.distanceTo(b);
+    const sag = 0.3 + dist * 0.03;
+    for (const [r2, off, s, rad] of [[0.055, 0, 1, 6], [0.024, 0.12, 1.18, 4]]) {
+      const pts = [];
+      const ox = off * (isR ? -1 : 1);
+      for (let i = 0; i <= 8; i++) {
+        const t = i / 8;
+        const p = b.clone().lerp(v1, t);
+        p.y -= sag * s * 4 * t * (1 - t) * (1 - 0.35 * t);
+        p.x += ox * Math.sin(t * Math.PI * 0.5);
+        pts.push(p);
+      }
+      pts.push(v1.clone().lerp(v2, 0.5).add(new Vector3(ox, 0, 0)), v2.clone().add(new Vector3(ox, 0, 0)), a.clone().add(new Vector3(ox * 0.5, 0.03, 0)));
+      tagFlex(tube(pts, r2, Math.max(16, Math.round(seg * 0.8)), rad), isR, v1, b);
+    }
+    for (const [p, q] of [[a, v2], [b, v1]]) {
+      const dir = q.clone().sub(p).normalize();
+      const fg = cyl(0.085, 0.07, 0.24, 7);
+      fg.applyMatrix4(new Matrix4().compose(p.clone().addScaledVector(dir, 0.12), new Quaternion().setFromUnitVectors(up, dir), new Vector3(1, 1, 1)));
+      tagFlex(fg, isR, v1, b);
+    }
+    for (const sp of [v1, v2]) {
+      const cl = torus(0.085, 0.022, 5, 8);
+      cl.rotateY(Math.PI / 2);
+      cl.translate(sp.x, sp.y - 0.02, sp.z);
+      tagFlex(cl, isR, v1, b);
+    }
+  }
+  const mg = mergeGeometries(list, false);
+  list.forEach((x) => x.dispose());
+  mg.computeBoundingSphere();
+  mg.boundingSphere.radius += 1.2;
+  return mg;
+}
+function bakeHullVertexColors(g, c1Hex, c2Hex, livery) {
+  const c1 = new Color(c1Hex), c2 = new Color(c2Hex);
+  const liv = g.attributes.aLiv;
+  const n = g.attributes.position.count;
+  const col = new Float32Array(n * 3);
+  const band = (x, cc, w) => Math.abs(x - cc) < w ? 1 : 0;
+  const fr = (x) => x - Math.floor(x);
+  const lv = (livery % 6 + 6) % 6;
+  for (let i = 0; i < n; i++) {
+    let m = 0;
+    if (liv) {
+      const c = liv.getX(i), a = liv.getY(i), z = liv.getZ(i);
+      const cd = Math.min(c, 1 - c);
+      if (z > 2.5) m = 1;
+      else if (z >= 0.5 && z < 1.5) {
+        if (lv === 0) m = Math.max(band(cd, 0, 0.06), band(a, 0.8, 0.035));
+        else if (lv === 1) m = Math.max(band(cd, 0.055, 0.02), band(cd, 0, 0.014), a >= 0.86 ? 1 : 0);
+        else if (lv === 2) m = a >= 0.14 && cd < 0.12 + Math.abs(fr(a * 5) - 0.5) * 0.16 ? 1 : 0;
+        else if (lv === 3) m = Math.max(band(a, 0.25, 0.042), band(a, 0.7, 0.042), a >= 0.3 && a <= 0.65 ? band(Math.abs(cd - 0.25), 0, 0.03) : 0);
+        else if (lv === 4) {
+          const ch = fr(a * 3.5 - cd * 1.8);
+          m = a >= 0.12 && a <= 0.9 && ch > 0.6 && ch < 0.88 || a >= 0.91 ? 1 : 0;
+        } else {
+          const chk = a >= 0.56 && a <= 0.86 && fr(cd * 8) >= 0.5 !== fr(a * 9) >= 0.5 ? 1 : 0;
+          m = Math.max(chk, band(cd, 0, 0.045));
+        }
+      } else if (z >= 1.5) {
+        const ck0 = Math.max(band(Math.abs(cd - 0.25 + (a - 0.5) * 0.12), 0, a * 0.02 + 0.035), a >= 0.9 ? 1 : 0);
+        m = lv === 4 ? Math.max(ck0, band(fr(a * 3 - cd * 1.5), 0.5, 0.16)) : lv === 5 ? Math.max(ck0, band(cd, 0.035, 0.016), band(cd, 0.085, 0.01)) : lv >= 2 ? Math.max(ck0, band(cd, 0, 0.05)) : ck0;
+      }
+    }
+    col[i * 3] = c1.r + (c2.r - c1.r) * m;
+    col[i * 3 + 1] = c1.g + (c2.g - c1.g) * m;
+    col[i * 3 + 2] = c1.b + (c2.b - c1.b) * m;
+  }
+  g.setAttribute("color", new BufferAttribute(col, 3));
+  return g;
+}
+function bakeSolidColor(g, col) {
+  const n = g.attributes.position.count;
+  const a = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    a[i * 3] = col.r;
+    a[i * 3 + 1] = col.g;
+    a[i * 3 + 2] = col.b;
+  }
+  g.setAttribute("color", new BufferAttribute(a, 3));
+  return g;
+}
+function makeBinderGeo(a, b, vertCol) {
+  const pos = new Float32Array(BINDER_PTS * 4 * 3), uv3 = new Float32Array(BINDER_PTS * 4 * 2);
+  const idx = [];
+  const w = 0.4;
+  const tmp3 = new Vector3();
+  for (let i = 0; i < BINDER_PTS; i++) {
+    const f = i / (BINDER_PTS - 1);
+    tmp3.copy(a).lerp(b, f);
+    for (let k = 0; k < 4; k++) {
+      uv3[(i * 4 + k) * 2] = f;
+      uv3[(i * 4 + k) * 2 + 1] = k % 2 === 0 ? 1 : 0;
+    }
+    const o = i * 12;
+    pos[o] = tmp3.x;
+    pos[o + 1] = tmp3.y + w;
+    pos[o + 2] = tmp3.z;
+    pos[o + 3] = tmp3.x;
+    pos[o + 4] = tmp3.y - w;
+    pos[o + 5] = tmp3.z;
+    pos[o + 6] = tmp3.x;
+    pos[o + 7] = tmp3.y;
+    pos[o + 8] = tmp3.z + w;
+    pos[o + 9] = tmp3.x;
+    pos[o + 10] = tmp3.y;
+    pos[o + 11] = tmp3.z - w;
+    if (i < BINDER_PTS - 1) for (const off of [0, 2]) {
+      const p = i * 4 + off, q = p + 4;
+      idx.push(p, p + 1, q, p + 1, q + 1, q);
+    }
+  }
+  const geo = new BufferGeometry();
+  geo.setAttribute("position", new BufferAttribute(pos, 3));
+  geo.setAttribute("uv", new BufferAttribute(uv3, 2));
+  geo.setIndex(idx);
+  if (vertCol) bakeSolidColor(geo, vertCol);
+  geo.computeBoundingSphere();
+  geo.boundingSphere.radius += 1.4;
+  return geo;
+}
+var oppFarCache = /* @__PURE__ */ new Map();
+function buildOpponentFarGeo(def, L) {
+  const hit = oppFarCache.get(def.id);
+  if (hit) return hit;
+  const pb = new PartBuilder();
+  const cp = new Vector3(0, L.cockpit.y, L.cockpit.z);
+  for (const em of L.engines) {
+    const { L: len, R, style } = em.spec, ext = engineExtent(em.spec);
+    if (style === "slab") {
+      pb.add("hull", rbox(ext.side * 1.8, R * 2, len, 0.12, 1), M4.t(em.x, em.y, em.z), [0, 0.5, 1]);
+      pb.add("dark", rbox(ext.side * 1.5, R * 1.2, 0.1, 0.02), M4.t(em.x, em.y, em.z + len * 0.5));
+      pb.add("glow", new ConeGeometry(R * 0.6, len * 0.5, 6, 1, true).rotateX(-Math.PI / 2), M4.trs(em.x, em.y, em.z - len * 0.74, 0, 0, 0, ext.side * 1.3 / R, 1, 1));
+    } else {
+      pb.add("hull", lathe(prof([[R * 0.72, -len * 0.5, 1], [R, -len * 0.35], [R, len * 0.42], [R * 0.88, len * 0.5, 1]]), 9, 1), M4.t(em.x, em.y, em.z));
+      pb.add("dark", new CircleGeometry(R * 0.84, 9), M4.t(em.x, em.y, em.z + len * 0.49));
+      pb.add("glow", new ConeGeometry(R * 0.46, len * 0.55, 7, 1, true).rotateX(-Math.PI / 2), M4.t(em.x, em.y, em.z - len * 0.75));
+      if (style === "rotor" || style === "hoop") pb.add("hull", torus(ext.side - 0.1, 0.08, 4, 12), M4.t(em.x, em.y, em.z + len * (style === "rotor" ? 0.36 : 0.06)), [0, 0, 3]);
+    }
+    const a = new Vector3(em.x, em.y + R, em.z), b = cp.clone();
+    pb.add("dark", tube([a, a.clone().lerp(b, 0.5).add(new Vector3(0, -0.4, 0)), b], 0.055, 5, 4));
+  }
+  const c = L.cockpit, CK = [0, 0.5, 2];
+  if (c.far === "disc") {
+    pb.add("hull", cyl(c.hw * 0.72, c.hw, c.hw * 0.6, 10), M4.t(0, c.y - c.hw * 0.1, c.z), CK);
+    pb.add("dark", new SphereGeometry(c.hw * 0.58, 8, 3, 0, Math.PI * 2, 0, Math.PI / 2), M4.t(0, c.y + c.hw * 0.2, c.z));
+  } else {
+    pb.add("hull", rbox(c.hw * 1.7, c.hw * 0.82, c.len, 0.14, 1), M4.t(0, c.y, c.z), CK);
+    pb.add("dark", rbox(c.hw * 0.9, c.hw * 0.45, c.len * 0.42, 0.05, 1), M4.t(0, c.y + c.hw * 0.42, c.z));
+    if (c.far === "fin") pb.add("hull", new BoxGeometry(0.06, 1, 0.9), M4.trs(0, c.y + c.hw * 0.4 + 0.5, c.z - c.len * 0.3, 0.35, 0, 0), [0, 0, 3]);
+    if (c.far === "cage") pb.add("dark", torus(c.hw * 0.8, 0.05, 4, 6, Math.PI), M4.t(0, c.y + c.hw * 0.4, c.z));
+    if (c.far === "ring") pb.add("hull", torus(1, 0.05, 4, 12), M4.trs(0, c.y + c.hw * 0.1, c.z, Math.PI / 2, 0, 0, c.hw * 1.25, c.len * 0.56, 1), [0, 0, 3]);
+  }
+  for (const link of L.binders) {
+    const A = L.engines[link.a], B2 = L.engines[link.b], z = link.zOff ?? 0;
+    pb.add("glow", tube([new Vector3(A.x, A.y + 0.2, A.z + z), new Vector3(B2.x, B2.y + 0.2, B2.z + z)], 0.09, 1, 4));
+  }
+  const built = pb.build();
+  const out = { hull: built.get("hull"), dark: built.get("dark"), glow: built.get("glow") };
+  oppFarCache.set(def.id, out);
+  return out;
+}
+function visibleIndices(full, ranges, hidden, out) {
+  const cut = ranges.filter((r3) => hidden.has(r3.id)).sort((a, b) => a.start - b.start);
+  let w = 0, r2 = 0;
+  for (const c of cut) {
+    if (c.start > r2) {
+      out.set(full.subarray(r2, c.start), w);
+      w += c.start - r2;
+    }
+    r2 = Math.max(r2, c.start + c.count);
+  }
+  if (full.length > r2) {
+    out.set(full.subarray(r2), w);
+    w += full.length - r2;
+  }
+  return w;
+}
+var Tagged = class {
+  lists = /* @__PURE__ */ new Map();
+  tags = [];
+  at = /* @__PURE__ */ new Map();
+  push(k, g, id) {
+    const a = this.at.get(k) ?? 0, n = g.index ? g.index.count : g.attributes.position.count;
+    if (id) {
+      if (!g.index) throw new Error(`pod assembly: Bruchteil "${id}" has geometry without an index (bucket "${k}")`);
+      this.tags.push({ key: k, id, start: a, count: n });
+    }
+    this.at.set(k, a + n);
+    push(this.lists, k, g);
+  }
+  count(k) {
+    return this.at.get(k) ?? 0;
+  }
+};
+var Breaks = class {
+  map = /* @__PURE__ */ new Map();
+  n = /* @__PURE__ */ new Map();
+  get(id) {
+    let s = this.map.get(id);
+    if (!s) {
+      s = { ranges: [], engines: [], fans: [], arcs: [], flames: [], center: new Vector3() };
+      this.map.set(id, s);
+    }
+    return s;
+  }
+  /** one more place where this Bruchteil sits (the centre is their mean) */
+  at(id, x, y, z) {
+    const s = this.get(id), k = this.n.get(id) ?? 0;
+    s.center.multiplyScalar(k).add(new Vector3(x, y, z)).divideScalar(k + 1);
+    this.n.set(id, k + 1);
+  }
+  tags(T2, where) {
+    for (const t of T2.tags) this.get(t.id).ranges.push({ where, key: t.key, start: t.start, count: t.count });
+  }
+};
+function engineBreakId(bpId, side, wanted) {
+  const flank = bpId.endsWith("-") ? -1 : bpId.endsWith("+") ? 1 : 0;
+  if (flank && flank !== side) return void 0;
+  const id = (flank ? bpId.slice(0, -1) : bpId) + (side < 0 ? "L" : "R");
+  return wanted.has(id) ? id : void 0;
+}
+function base(def, seg, head, isOpponent) {
+  const L = podLayout(def);
+  const exhaustLocal = [];
+  let frontZ = -Infinity, topY = 0, sumY = 0;
+  for (const em of L.engines) {
+    const eg = engineGeo(em.spec, seg);
+    exhaustLocal.push(new Vector3(em.x, em.y, em.z + eg.exhaustZ));
+    frontZ = Math.max(frontZ, em.z + eg.frontZ);
+    topY = Math.max(topY, em.y + eg.R);
+    sumY += em.y;
+  }
+  const ck = cockpitGeo(L, seg, head, detailFor(seg, isOpponent));
+  const eye = new Vector3(0, L.cockpit.y, L.cockpit.z).add(ck.info.eye);
+  const hood = new Vector3(0, sumY / Math.max(1, L.engines.length) + topY * 0.35 + 0.35, frontZ - 1.2);
+  const hi = seg >= 24;
+  const build2 = (fn) => {
+    const pb = new PartBuilder();
+    fn?.(pb, L, hi);
+    return { parts: pb.build(), breaks: pb.buildBreaks() };
+  };
+  const b = { layout: L, bodyZ: -L.cockpit.z * 0.25, exhaustLocal, eye, hood };
+  const model = damageModel(def.id);
+  return { b, ck, engineExtras: build2(L.engineExtras), cockpitExtras: build2(L.cockpitExtras), model, wanted: new Set(model.parts.map((p) => p.id)) };
+}
+var sideOf = (x) => x < 0 ? -1 : 1;
+function bankSpan(mounts) {
+  let z0 = Infinity, z1 = -Infinity;
+  for (const { em } of mounts) {
+    z0 = Math.min(z0, em.z - em.spec.L / 2);
+    z1 = Math.max(z1, em.z + em.spec.L / 2);
+  }
+  return [z0, z1 - z0];
+}
+function addSideExtras(T2, extras, side, piv, model, br, span) {
+  const shift = M4.t(-piv.x, -piv.y, -piv.z);
+  for (const [k, eg] of extras.parts) {
+    const idx = eg.index.array;
+    const pos = eg.attributes.position;
+    const keep = [];
+    for (let t = 0; t < idx.length; t += 3) {
+      const cx = (pos.getX(idx[t]) + pos.getX(idx[t + 1]) + pos.getX(idx[t + 2])) / 3;
+      if (sideOf(cx) === side) keep.push(idx[t], idx[t + 1], idx[t + 2]);
+    }
+    if (keep.length) {
+      const sub2 = eg.clone();
+      sub2.setIndex(keep);
+      if (k === "hull") heatAlong(sub2, span[0], span[1]);
+      sub2.applyMatrix4(shift);
+      T2.push(k, sub2);
+    }
+  }
+  for (const bp of extras.breaks) {
+    const part2 = model.parts.find((p) => p.id === bp.id);
+    if ((part2 && part2.side !== 0 ? part2.side : sideOf(bp.center.x)) !== side) continue;
+    for (const [k, g] of bp.parts) {
+      const c = g.clone();
+      if (k === "hull") heatAlong(c, span[0], span[1]);
+      c.applyMatrix4(shift);
+      T2.push(k, c, part2?.id);
+    }
+    if (part2) br.at(part2.id, bp.center.x, bp.center.y, bp.center.z);
+  }
+}
+function disposeExtras(e) {
+  for (const g of e.parts.values()) g.dispose();
+  for (const bp of e.breaks) for (const g of bp.parts.values()) g.dispose();
+}
+function binderGroups(L) {
+  const groups = /* @__PURE__ */ new Map();
+  for (const link of L.binders) {
+    const key = `${Math.min(link.a, link.b)}|${Math.max(link.a, link.b)}`;
+    const g = groups.get(key);
+    if (g) g.push(link);
+    else groups.set(key, [link]);
+  }
+  return [...groups.values()];
+}
+function mergeBinders(list) {
+  if (list.length === 1) return list[0];
+  const mg = mergeGeometries(list, false);
+  list.forEach((g) => g.dispose());
+  if (!mg) throw new Error("pod assembly: energy binders of one engine pair could not be merged");
+  mg.computeBoundingSphere();
+  mg.boundingSphere.radius += 1.4;
+  return mg;
+}
+function binderEnds(L, seg, link) {
+  let A = L.engines[link.a], B2 = L.engines[link.b];
+  if (A.x > B2.x) {
+    const t = A;
+    A = B2;
+    B2 = t;
+  }
+  const ea = engineGeo(A.spec, seg), eb = engineGeo(B2.spec, seg), z = link.zOff ?? 0;
+  return { A, B: B2, ea, eb, ax: A.x + ea.binder.x, ay: A.y + ea.binder.y, az: A.z + ea.binder.z + z, bx: B2.x - eb.binder.x, by: B2.y + eb.binder.y, bz: B2.z + eb.binder.z + z };
+}
+function flameOutOf(L, wanted) {
+  const out = /* @__PURE__ */ new Map();
+  for (const [id, list] of Object.entries(L.flameOut ?? {})) if (wanted.has(id)) for (const i of list) out.set(i, id);
+  return out;
+}
+function layoutBreaks(L, wanted, br, arcAt) {
+  const each = (rec, fn) => {
+    for (const [id, list] of Object.entries(rec ?? {})) if (wanted.has(id)) for (const i of list) fn(id, i);
+  };
+  each(L.flameOut, (id, i) => {
+    const e = L.engines[i];
+    br.get(id).engines.push(i);
+    br.at(id, e.x, e.y, e.z);
+  });
+  each(L.fanLoss, (id, i) => {
+    const e = L.engines[i];
+    br.get(id).fans.push(i);
+    br.at(id, e.x, e.y, e.z + e.spec.L * 0.4);
+  });
+  each(L.arcLoss, (id, i) => {
+    const a = arcAt.get(i);
+    if (!a) return;
+    br.get(id).arcs.push({ binder: a.binder, start: a.start, count: a.count });
+    br.at(id, a.x, a.y, a.z);
+  });
+}
+function cockpitViewScale(parts, eye) {
+  let near = Infinity;
+  for (const g of parts) {
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const dz = p.getZ(i) - eye.z;
+      if (dz < 0.1) continue;
+      const dx = Math.abs(p.getX(i) - eye.x), dy = p.getY(i) - eye.y;
+      if (dx > dz * 1.6 || dy > dz * 1.1 || dy < -dz * 1.5) continue;
+      if (dz < near) near = dz;
+    }
+  }
+  return Math.max(1.4, Math.min(3.2, 0.86 / near));
+}
+function assembleHero(def, seg, head, kit = NO_KIT) {
+  const { b, ck, engineExtras, cockpitExtras, model, wanted } = base(def, seg, head, false);
+  const L = b.layout;
+  const owned = [];
+  const banks = [];
+  const br = new Breaks();
+  const outOf = flameOutOf(L, wanted);
+  for (const side of [-1, 1]) {
+    const mounts = L.engines.map((em, index) => ({ em, index })).filter((m) => sideOf(m.em.x) === side);
+    if (!mounts.length) continue;
+    const piv = new Vector3();
+    for (const { em } of mounts) {
+      piv.x += em.x;
+      piv.y += em.y;
+      piv.z += em.z;
+    }
+    piv.divideScalar(mounts.length);
+    const T3 = new Tagged();
+    const engines = [];
+    for (const { em, index } of mounts) {
+      const off = new Vector3(em.x - piv.x, em.y - piv.y, em.z - piv.z);
+      const eg = engineGeo(em.spec, seg);
+      const emM = M4.t(off.x, off.y, off.z);
+      for (const [k, g] of eg.parts) {
+        const gc = g.clone();
+        gc.applyMatrix4(emM);
+        T3.push(k, gc, k === "glow" ? outOf.get(index) : void 0);
+      }
+      for (const bp of eg.breakParts) {
+        const id = engineBreakId(bp.id, side, wanted);
+        for (const [k, g] of bp.parts) {
+          const gc = g.clone();
+          gc.applyMatrix4(emM);
+          T3.push(k, gc, id);
+        }
+        if (id) br.at(id, em.x + bp.center.x, em.y + bp.center.y, em.z + bp.center.z);
+      }
+      const ek = engineKit(em.spec, seg, kit);
+      for (const [k, g] of ek.parts) {
+        const gc = g.clone();
+        gc.applyMatrix4(emM);
+        T3.push(k, gc, k === "glow" ? outOf.get(index) : void 0);
+      }
+      const flaps = ek.flaps.map((f) => {
+        const hinge = new Vector3(off.x + f.pivot.x, off.y + f.pivot.y, off.z + f.pivot.z), geo = f.geo.clone().translate(hinge.x, hinge.y, hinge.z);
+        owned.push(geo);
+        return { geo, hinge, sign: f.sign, gain: f.gain };
+      });
+      engines.push({ index, off, geo: eg, flaps });
+    }
+    addSideExtras(T3, engineExtras, side, piv, model, br, bankSpan(mounts));
+    br.tags(T3, banks.length);
+    banks.push({ side, pivot: piv, engines, buckets: mergeAll(T3.lists, owned, `${def.id} engine bank ${side}`) });
+  }
+  disposeExtras(engineExtras);
+  const T2 = new Tagged();
+  const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
+  const pushC = (k, g, id) => {
+    const gc = g.clone();
+    gc.applyMatrix4(ckM);
+    T2.push(k, gc, id);
+  };
+  for (const [k, g] of ck.parts) pushC(k, g);
+  for (const bp of ck.breakParts) {
+    const id = wanted.has(bp.id) ? bp.id : void 0;
+    for (const [k, g] of bp.parts) pushC(k, g, id);
+    if (id) br.at(id, bp.center.x, L.cockpit.y + bp.center.y, L.cockpit.z + bp.center.z);
+  }
+  for (const [k, g] of cockpitExtras.parts) T2.push(k, g);
+  for (const bp of cockpitExtras.breaks) for (const [k, g] of bp.parts) T2.push(k, g);
+  const viewScale = L.cockpit.viewScale ?? cockpitViewScale([...T2.lists.values()].flat(), b.eye);
+  const pilotStart = /* @__PURE__ */ new Map();
+  for (const [k, g] of ck.pilot) {
+    pilotStart.set(k, T2.count(k));
+    pushC(k, g);
+  }
+  br.tags(T2, "cockpit");
+  const cockpit = mergeAll(T2.lists, owned, `${def.id} cockpit`);
+  let lamps = null;
+  if (ck.lamps) {
+    lamps = ck.lamps.clone();
+    lamps.applyMatrix4(ckM);
+    lamps.computeBoundingSphere();
+    owned.push(lamps);
+  }
+  const cables = buildFlexCables(L, seg, ck.info.anchors);
+  owned.push(cables);
+  const binders = [];
+  const arcAt = /* @__PURE__ */ new Map();
+  for (const group of binderGroups(L)) {
+    let at = 0;
+    const g = mergeBinders(group.map((link) => {
+      const e = binderEnds(L, seg, link), geo = makeBinderGeo(new Vector3(e.ax, e.ay, e.az), new Vector3(e.bx, e.by, e.bz)), n = geo.index.count;
+      arcAt.set(L.binders.indexOf(link), { binder: binders.length, start: at, count: n, x: (e.ax + e.bx) / 2, y: (e.ay + e.by) / 2, z: (e.az + e.bz) / 2 });
+      at += n;
+      return geo;
+    }));
+    binders.push(g);
+    owned.push(g);
+  }
+  layoutBreaks(L, wanted, br, arcAt);
+  return { ...b, banks, cockpit, pilotStart, lamps, lampCount: ck.lampCount, viewScale, cables, binders, breaks: br.map, owned };
+}
+function assembleRival(def, seg, head, colors, pattern, kit = NO_KIT) {
+  const { b, ck, engineExtras, cockpitExtras, model, wanted } = base(def, seg, head, true);
+  const L = b.layout;
+  const owned = [];
+  const liv = pattern !== void 0 && pattern >= 0 ? pattern : L.livery;
+  const glowCol = new Color(colors[2]), glowBoost = glowCol.clone().multiplyScalar(1.2);
+  const bake = (k, mg) => {
+    if (k === "hull") bakeHullVertexColors(mg, colors[0], colors[1], liv);
+    else if (k === "glow") bakeSolidColor(mg, glowBoost);
+  };
+  const pushC = (T3, k, g, m, id) => {
+    const c = g.clone();
+    if (m) c.applyMatrix4(m);
+    T3.push(k, c, id);
+  };
+  const br = new Breaks();
+  const flameAt = /* @__PURE__ */ new Map();
+  const outOf = flameOutOf(L, wanted);
+  const banks = [];
+  for (const side of [-1, 1]) {
+    const sideMs = L.engines.map((em, index) => ({ em, index })).filter((m) => sideOf(m.em.x) === side);
+    const piv = new Vector3();
+    for (const { em } of sideMs) {
+      piv.x += em.x;
+      piv.y += em.y;
+      piv.z += em.z;
+    }
+    if (sideMs.length) piv.divideScalar(sideMs.length);
+    const T3 = new Tagged();
+    const fls = [];
+    const pts = [];
+    const rotors = [];
+    let flameN = 0;
+    for (const { em, index } of sideMs) {
+      const ox = em.x - piv.x, oy = em.y - piv.y, oz = em.z - piv.z;
+      const eg = engineGeo(em.spec, seg);
+      const emM = M4.t(ox, oy, oz);
+      for (const [k, g] of eg.parts) pushC(T3, k, g, emM, k === "glow" ? outOf.get(index) : void 0);
+      for (const bp of eg.breakParts) {
+        const id = engineBreakId(bp.id, side, wanted);
+        for (const [k, g] of bp.parts) pushC(T3, k, g, emM, id);
+        if (id) br.at(id, em.x + bp.center.x, em.y + bp.center.y, em.z + bp.center.z);
+      }
+      const ek = engineKit(em.spec, seg, kit);
+      for (const [k, g] of ek.parts) pushC(T3, k, g, emM, k === "glow" ? outOf.get(index) : void 0);
+      if (eg.openRotor) rotors.push({ geo: eg.fan, pos: new Vector3(ox, oy, oz + eg.fanZ), mat: eg.fanMat ?? "dark", spin: eg.fanSpin ?? 1, engine: index, lost: eg.fanLost });
+      else pushC(T3, eg.fanMat ?? "dark", eg.fan, M4.t(ox, oy, oz + eg.fanZ));
+      for (const f of ek.flaps) pushC(T3, "hull", f.geo, M4.t(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z));
+      const fo = eg.flameOuter.clone();
+      fo.applyMatrix4(M4.t(ox, oy, oz + eg.flameZ));
+      fls.push(fo);
+      flameAt.set(index, { bank: banks.length, start: flameN, count: fo.index.count });
+      flameN += fo.index.count;
+      pts.push(eg.petals.clone().translate(ox, oy, oz));
+    }
+    addSideExtras(T3, engineExtras, side, piv, model, br, bankSpan(sideMs));
+    br.tags(T3, banks.length);
+    const buckets = mergeAll(T3.lists, owned, `${def.id} rival bank ${side}`, bake);
+    let petals = null, flames = null;
+    if (pts.length) {
+      petals = mergeGeometries(pts, false);
+      pts.forEach((x) => x.dispose());
+      owned.push(petals);
+    }
+    if (fls.length) {
+      flames = mergeGeometries(fls, false);
+      fls.forEach((x) => x.dispose());
+      bakeSolidColor(flames, glowCol);
+      flames.computeBoundingSphere();
+      owned.push(flames);
+    }
+    banks.push({ side, pivot: piv, buckets, petals, flames, rotors });
+  }
+  disposeExtras(engineExtras);
+  const T2 = new Tagged();
+  const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
+  for (const [k, g] of ck.parts) pushC(T2, k, g, ckM);
+  for (const bp of ck.breakParts) {
+    const id = wanted.has(bp.id) ? bp.id : void 0;
+    for (const [k, g] of bp.parts) pushC(T2, k, g, ckM, id);
+    if (id) br.at(id, bp.center.x, L.cockpit.y + bp.center.y, L.cockpit.z + bp.center.z);
+  }
+  for (const [k, g] of ck.pilot) pushC(T2, k, g, ckM);
+  for (const [k, g] of cockpitExtras.parts) pushC(T2, k, g);
+  for (const bp of cockpitExtras.breaks) for (const [k, g] of bp.parts) pushC(T2, k, g);
+  disposeExtras(cockpitExtras);
+  const cp = new Vector3(0, L.cockpit.y, L.cockpit.z);
+  const cabPB = new PartBuilder();
+  for (const em of L.engines) {
+    const eg = engineGeo(em.spec, seg);
+    const a = eg.pylon.clone().add(new Vector3(em.x, em.y, em.z));
+    const anc = ck.info.anchors[em.x < 0 ? 0 : 1].clone().add(cp);
+    const mid = a.clone().lerp(anc, 0.5);
+    mid.y -= 0.55;
+    cabPB.add("dark", tube([anc, mid, a], 0.055, 8, 5));
+  }
+  for (const [k, g] of cabPB.build()) {
+    pushC(T2, k, g);
+    g.dispose();
+  }
+  br.tags(T2, "cockpit");
+  const cockpit = mergeAll(T2.lists, owned, `${def.id} rival cockpit`, bake);
+  const binders = [];
+  let spanX = 4.6;
+  const arcAt = /* @__PURE__ */ new Map();
+  for (const group of binderGroups(L)) {
+    let baseY = 0, at = 0;
+    const bg = mergeBinders(group.map((link) => {
+      const e = binderEnds(L, seg, link);
+      const dyh = (e.by - e.ay) * 0.5;
+      const pa = new Vector3(e.ax, -dyh, e.az);
+      const pb = new Vector3(e.bx, dyh, e.bz);
+      spanX = Math.max(1.5, Math.abs(pb.x - pa.x));
+      baseY = (e.A.y + e.ea.binder.y + e.B.y + e.eb.binder.y) * 0.5;
+      const geo = makeBinderGeo(pa, pb, glowCol), n = geo.index.count;
+      arcAt.set(L.binders.indexOf(link), { binder: binders.length, start: at, count: n, x: (e.ax + e.bx) / 2, y: (e.ay + e.by) / 2, z: (e.az + e.bz) / 2 });
+      at += n;
+      return geo;
+    }));
+    owned.push(bg);
+    binders.push({ geo: bg, baseY });
+  }
+  layoutBreaks(L, wanted, br, arcAt);
+  for (const s of br.map.values()) for (const e of s.engines) {
+    const f = flameAt.get(e);
+    if (f) s.flames.push(f);
+  }
+  const far0 = buildOpponentFarGeo(def, L);
+  const hull = bakeHullVertexColors(far0.hull.clone(), colors[0], colors[1], liv);
+  owned.push(hull);
+  const glow = bakeSolidColor(far0.glow.clone(), glowBoost);
+  owned.push(glow);
+  return { ...b, banks, cockpit, binders, spanX, far: { hull, dark: far0.dark, glow }, breaks: br.map, owned };
+}
+
+// ../../src/game/podTextures.ts
 function mulberry(a) {
   return () => {
     a |= 0;
@@ -73017,8 +75794,8 @@ var TNoise = class {
     const a = w(ix, iy), b = w(ix + 1, iy), c = w(ix, iy + 1), d = w(ix + 1, iy + 1);
     return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
   }
-  fbm(u, v, base, oct) {
-    let s = 0, a = 1, nn = 0, p = base;
+  fbm(u, v, base2, oct) {
+    let s = 0, a = 1, nn = 0, p = base2;
     for (let o = 0; o < oct; o++) {
       s += this.n(u, v, p) * a;
       nn += a;
@@ -73164,12 +75941,12 @@ function hullTextures(size = 1024) {
     H2.stroke();
   };
   for (const p of panels) {
-    const base = 150 + (rnd() - 0.5) * 36;
+    const base2 = 150 + (rnd() - 0.5) * 36;
     const x = p.x + seam / 2, y = p.y + seam / 2, w = p.w - seam, h = p.h - seam;
-    H2.fillStyle = gray(base - 14);
+    H2.fillStyle = gray(base2 - 14);
     rrect(H2, x, y, w, h, 3 * k);
     H2.fill();
-    H2.fillStyle = gray(base);
+    H2.fillStyle = gray(base2);
     rrect(H2, x + 3 * k, y + 3 * k, w - 6 * k, h - 6 * k, 3 * k);
     H2.fill();
     const big = w > 90 * k && h > 70 * k;
@@ -73191,7 +75968,7 @@ function hullTextures(size = 1024) {
       H2.lineWidth = 2.4 * k;
       rrect(H2, hx, hy, hw, hh, 6 * k);
       H2.stroke();
-      H2.fillStyle = gray(base + 10);
+      H2.fillStyle = gray(base2 + 10);
       rrect(H2, hx + 2 * k, hy + 2 * k, hw - 4 * k, hh - 4 * k, 5 * k);
       H2.fill();
       for (const [sx, sy] of [[hx + 8 * k, hy + 8 * k], [hx + hw - 8 * k, hy + 8 * k], [hx + 8 * k, hy + hh - 8 * k], [hx + hw - 8 * k, hy + hh - 8 * k]]) screw(sx, sy, 2.6 * k);
@@ -73274,7 +76051,7 @@ function hullTextures(size = 1024) {
       }
     } else if (r2 < 0.76 && w > 50 * k) {
       const dx = x + w * 0.1, dy = y + h * 0.1, dw = w * 0.8, dh = h * 0.8;
-      H2.fillStyle = gray(base + 26);
+      H2.fillStyle = gray(base2 + 26);
       rrect(H2, dx, dy, dw, dh, 5 * k);
       H2.fill();
       for (let t = dx + 6 * k; t < dx + dw - 4 * k; t += 11 * k) {
@@ -73595,14 +76372,14 @@ function carbonTexture() {
   return carbonCache;
 }
 
-// src/game/podMaterials.ts
+// ../../src/game/podMaterials.ts
 var TSL = three_tsl_exports;
 var {
   userData: userDataN,
   floor: floorN,
   abs: abs2,
   attribute: attribute2,
-  clamp: clamp3,
+  clamp: clamp4,
   cos: cos2,
   cross: cross2,
   dFdx: dFdx2,
@@ -73629,7 +76406,7 @@ var {
   pow: pow5,
   select: select2,
   sin: sin2,
-  smoothstep: smoothstep2,
+  smoothstep: smoothstep3,
   step: step2,
   texture: texture2,
   uniform: uniform2,
@@ -73638,7 +76415,7 @@ var {
   vec3: vec32,
   vertexColor: vertexColor2
 } = TSL;
-var ssInv = (a, b, x) => oneMinus2(smoothstep2(b, a, x));
+var ssInv = (a, b, x) => oneMinus2(smoothstep3(b, a, x));
 var podSharedTime = uniform2(0);
 function safeHullNormal(nTex, tuv, scale3) {
   const tsN = texture2(nTex, tuv).xyz.mul(2).sub(1);
@@ -73650,10 +76427,11 @@ function safeHullNormal(nTex, tuv, scale3) {
   const B2 = dp2p.mul(duv1.y).add(dp1p.mul(duv2.y));
   const det2 = max2(dot2(T2, T2), dot2(B2, B2));
   const quadJump = dot2(dp1, dp1).add(dot2(dp2, dp2));
-  const valid = smoothstep2(1e-7, 2e-6, det2).mul(ssInv(9e4, 2e4, quadJump)).mul(ssInv(85, 18, length2(p))).mul(scale3);
+  const valid = smoothstep3(1e-7, 2e-6, det2).mul(ssInv(9e4, 2e4, quadJump)).mul(ssInv(85, 18, length2(p))).mul(scale3);
   const sc2 = inverseSqrt2(max2(det2, float2(1e-7))).mul(valid);
   return normalize3(T2.mul(tsN.x.mul(sc2)).add(B2.mul(tsN.y.mul(sc2)).add(Nn.mul(max2(tsN.z, float2(0.4))))));
 }
+var HIT_MARKS = 4;
 function hullMaterial(c1, c2, glow, livery, texSize, finish = 0) {
   const tex = hullTextures(texSize);
   const mat = new MeshPhysicalNodeMaterial();
@@ -73673,7 +76451,8 @@ function hullMaterial(c1, c2, glow, livery, texSize, finish = 0) {
     uScorch: uniform2(0),
     uHeat: uniform2(0),
     uGrime: uniform2(0.75),
-    uLivery: uniform2(livery)
+    uLivery: uniform2(livery),
+    uHits: Array.from({ length: HIT_MARKS }, () => uniform2(new Vector4(0, 0, 0, 0)))
   };
   mat.userData.u = u;
   const L = attribute2("aLiv", "vec3");
@@ -73684,39 +76463,49 @@ function hullMaterial(c1, c2, glow, livery, texSize, finish = 0) {
   const aaC = fwidth2(cd).mul(1.5).add(1e-4), aaA = fwidth2(a).mul(1.5).add(1e-4);
   const side0 = abs2(cd.sub(0.25).add(a.sub(0.5).mul(0.12))), side1 = abs2(cd.sub(0.25));
   const aaS0 = fwidth2(side0).mul(1.5).add(1e-4), aaS1 = fwidth2(side1).mul(1.5).add(1e-4);
-  const band = (x, cc, w, aa) => oneMinus2(smoothstep2(float2(w).sub(aa), float2(w).add(aa), abs2(x.sub(cc))));
+  const band = (x, cc, w, aa) => oneMinus2(smoothstep3(float2(w).sub(aa), float2(w).add(aa), abs2(x.sub(cc))));
   const lv = (livery % 6 + 6) % 6;
   const eng = lv === 0 ? max2(band(cd, 0, 0.06, aaC), band(a, 0.8, 0.035, aaA)) : lv === 1 ? max2(max2(band(cd, 0.055, 0.02, aaC), band(cd, 0, 0.014, aaC)), step2(0.86, a)) : lv === 2 ? (() => {
     const ez = float2(0.12).add(abs2(fract2(a.mul(5)).sub(0.5)).mul(0.16));
-    return oneMinus2(smoothstep2(ez.sub(aaC), ez.add(aaC), cd)).mul(step2(0.14, a));
+    return oneMinus2(smoothstep3(ez.sub(aaC), ez.add(aaC), cd)).mul(step2(0.14, a));
   })() : lv === 3 ? max2(max2(band(a, 0.25, 0.042, aaA), band(a, 0.7, 0.042, aaA)), band(side1, 0, 0.03, aaS1).mul(step2(0.3, a)).mul(step2(a, 0.65))) : lv === 4 ? (() => {
     const ch = fract2(a.mul(3.5).sub(cd.mul(1.8)));
-    return max2(smoothstep2(0.58, 0.62, ch).mul(ssInv(0.9, 0.86, ch)).mul(step2(0.12, a)).mul(step2(a, 0.9)), step2(0.91, a));
+    return max2(smoothstep3(0.58, 0.62, ch).mul(ssInv(0.9, 0.86, ch)).mul(step2(0.12, a)).mul(step2(a, 0.9)), step2(0.91, a));
   })() : (() => {
     const gx = step2(0.5, fract2(cd.mul(8))), gy = step2(0.5, fract2(a.mul(9))), chk = abs2(gx.sub(gy)).mul(step2(0.56, a)).mul(step2(a, 0.86));
     return max2(chk, band(cd, 0, 0.045, aaC));
   })();
   const ck0 = max2(band(side0, 0, a.mul(0.02).add(0.035), aaS0), step2(0.9, a));
   const ck = lv === 4 ? max2(ck0, band(fract2(a.mul(3).sub(cd.mul(1.5))), 0.5, float2(0.16), aaA)) : lv === 5 ? max2(ck0, max2(band(cd, 0.035, 0.016, aaC), band(cd, 0.085, 0.01, aaC))) : lv >= 2 ? max2(ck0, band(cd, 0, 0.05, aaC)) : ck0;
-  const livM = clamp3(select2(L.z.lessThan(0.5), float2(0), select2(L.z.greaterThan(2.5), float2(1), select2(L.z.lessThan(1.5), eng, ck))), 0, 1);
+  const livM = clamp4(select2(L.z.lessThan(0.5), float2(0), select2(L.z.greaterThan(2.5), float2(1), select2(L.z.lessThan(1.5), eng, ck))), 0, 1);
   const wt = oneMinus2(u.uWear);
-  const hWear = smoothstep2(wt.sub(0.06), wt.add(0.06), hMask.b);
+  const hWear = smoothstep3(wt.sub(0.06), wt.add(0.06), hMask.b);
   let col = mix2(materialColor2, u.uPaint2, livM);
   col = mix2(col, vec32(0.025), hDec.r.mul(0.9));
   col = mix2(col, vec32(0.78, 0.56, 0.07), hDec.g);
   col = mix2(col, vec32(0.52, 0.53, 0.56), hWear);
-  const hGrime = clamp3(hMask.a.mul(u.uGrime), 0, 1);
+  const hGrime = clamp4(hMask.a.mul(u.uGrime), 0, 1);
   col = col.mul(mix2(vec32(1), vec32(0.42, 0.36, 0.3), hGrime));
-  const hScorch = clamp3(u.uScorch.mul(ssInv(0.72, 0, a)).mul(hMask.a.mul(0.7).add(0.55)), 0, 0.95);
+  const hScorch0 = clamp4(u.uScorch.mul(ssInv(0.72, 0, a)).mul(hMask.a.mul(0.7).add(0.55)), 0, 0.95);
+  let hitSoot = float2(0), hitBare = float2(0), hitPit = float2(0);
+  for (const h of u.uHits) {
+    const d = length2(positionLocal2.sub(h.xyz)), r2 = h.w.mul(0.5).add(0.45);
+    hitSoot = max2(hitSoot, h.w.mul(oneMinus2(smoothstep3(r2.mul(0.5), r2, d))));
+    hitBare = max2(hitBare, h.w.mul(oneMinus2(smoothstep3(r2.mul(0.14), r2.mul(0.3), d))));
+    hitPit = max2(hitPit, h.w.mul(oneMinus2(smoothstep3(r2.mul(0.02), r2.mul(0.12), d))));
+  }
+  const hSoot = clamp4(hitSoot.mul(hMask.a.mul(0.8).add(0.8)), 0, 1), hBare = clamp4(hitBare.mul(hMask.b.mul(0.7).add(0.62)), 0, 1);
+  const hScorch = clamp4(max2(hScorch0, hSoot.mul(0.96)), 0, 0.96);
   col = mix2(col, vec32(0.02, 0.018, 0.016), hScorch);
+  col = mix2(col, vec32(0.62, 0.62, 0.66), hBare).mul(oneMinus2(hitPit.mul(0.7)));
   mat.colorNode = col.mul(hMask.r);
-  mat.roughnessNode = clamp3(mix2(materialRoughness2.mul(hMask.g.mul(0.55).add(0.72)), hMask.g.mul(0.28).add(0.3), hWear).add(hGrime.mul(0.34)).add(hScorch.mul(0.42)), 0.1, 1);
-  mat.metalnessNode = mix2(materialMetalness2, float2(0.95), hWear).mul(oneMinus2(hScorch.mul(0.7))).mul(oneMinus2(hGrime.mul(0.3)));
-  mat.clearcoatNode = float2(baseCoat).mul(oneMinus2(hWear)).mul(oneMinus2(hGrime.mul(0.7))).mul(oneMinus2(hScorch));
+  mat.roughnessNode = clamp4(mix2(mix2(materialRoughness2.mul(hMask.g.mul(0.55).add(0.72)), hMask.g.mul(0.28).add(0.3), hWear).add(hGrime.mul(0.34)).add(hScorch.mul(0.42)), float2(0.36), hBare), 0.1, 1);
+  mat.metalnessNode = mix2(mix2(materialMetalness2, float2(0.95), hWear).mul(oneMinus2(hScorch.mul(0.7))).mul(oneMinus2(hGrime.mul(0.3))), float2(0.95), hBare);
+  mat.clearcoatNode = float2(baseCoat).mul(oneMinus2(hWear)).mul(oneMinus2(hGrime.mul(0.7))).mul(oneMinus2(hScorch)).mul(oneMinus2(hBare));
   mat.normalNode = safeHullNormal(tex.normal, tuv, 0.85);
-  const hT = clamp3(u.uHeat.mul(1.3).sub(a.mul(1.45)), 0, 1.3);
-  const hCol = mix2(mix2(vec32(0.5, 0.03, 0), vec32(1, 0.3, 0.04), smoothstep2(0.1, 0.5, hT)), vec32(1, 0.88, 0.4), smoothstep2(0.55, 1.05, hT));
-  const hGlow = hCol.mul(smoothstep2(0, 0.35, hT).mul(0.85).add(pow5(hT, 3).mul(1.5))).mul(hMask.a.mul(0.35).add(0.65));
+  const hT = clamp4(u.uHeat.mul(1.3).sub(a.mul(1.45)), 0, 1.3);
+  const hCol = mix2(mix2(vec32(0.5, 0.03, 0), vec32(1, 0.3, 0.04), smoothstep3(0.1, 0.5, hT)), vec32(1, 0.88, 0.4), smoothstep3(0.55, 1.05, hT));
+  const hGlow = hCol.mul(smoothstep3(0, 0.35, hT).mul(0.85).add(pow5(hT, 3).mul(1.5))).mul(hMask.a.mul(0.35).add(0.65));
   mat.emissiveNode = u.uGlowCol.mul(hDec.b.mul(1.3)).add(hGlow);
   return mat;
 }
@@ -73731,16 +76520,18 @@ function sharedOpponentHullMaterial(texSize) {
   mat.envMapIntensity = 0.92;
   const tuv = uv2();
   const hMask = texture2(tex.mask, tuv), hDec = texture2(tex.decal, tuv);
-  const hWear = smoothstep2(0.66, 0.78, hMask.b);
-  const hGrime = clamp3(hMask.a.mul(0.72), 0, 1);
+  const hWear = smoothstep3(0.66, 0.78, hMask.b);
+  const hGrime = clamp4(hMask.a.mul(0.72), 0, 1);
   let col = vertexColor2();
   col = mix2(col, vec32(0.025), hDec.r.mul(0.88));
   col = mix2(col, vec32(0.78, 0.56, 0.07), hDec.g);
   col = mix2(col, vec32(0.52, 0.53, 0.56), hWear);
   col = col.mul(mix2(vec32(1), vec32(0.44, 0.38, 0.32), hGrime));
+  const hScorch = clamp4(userDataN("scorch", "float").mul(hMask.a.mul(0.7).add(0.55)), 0, 0.92);
+  col = mix2(col, vec32(0.02, 0.018, 0.016), hScorch);
   mat.colorNode = col.mul(hMask.r);
-  mat.roughnessNode = clamp3(mix2(hMask.g.mul(0.18).add(0.22), float2(0.34), hWear).add(hGrime.mul(0.32)), 0.14, 1);
-  mat.metalnessNode = mix2(float2(0.48), float2(0.94), hWear).mul(oneMinus2(hGrime.mul(0.28)));
+  mat.roughnessNode = clamp4(mix2(hMask.g.mul(0.18).add(0.22), float2(0.34), hWear).add(hGrime.mul(0.32)).add(hScorch.mul(0.42)), 0.14, 1);
+  mat.metalnessNode = mix2(float2(0.48), float2(0.94), hWear).mul(oneMinus2(hGrime.mul(0.28))).mul(oneMinus2(hScorch.mul(0.7)));
   mat.normalNode = safeHullNormal(tex.normal, tuv, 0.7);
   mat.emissiveNode = vec32(1, 0.68, 0.28).mul(hDec.b.mul(0.9));
   mat.userData.shared = true;
@@ -73756,10 +76547,10 @@ function sharedOpponentFlameMaterial() {
   const ang = L.x.mul(Math.PI * 2);
   const fl = sin2(ang.mul(3).add(t.mul(9)).sub(podSharedTime.mul(22))).mul(0.3).add(0.72);
   const dia = pow5(abs2(sin2(t.mul(18).sub(podSharedTime.mul(3)))), 3).mul(0.45).add(0.55);
-  const fade = pow5(clamp3(oneMinus2(t), 0, 1), 1.3).mul(smoothstep2(0, 0.05, t.add(0.01)));
+  const fade = pow5(clamp4(oneMinus2(t), 0, 1), 1.3).mul(smoothstep3(0, 0.05, t.add(0.01)));
   const edge = pow5(abs2(dot2(normalViewGeometry2, positionViewDirection2)), 1.3);
-  mat.colorNode = mix2(vertexColor2(), vec32(1, 0.96, 0.9), pow5(clamp3(oneMinus2(t), 0, 1), 1.8).mul(0.65));
-  mat.opacityNode = clamp3(fade.mul(edge).mul(fl).mul(dia).mul(0.92), 0, 1);
+  mat.colorNode = mix2(vertexColor2(), vec32(1, 0.96, 0.9), pow5(clamp4(oneMinus2(t), 0, 1), 1.8).mul(0.65));
+  mat.opacityNode = clamp4(fade.mul(edge).mul(fl).mul(dia).mul(0.92).mul(userDataN("power", "float")), 0, 1);
   mat.userData.shared = true;
   oppFlameCache = mat;
   return mat;
@@ -73767,17 +76558,17 @@ function sharedOpponentFlameMaterial() {
 var oppBinderCache = null;
 function boltLook(f, y, t) {
   const c = y.mul(2).sub(1), ac = oneMinus2(abs2(c));
-  const core = pow5(ac, 26).mul(0.85), halo = pow5(ac, 2.6).mul(0.13);
+  const core = pow5(ac, 26).mul(0.85), halo2 = pow5(ac, 2.6).mul(0.13);
   let arcs = float2(0);
   const A = [[21, 33, 47, 58, 0.5], [17, -41, 61, 77, 0.62], [29, 52, 39, -66, 0.72], [13, -27, 71, 93, 0.8]];
   A.forEach(([f1, s1, f2, s2, amp], k) => {
     const wv = sin2(f.mul(f1).add(t.mul(s1)).add(k * 1.7)).mul(amp * 0.7).add(sin2(f.mul(f2).sub(t.mul(s2))).mul(amp * 0.3));
     const on = step2(0.28, fract2(sin2(floorN(t.mul(17 + k * 3)).add(k * 7.1).mul(91.7)).mul(43758.5)));
-    arcs = arcs.add(pow5(oneMinus2(clamp3(abs2(c.sub(wv)), 0, 1)), 48).mul(on));
+    arcs = arcs.add(pow5(oneMinus2(clamp4(abs2(c.sub(wv)), 0, 1)), 48).mul(on));
   });
   const pulse = pow5(sin2(f.mul(9).sub(t.mul(24))).mul(0.5).add(0.5), 6).mul(0.8);
-  const ends = smoothstep2(0, 0.05, f).mul(ssInv(1, 0.95, f));
-  return [clamp3(core.add(arcs).mul(0.9), 0, 1), core.add(halo).add(arcs.mul(0.95)).mul(pulse.add(0.75)).mul(ends)];
+  const ends = smoothstep3(0, 0.05, f).mul(ssInv(1, 0.95, f));
+  return [clamp4(core.add(arcs).mul(0.9), 0, 1), core.add(halo2).add(arcs.mul(0.95)).mul(pulse.add(0.75)).mul(ends)];
 }
 function sharedOpponentBinderMaterial() {
   if (oppBinderCache) return oppBinderCache;
@@ -73790,7 +76581,7 @@ function sharedOpponentBinderMaterial() {
   mat.positionNode = positionLocal2.add(vec32(0, env.mul(float2(0.16).add(jigY)), env.mul(jigZ)));
   const [wh, al] = boltLook(f, vUv.y, podSharedTime);
   mat.colorNode = mix2(vertexColor2(), vec32(1), wh).mul(1.7);
-  mat.opacityNode = clamp3(al.mul(0.95), 0, 1);
+  mat.opacityNode = clamp4(al.mul(0.95), 0, 1);
   mat.userData.shared = true;
   oppBinderCache = mat;
   return mat;
@@ -73829,12 +76620,35 @@ function sharedPodMaterials(texSize) {
   sharedCache.set(texSize, m);
   return m;
 }
+var CANOPY = [["#9fd4ff", 0.28, 0.1, 0.12], ["#20262e", 0.62, 0.2, 0.16], ["#ffab3d", 0.42, 0.15, 0.12], ["#dfe9f2", 0.86, 1, 0.05]];
+var canopyCache = [];
+function canopyGlass(tint) {
+  const i = Math.max(0, Math.min(CANOPY.length - 1, Math.round(tint) || 0));
+  let m = canopyCache[i];
+  if (!m) {
+    const [color2, opacity, metalness2, roughness2] = CANOPY[i];
+    m = new MeshStandardMaterial({ color: color2, metalness: metalness2, roughness: roughness2, transparent: true, opacity, envMapIntensity: i === 3 ? 1.6 : 1.2, side: DoubleSide, depthWrite: false });
+    m.userData.shared = true;
+    canopyCache[i] = m;
+  }
+  return m;
+}
 function suitMaterial(color2) {
   let m = suitCache.get(color2);
   if (!m) {
     m = new MeshStandardMaterial({ color: color2, roughness: 0.66, metalness: 0.05 });
     m.userData.shared = true;
     suitCache.set(color2, m);
+  }
+  return m;
+}
+var skinCache = /* @__PURE__ */ new Map();
+function skinMaterial(color2) {
+  let m = skinCache.get(color2);
+  if (!m) {
+    m = new MeshStandardMaterial({ color: color2, roughness: 0.64 });
+    m.userData.shared = true;
+    skinCache.set(color2, m);
   }
   return m;
 }
@@ -73849,10 +76663,10 @@ function flameMaterial(color2, core) {
   const w22 = cos2(ang.mul(5).sub(t.mul(17)).add(u.uTime.mul(31))).mul(0.5).add(0.5);
   const fl = w12.mul(0.6).add(w22.mul(0.4));
   const dia = pow5(abs2(sin2(t.mul(19).sub(u.uTime.mul(3)))), 3).mul(0.45).add(0.55);
-  const fade = pow5(clamp3(oneMinus2(t), 0, 1), 1.35).mul(smoothstep2(0, 0.05, t.add(0.01)));
+  const fade = pow5(clamp4(oneMinus2(t), 0, 1), 1.35).mul(smoothstep3(0, 0.05, t.add(0.01)));
   const edge = pow5(abs2(dot2(normalViewGeometry2, positionViewDirection2)), 1.35);
   mat.colorNode = mix2(u.uColor, vec32(1, 0.96, 0.9), oneMinus2(t).mul(0.7 * coreF));
-  mat.opacityNode = clamp3(fade.mul(edge).mul(fl.mul(0.75).add(0.42)).mul(mix2(float2(1), dia, 0.25 + 0.4 * coreF)).mul(u.uPower), 0, 1);
+  mat.opacityNode = clamp4(fade.mul(edge).mul(fl.mul(0.75).add(0.42)).mul(mix2(float2(1), dia, 0.25 + 0.4 * coreF)).mul(u.uPower), 0, 1);
   mat.userData.u = u;
   return mat;
 }
@@ -73868,7 +76682,7 @@ function binderMaterial(color2) {
   mat.positionNode = positionLocal2.add(vec32(0, endLift.add(env.mul(float2(0.18).add(jigY))), env.mul(jigZ)));
   const [wh, al] = boltLook(f, vUv.y, u.uTime);
   mat.colorNode = mix2(u.uColor, vec32(1), wh).mul(1.8);
-  mat.opacityNode = clamp3(al.mul(u.uPower), 0, 1);
+  mat.opacityNode = clamp4(al.mul(u.uPower), 0, 1);
   mat.userData.u = u;
   return mat;
 }
@@ -73881,7 +76695,7 @@ function cableFlexMaterial() {
   const L = attribute2("aLiv", "vec3");
   const lift = mix2(uLift.x, uLift.y, L.x).mul(L.y);
   const uCk = uniform2(new Vector3());
-  mat.positionNode = positionLocal2.add(vec32(0, lift, 0)).add(uCk.mul(oneMinus2(clamp3(L.y, 0, 1))));
+  mat.positionNode = positionLocal2.add(vec32(0, lift, 0)).add(uCk.mul(oneMinus2(clamp4(L.y, 0, 1))));
   mat.userData.uCk = uCk;
   mat.normalNode = safeHullNormal(braid, uv2().mul(vec22(26, 6)), 0.65);
   mat.userData.uLift = uLift;
@@ -73899,187 +76713,11 @@ function petalMaterial() {
   return m;
 }
 
-// src/game/podModel.ts
+// ../../src/game/podModel.ts
 var SHADOW_KEYS = /* @__PURE__ */ new Set(["hull", "steel", "dark", "chrome", "carbon"]);
+var PILOT = "#pilot";
 var OPP_SHADOW_KEYS = /* @__PURE__ */ new Set(["hull", "steel", "dark"]);
-var BINDER_PTS = 18;
 var podLodScale = 1;
-function buildFlexCables(L, seg, anchors) {
-  const cp = new Vector3(0, L.cockpit.y, L.cockpit.z);
-  const up = new Vector3(0, 1, 0);
-  const list = [];
-  const tagFlex = (g, isR, pA, pB) => {
-    const p = g.attributes.position;
-    const n = p.count;
-    const liv = new Float32Array(n * 3);
-    const dz = pA.z - pB.z || 1;
-    for (let i = 0; i < n; i++) {
-      const w = Math.max(0, Math.min(1, (p.getZ(i) - pB.z) / dz));
-      liv[i * 3] = isR;
-      liv[i * 3 + 1] = w;
-      liv[i * 3 + 2] = 0;
-    }
-    g.setAttribute("aLiv", new BufferAttribute(liv, 3));
-    if (!g.attributes.normal) g.computeVertexNormals();
-    if (!g.attributes.uv) g.setAttribute("uv", new BufferAttribute(new Float32Array(n * 2), 2));
-    list.push(g);
-  };
-  for (const em of L.engines) {
-    const eg = engineGeo(em.spec, seg);
-    const isR = em.x >= 0 ? 1 : 0;
-    const a = eg.pylon.clone().add(new Vector3(em.x, em.y, em.z));
-    const b = anchors[isR].clone().add(cp);
-    const rearZ = eg.exhaustZ + 0.12 * eg.L, topY = Math.max(eg.top, eg.R) + 0.14;
-    const v1 = new Vector3(em.x, em.y + topY + 0.1, em.z + rearZ - 0.3);
-    const v2 = new Vector3(em.x, em.y + topY, em.z + rearZ + (eg.pylon.z - rearZ) * 0.5);
-    const dist = v1.distanceTo(b);
-    const sag = 0.3 + dist * 0.03;
-    for (const [r2, off, s, rad] of [[0.055, 0, 1, 6], [0.024, 0.12, 1.18, 4]]) {
-      const pts = [];
-      const ox = off * (isR ? -1 : 1);
-      for (let i = 0; i <= 8; i++) {
-        const t = i / 8;
-        const p = b.clone().lerp(v1, t);
-        p.y -= sag * s * 4 * t * (1 - t) * (1 - 0.35 * t);
-        p.x += ox * Math.sin(t * Math.PI * 0.5);
-        pts.push(p);
-      }
-      pts.push(v1.clone().lerp(v2, 0.5).add(new Vector3(ox, 0, 0)), v2.clone().add(new Vector3(ox, 0, 0)), a.clone().add(new Vector3(ox * 0.5, 0.03, 0)));
-      tagFlex(tube(pts, r2, Math.max(16, Math.round(seg * 0.8)), rad), isR, v1, b);
-    }
-    for (const [p, q] of [[a, v2], [b, v1]]) {
-      const dir = q.clone().sub(p).normalize();
-      const fg = cyl(0.085, 0.07, 0.24, 7);
-      fg.applyMatrix4(new Matrix4().compose(p.clone().addScaledVector(dir, 0.12), new Quaternion().setFromUnitVectors(up, dir), new Vector3(1, 1, 1)));
-      tagFlex(fg, isR, v1, b);
-    }
-    for (const sp of [v1, v2]) {
-      const cl = torus(0.085, 0.022, 5, 8);
-      cl.rotateY(Math.PI / 2);
-      cl.translate(sp.x, sp.y - 0.02, sp.z);
-      tagFlex(cl, isR, v1, b);
-    }
-  }
-  const mg = mergeGeometries(list, false);
-  list.forEach((x) => x.dispose());
-  mg.computeBoundingSphere();
-  mg.boundingSphere.radius += 1.2;
-  return mg;
-}
-function bakeHullVertexColors(g, c1Hex, c2Hex, livery) {
-  const c1 = new Color(c1Hex), c2 = new Color(c2Hex);
-  const liv = g.attributes.aLiv;
-  const n = g.attributes.position.count;
-  const col = new Float32Array(n * 3);
-  const band = (x, cc, w) => Math.abs(x - cc) < w ? 1 : 0;
-  const fr = (x) => x - Math.floor(x);
-  const lv = (livery % 6 + 6) % 6;
-  for (let i = 0; i < n; i++) {
-    let m = 0;
-    if (liv) {
-      const c = liv.getX(i), a = liv.getY(i), z = liv.getZ(i);
-      const cd = Math.min(c, 1 - c);
-      if (z > 2.5) m = 1;
-      else if (z >= 0.5 && z < 1.5) {
-        if (lv === 0) m = Math.max(band(cd, 0, 0.06), band(a, 0.8, 0.035));
-        else if (lv === 1) m = Math.max(band(cd, 0.055, 0.02), band(cd, 0, 0.014), a >= 0.86 ? 1 : 0);
-        else if (lv === 2) m = a >= 0.14 && cd < 0.12 + Math.abs(fr(a * 5) - 0.5) * 0.16 ? 1 : 0;
-        else if (lv === 3) m = Math.max(band(a, 0.25, 0.042), band(a, 0.7, 0.042), a >= 0.3 && a <= 0.65 ? band(Math.abs(cd - 0.25), 0, 0.03) : 0);
-        else if (lv === 4) {
-          const ch = fr(a * 3.5 - cd * 1.8);
-          m = a >= 0.12 && a <= 0.9 && ch > 0.6 && ch < 0.88 || a >= 0.91 ? 1 : 0;
-        } else {
-          const chk = a >= 0.56 && a <= 0.86 && fr(cd * 8) >= 0.5 !== fr(a * 9) >= 0.5 ? 1 : 0;
-          m = Math.max(chk, band(cd, 0, 0.045));
-        }
-      } else if (z >= 1.5) {
-        const ck0 = Math.max(band(Math.abs(cd - 0.25 + (a - 0.5) * 0.12), 0, a * 0.02 + 0.035), a >= 0.9 ? 1 : 0);
-        m = lv === 4 ? Math.max(ck0, band(fr(a * 3 - cd * 1.5), 0.5, 0.16)) : lv === 5 ? Math.max(ck0, band(cd, 0.035, 0.016), band(cd, 0.085, 0.01)) : lv >= 2 ? Math.max(ck0, band(cd, 0, 0.05)) : ck0;
-      }
-    }
-    col[i * 3] = c1.r + (c2.r - c1.r) * m;
-    col[i * 3 + 1] = c1.g + (c2.g - c1.g) * m;
-    col[i * 3 + 2] = c1.b + (c2.b - c1.b) * m;
-  }
-  g.setAttribute("color", new BufferAttribute(col, 3));
-  return g;
-}
-function bakeSolidColor(g, col) {
-  const n = g.attributes.position.count;
-  const a = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) {
-    a[i * 3] = col.r;
-    a[i * 3 + 1] = col.g;
-    a[i * 3 + 2] = col.b;
-  }
-  g.setAttribute("color", new BufferAttribute(a, 3));
-  return g;
-}
-function makeBinderGeo(a, b, vertCol) {
-  const pos = new Float32Array(BINDER_PTS * 4 * 3), uv3 = new Float32Array(BINDER_PTS * 4 * 2);
-  const idx = [];
-  const w = 0.4;
-  const tmp3 = new Vector3();
-  for (let i = 0; i < BINDER_PTS; i++) {
-    const f = i / (BINDER_PTS - 1);
-    tmp3.copy(a).lerp(b, f);
-    for (let k = 0; k < 4; k++) {
-      uv3[(i * 4 + k) * 2] = f;
-      uv3[(i * 4 + k) * 2 + 1] = k % 2 === 0 ? 1 : 0;
-    }
-    const o = i * 12;
-    pos[o] = tmp3.x;
-    pos[o + 1] = tmp3.y + w;
-    pos[o + 2] = tmp3.z;
-    pos[o + 3] = tmp3.x;
-    pos[o + 4] = tmp3.y - w;
-    pos[o + 5] = tmp3.z;
-    pos[o + 6] = tmp3.x;
-    pos[o + 7] = tmp3.y;
-    pos[o + 8] = tmp3.z + w;
-    pos[o + 9] = tmp3.x;
-    pos[o + 10] = tmp3.y;
-    pos[o + 11] = tmp3.z - w;
-    if (i < BINDER_PTS - 1) for (const off of [0, 2]) {
-      const p = i * 4 + off, q = p + 4;
-      idx.push(p, p + 1, q, p + 1, q + 1, q);
-    }
-  }
-  const geo = new BufferGeometry();
-  geo.setAttribute("position", new BufferAttribute(pos, 3));
-  geo.setAttribute("uv", new BufferAttribute(uv3, 2));
-  geo.setIndex(idx);
-  if (vertCol) bakeSolidColor(geo, vertCol);
-  geo.computeBoundingSphere();
-  geo.boundingSphere.radius += 1.4;
-  return geo;
-}
-var oppFarCache = /* @__PURE__ */ new Map();
-function buildOpponentFarGeo(def, L) {
-  const hit = oppFarCache.get(def.id);
-  if (hit) return hit;
-  const pb = new PartBuilder();
-  const cp = new Vector3(0, L.cockpit.y, L.cockpit.z);
-  for (const em of L.engines) {
-    const { L: len, R } = em.spec;
-    pb.add("hull", lathe(prof([[R * 0.72, -len * 0.5, 1], [R, -len * 0.35], [R, len * 0.42], [R * 0.88, len * 0.5, 1]]), 9, 1), M4.t(em.x, em.y, em.z));
-    pb.add("dark", new CircleGeometry(R * 0.84, 9), M4.t(em.x, em.y, em.z + len * 0.49));
-    pb.add("glow", new ConeGeometry(R * 0.46, len * 0.55, 7, 1, true).rotateX(-Math.PI / 2), M4.t(em.x, em.y, em.z - len * 0.75));
-    const a = new Vector3(em.x, em.y + R, em.z), b = cp.clone();
-    pb.add("dark", tube([a, a.clone().lerp(b, 0.5).add(new Vector3(0, -0.4, 0)), b], 0.055, 5, 4));
-  }
-  const c = L.cockpit;
-  pb.add("hull", rbox(c.hw * 1.7, c.hw * 0.82, c.len, 0.14, 1), M4.t(0, c.y, c.z), [0, 0.5, 2]);
-  pb.add("dark", rbox(c.hw * 0.9, c.hw * 0.45, c.len * 0.42, 0.05, 1), M4.t(0, c.y + c.hw * 0.42, c.z));
-  if (L.binder) {
-    const A = L.engines[L.binder[0]], B2 = L.engines[L.binder[1]];
-    pb.add("glow", rbox(Math.abs(B2.x - A.x), 0.18, 0.18, 0.02), M4.t((A.x + B2.x) * 0.5, (A.y + B2.y) * 0.5 + 0.2, (A.z + B2.z) * 0.5));
-  }
-  const built = pb.build();
-  const out = { hull: built.get("hull"), dark: built.get("dark"), glow: built.get("glow") };
-  oppFarCache.set(def.id, out);
-  return out;
-}
 var sharedOppGlow = null;
 var sharedOppFarHull = null;
 function getOppGlow() {
@@ -74088,56 +76726,84 @@ function getOppGlow() {
 function getOppFarHull() {
   return sharedOppFarHull ?? (sharedOppFarHull = new MeshStandardMaterial({ vertexColors: true, metalness: 0.48, roughness: 0.34 }));
 }
+var Hider = class {
+  constructor(mesh, ranges) {
+    this.mesh = mesh;
+    this.ranges = ranges;
+    this.full = mesh.geometry.index.array.slice();
+    this.ids = new Set(ranges.map((r2) => r2.id));
+  }
+  mesh;
+  ranges;
+  full;
+  hidden = /* @__PURE__ */ new Set();
+  ids;
+  /** true when the mesh has to be rebuilt */
+  set(id, off) {
+    if (!this.ids.has(id) || this.hidden.has(id) === off) return false;
+    if (off) this.hidden.add(id);
+    else this.hidden.delete(id);
+    return true;
+  }
+  apply() {
+    const idx = this.mesh.geometry.index, n = visibleIndices(this.full, this.ranges, this.hidden, idx.array);
+    idx.needsUpdate = true;
+    this.mesh.geometry.setDrawRange(0, n);
+    this.mesh.visible = n > 0;
+  }
+};
+function rangesIn(breaks, where, key) {
+  const out = [];
+  for (const [id, s] of breaks) for (const r2 of s.ranges) if (r2.where === where && r2.key === key) out.push({ id, start: r2.start, count: r2.count });
+  return out;
+}
+function partsSwitch(podId, breaks, hiders, each) {
+  const parts = damageModel(podId).parts;
+  let now = 0;
+  return (mask) => {
+    if (mask === now) return;
+    const changed = mask ^ now;
+    now = mask;
+    const dirty = /* @__PURE__ */ new Set();
+    for (let i = 0; i < parts.length; i++) {
+      if (!(changed >> i & 1)) continue;
+      const id = parts[i].id, lost = !!(mask >> i & 1), s = breaks.get(id);
+      if (!s) continue;
+      for (const h of hiders) if (h.set(id, lost)) dirty.add(h);
+      each(id, lost, s);
+    }
+    for (const h of dirty) h.apply();
+  };
+}
 function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = false, opts) {
-  const seg = isOpponent ? quality >= 3 ? 18 : 14 : quality >= 3 ? 40 : quality === 2 ? 28 : 20;
+  const seg = segFor(quality, isOpponent);
   const texSize = texRes >= 2048 && !isOpponent ? 2048 : 1024;
-  const L = podLayout(def);
-  const liv = opts?.pattern !== void 0 && opts.pattern >= 0 ? opts.pattern : L.livery;
-  const fin = opts?.finish ?? 0;
-  const shared = sharedPodMaterials(texSize);
+  const fin2 = opts?.finish ?? 0;
+  const kit = { fins: opts?.kit?.fins ?? 0, intake: opts?.kit?.intake ?? 0, nozzle: opts?.kit?.nozzle ?? 0, tune: tuneTiers(opts?.tune) };
+  const shared = { ...sharedPodMaterials(texSize), glass: canopyGlass(opts?.kit?.canopy ?? 0) };
   const glowCol = new Color(colors[2]);
-  const pilot = PILOTS.find((p) => p.id === def.pilotId) ?? PILOTS[0];
-  const suit = suitMaterial(pilot.color);
+  const pilot2 = PILOTS.find((p) => p.id === def.pilotId) ?? PILOTS[0];
+  const suit = suitMaterial(pilot2.color), skin = skinMaterial(pilot2.skin);
   const group = new Group();
   const body = new Group();
   group.add(body);
-  body.position.z = -L.cockpit.z * 0.25;
-  const exhaustLocal = [];
-  let frontZ = -Infinity, topY = 0, sumY = 0;
-  for (const em of L.engines) {
-    const eg = engineGeo(em.spec, seg);
-    exhaustLocal.push(new Vector3(em.x, em.y, em.z + eg.exhaustZ));
-    frontZ = Math.max(frontZ, em.z + eg.frontZ);
-    topY = Math.max(topY, em.y + eg.R);
-    sumY += em.y;
-  }
-  const ckBuilt = cockpitGeo(L, seg, pilot.species);
-  const eye = new Vector3(0, L.cockpit.y, L.cockpit.z).add(ckBuilt.info.head).add(new Vector3(0, 0.24, 0.32));
-  const hood = new Vector3(0, sumY / Math.max(1, L.engines.length) + topY * 0.35 + 0.35, frontZ - 1.2);
-  const extraPB = new PartBuilder();
-  L.extras?.(extraPB, L);
-  const extraParts = extraPB.build();
   if (isOpponent) {
+    const A2 = assembleRival(def, seg, pilot2.head, colors, opts?.pattern, kit);
+    body.position.z = A2.bodyZ;
     const oppHull = sharedOpponentHullMaterial(1024);
     const oppFlame = sharedOpponentFlameMaterial();
     const oppBinder = sharedOpponentBinderMaterial();
     const oppGlow = getOppGlow();
-    const glowBoost = glowCol.clone().multiplyScalar(1.2);
-    const ownedGeos = [];
     const shadowMeshes = [];
     const engines2 = [];
     const nearGrp = new Group();
     body.add(nearGrp);
-    const addBucket = (buckets, parent) => {
-      for (const [k, list] of buckets) {
-        const mg = mergeGeometries(list, false);
-        list.forEach((x) => x.dispose());
-        if (!mg) continue;
-        if (k === "hull") bakeHullVertexColors(mg, colors[0], colors[1], liv);
-        else if (k === "glow") bakeSolidColor(mg, glowBoost);
-        mg.computeBoundingSphere();
-        ownedGeos.push(mg);
-        const mat = k === "hull" ? oppHull : k === "glow" ? oppGlow : k === "suit" ? suit : shared[k];
+    const hiders2 = [];
+    const sootMeshes = [];
+    const plumes = [];
+    const addBuckets = (buckets, parent, where) => {
+      for (const [k, mg] of buckets) {
+        const mat = k === "hull" ? oppHull : k === "glow" ? oppGlow : k === "suit" ? suit : k === "skin" ? skin : shared[k];
         if (!mat) continue;
         const m = new Mesh(mg, mat);
         const fx = k === "glow" || k === "glass";
@@ -74146,132 +76812,72 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
         m.receiveShadow = !fx;
         if (cast) shadowMeshes.push(m);
         if (k === "glass") m.renderOrder = 1;
+        if (k === "hull") {
+          m.userData.scorch = 0;
+          sootMeshes.push({ m, where });
+        }
         parent.add(m);
+        const rg = rangesIn(A2.breaks, where, k);
+        if (rg.length) hiders2.push(new Hider(m, rg));
       }
     };
-    const pushB = (b, k, g, m) => {
-      const c = g.clone();
-      if (m) c.applyMatrix4(m);
-      let l = b.get(k);
-      if (!l) {
-        l = [];
-        b.set(k, l);
-      }
-      l.push(c);
-    };
-    let spanX = 4.6;
     const oppPetals = [];
     let oppOpen = 0;
+    const oppRotors = [];
     const oppPivots = [];
-    for (const side of [-1, 1]) {
-      const sideMs = L.engines.filter((e) => (e.x < 0 ? -1 : 1) === side);
-      const piv = new Vector3();
-      for (const em of sideMs) {
-        piv.x += em.x;
-        piv.y += em.y;
-        piv.z += em.z;
-      }
-      if (sideMs.length) piv.divideScalar(sideMs.length);
-      oppPivots.push(piv);
+    A2.banks.forEach((bank, bi) => {
+      oppPivots.push(bank.pivot);
       const grp = new Group();
-      grp.position.copy(piv);
+      grp.position.copy(bank.pivot);
       nearGrp.add(grp);
       engines2.push(grp);
-      const b = /* @__PURE__ */ new Map();
-      const fls = [];
-      const pts = [];
-      for (const em of sideMs) {
-        const ox = em.x - piv.x, oy = em.y - piv.y, oz = em.z - piv.z;
-        const eg = engineGeo(em.spec, seg);
-        const emM = M4.t(ox, oy, oz);
-        for (const [k, g] of eg.parts) pushB(b, k, g, emM);
-        pushB(b, "dark", eg.fan, M4.t(ox, oy, oz + eg.fanZ));
-        for (const f of eg.flaps) pushB(b, "hull", f.geo, M4.t(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z));
-        const fo = eg.flameOuter.clone();
-        fo.applyMatrix4(M4.t(ox, oy, oz + eg.flameZ));
-        fls.push(fo);
-        pts.push(eg.petals.clone().translate(ox, oy, oz));
+      addBuckets(bank.buckets, grp, bi);
+      for (const r2 of bank.rotors) {
+        const rm = new Mesh(r2.geo, shared[r2.mat] ?? shared.dark);
+        rm.position.copy(r2.pos);
+        rm.castShadow = false;
+        rm.receiveShadow = true;
+        grp.add(rm);
+        oppRotors.push({ m: rm, spin: r2.spin, engine: r2.engine, geo: r2.geo, lost: r2.lost });
       }
-      addBucket(b, grp);
-      if (pts.length) {
-        const pg = mergeGeometries(pts, false);
-        pts.forEach((x) => x.dispose());
-        ownedGeos.push(pg);
-        const pm2 = new Mesh(pg, petalMaterial());
+      if (bank.petals) {
+        const pm2 = new Mesh(bank.petals, petalMaterial());
         pm2.userData.open = 0;
         grp.add(pm2);
         oppPetals.push(pm2);
       }
-      if (fls.length) {
-        const fg = mergeGeometries(fls, false);
-        fls.forEach((x) => x.dispose());
-        bakeSolidColor(fg, glowCol);
-        fg.computeBoundingSphere();
-        ownedGeos.push(fg);
-        const fm = new Mesh(fg, oppFlame);
+      if (bank.flames) {
+        const fm = new Mesh(bank.flames, oppFlame);
         fm.renderOrder = 2;
+        fm.userData.power = 1;
         grp.add(fm);
+        plumes.push({ m: fm, side: bank.side });
+        const rg = [];
+        for (const [id, sh] of A2.breaks) for (const f of sh.flames) if (f.bank === bi) rg.push({ id, start: f.start, count: f.count });
+        if (rg.length) hiders2.push(new Hider(fm, rg));
       }
-    }
-    {
-      const b = /* @__PURE__ */ new Map();
-      const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
-      for (const [k, g] of ckBuilt.parts) pushB(b, k, g, ckM);
-      for (const [k, g] of extraParts) {
-        pushB(b, k, g);
-        g.dispose();
-      }
-      const cp = new Vector3(0, L.cockpit.y, L.cockpit.z);
-      const cabPB = new PartBuilder();
-      for (const em of L.engines) {
-        const eg = engineGeo(em.spec, seg);
-        const a = eg.pylon.clone().add(new Vector3(em.x, em.y, em.z));
-        const anc = ckBuilt.info.anchors[em.x < 0 ? 0 : 1].clone().add(cp);
-        const mid = a.clone().lerp(anc, 0.5);
-        mid.y -= 0.55;
-        cabPB.add("dark", tube([anc, mid, a], 0.055, 8, 5));
-      }
-      for (const [k, g] of cabPB.build()) {
-        pushB(b, k, g);
-        g.dispose();
-      }
-      addBucket(b, nearGrp);
-    }
+    });
+    addBuckets(A2.cockpit, nearGrp, "cockpit");
+    const spanX = A2.spanX;
     const binderMeshes = [];
-    for (const [ia, ib] of L.binders ?? (L.binder ? [L.binder] : [])) {
-      let A = L.engines[ia], B2 = L.engines[ib];
-      if (A.x > B2.x) {
-        const t = A;
-        A = B2;
-        B2 = t;
-      }
-      const ea = engineGeo(A.spec, seg), eb = engineGeo(B2.spec, seg);
-      const dyh = (B2.y + eb.R * 0.2 - (A.y + ea.R * 0.2)) * 0.5;
-      const pa = new Vector3(A.x + ea.R * 0.97, -dyh, A.z + ea.L * 0.12);
-      const pb = new Vector3(B2.x - eb.R * 0.97, dyh, B2.z + eb.L * 0.12);
-      spanX = Math.max(1.5, Math.abs(pb.x - pa.x));
-      const baseY = (A.y + ea.R * 0.2 + B2.y + eb.R * 0.2) * 0.5;
-      const bg = makeBinderGeo(pa, pb, glowCol);
-      ownedGeos.push(bg);
-      const bm = new Mesh(bg, oppBinder);
-      bm.position.y = baseY;
+    A2.binders.forEach((b, bi) => {
+      const bm = new Mesh(b.geo, oppBinder);
+      bm.position.y = b.baseY;
       bm.renderOrder = 3;
       nearGrp.add(bm);
-      binderMeshes.push({ m: bm, y: baseY });
-    }
+      binderMeshes.push({ m: bm, y: b.baseY });
+      const rg = [];
+      for (const [id, sh] of A2.breaks) for (const a of sh.arcs) if (a.binder === bi) rg.push({ id, start: a.start, count: a.count });
+      if (rg.length) hiders2.push(new Hider(bm, rg));
+    });
     const farGrp = new Group();
     farGrp.visible = false;
     body.add(farGrp);
-    const far = buildOpponentFarGeo(def, L);
-    const fhGeo = bakeHullVertexColors(far.hull.clone(), colors[0], colors[1], liv);
-    ownedGeos.push(fhGeo);
-    const fgGeo = bakeSolidColor(far.glow.clone(), glowBoost);
-    ownedGeos.push(fgGeo);
-    const fhM = new Mesh(fhGeo, getOppFarHull());
+    const fhM = new Mesh(A2.far.hull, getOppFarHull());
     fhM.receiveShadow = true;
     farGrp.add(fhM);
-    farGrp.add(new Mesh(far.dark, shared.dark));
-    farGrp.add(new Mesh(fgGeo, oppGlow));
+    farGrp.add(new Mesh(A2.far.dark, shared.dark));
+    farGrp.add(new Mesh(A2.far.glow, oppGlow));
     const setDistance = (d, forceAll = false) => {
       if (forceAll) {
         nearGrp.visible = true;
@@ -74300,20 +76906,47 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
         b.m.rotation.z = Math.atan2(yR - yL, spanX);
       }
     };
-    const update2 = (t, throttle = 0, boost = 0) => {
+    const update2 = (t, throttle = 0, boost = 0, _airbrake = 0, dmgL = 1, dmgR = 1) => {
       podSharedTime.value = t;
       oppOpen += (boost - oppOpen) * 0.14;
+      if (nearGrp.visible) {
+        const hpMin = Math.min(dmgL, dmgR);
+        for (let i = 0; i < sootMeshes.length; i++) {
+          const s = sootMeshes[i];
+          s.m.userData.scorch = s.where === "cockpit" ? Math.min(0.6, (1 - hpMin) * 0.6) : Math.min(1, (1 - (A2.banks[s.where].side < 0 ? dmgL : dmgR)) * 1.1);
+        }
+        for (let i = 0; i < plumes.length; i++) {
+          const hp = plumes[i].side < 0 ? dmgL : dmgR;
+          plumes[i].m.userData.power = (hp < 0.35 ? 0.55 + 0.45 * hp / 0.35 : 1) * (hp < 0.15 ? 0.35 + 0.55 * Math.abs(Math.sin(t * (41 + i * 6))) : 1);
+        }
+      }
       const o = 0.1 * throttle + 0.9 * oppOpen;
       for (let i = 0; i < oppPetals.length; i++) oppPetals[i].userData.open = o;
+      if (oppRotors.length && nearGrp.visible) {
+        const ang = t * (16 + throttle * 42);
+        for (let i = 0; i < oppRotors.length; i++) oppRotors[i].m.rotation.z = ang * oppRotors[i].spin + i * 0.7;
+      }
+    };
+    const engineOut2 = A2.layout.engines.map(() => false);
+    const setParts2 = partsSwitch(def.id, A2.breaks, hiders2, (_id2, lost, sh) => {
+      for (const e of sh.engines) engineOut2[e] = lost;
+      for (const e of sh.fans) for (const r2 of oppRotors) if (r2.engine === e && r2.lost) r2.m.geometry = lost ? r2.lost : r2.geo;
+    });
+    const partBody2 = (i, out) => {
+      const sh = A2.breaks.get(damageModel(def.id).parts[i]?.id ?? "");
+      return sh ? out.copy(sh.center) : out.set(0, 0, 0);
     };
     const dispose2 = () => {
-      ownedGeos.forEach((g) => g.dispose());
+      A2.owned.forEach((g) => g.dispose());
     };
-    return { group, body, engines: engines2, exhaustLocal, eye, hood, update: update2, setEngineMotion: setEngineMotion2, setDistance, dispose: dispose2 };
+    return { group, body, engines: engines2, exhaustLocal: A2.exhaustLocal, eye: A2.eye, hood: A2.hood, update: update2, setEngineMotion: setEngineMotion2, setDistance, setParts: setParts2, engineOut: engineOut2, partBody: partBody2, dispose: dispose2 };
   }
-  const hullL = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
-  const hullR = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
-  const hullC = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
+  const A = assembleHero(def, seg, pilot2.head, kit);
+  body.position.z = A.bodyZ;
+  const liv = opts?.pattern !== void 0 && opts.pattern >= 0 ? opts.pattern : A.layout.livery;
+  const hullL = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin2);
+  const hullR = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin2);
+  const hullC = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin2);
   const ckGrp = new Group();
   const glow = new MeshBasicMaterial({ color: glowCol.clone().multiplyScalar(1.2) });
   const flameL = flameMaterial(glowCol, false), coreL = flameMaterial(glowCol, true);
@@ -74322,8 +76955,10 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
   const cabLift = cabMat.userData.uLift;
   const cabCk = cabMat.userData.uCk;
   const own = [hullL, hullR, hullC, glow, flameL, coreL, flameR, coreR, cabMat];
-  const matFor = (k, hull) => k === "hull" ? hull : k === "glow" ? glow : k === "suit" ? suit : shared[k];
-  const addMeshes = (parts, parent, hull) => {
+  const matFor = (k, hull) => k === "hull" ? hull : k === "glow" ? glow : k === "suit" ? suit : k === "skin" ? skin : shared[k];
+  const hiders = [];
+  const addMeshes = (parts, parent, hull, where) => {
+    const made = [];
     for (const [k, g] of parts) {
       const mat = matFor(k, hull);
       if (!mat) continue;
@@ -74333,176 +76968,109 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       m.receiveShadow = !fx;
       if (k === "glass") m.renderOrder = 1;
       parent.add(m);
+      made.push({ k, m });
+      const rg = rangesIn(A.breaks, where, k);
+      if (where === "cockpit") {
+        const start = A.pilotStart.get(k);
+        if (start !== void 0 && g.index && start < g.index.count) rg.push({ id: PILOT, start, count: g.index.count - start });
+      }
+      if (rg.length) hiders.push(new Hider(m, rg));
     }
+    return made;
   };
-  const attachExtraToEngines = def.id === "aurora" || def.id === "brute" || def.id === "gasvaro" || def.id === "bomquad" || def.id === "teemo";
   const engines = [];
   const fans = [];
+  const fanGeo = [];
   const flaps = [];
   const petals = [];
   const flames = [];
-  const sideGeos = [];
+  const engineOut = A.layout.engines.map(() => false);
   const hc = new Color(), hot = new Color("#ff5a1a");
   const heroPivots = [];
-  for (const side of [-1, 1]) {
-    const sideMounts = L.engines.filter((e) => (e.x < 0 ? -1 : 1) === side);
-    if (!sideMounts.length) continue;
-    const piv = new Vector3();
-    for (const em of sideMounts) {
-      piv.x += em.x;
-      piv.y += em.y;
-      piv.z += em.z;
-    }
-    piv.divideScalar(sideMounts.length);
-    heroPivots.push(piv);
+  A.banks.forEach((bank, bi) => {
+    const side = bank.side;
+    heroPivots.push(bank.pivot);
     const engGrp = new Group();
-    engGrp.position.copy(piv);
+    engGrp.position.copy(bank.pivot);
     body.add(engGrp);
     engines.push(engGrp);
     const hull = side < 0 ? hullL : hullR;
-    const buckets = /* @__PURE__ */ new Map();
-    for (const em of sideMounts) {
-      const ox = em.x - piv.x, oy = em.y - piv.y, oz = em.z - piv.z;
-      const eg = engineGeo(em.spec, seg);
-      const emM = M4.t(ox, oy, oz);
-      for (const [k, g] of eg.parts) {
-        const gc = g.clone();
-        gc.applyMatrix4(emM);
-        let l = buckets.get(k);
-        if (!l) {
-          l = [];
-          buckets.set(k, l);
-        }
-        l.push(gc);
-      }
-      const fan = new Mesh(eg.fan, shared.dark);
-      fan.position.set(ox, oy, oz + eg.fanZ);
-      fan.castShadow = false;
+    for (const { index, off, geo: eg, flaps: egFlaps } of bank.engines) {
+      const fan = new Mesh(eg.fan, shared[eg.fanMat ?? "dark"] ?? shared.dark);
+      fan.position.set(off.x, off.y, off.z + eg.fanZ);
+      fan.castShadow = !!eg.openRotor;
+      fan.receiveShadow = !!eg.openRotor;
+      fan.userData.spin = eg.fanSpin ?? 1;
+      fan.userData.engine = index;
       engGrp.add(fan);
       fans.push(fan);
+      fanGeo[index] = { fan: eg.fan, lost: eg.fanLost };
       {
         const pm2 = new Mesh(eg.petals, petalMaterial());
-        pm2.position.set(ox, oy, oz);
+        pm2.position.copy(off);
         pm2.userData.open = 0;
         pm2.castShadow = false;
         engGrp.add(pm2);
         petals.push(pm2);
       }
-      for (const f of eg.flaps) {
+      for (const f of egFlaps) {
+        const hinge = new Group();
+        hinge.position.copy(f.hinge);
         const m = new Mesh(f.geo, hull);
-        m.position.set(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z);
+        m.position.copy(f.hinge).negate();
         m.castShadow = false;
         m.receiveShadow = true;
-        engGrp.add(m);
-        flaps.push({ m, sign: f.sign, side });
+        hinge.add(m);
+        engGrp.add(hinge);
+        flaps.push({ m: hinge, sign: f.sign, side, gain: f.gain ?? 1 });
       }
       for (const core of [false, true]) {
         const m = new Mesh(core ? eg.flameCore : eg.flameOuter, side < 0 ? core ? coreL : flameL : core ? coreR : flameR);
-        m.position.set(ox, oy, oz + eg.flameZ);
+        m.position.set(off.x, off.y, off.z + eg.flameZ);
         m.renderOrder = 2;
         engGrp.add(m);
-        flames.push({ m, side });
+        flames.push({ m, side, engine: index });
       }
     }
-    if (attachExtraToEngines) {
-      const shift = M4.t(-piv.x, -piv.y, -piv.z);
-      for (const [k, eg] of extraParts) {
-        const idx = eg.index.array;
-        const pos = eg.attributes.position;
-        const keep = [];
-        for (let t = 0; t < idx.length; t += 3) {
-          const cx = (pos.getX(idx[t]) + pos.getX(idx[t + 1]) + pos.getX(idx[t + 2])) / 3;
-          if ((cx < 0 ? -1 : 1) === side) keep.push(idx[t], idx[t + 1], idx[t + 2]);
-        }
-        if (keep.length) {
-          const sub2 = eg.clone();
-          sub2.setIndex(keep);
-          sub2.applyMatrix4(shift);
-          let l = buckets.get(k);
-          if (!l) {
-            l = [];
-            buckets.set(k, l);
-          }
-          l.push(sub2);
-        }
-      }
-    }
-    const mergedSide = /* @__PURE__ */ new Map();
-    for (const [k, list] of buckets) {
-      const mg = mergeGeometries(list, false);
-      list.forEach((x) => x.dispose());
-      if (mg) {
-        mg.computeBoundingSphere();
-        mergedSide.set(k, mg);
-        sideGeos.push(mg);
-      }
-    }
-    addMeshes(mergedSide, engGrp, hull);
+    addMeshes(bank.buckets, engGrp, hull, bi);
+  });
+  const ckView = new Group();
+  ckGrp.add(ckView);
+  body.add(ckGrp);
+  const ckMeshes = addMeshes(A.cockpit, ckView, hullC, "cockpit");
+  let lampCol = null;
+  const lampNow = new Float32Array(9).fill(-1);
+  if (A.lamps) {
+    const lm = new Mesh(A.lamps, getOppGlow());
+    ckView.add(lm);
+    lampCol = A.lamps.attributes.color;
   }
-  {
-    const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
-    const buckets = /* @__PURE__ */ new Map();
-    for (const [k, g] of ckBuilt.parts) {
-      const gc = g.clone();
-      gc.applyMatrix4(ckM);
-      let l = buckets.get(k);
-      if (!l) {
-        l = [];
-        buckets.set(k, l);
-      }
-      l.push(gc);
-    }
-    for (const [k, g] of extraParts) {
-      if (!attachExtraToEngines) {
-        let l = buckets.get(k);
-        if (!l) {
-          l = [];
-          buckets.set(k, l);
-        }
-        l.push(g);
-      } else g.dispose();
-    }
-    const mergedBody = /* @__PURE__ */ new Map();
-    for (const [k, list] of buckets) {
-      const mg = mergeGeometries(list, false);
-      list.forEach((x) => x.dispose());
-      if (mg) {
-        mg.computeBoundingSphere();
-        mergedBody.set(k, mg);
-        sideGeos.push(mg);
-      }
-    }
-    body.add(ckGrp);
-    addMeshes(mergedBody, ckGrp, hullC);
-    const cabGeo = buildFlexCables(L, seg, ckBuilt.info.anchors);
-    sideGeos.push(cabGeo);
-    const cabMesh = new Mesh(cabGeo, cabMat);
-    cabMesh.castShadow = false;
-    cabMesh.receiveShadow = true;
-    body.add(cabMesh);
-  }
-  const binderGeos = [];
+  const setLamp = (i, r2, g, b) => {
+    if (!lampCol || lampNow[i * 3] === r2 && lampNow[i * 3 + 1] === g && lampNow[i * 3 + 2] === b) return;
+    lampNow[i * 3] = r2;
+    lampNow[i * 3 + 1] = g;
+    lampNow[i * 3 + 2] = b;
+    for (let v = i * LAMP_VERTS; v < (i + 1) * LAMP_VERTS; v++) lampCol.setXYZ(v, r2, g, b);
+    lampCol.needsUpdate = true;
+  };
+  const cabMesh = new Mesh(A.cables, cabMat);
+  cabMesh.castShadow = false;
+  cabMesh.receiveShadow = true;
+  body.add(cabMesh);
   let binderU = null;
   const binderSwap = false;
-  const BL = L.binders ?? (L.binder ? [L.binder] : []);
-  if (BL.length) {
+  if (A.binders.length) {
     const bMat = binderMaterial(glowCol);
     own.push(bMat);
     binderU = bMat.userData.u;
-    for (const [ia, ib] of BL) {
-      let A = L.engines[ia], B2 = L.engines[ib];
-      if (A.x > B2.x) {
-        const t = A;
-        A = B2;
-        B2 = t;
-      }
-      const ea = engineGeo(A.spec, seg), eb = engineGeo(B2.spec, seg);
-      const g = makeBinderGeo(new Vector3(A.x + ea.R * 0.97, A.y + ea.R * 0.2, A.z + ea.L * 0.12), new Vector3(B2.x - eb.R * 0.97, B2.y + eb.R * 0.2, B2.z + eb.L * 0.12));
-      binderGeos.push(g);
+    A.binders.forEach((g, bi) => {
       const bm = new Mesh(g, bMat);
       bm.renderOrder = 3;
       body.add(bm);
-    }
+      const rg = [];
+      for (const [id, sh] of A.breaks) for (const a of sh.arcs) if (a.binder === bi) rg.push({ id, start: a.start, count: a.count });
+      if (rg.length) hiders.push(new Hider(bm, rg));
+    });
   }
   const setCockpitSway = (x, y, z) => {
     ckGrp.position.set(x, y, z);
@@ -74510,9 +77078,17 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     ckGrp.rotation.x = z * 0.07;
     cabCk.value.set(x, y, z);
   };
-  const setCockpitVisible = (v) => {
-    ckGrp.visible = v;
+  let inside = false;
+  const setCockpitView = (on) => {
+    if (on === inside) return;
+    inside = on;
+    const kS = on ? A.viewScale : 1;
+    ckView.scale.setScalar(kS);
+    ckView.position.copy(A.eye).multiplyScalar(1 - kS);
+    for (const h of hiders) if (h.set(PILOT, on)) h.apply();
+    for (const { k, m } of ckMeshes) if (SHADOW_KEYS.has(k)) m.castShadow = !on;
   };
+  const eyeWorld = (out) => ckGrp.localToWorld(out.copy(A.eye));
   const setEngineMotion = (yL, yR, pitchL, pitchR, rollBank) => {
     if (engines[0]) {
       engines[0].position.y = heroPivots[0].y + yL;
@@ -74535,6 +77111,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       const f = flames[i];
       const sp = f.side < 0 ? spL : spR;
       const w = 1 + boost * 0.24;
+      f.m.visible = !engineOut[f.engine];
       f.m.scale.set(w, w, Math.max(0.05, fl * (0.92 + 0.1 * Math.sin(t * 53 + i * 2.1)) * sp));
     }
     hc.copy(glowCol).lerp(hot, Math.min(1, Math.max(0, heat - 0.6) * 2.5));
@@ -74547,7 +77124,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     }
     glow.color.copy(hc).multiplyScalar(1.1 + boost * 0.3);
     const fanAng = t * (16 + throttle * 42);
-    for (let i = 0; i < fans.length; i++) fans[i].rotation.z = fanAng + i * 0.7;
+    for (let i = 0; i < fans.length; i++) if (!engineOut[fans[i].userData.engine]) fans[i].rotation.z = fanAng * fans[i].userData.spin + i * 0.7;
     const dmgFL = Math.max(0, 0.55 - dmgL) / 0.55, dmgFR = Math.max(0, 0.55 - dmgR) / 0.55;
     const dtF = Math.max(0, Math.min(0.1, t - flapT));
     flapT = t;
@@ -74556,7 +77133,7 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
     for (let i = 0; i < petals.length; i++) petals[i].userData.open = open;
     for (let i = 0; i < flaps.length; i++) {
       const flp = flaps[i], df = flp.side < 0 ? dmgFL : dmgFR;
-      flp.m.rotation.y = flp.sign * (airbrake * 1.05 + (df > 0 ? (0.18 + 0.14 * Math.sin(t * 39 + i * 2.1)) * df : 0));
+      flp.m.rotation.y = flp.sign * (airbrake * 1.05 * flp.gain + (df > 0 ? (0.18 + 0.14 * Math.sin(t * 39 + i * 2.1)) * df : 0));
       flp.m.rotation.z = df > 0.25 ? flp.sign * (df - 0.25) * 0.34 : 0;
     }
     glowH += (heat - glowH) * Math.min(1, dtF * (heat > glowH ? 1.5 : 0.55));
@@ -74574,17 +77151,73 @@ function buildPodModel(def, colors, quality = 2, texRes = 1024, isOpponent = fal
       binderU.uColor.value.copy(hc);
       binderU.uPower.value = (0.55 + throttle * 0.35 + boost * 0.6) * Math.min(1, Math.min(dmgL, dmgR) * 3);
     }
+    const blink = Math.sin(t * 14) > 0 ? 1 : 0.25, hpMin = Math.min(dmgL, dmgR);
+    if (boostK > 0.08) setLamp(0, 0.2, 1.9, 2.6);
+    else setLamp(0, 0.02, 0.12, 0.2);
+    if (heat > 0.85) setLamp(1, 2.6 * blink, 0.16 * blink, 0.05);
+    else if (heat > 0.55) setLamp(1, 2.2, 1.1, 0.08);
+    else setLamp(1, 0.12, 1.3, 0.25);
+    if (hpMin < 0.3) setLamp(2, 2.6 * blink, 0.14 * blink, 0.06);
+    else if (hpMin < 0.6) setLamp(2, 2.2, 1.1, 0.08);
+    else setLamp(2, 0.12, 1.3, 0.25);
+  };
+  const setParts = partsSwitch(def.id, A.breaks, hiders, (_id2, lost, sh) => {
+    for (const e of sh.engines) engineOut[e] = lost;
+    for (const e of sh.fans) {
+      const fg = fanGeo[e], fm = fans.find((f) => f.userData.engine === e);
+      if (fg?.lost && fm) fm.geometry = lost ? fg.lost : fg.fan;
+    }
+  });
+  const partBody = (i, out) => {
+    const sh = A.breaks.get(damageModel(def.id).parts[i]?.id ?? "");
+    return sh ? out.copy(sh.center) : out.set(0, 0, 0);
+  };
+  const hulls = [hullL, hullR, hullC].map((h) => h.userData.u.uHits), hitNext = [0, 0, 0], hv = new Vector3();
+  const mark = (hull, x, y, z, k) => {
+    hulls[hull][hitNext[hull]++ % HIT_MARKS].value.set(x, y, z, k);
+  };
+  const hitMark = (bx, by, bz, strength) => {
+    const k = Math.max(0.4, Math.min(1, strength / 28)), ck = A.layout.cockpit;
+    hv.set(bx, by, bz);
+    const side = Math.abs(hv.x) < 0.4;
+    if (!side && hv.z < ck.z + ck.len * 0.5 + 0.5 && Math.abs(hv.x) < ck.hw + 1.4) {
+      mark(2, Math.max(-ck.hw, Math.min(ck.hw, hv.x)), ck.y + Math.max(-0.5, Math.min(0.4, hv.y - ck.y)) * ck.hw, Math.max(ck.z - ck.len * 0.5, Math.min(ck.z + ck.len * 0.5, hv.z)), k);
+      return;
+    }
+    const bi = A.banks.length < 2 ? 0 : (side ? Math.random() < 0.5 : hv.x > 0) ? 1 : 0, bank = A.banks[bi];
+    let best = bank.engines[0], bd = Infinity;
+    for (const e of bank.engines) {
+      const d = Math.hypot(hv.x - bank.pivot.x - e.off.x, hv.y - bank.pivot.y - e.off.y);
+      if (d < bd) {
+        bd = d;
+        best = e;
+      }
+    }
+    const R = best.geo.R, hl = best.geo.L * 0.5;
+    let dx = hv.x - bank.pivot.x - best.off.x, dy = hv.y - bank.pivot.y - best.off.y;
+    const dl = Math.hypot(dx, dy);
+    if (side || dl < 1e-3) {
+      dx = 0;
+      dy = R;
+    } else {
+      dx *= R / dl;
+      dy *= R / dl;
+    }
+    const z = side ? (Math.random() * 1.2 - 0.3) * hl : Math.max(-hl * 0.8, Math.min(hl * 0.95, hv.z - bank.pivot.z - best.off.z));
+    mark(bank.side < 0 ? 0 : 1, best.off.x + dx, best.off.y + dy, best.off.z + z, k);
+  };
+  const clearMarks = () => {
+    for (const h of hulls) for (const u of h) u.value.set(0, 0, 0, 0);
   };
   const dispose = () => {
     own.forEach((m) => m.dispose());
-    sideGeos.forEach((g) => g.dispose());
-    binderGeos.forEach((g) => g.dispose());
+    A.owned.forEach((g) => g.dispose());
   };
-  return { group, body, engines, exhaustLocal, eye, hood, update, setEngineMotion, setDistance: () => {
-  }, setCockpitSway, setCockpitVisible, dispose };
+  return { group, body, engines, exhaustLocal: A.exhaustLocal, eye: A.eye, hood: A.hood, update, setEngineMotion, setDistance: () => {
+  }, setCockpitSway, setCockpitView, eyeWorld, setParts, engineOut, partBody, hitMark, clearMarks, dispose };
 }
 
-// src/game/texCore.ts
+// ../../src/game/texCore.ts
 var TileNoise = class {
   perm = new Uint8Array(512);
   vals = new Float32Array(256);
@@ -74633,8 +77266,8 @@ var TileNoise = class {
     const a = vals[perm[px0 + my0]], b = vals[perm[px1 + my0]], c = vals[perm[px0 + my1]], d = vals[perm[px1 + my1]];
     return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
   }
-  fbm(u, v, base, oct, gain2 = 0.5) {
-    let sum = 0, amp = 1, norm = 0, p = base;
+  fbm(u, v, base2, oct, gain2 = 0.5) {
+    let sum = 0, amp = 1, norm = 0, p = base2;
     for (let o = 0; o < oct; o++) {
       sum += this.noise(u * p, v * p, p) * amp;
       norm += amp;
@@ -74643,8 +77276,8 @@ var TileNoise = class {
     }
     return sum / norm;
   }
-  ridged(u, v, base, oct) {
-    let sum = 0, amp = 1, norm = 0, p = base;
+  ridged(u, v, base2, oct) {
+    let sum = 0, amp = 1, norm = 0, p = base2;
     for (let o = 0; o < oct; o++) {
       const n = 1 - Math.abs(this.noise(u * p, v * p, p) * 2 - 1);
       sum += n * n * amp;
@@ -74685,10 +77318,10 @@ var TileNoise = class {
   }
 };
 
-// src/game/texStore.ts
+// ../../src/game/texStore.ts
 var MAX_BYTES = 420 * 1024 * 1024;
 
-// src/game/textures.ts
+// ../../src/game/textures.ts
 function toTex(data, size, srgb, aniso) {
   const t = new DataTexture(data, size, size, RGBAFormat);
   t.wrapS = t.wrapT = RepeatWrapping;
@@ -74718,10 +77351,10 @@ function macroTexture() {
   return macroTex;
 }
 
-// src/game/sky.ts
+// ../../src/game/sky.ts
 var TSL2 = three_tsl_exports;
-var { atan: atan2, cameraProjectionMatrix: cameraProjectionMatrix2, cross: cross3, dot: dot3, exp: exp3, float: float3, floor: floor2, fract: fract3, length: length3, max: max3, mix: mix3, modelViewMatrix: modelViewMatrix2, normalize: normalize4, oneMinus: oneMinus3, positionLocal: positionLocal3, pow: pow6, sin: sin3, smoothstep: smoothstep3, step: step3, texture: texture3, uniform: uniform3, vec2: vec23, vec3: vec33, vec4: vec42 } = TSL2;
-var ssInv2 = (a, b, x) => oneMinus3(smoothstep3(b, a, x));
+var { atan: atan2, cameraProjectionMatrix: cameraProjectionMatrix2, cross: cross3, dot: dot3, exp: exp3, float: float3, floor: floor2, fract: fract3, length: length3, max: max3, mix: mix3, modelViewMatrix: modelViewMatrix2, normalize: normalize4, oneMinus: oneMinus3, positionLocal: positionLocal3, pow: pow6, sin: sin3, smoothstep: smoothstep4, step: step3, texture: texture3, uniform: uniform3, vec2: vec23, vec3: vec33, vec4: vec42 } = TSL2;
+var ssInv2 = (a, b, x) => oneMinus3(smoothstep4(b, a, x));
 function sunDirection(theme) {
   const el = theme.sunElev * Math.PI / 180, az = theme.sunAz * Math.PI / 180;
   return new Vector3(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az)).normalize();
@@ -74756,28 +77389,28 @@ function makeSky(theme, forEnv = false) {
     const h21s = (p) => fract3(sin3(dot3(p, vec23(127.1, 311.7))).mul(43758.5453));
     const cellS = floor2(d.mul(210));
     const sh = h21s(cellS.xy.add(cellS.z.mul(vec23(17.31, 41.7))));
-    col = col.add(vec33(0.8, 0.88, 1).mul(step3(0.9955, sh)).mul(sh.sub(0.9955).mul(180).add(0.25)).mul(smoothstep3(0.02, 0.35, d.y)).mul(uniforms.stars));
+    col = col.add(vec33(0.8, 0.88, 1).mul(step3(0.9955, sh)).mul(sh.sub(0.9955).mul(180).add(0.25)).mul(smoothstep4(0.02, 0.35, d.y)).mul(uniforms.stars));
   }
   let covN = float3(0);
   if (theme.clouds > 1e-3) {
     const m = macroTexture();
     const cuv = d.xz.div(max3(d.y, 0).add(0.1)).mul(0.26).add(vec23(uniforms.time.mul(25e-4), uniforms.time.mul(14e-4)));
     const cn = texture3(m, cuv).r.mul(0.65).add(texture3(m, cuv.mul(2.3).add(0.37)).g.mul(0.35));
-    const cov = smoothstep3(oneMinus3(uniforms.clouds), oneMinus3(uniforms.clouds).add(0.34), cn);
+    const cov = smoothstep4(oneMinus3(uniforms.clouds), oneMinus3(uniforms.clouds).add(0.34), cn);
     const hc = new Color(theme.skyHorizon), tc = new Color(theme.skyTop);
     const lit = Math.min(1, (0.2126 * hc.r + 0.7152 * hc.g + 0.0722 * hc.b) * 2.4 + (0.2126 * tc.r + 0.7152 * tc.g + 0.0722 * tc.b) * 0.8);
     uniforms.cloudLit.value = lit;
     let cc = mix3(uniforms.horizon.mul(1.08), vec33(uniforms.cloudLit), 0.48).mul(pow6(sd, 4).mul(0.45).add(0.75));
     cc = mix3(cc, uniforms.sunColor.mul(1.3), pow6(sd, 12).mul(0.55));
-    col = mix3(col, cc, cov.mul(smoothstep3(0, 0.16, d.y)).mul(0.85));
+    col = mix3(col, cc, cov.mul(smoothstep4(0, 0.16, d.y)).mul(0.85));
     covN = cov;
   }
-  if (!forEnv) col = col.add(vec33(0.5, 0.6, 0.85).mul(uniforms.flash).mul(covN.mul(0.75).add(0.25)).mul(smoothstep3(-0.05, 0.3, d.y)));
+  if (!forEnv) col = col.add(vec33(0.5, 0.6, 0.85).mul(uniforms.flash).mul(covN.mul(0.75).add(0.25)).mul(smoothstep4(-0.05, 0.3, d.y)));
   if (!forEnv) {
-    col = col.add(uniforms.sunColor.mul(smoothstep3(0.9992, 0.9997, sd).mul(8.5)));
+    col = col.add(uniforms.sunColor.mul(smoothstep4(0.9992, 0.9997, sd).mul(8.5)));
     if (hasSun2) {
       const sdB = max3(dot3(d, normalize4(uniforms.sunDir2)), 0);
-      col = col.add(uniforms.sunColor.mul(vec33(1, 0.82, 0.62)).mul(smoothstep3(0.9995, 0.99975, sdB).mul(6.5).add(pow6(sdB, 48).mul(0.28))));
+      col = col.add(uniforms.sunColor.mul(vec33(1, 0.82, 0.62)).mul(smoothstep4(0.9995, 0.99975, sdB).mul(6.5).add(pow6(sdB, 48).mul(0.28))));
     }
   }
   if (isPrison && !forEnv) {
@@ -74785,7 +77418,7 @@ function makeSky(theme, forEnv = false) {
     const h21 = (p) => fract3(sin3(dot3(p, vec23(127.1, 311.7))).mul(43758.5453));
     const cell = floor2(d.mul(250));
     const starH = h21(cell.xy.add(cell.z.mul(vec23(17.31, 41.7))));
-    let night = col.add(vec33(0.85, 0.9, 1).mul(step3(0.996, starH)).mul(smoothstep3(-0.1, 0.3, d.y)));
+    let night = col.add(vec33(0.85, 0.9, 1).mul(step3(0.996, starH)).mul(smoothstep4(-0.1, 0.3, d.y)));
     const belt = normalize4(vec33(d.x, d.y.mul(0.4).sub(0.15), d.z));
     const band = exp3(pow6(d.y.add(0.05).mul(9), 2).negate());
     const beltN = texture3(m, vec23(atan2(belt.z, belt.x).mul(0.48), belt.y.mul(3.2))).r;
@@ -74802,7 +77435,7 @@ function makeSky(theme, forEnv = false) {
     const radialV = d.sub(gp.mul(along));
     const radial2 = length3(radialV);
     const tilt = dot3(normalize4(radialV.add(1e-5)), axis).abs();
-    const ring = smoothstep3(0.16, 0.17, radial2).mul(ssInv2(0.32, 0.3, radial2)).mul(ssInv2(0.045, 0.01, tilt)).mul(oneMinus3(disc)).mul(front);
+    const ring = smoothstep4(0.16, 0.17, radial2).mul(ssInv2(0.32, 0.3, radial2)).mul(ssInv2(0.045, 0.01, tilt)).mul(oneMinus3(disc)).mul(front);
     const gap = ssInv2(4e-3, 0, radial2.sub(0.23).abs().sub(4e-3));
     col = night.add(vec33(0.62, 0.55, 0.42).mul(ring).mul(oneMinus3(gap)).mul(0.85));
   }
@@ -74818,7 +77451,7 @@ function makeSky(theme, forEnv = false) {
   return { mesh, uniforms };
 }
 
-// tools/harness/pods.ts
+// pods.ts
 var W = 1280;
 var H = 720;
 var FORCE_WEBGL = location.search.includes("webgl");
@@ -74828,7 +77461,10 @@ var BACKEND = r.backend.isWebGPUBackend ? "WebGPU" : "WebGL2";
 r.setSize(W, H);
 r.setPixelRatio(1);
 document.body.style.margin = "0";
+document.body.style.background = "#111";
 document.body.appendChild(r.domElement);
+r.domElement.style.width = "100%";
+r.domElement.style.height = "auto";
 r.toneMapping = ACESFilmicToneMapping;
 r.toneMappingExposure = 1;
 r.outputColorSpace = SRGBColorSpace;
@@ -74861,28 +77497,57 @@ floor3.position.y = -1.9;
 floor3.receiveShadow = true;
 scene.add(floor3);
 var cam = new PerspectiveCamera(40, W / 2 / (H / 2), 0.1, 3e3);
+var win = window;
 var pod = null;
-window.show = async (idx, dmg = 1, quality = 3) => {
+async function saveFrame(name) {
+  if (!name) return "";
+  const blob = await new Promise((res) => r.domElement.toBlob(res, "image/jpeg", 0.9));
+  if (!blob) return " | save FAILED (no blob)";
+  try {
+    const rs = await fetch("http://127.0.0.1:5174/save?name=" + encodeURIComponent(name), { method: "POST", body: blob });
+    return " | saved " + await rs.text();
+  } catch (e) {
+    return " | save FAILED (" + e.message + " \u2013 start tools/harness/shot-server.mjs)";
+  }
+}
+function build(idx, quality, rival, far = false, o = {}) {
+  const def = PODS[idx];
+  const tune = typeof o.tune === "number" ? Object.fromEntries(STAT_KEYS.map((k) => [k, o.tune])) : o.tune;
+  const p = buildPodModel(def, def.colors, quality, 1024, rival, { ...rival ? { pattern: (idx + 1) % 6 } : {}, kit: o.kit, tune });
+  if (rival) p.setDistance(far ? 100 : 10);
+  return p;
+}
+function settle(p, t, boost, airbrake, hpL, hpR, heat) {
+  for (let i = 39; i >= 0; i--) p.update(t - i * 0.1, 1, boost, airbrake, hpL, hpR, heat);
+}
+win.show = async (idx, dmg = 1, quality = 3, o = {}) => {
   if (pod) {
     scene.remove(pod.group);
     pod.dispose();
   }
   const def = PODS[idx];
-  pod = buildPodModel(def, def.colors, quality, 1024);
+  pod = build(idx, quality, !!o.rival, false, o);
   scene.add(pod.group);
-  pod.update(1.3, 1, 0, 0.6, dmg, 1, dmg < 1 ? 0.95 : 0.2);
+  const hpR = o.both ? dmg : 1;
+  pod.setParts(o.parts ?? partsDue(damageModel(def.id), dmg * 100, hpR * 100));
+  settle(pod, 1.3, o.boost ? 1 : 0, o.airbrake ?? 0.6, dmg, hpR, o.heat ?? 0.03);
+  pod.group.updateMatrixWorld(true);
+  for (const [x, y, z, k] of o.marks ?? []) pod.hitMark?.(x, y, z, k);
   pod.group.updateMatrixWorld(true);
   const box = new Box3().setFromObject(pod.group);
   const size = box.getSize(new Vector3());
   const c = box.getCenter(new Vector3());
   const D = Math.max(size.x, size.z) * 0.95 + 4;
   const ex = pod.engines[0].getWorldPosition(new Vector3());
+  const eBox = new Box3().setFromObject(pod.engines[0]), eLen = eBox.max.z - eBox.min.z;
   const views = [
     [new Vector3(c.x + D * 0.62, c.y + D * 0.28, c.z + D * 0.62), c],
     [new Vector3(c.x, c.y + 4.2, box.min.z - 11), new Vector3(c.x, c.y + 1, c.z + 6)],
-    [new Vector3(ex.x - 3.2, ex.y + 1.2, ex.z + def.engineLen * 0.5 + 3.4), new Vector3(ex.x, ex.y, ex.z + def.engineLen * 0.35)],
+    [new Vector3(ex.x - 3.2, ex.y + 1.2, eBox.max.z + 3.4), new Vector3(ex.x, ex.y, eBox.max.z - eLen * 0.15)],
     [pod.body.localToWorld(pod.eye.clone().add(new Vector3(2, 1.1, -2.6))), pod.body.localToWorld(pod.eye.clone().add(new Vector3(0, -0.5, 0.3)))]
   ];
+  cam.aspect = W / 2 / (H / 2);
+  cam.updateProjectionMatrix();
   r.setScissorTest(true);
   for (let i = 0; i < views.length; i++) {
     const [p, t] = views[i];
@@ -74894,31 +77559,57 @@ window.show = async (idx, dmg = 1, quality = 3) => {
     sky.mesh.position.copy(p);
     await r.renderAsync(scene, cam);
   }
-  return `${BACKEND} ${def.id} tris=${r.info.render.triangles} calls=${r.info.render.drawCalls ?? r.info.render.calls}`;
+  const saved = await saveFrame(o.save);
+  return `${BACKEND} ${def.id}${o.rival ? " (rival)" : ""} tris=${r.info.render.triangles} calls=${r.info.render.drawCalls ?? r.info.render.calls}${saved}`;
 };
-window.grid = async () => {
-  const cols = 5, rows = 2;
+async function sheet(view, o = {}) {
+  const n = PODS.length, cols = view === "profile" ? 2 : n <= 10 ? 5 : Math.ceil(n / 3), rows = Math.ceil(n / cols);
   const w = W / cols, h = H / rows;
   cam.aspect = w / h;
+  cam.fov = view === "inside" ? 79 : view === "chase" ? 75 : 40;
+  cam.near = view === "inside" ? 0.8 : 0.1;
   cam.updateProjectionMatrix();
   r.setScissorTest(true);
+  const boost = o.boost ?? location.search.includes("boost"), hp = o.health ?? 1;
+  const half = Math.min(MathUtils.degToRad(cam.fov / 2), Math.atan(Math.tan(MathUtils.degToRad(cam.fov / 2)) * cam.aspect));
   let tris = 0;
-  for (let i = 0; i < PODS.length; i++) {
-    const def = PODS[i];
+  for (let i = 0; i < n; i++) {
     if (pod) {
       scene.remove(pod.group);
       pod.dispose();
     }
-    pod = buildPodModel(def, def.colors, 2, 1024);
+    pod = build(i, o.quality ?? 2, !!o.rival, !!o.far, o);
     scene.add(pod.group);
-    pod.update(2, 1, location.search.includes("boost") ? 1 : 0, 0, 1, 1, 0.2);
+    pod.setParts(o.parts ?? partsDue(damageModel(PODS[i].id), hp * 100, hp * 100));
+    settle(pod, 2, boost ? 1 : 0, 0, hp, hp, o.heat ?? 0.03);
     pod.group.updateMatrixWorld(true);
-    const box = new Box3().setFromObject(pod.group);
-    const size = box.getSize(new Vector3());
-    const c = box.getCenter(new Vector3());
-    const D = Math.max(size.x, size.z) * 0.85 + 3;
-    cam.position.set(c.x + D * 0.66, c.y + D * 0.42, c.z + D * 0.5);
-    cam.lookAt(c);
+    const Lc = podLayout(PODS[i]).cockpit;
+    const ck = pod.body.localToWorld(new Vector3(0, Lc.y + 0.12, Lc.z));
+    if (view === "pod") {
+      const sph = new Box3().setFromObject(pod.group).getBoundingSphere(new Sphere());
+      const d = sph.radius / Math.sin(half) * 0.92;
+      cam.position.copy(sph.center).add(new Vector3(0.66, 0.42, 0.5).normalize().multiplyScalar(d));
+      cam.lookAt(sph.center);
+    } else if (view === "inside") {
+      pod.setCockpitView?.(true);
+      pod.group.updateMatrixWorld(true);
+      const e = pod.eyeWorld ? pod.eyeWorld(new Vector3()) : pod.body.localToWorld(pod.eye.clone());
+      cam.position.copy(e);
+      cam.lookAt(e.x, e.y - 3.2, e.z + 60);
+    } else if (view === "chase") {
+      cam.position.set(0, 4.5, -13.5);
+      cam.lookAt(0, 1.6, 16);
+    } else if (view === "profile") {
+      const box = new Box3().setFromObject(pod.group), c = box.getCenter(new Vector3()), sz = box.getSize(new Vector3());
+      const vHalf = MathUtils.degToRad(cam.fov / 2), hHalf = Math.atan(Math.tan(vHalf) * cam.aspect);
+      const d = Math.max(sz.z * 0.5 / Math.tan(hHalf), (sz.y * 0.5 + 0.5) / Math.tan(vHalf)) * 1.06 + sz.x * 0.5;
+      cam.position.set(c.x + d, c.y, c.z);
+      cam.lookAt(c);
+    } else {
+      const dir = view === "front" ? new Vector3(0.55, 0.42, 0.72) : view === "rear" ? new Vector3(-0.6, 0.45, -0.66) : new Vector3(1, 0.16, 0.05);
+      cam.position.copy(ck).add(dir.normalize().multiplyScalar(2.6 / Math.sin(half) * 0.8));
+      cam.lookAt(ck);
+    }
     sky.mesh.position.copy(cam.position);
     const x = i % cols * w, y = Math.floor(i / cols) * h;
     r.setViewport(x, y, w, h);
@@ -74926,8 +77617,39 @@ window.grid = async () => {
     await r.renderAsync(scene, cam);
     tris += r.info.render.triangles;
   }
-  return "grid tris(sum incl shadow)=" + tris;
+  const saved = await saveFrame(o.save);
+  cam.fov = 40;
+  cam.near = 0.1;
+  cam.updateProjectionMatrix();
+  return `${view} sheet, ${n} pods${o.rival ? " (rival)" : ""} tris(sum incl shadow)=${tris}${saved}`;
+}
+win.grid = (o = {}) => sheet("pod", o);
+win.sheet = sheet;
+function count(root) {
+  let meshes = 0, tris = 0;
+  const mats = /* @__PURE__ */ new Set();
+  root.traverse((o) => {
+    const m = o;
+    if (!m.isMesh) return;
+    meshes++;
+    const g = m.geometry;
+    tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
+    mats.add(m.material.uuid);
+  });
+  return { meshes, tris: Math.round(tris), mats: mats.size };
+}
+win.stats = (idx, quality = 2, rival = false) => {
+  const def = PODS[idx];
+  const p = buildPodModel(def, def.colors, quality, 1024, rival, rival ? { pattern: 1 } : void 0);
+  const out = rival ? { id: def.id, near: count(p.body.children[0]), far: count(p.body.children[1]) } : { id: def.id, hero: count(p.group) };
+  p.dispose();
+  return out;
 };
+win.statsAll = () => PODS.map((d, i) => {
+  const s = win.stats;
+  const h = [1, 2, 3].map((q) => s(i, q, false).hero), n2 = s(i, 2, true), n3 = s(i, 3, true);
+  return [d.id, ...h.flatMap((x) => [x.meshes, x.tris]), n2.near.meshes, n2.near.tris, n3.near.meshes, n3.near.tris, n2.far.meshes, n2.far.tris];
+});
 /*! Bundled license information:
 
 three/build/three.core.js:

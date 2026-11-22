@@ -37,7 +37,30 @@ function flipWinding(g: THREE.BufferGeometry) {
 /** Collects geometry per material key and merges every bucket into one geometry (one draw call). */
 export class PartBuilder {
   buckets = new Map<MatKey, THREE.BufferGeometry[]>();
+  /** Bruchteile: geometry added inside `brk(id, …)` goes into a set of its own (`buildBreaks`), never into `build()` */
+  private breaks = new Map<string, PartBuilder>();
+  private into: PartBuilder | null = null;
+  /** Everything `make` adds becomes part of the Bruchteil `id` (several calls with one id add up).
+   *  Engine builders: an id ending in '-' / '+' sits on the engine's left / right flank – it is a Bruchteil only on the pod's outer flank. */
+  brk(id: string, make: () => void) {
+    const was = this.into; let sub = this.breaks.get(id);
+    if (!sub) { sub = new PartBuilder(); this.breaks.set(id, sub); }
+    this.into = sub; try { make(); } finally { this.into = was; }
+    return this;
+  }
+  /** The Bruchteile collected by `brk`: one geometry set each, with the centre of its bounding box. Call once, like `build`. */
+  buildBreaks() {
+    const out: { id: string; parts: Map<MatKey, THREE.BufferGeometry>; center: THREE.Vector3 }[] = [];
+    for (const [id, sub] of this.breaks) {
+      const parts = sub.build(); if (!parts.size) continue;
+      const box = new THREE.Box3(); for (const g of parts.values()) box.union(g.boundingBox!);
+      out.push({ id, parts, center: box.getCenter(new THREE.Vector3()) });
+    }
+    this.breaks.clear();
+    return out;
+  }
   add(key: MatKey, g: THREE.BufferGeometry, m?: THREE.Matrix4, liv: [number, number, number] = [0, 0, 0]) {
+    if (this.into) { this.into.add(key, g, m, liv); return this; }
     const geo = ensureAttrs(g, liv);
     if (m) { geo.applyMatrix4(m); if (m.determinant() < 0) flipWinding(geo); }
     let list = this.buckets.get(key); if (!list) { list = []; this.buckets.set(key, list); }
@@ -282,6 +305,28 @@ export function radial(make: () => THREE.BufferGeometry, n: number, phase = 0) {
   const list: THREE.BufferGeometry[] = [];
   for (let i = 0; i < n; i++) { const g = ensureAttrs(make(), [0, 0, 0]); g.rotateZ(phase + (i / n) * Math.PI * 2); list.push(g); }
   const m = mergeGeometries(list, false)!; list.forEach(g => g.dispose()); return m;
+}
+
+/** Exhaust flame: a tapering body of revolution from the nozzle (z = 0, radius `rn`) backwards over `len`. */
+/**
+ * Heat glow and soot spread along an engine from its nozzle: the hull shader reads `aLiv.y` (0 rear .. 1 front) for that. The paint of parts
+ * in plain or solid secondary colour (livery modes 0 and 3) does not use the coordinate, so here it gets their true place along the engine,
+ * `(z + dz - z0) / len`. Without it a flat plate (built without livery coordinates: y = 0) glows white-hot and soots like the nozzle
+ * wherever it sits. Parts with a livery pattern (modes 1 and 2) keep their own coordinate.
+ */
+export function heatAlong(g: THREE.BufferGeometry, z0: number, len: number, dz = 0) {
+  const liv = g.attributes.aLiv, pos = g.attributes.position; if (!liv || !(len > 0)) return g;
+  for (let i = 0; i < liv.count; i++) {
+    const mode = liv.getZ(i); if (mode > 0.5 && mode < 2.5) continue;
+    liv.setY(i, Math.max(0, Math.min(1, (pos.getZ(i) + dz - z0) / len)));
+  }
+  return g;
+}
+
+export function flameGeo(rn: number, len: number, seg: number) {
+  const pts: [number, number, 0][] = [];
+  for (let i = 0; i <= 12; i++) { const t = 1 - i / 12; const r = rn * Math.pow(1 - t, 0.55) * (1 + 0.18 * Math.sin(Math.PI * t)) + 0.01; pts.push([r, -t * len, 0]); }
+  return lathe(prof(pts), seg, 0);
 }
 
 /** Ring of bolt heads facing +Z (or outward when `radialOut`). */

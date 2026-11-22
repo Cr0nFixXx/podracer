@@ -1,32 +1,91 @@
 import * as THREE from 'three';
 import type { EngineStyle } from './data';
-import { PartBuilder, M4, blade, boltRing, cyl, extrude, lathe, prof, radial, rbox, sphere, torus, tube, type MatKey } from './podKit';
+import { PartBuilder, M4, blade, boltRing, cyl, extrude, flameGeo, heatAlong, lathe, prof, radial, rbox, sphere, torus, tube, type MatKey } from './podKit';
+import { OWN_ENGINES, OWN_EXTENTS } from './podEngines';
 
 /** Parametric podracer engine. Geometry is merged per material and cached per spec. */
 export interface EngineSpec { L: number; R: number; style: EngineStyle; bands: number; blades: number; spike: boolean; fins: number; }
-export interface FlapGeo { geo: THREE.BufferGeometry; pivot: THREE.Vector3; sign: number; }
+/** `gain`: how far this flap opens compared with a normal one (outer leaf of a double flap, default 1). */
+export interface FlapGeo { geo: THREE.BufferGeometry; pivot: THREE.Vector3; sign: number; gain?: number; }
+/** Hard points of an engine: where Tuning-Teile and Style-Teile attach (podKitParts.ts). Engine space, metres.
+ *  `slot` = the part is flat (slab engine): [half width, half height] instead of a radius. */
+export interface HardPoints {
+  /** nozzle: exit plane z, skin radius at the exit (r0) and 0.3 m ahead of it (r1), radius the open petals reach, z of the petal tips */
+  nozzle: { z: number; r0: number; r1: number; open: number; tipZ: number; slot?: [number, number] };
+  /** intake: plane of the front rim, outer radius of the rim (r), radius of the throat (ri) */
+  mouth: { z: number; r: number; ri: number; slot?: [number, number] };
+  /** tip of the nose spike */ spikeZ: number;
+  /** barrel of the body between zA (rear) and zB (front) with radius r */
+  body: { zA: number; zB: number; r: number; slot?: [number, number] };
+  /** free strip on the spine ahead of the cable pylon (a central fin stands there) and its surface height */
+  spine: { zA: number; zB: number; y: number };
+  /** station on the rear spine (twin fins straddle the cable there) and its surface height */
+  tail: { z: number; y: number };
+  /** how far a part may reach sideways / downwards from the axis (the physics shapes cover that much) */
+  sideMax: number; bottomMax: number;
+}
 export interface EngineGeo {
   parts: Map<MatKey, THREE.BufferGeometry>;
+  /** the turning part: turbine fan, open rotor or armature (its own mesh on the player pod) */
   fan: THREE.BufferGeometry; fanZ: number;
+  /** material of the fan (default 'dark') and how fast it turns compared with a turbine fan (default 1) */
+  fanMat?: MatKey; fanSpin?: number;
+  /** the fan is a big open rotor: a Gegner pod shows it as its own turning mesh too instead of merging it into the static parts */
+  openRotor?: boolean;
+  /** the same fan with a blade torn off (Bruchteil of a pod whose layout names this engine in `fanLoss`) */
+  fanLost?: THREE.BufferGeometry;
   flaps: FlapGeo[];
   /** animated nozzle petals (attribute aPet), see petalMaterial() */
   petals: THREE.BufferGeometry;
   flameOuter: THREE.BufferGeometry; flameCore: THREE.BufferGeometry; flameZ: number;
   exhaustZ: number; pylon: THREE.Vector3; frontZ: number; top: number; R: number; L: number;
+  /** where the energy binder couples, relative to the engine axis: x = sideways towards the partner engine, y up, z along the engine */
+  binder: THREE.Vector3;
+  /** parts that can break off (Bruchteile): own geometry sets, never merged into `parts` (the assembly adds them and remembers
+   *  where they are). An id ending in '-' / '+' sits on the engine's left / right flank and breaks only on the pod's outer flank. */
+  breakParts: BreakPart[];
+  /** where Tuning-Teile and Style-Teile attach */
+  hard: HardPoints;
+}
+export interface BreakPart { id: string; parts: Map<MatKey, THREE.BufferGeometry>; center: THREE.Vector3 }
+
+/** Size of an engine as physics and cable routing see it – pure numbers, the single source for collision, ground clamp and wake.
+ *  The pod audit (tools/ci/pods.ts) compares them with the real geometry. */
+export interface EngineExtent {
+  /** radius of the collision circles */ coll: number;
+  /** lowest point below the engine axis (ground clamp) */ bottom: number;
+  /** outermost point sideways from the axis (ground clamp, dust wake) */ side: number;
+  /** highest solid point above the axis besides the cable pylon (cable routing) */ top: number;
+  /** half length */ halfL: number;
+}
+export function engineExtent(spec: EngineSpec): EngineExtent {
+  const { R, L, style } = spec;
+  const own = OWN_EXTENTS[style]; if (own) return own(spec); // Session 20 styles (podEngines.ts)
+  return {
+    coll: R * 1.05 + (style === 'blade' ? 0.45 : 0) + (style === 'ring' ? 0.3 : 0),
+    bottom: R * (style === 'ring' ? 1.36 : 1.12) + 0.1,
+    side: R * (style === 'blade' ? 2.1 : 1.1),
+    top: R,
+    halfL: L * 0.5,
+  };
 }
 
 const cache = new Map<string, EngineGeo>();
 
-function flameGeo(rn: number, len: number, seg: number) {
-  const pts: [number, number, 0][] = [];
-  for (let i = 0; i <= 12; i++) { const t = 1 - i / 12; const r = rn * Math.pow(1 - t, 0.55) * (1 + 0.18 * Math.sin(Math.PI * t)) + 0.01; pts.push([r, -t * len, 0]); }
-  return lathe(prof(pts), seg, 0);
+/** Plain and secondary-paint hull parts of an engine take their heat place from where they sit along it (`heatAlong`; flaps are hinge-local). */
+function placeHeat(eg: EngineGeo, L: number) {
+  const hull = eg.parts.get('hull'); if (hull) heatAlong(hull, -L / 2, L);
+  for (const bp of eg.breakParts) { const g = bp.parts.get('hull'); if (g) heatAlong(g, -L / 2, L); }
+  for (const f of eg.flaps) heatAlong(f.geo, -L / 2, L, f.pivot.z);
+  return eg;
 }
 
 export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
   const key = `${spec.L}|${spec.R}|${spec.style}|${spec.bands}|${spec.blades}|${spec.spike}|${spec.fins}|${seg}`;
   const hit = cache.get(key); if (hit) return hit;
   const { L, R, style } = spec;
+  const own = OWN_ENGINES[style]; // Session 20 styles have builders of their own (podEngines.ts)
+  if (own) { const made = placeHeat(own(spec, seg), L); cache.set(key, made); return made; }
   const pb = new PartBuilder();
   const Z = (t: number) => -L / 2 + t * L;
   const segS = Math.max(10, Math.round(seg * 0.5));
@@ -170,6 +229,28 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
     pb.add('glow', sphere(0.075 * R, 8, 6), M4.t(sd * (cR + 0.075 * R), 0.2 * R, Z(0.62)));
   }
 
+  // ---------------- Session 20 detail pass (player pod, Gegner on Ultra) ----------------
+  if (detailHi) {
+    // injector ring: copper nozzles feeding the afterburner
+    pb.add('copper', radial(() => cyl(0.014 * R, 0.022 * R, 0.07 * R, 6).rotateX(Math.PI / 2).translate(0, 0.705 * R, Z(0.085)), 12));
+    // junction boxes on the spine with a status light, linked by a conduit to the cable pylon
+    for (const tt of [0.3, 0.76]) { const r = bodyR(tt) * R; pb.add('steel', rbox(0.2 * R, 0.07 * R, 0.16 * R + 0.06, 0.012), M4.t(0, r + 0.03 * R, Z(tt))); pb.add('glow', sphere(0.018 * R + 0.008, 6, 4), M4.t(0.06 * R, r + 0.075 * R, Z(tt))); }
+    pb.add('dark', tube([new THREE.Vector3(0, bodyR(0.3) * R + 0.05 * R, Z(0.3)), new THREE.Vector3(0.06 * R, bodyR(0.45) * R + 0.07 * R, Z(0.45)), new THREE.Vector3(0, topR + 0.06, Z(0.56))], 0.014 * R + 0.006, 8, 5));
+    // strakes along the lower flanks (secondary paint) and grab handles for the pit crew
+    for (const sd of [-1, 1]) {
+      const a = sd * 2.25, r = bodyR(0.45) * R + 0.035 * R;
+      pb.add('hull', rbox(0.02 * R + 0.008, 0.09 * R, 0.36 * L, 0.004), M4.trs(Math.sin(a) * r, Math.cos(a) * r, Z(0.47), 0, 0, -a), [0, 0, 3]);
+      const h = sd * 0.52, rh = bodyR(0.42) * R;
+      pb.add('chrome', torus(0.05 * R + 0.03, 0.008 * R + 0.005, 5, 8, Math.PI), M4.trs(Math.sin(h) * rh, Math.cos(h) * rh, Z(0.42), 0, Math.PI / 2, -h));
+    }
+    // air-brake actuators: a ram behind each side flap
+    { const fr = bodyR(0.5) * R; for (const sd of [-1, 1]) { pb.add('dark', cyl(0.03 * R, 0.03 * R, 0.13 * L, 6).rotateX(Math.PI / 2), M4.t(sd * (fr + 0.02 * R), -0.2 * R, Z(0.55))); pb.add('chrome', cyl(0.015 * R, 0.015 * R, 0.1 * L, 5).rotateX(Math.PI / 2), M4.t(sd * (fr + 0.02 * R), -0.2 * R, Z(0.45))); } }
+    if (seg >= 40) { // Ultra: static wicks on the nozzle rim, bolts on every band
+      pb.add('dark', radial(() => cyl(0.004 * R + 0.003, 0.004 * R + 0.003, 0.12 * R + 0.05, 4).rotateX(Math.PI / 2).translate(0, 0.76 * R, Z(0) - 0.05 * R), 6, 0.4));
+      bandTs.forEach((tb, i) => { if (tb > bodyEnd - 0.04 || i % 2 === 0) return; pb.add('chrome', boltRing(bodyR(tb) * 0.955 * R + 0.035 * R, Math.round(seg * 0.45), 0.018 * R, Z(tb), true)); });
+    }
+  }
+
   // ---------------- style specific ----------------
   if (split) {
     // Split-X: four armoured petals around the intake, hinged open
@@ -180,23 +261,25 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
       const hinge = new THREE.Vector3(Math.sin(c) * rf * R, Math.cos(c) * rf * R, Z(bodyEnd));
       const axis = new THREE.Vector3(Math.cos(c), -Math.sin(c), 0);
       const m = new THREE.Matrix4().makeTranslation(hinge.x, hinge.y, hinge.z).multiply(new THREE.Matrix4().makeRotationAxis(axis, -0.22)).multiply(new THREE.Matrix4().makeTranslation(-hinge.x, -hinge.y, -hinge.z));
-      pb.add('hull', g, m);
+      pb.brk('petals', () => pb.add('hull', g, m)); // Bruchteil: the petals tear off, their hinge blocks stay
       pb.add('steel', rbox(0.12 * R, 0.12 * R, 0.08 * L, 0.02), new THREE.Matrix4().makeTranslation(hinge.x * 1.02, hinge.y * 1.02, hinge.z));
     }
-    // radial cooling slats on top
-    for (let i = 0; i < 9; i++) pb.add('steel', rbox(0.035 * R, 0.32 * R, 0.4 * L, 0.01), M4.t((i - 4) * 0.11 * R, R * 1.08, Z(0.45)));
+    // radial cooling slats on top (Bruchteil)
+    pb.brk('slats', () => { for (let i = 0; i < 9; i++) pb.add('steel', rbox(0.035 * R, 0.32 * R, 0.4 * L, 0.01), M4.t((i - 4) * 0.11 * R, R * 1.08, Z(0.45))); });
   }
   if (style === 'ring') {
     const rr = 1.24 * R;
-    pb.add('hull', torus(rr, 0.11 * R, 12, seg), M4.t(0, 0, Z(0.95)), [0, 0, 3]);
-    pb.add('chrome', torus(rr - 0.11 * R, 0.025 * R, 6, seg), M4.t(0, 0, Z(0.95) + 0.06 * R));
-    for (let q = 0; q < 4; q++) { const a = Math.PI / 4 + q * Math.PI / 2; const mid = (rr + rf * R) / 2; pb.add('steel', rbox(0.08 * R, rr - rf * R + 0.1 * R, 0.1 * R, 0.02), M4.trs(Math.sin(a) * mid, Math.cos(a) * mid, Z(0.95), 0, 0, -a)); }
+    pb.brk('shroud', () => { // Bruchteil: the ring shroud with its four struts
+      pb.add('hull', torus(rr, 0.11 * R, 12, seg), M4.t(0, 0, Z(0.95)), [0, 0, 3]);
+      pb.add('chrome', torus(rr - 0.11 * R, 0.025 * R, 6, seg), M4.t(0, 0, Z(0.95) + 0.06 * R));
+      for (let q = 0; q < 4; q++) { const a = Math.PI / 4 + q * Math.PI / 2; const mid = (rr + rf * R) / 2; pb.add('steel', rbox(0.08 * R, rr - rf * R + 0.1 * R, 0.1 * R, 0.02), M4.trs(Math.sin(a) * mid, Math.cos(a) * mid, Z(0.95), 0, 0, -a)); }
+    });
   }
   if (style === 'blade') {
     for (const sd of [-1, 1]) {
       const g = extrude([[0, 0], [1.25 * R, -0.25 * L], [1.3 * R, -0.42 * L], [0.0, -0.6 * L]], 0.05 * R, 0.015);
       g.rotateX(-Math.PI / 2); if (sd < 0) g.scale(-1, 1, 1);
-      pb.add('hull', g, M4.t(sd * bodyR(0.6) * R * 0.9, 0, Z(0.8)), [0, 0, 3]);
+      pb.brk('blade' + (sd < 0 ? '-' : '+'), () => pb.add('hull', g, M4.t(sd * bodyR(0.6) * R * 0.9, 0, Z(0.8)), [0, 0, 3])); // Bruchteil on the outer flank
     }
   }
   if (style === 'needle') pb.add('chrome', torus(rf * 0.75 * R, 0.02 * R, 6, seg), M4.t(0, 0, Z(0.97)));
@@ -217,7 +300,21 @@ export function engineGeo(spec: EngineSpec, seg: number): EngineGeo {
     parts: pb.build(), fan, fanZ: faceZ + 0.06 * L * 0.5,
     flaps, petals, flameOuter: flameGeo(rn, L * 0.75, Math.max(12, Math.round(seg * 0.5))), flameCore: flameGeo(rn * 0.42, L * 0.38, 12), flameZ: Z(0.07) - 0.02,
     exhaustZ: Z(0) - 0.12 * L, pylon: new THREE.Vector3(0, py + 0.06, Z(0.58)), frontZ: Z(1.0), top: py, R, L,
+    binder: new THREE.Vector3(R * 0.97, R * 0.2, L * 0.12), breakParts: pb.buildBreaks(),
+    hard: (() => { // (data only – the geometry above does not depend on it)
+      const ext = engineExtent(spec), t3 = 0.3 / L;
+      const skin3 = (t3 < 0.025 ? 0.74 + 0.06 * (t3 / 0.025) : t3 < 0.08 ? 0.8 + (bodyR(0.08) * 0.94 - 0.8) * ((t3 - 0.025) / 0.055) : bodyR(t3)) * R;
+      return {
+        nozzle: { z: Z(0), r0: 0.75 * R, r1: skin3, open: 1.02 * R, tipZ: Z(0) - 0.085 * L },
+        mouth: { z: Z(1.0), r: rf * (split ? 1.06 : 1.035) * R, ri: rf * (split ? 0.93 : 0.86) * R },
+        spikeZ: spec.spike ? Z(1.0) + L * 0.26 : faceZ + L * 0.085,
+        body: { zA: Z(0.2), zB: Z(bodyEnd - 0.12), r: bodyR(0.45) * R },
+        spine: { zA: Z(0.58) + 0.3, zB: Z(bodyEnd - 0.1), y: bodyR(0.75) * R },
+        tail: { z: Z(0.13), y: bodyR(0.2) * R },
+        sideMax: ext.side, bottomMax: ext.bottom,
+      };
+    })(),
   };
-  cache.set(key, out);
+  cache.set(key, placeHeat(out, L));
   return out;
 }

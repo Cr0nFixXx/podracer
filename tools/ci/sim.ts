@@ -1,15 +1,21 @@
 // Headless CI check (no browser, no GPU): `npm run check`
-// 14 tracks × 11 AI pods × SECS seconds of real physics (stepPod + aiInputs + hazards). Pod 0 additionally stress-tests the
+// 13 tracks × 11 AI pods × SECS seconds of real physics (stepPod + aiInputs + hazards). The grid moves on by three pods per track
+// (tools/ci/roster.ts), so all 14 pods get driven; ROSTER_OLD=1 runs the Session 19 grid. Pod 0 additionally stress-tests the
 // manual controls (90° roll, lift/dive, handbrake slide). Fails (exit 1) on NaN, wall tunnelling, ground clipping, mass deaths or stuck pods.
 import * as THREE from 'three';
-import { DIFFICULTIES, PILOTS, PODS, TRACKS } from '../../src/game/data';
+import { DIFFICULTIES, PILOTS, TRACKS } from '../../src/game/data';
+import { ciRoster } from './roster';
 import { buildTrack, roadSurfaceAt } from '../../src/game/trackBuilder';
-import { aiInputs, collidePods, podParams, respawn, stepPod, HOVER, type PodState } from '../../src/game/physics';
+import { aiInputs, applyDamage, collidePods, podParams, respawn, stepPod, HOVER, type PodState } from '../../src/game/physics';
 import { effectiveStats } from '../../src/game/settings';
 import { podEnvelope } from '../../src/game/podDesigns';
+import { DAMAGE_RULES, damageModel } from '../../src/game/podDamage';
 
 if (process.env.NO_TUNNELS) (globalThis as { NO_TUNNELS?: boolean }).NO_TUNNELS = true;
 if (process.env.NO_EXPAND) (globalThis as { NO_EXPAND?: boolean }).NO_EXPAND = true; // old (un-expanded) layouts for A/B comparison
+// Schadensmodelle A/B: ARMOR=0 switches the Panzerzonen off, PARTS=0 the Bruchteile – both off must print the table from before Phase 5
+if (process.env.ARMOR === '0') DAMAGE_RULES.armor = false;
+if (process.env.PARTS === '0') DAMAGE_RULES.parts = false;
 const SECS = Number(process.env.SECS ?? 45), ONLY = process.env.TRACK, GRIP = Number(process.env.GRIP ?? 1); // GRIP=0.9 ≈ storm/snow weather
 const LIMIT = { deaths: 3, wall: 0.6, clear: 0.2, minSpeed: 18, divePct: 1.5 }; // divePct: share of AI frames holding "dive"
 let seed = 1234567; Math.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; // deterministic runs
@@ -20,8 +26,9 @@ for (const def of TRACKS) {
   if (ONLY && def.id !== ONLY) continue;
   const td = buildTrack(def); const S = td.main.samples, N = td.N;
   const pods: PodState[] = [];
+  const roster = ciRoster(TRACKS.indexOf(def), !!process.env.ROSTER_OLD); // ROSTER_OLD=1: the Session 19 grid (A/B against the old table)
   for (let g = 0; g < 11; g++) {
-    const pd = PODS[g % PODS.length]; const row = Math.floor(g / 3), col = g % 3;
+    const pd = roster[g]; const row = Math.floor(g / 3), col = g % 3;
     let idx = td.startIdx - 6 - row * 13; idx = td.main.closed ? ((idx % N) + N) % N : Math.max(0, idx);
     const s = S[idx], lat = (col - 1) * s.hw * 0.55, eLat = Math.min(1, Math.abs(lat) / s.hw), gY = s.y - lat * s.bank + (1 - eLat * eLat) * 0.2 + 0.08;
     const pilot = PILOTS.find(p => p.id === pd.pilotId) ?? PILOTS[0], skill = diff.skill * (0.7 + 0.3 * pilot.skill);
@@ -48,7 +55,7 @@ for (const def of TRACKS) {
     runs.push(`${['?', 'std', 'sea', 'cave', 'under'][S[i].tun ?? 1]} ${(e - i) * 2}m(h${rMax.toFixed(0)})${td.seaY !== undefined && S[i].tun === 2 ? ` [${(lo - td.seaY).toFixed(1)}m vs sea]` : ''}`); if (tunA < 0 && S[i].tun === 1 && i > 80) tunA = i; }
   let lifted = false, deckFrames = 0, teleports = 0, dbgT = 0; const prevY = pods.map(p => p.pos.y);
   let tunnels = 0, tunLen = 0; for (let i = 1; i < N; i++) { if (S[i].roof > 0) { tunLen += 2; if (!(S[i - 1].roof > 0)) tunnels++; } }
-  const prog0 = pods.map(p => p.prog); const wasDead = pods.map(() => false);
+  const prog0 = pods.map(p => p.prog); const wasDead = pods.map(() => false); const partsLost = new Map<string, number>();
   let deaths = 0, nan = 0, wall = 0, clear = 9, airMax = 0, rolls = 0, slides = 0, dives = 0, aiFrames = 0, breaks = 0, ohHits = 0, zgV = 0, zgN = 0, gV = 0, gN = 0, t = 0, worst = '', airDbg = '', air0 = 0, air0Dist = 0;
   const h = 1 / 120, frames = SECS * 60;
   for (let f = 0; f < frames; f++) {
@@ -67,17 +74,18 @@ for (const def of TRACKS) {
       if (Math.abs(A.pos.y - B.pos.y) < 3 && Math.hypot(A.pos.x - B.pos.x, A.pos.z - B.pos.z) < R * 1.01) touch.add(a * 16 + b2);
     }
     for (const p of pods) { if (p.dead > 0) continue; const v = Math.hypot(p.vel.x, p.vel.z); if (p.zeroG) { zgV += v; zgN++; } else if (t > 6) { gV += v; gN++; } }
-    if (tunA >= 0 && !lifted) { const p = pods[1]; if (p.path === 0 && p.dead <= 0 && p.idx >= tunA - 12 && p.idx < tunA - 5) { p.pos.y += S[tunA].roof + 9; p.vel.y = 0; lifted = true; if (process.env.DEBUG) dbgT = t; } }
+    // (no lift in the last 2 s of the run: it would end before the pod has spent its 20 frames on the deck – a false alarm)
+    if (tunA >= 0 && !lifted && t < SECS - 2) { const p = pods[1]; if (p.path === 0 && p.dead <= 0 && p.idx >= tunA - 12 && p.idx < tunA - 5) { p.pos.y += S[tunA].roof + 9; p.vel.y = 0; lifted = true; if (process.env.DEBUG) dbgT = t; } }
     if (process.env.DEBUG && lifted && t - dbgT < 1.2 && f % 6 === 0) { const p = pods[1], q = td.paths[p.path].samples[p.idx]; console.log(`   dbg t=${(t - dbgT).toFixed(2)} path=${p.path} idx=${p.idx} tunA=${tunA} y-ground=${(p.pos.y - q.y).toFixed(1)} roof=${q.roof} upper=${p.upper} inRoof=${p.inRoof} dead=${p.dead.toFixed(1)} lat=${p.lat.toFixed(0)} hw=${q.hw.toFixed(0)}`); }
     for (let k = 0; k < 2; k++) { for (const p of pods) stepPod(p, td, h, t, GRIP, false); collidePods(pods, t); }
-    pods.forEach((p, i) => { if (p.upper) deckFrames++; if (p.dead <= 0 && prevY[i] - p.pos.y > 4.5 && i !== 1) teleports++; prevY[i] = p.pos.y; }); // > 4.5 m down within one frame = teleport
+    pods.forEach((p, i) => { if (p.upper) deckFrames++; if (p.dead <= 0 && prevY[i] - p.pos.y > 4.5 && i !== 1 && !(p.invuln > 2.15)) { teleports++; /* (invuln > 2.15 = respawned this frame, e.g. the AI's stuck recovery: a reset, not a teleport) */ if (process.env.DEBUG) console.log(`   teleport: pod${i} ${p.def.id} t=${t.toFixed(1)} path=${p.path} idx=${p.idx}/${td.paths[p.path].samples.length} finishIdx=${td.finishIdx} closed=${td.main.closed} dy=${(prevY[i] - p.pos.y).toFixed(1)} invuln=${p.invuln.toFixed(2)} hp=${p.hpL.toFixed(0)}/${p.hpR.toFixed(0)} roof=${td.paths[p.path].samples[p.idx].roof} tun=${td.paths[p.path].samples[p.idx].tun} upper=${p.upper} inRoof=${p.inRoof} grounded=${p.grounded} vy=${p.vel.y.toFixed(1)} y-ground=${(p.pos.y - td.paths[p.path].samples[p.idx].y).toFixed(1)} lat=${p.lat.toFixed(1)} hw=${td.paths[p.path].samples[p.idx].hw.toFixed(1)} bridge=${(td.paths[p.path].samples[p.idx] as { bridge?: unknown }).bridge} underpass=${(td.paths[p.path].samples[p.idx] as { underpass?: unknown }).underpass} gap=${td.paths[p.path].samples[p.idx].gap} ramp=${td.paths[p.path].samples[p.idx].ramp}`); } prevY[i] = p.pos.y; }); // > 4.5 m down within one frame = teleport
     for (const hz of td.hazards) {
       const ph = (((t + hz.phase) % hz.period) + hz.period) % hz.period; hz.state = ph < hz.period * hz.duty ? 1 : ph > hz.period - 1 ? 0.5 : 0;
       if (hz.state < 1) continue;
-      for (const p of pods) { if (p.dead > 0) continue; const dx = p.pos.x - hz.x, dz = p.pos.z - hz.z; if (dx * dx + dz * dz > hz.r ** 2 || p.pos.y > hz.y + 18) continue; const P = podParams(p); if (p.invuln <= 0) { p.hpL -= 12 / 60 * P.sturdy; p.hpR -= 12 / 60 * P.sturdy; } p.heat = Math.min(1, p.heat + 0.55 / 60); p.vel.y += 28 / 60; }
+      for (const p of pods) { if (p.dead > 0) continue; const dx = p.pos.x - hz.x, dz = p.pos.z - hz.z; if (dx * dx + dz * dz > hz.r ** 2 || p.pos.y > hz.y + 18) continue; const P = podParams(p); if (p.invuln <= 0) applyDamage(p, 'both', 12 / 60 * P.sturdy, 'heat'); p.heat = Math.min(1, p.heat + 0.55 / 60); p.vel.y += 28 / 60; }
     }
     pods.forEach((p, i) => {
-      for (const ev of p.events) { if (ev.type === 'break') breaks++; if (ev.type === 'wall' && ev.nx === 0 && ev.nz === 0 && ev.y > 0 && ohIdx >= 0 && Math.abs(p.idx - ohIdx) < 8) ohHits++; }
+      for (const ev of p.events) { if (ev.type === 'part') { const b = damageModel(p.def.id).parts[ev.part ?? 0]; partsLost.set(b.label, (partsLost.get(b.label) ?? 0) + 1); } if (ev.type === 'break') breaks++; if (ev.type === 'wall' && ev.nx === 0 && ev.nz === 0 && ev.y > 0 && ohIdx >= 0 && Math.abs(p.idx - ohIdx) < 8) ohHits++; }
       p.events.length = 0;
       if (!isFinite(p.pos.x + p.pos.y + p.pos.z + p.vel.x + p.vel.y + p.vel.z + p.yaw + p.roll + p.pitch)) nan++;
       if (p.dead > 0) { if (!wasDead[i]) deaths++; wasDead[i] = true; p.dead -= 1 / 60; if (p.dead <= 0) respawn(p, td); return; }
@@ -109,6 +117,7 @@ for (const def of TRACKS) {
   if (lifted) console.log(`  deck self-test: ${deckFrames} frames on a tunnel deck (${deckFrames > 20 ? 'ok' : 'FAIL'}), downward teleports: ${teleports}`);
   if (zgN > 200) console.log(`  zero-G: avg ${(zgV / zgN).toFixed(0)} m/s in the tubes vs ${(gV / Math.max(1, gN)).toFixed(0)} m/s outside`);
   if (ohIdx >= 0) console.log(`  overhead self-test: ${ohHits} hits registered (${ohHits > 0 ? 'ok' : 'FAIL'})`);
+  if (DAMAGE_RULES.parts) { const n = [...partsLost.values()].reduce((a, b) => a + b, 0); console.log(`  parts lost: ${n}${n ? ' (' + [...partsLost].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([l, k]) => `${l} ×${k}`).join(', ') + ')' : ''}`); }
   const bad = (lifted && deckFrames <= 20) || teleports > 0 || (ohIdx >= 0 && ohHits === 0) || divePct > LIMIT.divePct || nan > 0 || deaths > LIMIT.deaths || wall > LIMIT.wall || clear < LIMIT.clear || slow < LIMIT.minSpeed;
   if (bad) failed++; if (process.env.PITCH_AIR !== undefined) console.log(`  pod0 airborne pitch ${process.env.PITCH_AIR}: longest flight ${air0.toFixed(2)} s ≈ ${air0Dist.toFixed(0)} m`);
   if (process.env.DEBUG) console.log('  worst:', worst, '\n  air:', airDbg, 'gap@idx', td.paths[0].samples.map((q, k) => q.gap ? k : -1).filter(k => k >= 0 && (k % 8 === 0)).join(','));

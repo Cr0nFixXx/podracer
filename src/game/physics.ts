@@ -2,8 +2,10 @@ import * as THREE from 'three';
 import type { PilotDef, PodDef, StatKey } from './data';
 import { DS, TUNNEL_SHOULDER, boulderState, tunnelCeiling, bridgeSwing, frameAt, gateDrop, nearestGlobal, nearestOnPath, roadSurfaceAt, rotorAngle, tunnelProfile, type Obstacle, type SetPiece, type TrackData } from './trackBuilder';
 import type { PodVisual } from './podModel';
-import { podCollision, podEnvelope } from './podDesigns';
+import { podCollision, podEnvelope, podHeight } from './podDesigns';
 import { surfaceOf } from './surfaces';
+import { DAMAGE_RULES, FX_NONE, damageModel, partsDue, partsFx, zoneFactor, type DamageZone, type PodFx } from './podDamage';
+export { FX_NONE, type DamageZone, type PodFx };
 
 /** `airbrake` = air brake, and a handbrake slide while steering. `pitch`: +1 lift (nose up), -1 dive (nose down). `roll`: -1 left / +1 right knife-edge (90°). */
 export interface Inputs { throttle: number; brake: number; steer: number; boost: boolean; airbrake: boolean; repair: boolean; pitch?: number; roll?: number; }
@@ -25,7 +27,11 @@ export interface PodState {
   /** Session 17: on the drivable deck above a tunnel / inside a roofed section; boost overdrive seconds used (max 3); cockpit pendulum (visual) */
   upper?: boolean; inRoof?: boolean; overT?: number;
   ckX?: number; ckY?: number; ckZ?: number; ckVX?: number; ckVY?: number; ckVZ?: number; ckPv?: number;
-  events: { type: 'wall' | 'obstacle' | 'land' | 'explode' | 'pod' | 'fall' | 'field' | 'break'; strength: number; x: number; y: number; z: number; nx: number; nz: number; ref?: Obstacle }[];
+  /** Session 20: lost Bruchteile (bit i = part i of the racer's Schadensmodell is gone) and the handling multipliers that follow
+   *  from them (undefined = intact). Both change only in `applyDamage` (a part breaks) and `respawn` (all parts return). */
+  parts?: number; fx?: PodFx;
+  /** `part`: a Bruchteil broke off (`part` = its index in the Schadensmodell) */
+  events: { type: 'wall' | 'obstacle' | 'land' | 'explode' | 'pod' | 'fall' | 'field' | 'break' | 'part'; strength: number; x: number; y: number; z: number; nx: number; nz: number; ref?: Obstacle; part?: number }[];
   visual: PodVisual | null;
   ai: AIState | null;
   place: number;
@@ -40,17 +46,58 @@ export const HOVER = 2.85;
 export const TUNNEL_DECK = 1.2;
 const MIN_ROAD_CLEAR = 0.68;
 
+/** The one place where a pod loses engine health.
+ *  `side`: < 0 left engine side, > 0 right, 0 = no side (split half and half), 'both' = the full amount on each side.
+ *  `zone`: where the hit comes from – the racer's Schadensmodell (podDamage.ts) weighs it: armour of that Panzerzone times the guards
+ *  still attached on that side. Afterwards every Bruchteil whose side fell through its step breaks off (event `part`).
+ *  Stat factors (`sturdy`), AI factors, cooldowns and invulnerability stay with the caller. */
+/** A pod's pose as its model is posed: yaw about the vertical axis at `pos`, then pitch and roll of the body about an origin `bodyZ` ahead. */
+type Pose = { pos: THREE.Vector3; yaw: number; pitch: number; roll: number };
+/** World point -> the pod's body space (x right, y up, z forward: the frame its model is built in), in place. Takes the pose of THIS
+ *  step: while the events of a step are handled, the model's own matrices still hold the pose of the frame before (1.7 m back at 100 m/s). */
+export function worldToBody(p: Pose, bodyZ: number, v: THREE.Vector3) {
+  const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw), sp = Math.sin(p.pitch), cp = Math.cos(p.pitch), sr = Math.sin(p.roll), cr = Math.cos(p.roll);
+  const dx = v.x - p.pos.x, dy = v.y - p.pos.y, dz = v.z - p.pos.z;
+  const x1 = dx * cy - dz * sy, z1 = dx * sy + dz * cy - bodyZ; // undo the yaw, step back to the body origin
+  const y2 = dy * cp + z1 * sp, z2 = -dy * sp + z1 * cp;         // undo the pitch
+  return v.set(x1 * cr + y2 * sr, -x1 * sr + y2 * cr, z2);      // undo the roll
+}
+/** Body space -> world, in place (the inverse of `worldToBody`). */
+export function bodyToWorld(p: Pose, bodyZ: number, v: THREE.Vector3) {
+  const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw), sp = Math.sin(p.pitch), cp = Math.cos(p.pitch), sr = Math.sin(p.roll), cr = Math.cos(p.roll);
+  const x1 = v.x * cr - v.y * sr, y1 = v.x * sr + v.y * cr;       // roll
+  const y2 = y1 * cp - v.z * sp, z2 = y1 * sp + v.z * cp + bodyZ; // pitch, out to the body origin
+  return v.set(p.pos.x + x1 * cy + z2 * sy, p.pos.y + y2, p.pos.z - x1 * sy + z2 * cy); // yaw
+}
+
+export function applyDamage(p: PodState, side: number | 'both', amount: number, zone: DamageZone) {
+  const m = DAMAGE_RULES.armor || DAMAGE_RULES.parts ? damageModel(p.def.id) : null;
+  let aL = side === 'both' || side < 0 ? amount : side > 0 ? 0 : amount * 0.5;
+  let aR = side === 'both' || side > 0 ? amount : side < 0 ? 0 : amount * 0.5;
+  if (m && DAMAGE_RULES.armor) { const mask = p.parts ?? 0; aL *= zoneFactor(m, mask, -1, zone); aR *= zoneFactor(m, mask, 1, zone); }
+  p.hpL -= aL; p.hpR -= aR;
+  if (!m || !DAMAGE_RULES.parts || p.hpL <= 0 || p.hpR <= 0) return; // (a pod about to explode loses everything at once: no single parts)
+  const due = partsDue(m, p.hpL, p.hpR) & ~(p.parts ?? 0);
+  if (!due) return;
+  p.parts = (p.parts ?? 0) | due;
+  p.fx = partsFx(m, p.parts, !p.isPlayer); // a Gegner feels half of it
+  for (let i = 0; i < m.parts.length; i++) if ((due >> i) & 1) p.events.push({ type: 'part', strength: 1, part: i, x: p.pos.x, y: p.pos.y, z: p.pos.z, nx: 0, nz: 0 });
+}
+/** Zone of a hit whose contact normal (nx, nz) points from the obstacle to the pod: head-on = front, anything else = side. */
+function hitZone(p: PodState, nx: number, nz: number): DamageZone { return nx * Math.sin(p.yaw) + nz * Math.cos(p.yaw) < -0.5 ? 'front' : 'side'; }
+
 export function podParams(p: PodState) {
-  const s = p.stats;
+  const s = p.stats, f = p.fx ?? FX_NONE;
   return {
-    vmax: 108 + 50 * s.topSpeed,
-    accel: 24 + 30 * s.accel,
-    turn: 1.05 + 0.75 * s.turn,
-    grip: 2.6 + 5.2 * s.traction,
-    abDecel: 22 + 38 * s.airbrake,
+    vmax: (108 + 50 * s.topSpeed) * f.vmax,
+    /** top speed without lost Bruchteile (sense of speed: camera FOV) */ vmax0: 108 + 50 * s.topSpeed,
+    accel: (24 + 30 * s.accel) * f.accel,
+    turn: (1.05 + 0.75 * s.turn) * f.turn,
+    grip: (2.6 + 5.2 * s.traction) * f.grip,
+    abDecel: (22 + 38 * s.airbrake) * f.abDecel,
     abTurn: 1.45 + 0.6 * s.airbrake,
-    cool: 0.16 + 0.3 * s.cooling,
-    heatRate: 0.38 - 0.16 * s.cooling,
+    cool: (0.16 + 0.3 * s.cooling) * f.cool,
+    heatRate: (0.38 - 0.16 * s.cooling) * f.heatRate,
     repair: 6 + 16 * s.repair,
     sturdy: 1.25 - 0.5 * s.repair,
     width: podCollision(p.def).halfW,
@@ -111,7 +158,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   // After 3 s the engines cut out (lock-out until they have cooled to 55 %). Releasing early cools down normally; the used time recovers below 90 %.
   if (p.heat >= 1) {
     p.heat = 1;
-    if (p.boosting && (p.overT ?? 0) < 3) { p.overT = (p.overT ?? 0) + dt; p.hpL -= 3.2 * dt * P.sturdy; p.hpR -= 3.2 * dt * P.sturdy; }
+    if (p.boosting && (p.overT ?? 0) < 3) { p.overT = (p.overT ?? 0) + dt; applyDamage(p, 'both', 3.2 * dt * P.sturdy, 'heat'); }
     if ((p.overT ?? 0) >= 3) { p.overheat = true; p.boosting = false; }
   } else if (!p.boosting && (p.overT ?? 0) > 0 && p.heat < 0.9) p.overT = Math.max(0, p.overT! - dt * 1.5);
   if (p.overheat && p.heat < 0.55) { p.overheat = false; p.overT = 0; }
@@ -193,7 +240,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
       // the deck instead of being pressed down through the headwall
       p.inRoof = true; p.upper = S.tun !== 2 && p.pos.y + 1.2 > fr.groundY + tunnelCeiling(S, fr.lat);
       if (p.upper && p.pos.y < fr.groundY + S.roof + 2.4 && p.invuln <= 0) { // clipped the portal lip on the way up
-        const dmg = 5 * P.sturdy; p.hpL -= dmg; p.hpR -= dmg; p.shake = Math.min(1, p.shake + 0.4);
+        const dmg = 5 * P.sturdy; applyDamage(p, 'both', dmg, 'belly'); p.shake = Math.min(1, p.shake + 0.4);
         p.events.push({ type: 'wall', strength: 16, x: p.pos.x, y: p.pos.y, z: p.pos.z, nx: 0, nz: 0 });
       }
     }
@@ -249,19 +296,22 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   if (!wasGrounded && p.grounded && (p.vel.y < -14 || landImpulse > 14)) {
     const imp = Math.max(-p.vel.y, landImpulse);
     const dmg = (imp - 14) * 0.9 * P.sturdy;
-    p.hpL -= dmg * 0.5; p.hpR -= dmg * 0.5; p.shake = Math.min(1, p.shake + 0.4);
+    applyDamage(p, 0, dmg, 'belly'); p.shake = Math.min(1, p.shake + 0.4);
     landImpulse = imp;
     p.events.push({ type: 'land', strength: imp, x: p.pos.x, y: fr.groundY, z: p.pos.z, nx: 0, nz: 0 });
   }
   // tunnel ceilings & zero-G tubes (matches wide-shouldered tunnel & chamber vault geometry Wd = hw + 3.4 + caveW)
   if (S.roof > 0 && !fr.gap && !p.upper) {
-    // Session 20: same superellipse as the mesh (`tunnelProfile`); the limit applies to the TOP of the pod (engine radius + lifted outer
-    // engine = 2.15 m, knife-edge roll adds the half span) – before, only the pod centre was tested and its upper half dipped into the vault.
+    // Session 20: same superellipse as the mesh (`tunnelProfile`); the limit applies to the TOP of the pod – before, only the pod centre
+    // was tested and its upper half dipped into the vault. The top is the pod's own (`podHeight`): its cockpit roof or the higher
+    // engine side with that side's present travel, turned by the knife-edge roll – at 90° the half width of the model. (One height
+    // of 2.15 m for every pod left the tall ones up to 2 m inside the vault, a lifted outer engine more.) The vault is tested above
+    // the pod centre.
     const l = Math.min(0.96, Math.abs(fr.lat) / (fr.hw + TUNNEL_SHOULDER + (S.caveW ?? 0)));
-    const ceil = fr.groundY + 1.5 + (S.roof - 1.5) * tunnelProfile(l) - (2.15 + knife * halfSpan * 0.95);
+    const ceil = fr.groundY + 1.5 + (S.roof - 1.5) * tunnelProfile(l) - podHeight(env0, p.engYL ?? 0, p.engYR ?? 0, rollA);
     if (p.pos.y > ceil) {
       const imp = Math.max(0, p.vel.y); p.pos.y = Math.max(ceil, p.pos.y - 45 * dt); if (p.vel.y > 0) p.vel.y *= -0.3; // pressed down quickly, never teleported
-      if (imp > 6 && p.invuln <= 0) { const dmg = Math.min(20, (imp - 6) * 0.8 * P.sturdy); p.hpL -= dmg * 0.5; p.hpR -= dmg * 0.5; p.shake = Math.min(1, p.shake + 0.3); p.events.push({ type: 'wall', strength: imp, x: p.pos.x, y: p.pos.y + 1, z: p.pos.z, nx: 0, nz: 0 }); }
+      if (imp > 6 && p.invuln <= 0) { const dmg = Math.min(20, (imp - 6) * 0.8 * P.sturdy); applyDamage(p, 0, dmg, 'top'); p.shake = Math.min(1, p.shake + 0.3); p.events.push({ type: 'wall', strength: imp, x: p.pos.x, y: p.pos.y + 1, z: p.pos.z, nx: 0, nz: 0 }); }
     }
   }
   if (p.zeroG) {
@@ -310,7 +360,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
         if (vt > 4 && p.invuln <= 0 && !(wc.wCd! > 0)) {
           wc.wCd = 0.2;
           const dmg = Math.min(28, Math.max(0, vt - 9) * 0.7 * P.sturdy);
-          if (side < 0) p.hpL -= dmg; else if (side > 0) p.hpR -= dmg; else { p.hpL -= dmg * 0.5; p.hpR -= dmg * 0.5; }
+          applyDamage(p, side, dmg, 'side');
           p.shake = Math.min(1, p.shake + vt * 0.02);
           p.events.push({ type: 'wall', strength: vt, x: hx, y: p.pos.y, z: hz, nx, nz });
         }
@@ -338,7 +388,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
       const wc = p as unknown as { wCd?: number };
       if (p.invuln <= 0 && !(wc.wCd! > 0)) {
         wc.wCd = 0.5; const spd = Math.hypot(p.vel.x, p.vel.z), dmg = Math.min(18, 5 + spd * 0.07) * P.sturdy;
-        p.hpL -= dmg * 0.5; p.hpR -= dmg * 0.5; p.vel.x *= 0.9; p.vel.z *= 0.9; p.shake = Math.min(1, p.shake + 0.5);
+        applyDamage(p, 0, dmg, 'top'); p.vel.x *= 0.9; p.vel.z *= 0.9; p.shake = Math.min(1, p.shake + 0.5);
         p.events.push({ type: 'wall', strength: 18 + spd * 0.1, x: p.pos.x, y: hitY, z: p.pos.z, nx: 0, nz: 0 });
       }
     }
@@ -508,7 +558,7 @@ function collideObstacle(p: PodState, o: Obstacle, sturdy: number) {
     const vn = p.vel.x * nx + p.vel.z * nz;
     // Session 14: small rocks and cargo crates shatter when hit at speed – the pod ploughs through and pays with a little hull damage
     if (o.breakable && vn < -5 && Math.hypot(p.vel.x, p.vel.z) > 38) {
-      if (p.invuln <= 0) { const dmg = (4 + o.r * 2.6) * sturdy * (p.isPlayer ? 1 : 0.6); if (c.side < 0) p.hpL -= dmg; else if (c.side > 0) p.hpR -= dmg; else { p.hpL -= dmg * 0.5; p.hpR -= dmg * 0.5; } }
+      if (p.invuln <= 0) { const dmg = (4 + o.r * 2.6) * sturdy * (p.isPlayer ? 1 : 0.6); applyDamage(p, c.side, dmg, hitZone(p, nx, nz)); }
       p.vel.x *= 0.93; p.vel.z *= 0.93; p.shake = Math.min(1, p.shake + 0.35);
       p.events.push({ type: 'break', strength: o.r, x: o.x, y: o.y, z: o.z, nx, nz, ref: o });
       o.broken = true; o.x = 1e9; o.z = 1e9; o.lat = 1e6; // moved out of the world: every other system (AI lanes, collisions) ignores it from now on
@@ -522,7 +572,7 @@ function collideObstacle(p: PodState, o: Obstacle, sturdy: number) {
       if (p.invuln <= 0 && !(pc.obCd! > 0)) {
         pc.obCd = 0.35;
         const dmg = Math.min(38, Math.max(0, -vn - 6) * 0.9 * sturdy) * (p.isPlayer ? 1 : 0.45);
-        if (c.side < 0) p.hpL -= dmg; else if (c.side > 0) p.hpR -= dmg; else { p.hpL -= dmg * 0.5; p.hpR -= dmg * 0.5; }
+        applyDamage(p, c.side, dmg, hitZone(p, nx, nz));
         p.shake = Math.min(1, p.shake + 0.5);
         p.events.push({ type: 'obstacle', strength: -vn, x: o.x + nx * o.r, y: p.pos.y, z: o.z + nz * o.r, nx, nz });
       }
@@ -533,11 +583,11 @@ function collideObstacle(p: PodState, o: Obstacle, sturdy: number) {
 
 function collideSetPieces(p: PodState, td: TrackData, time: number, sturdy: number) {
   const C = podCollision(p.def).circles; const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
-  const hurt = (dmg: number, side: number, x: number, z: number, nx: number, nz: number, strength: number) => {
+  const hurt = (dmg: number, side: number, x: number, z: number, nx: number, nz: number, strength: number, zone?: DamageZone) => {
     if (p.invuln > 0) return;
     const hp = p as unknown as { spHit?: number }; if (time - (hp.spHit ?? -9) < 0.7) return; hp.spHit = time;
     if (!p.isPlayer) dmg *= 0.45;
-    if (side < 0) p.hpL -= dmg; else if (side > 0) p.hpR -= dmg; else { p.hpL -= dmg * 0.5; p.hpR -= dmg * 0.5; }
+    applyDamage(p, side, dmg, zone ?? hitZone(p, nx, nz));
     p.shake = Math.min(1, p.shake + 0.45); p.events.push({ type: 'obstacle', strength, x, y: p.pos.y, z, nx, nz });
   };
   for (const sp of td.setPieces) {
@@ -619,7 +669,7 @@ function collideSetPieces(p: PodState, td: TrackData, time: number, sturdy: numb
           const wx = p.pos.x + c.x * cy + c.z * sy, wz = p.pos.z - c.x * sy + c.z * cy; const dx = wx - r.x, dz = wz - r.z, d = Math.hypot(dx, dz);
           if (d > r.r + c.r) continue;
           r.hits |= 1 << p.id; const nx = d > 1e-3 ? dx / d : 1, nz = d > 1e-3 ? dz / d : 0;
-          p.vel.x += nx * 8; p.vel.z += nz * 8; p.vel.y -= 6; hurt(22 * sturdy, c.side, r.x, r.z, nx, nz, 30); break;
+          p.vel.x += nx * 8; p.vel.z += nz * 8; p.vel.y -= 6; hurt(22 * sturdy, c.side, r.x, r.z, nx, nz, 30, 'top'); break; // falling rock: comes from above
         }
       }
     }
@@ -647,6 +697,7 @@ export function respawn(p: PodState, td: TrackData) {
   p.upper = false; p.inRoof = false; p.overT = 0; p.ckX = 0; p.ckY = 0; p.ckZ = 0; p.ckVX = 0; p.ckVY = 0; p.ckVZ = 0;
   p.vel.set(s.tx * 35, 0, s.tz * 35);
   p.hpL = Math.max(p.hpL, 55); p.hpR = Math.max(p.hpR, 55); p.heat = 0; p.overheat = false;
+  p.parts = 0; p.fx = undefined; // every Bruchteil is back (ADR 0001: parts return only here)
   p.dead = 0; p.invuln = 2.2; p.grounded = false; p.groundY = s.y; p.prevGroundY = s.y;
 }
 
@@ -965,7 +1016,7 @@ export function collidePods(ps: PodState[], time: number) {
     const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z, dy = b.pos.y - a.pos.y;
     const ka = Math.abs(Math.sin((a.rollCtl ?? 0) * Math.PI / 2)), kb = Math.abs(Math.sin((b.rollCtl ?? 0) * Math.PI / 2));
     if (Math.abs(dy) > 3 + (ka + kb) * 1.8) continue;
-    const ra = podParams(a).width * 0.8 * Math.max(0.3, 1 - ka * 0.7), rb = podParams(b).width * 0.8 * Math.max(0.3, 1 - kb * 0.7); const R = ra + rb;
+    const ra = podCollision(a.def).halfW * 0.8 * Math.max(0.3, 1 - ka * 0.7), rb = podCollision(b.def).halfW * 0.8 * Math.max(0.3, 1 - kb * 0.7); const R = ra + rb; // (cached shape – no per-pair podParams)
     const d2 = dx * dx + dz * dz; if (d2 > R * R || d2 < 1e-6) continue;
     const d = Math.sqrt(d2); const nx = dx / d, nz = dz / d; const pen = R - d;
     a.pos.x -= nx * pen / 2; a.pos.z -= nz * pen / 2; b.pos.x += nx * pen / 2; b.pos.z += nz * pen / 2;
@@ -977,7 +1028,7 @@ export function collidePods(ps: PodState[], time: number) {
       const dmg = Math.min(22, Math.max(0, -rv - 5) * 0.85);
       if (dmg > 0 && time - (ac.pCd ?? -1) > 0.2 && time - (bc.pCd ?? -1) > 0.2) {
         ac.pCd = time; bc.pCd = time;
-        a.hpL -= dmg * 0.5; a.hpR -= dmg * 0.5; b.hpL -= dmg * 0.5; b.hpR -= dmg * 0.5;
+        applyDamage(a, 0, dmg, 'side'); applyDamage(b, 0, dmg, 'side'); // pod contact knows only the centre normal: half and half, no sturdy
         a.shake = Math.min(1, a.shake + 0.3); b.shake = Math.min(1, b.shake + 0.3);
         a.events.push({ type: 'pod', strength: -rv, x: a.pos.x + nx * ra, y: a.pos.y, z: a.pos.z + nz * ra, nx: -nx, nz: -nz });
       }

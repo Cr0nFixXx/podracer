@@ -1,6 +1,15 @@
 # TODO
 
-## 0. Direkt aus Session 20
+## Aus dem Merge von Session 20 (Strecken) und Session 20 (Pods) (2026-11-22)
+- [x] **Tunneldecke je Pod** – erledigt im Folge-Commit: gemessener Kasten je Pod (`POD_BOX`), `podHeight`, zwei Unit-Prüfungen, Audit-Spalte `box` (`HANDOFF.md` → „Tunneldecke je Pod")
+- [ ] Tunneldecke, Rest: sie wird über der Pod-Mitte geprüft – an der Flanke kann die äußere Triebwerksseite weiter ins Gewölbe reichen; Nicken ist nicht eingerechnet → an drei Punkten prüfen (Cockpit, beide Triebwerksseiten)?
+- [ ] Überkopf-Bauten (Sponsor-Brücken, Startportal, Bögen) rechnen mit festen 1,5 m Pod-Höhe (`physics.ts`, `ext`) → `podHeight` verwenden
+- [ ] Entscheidung prüfen: ein Pod zählt so hoch wie seine größte Ausstattung (Aurora XR-7 ab Werk 0,70 m mehr, als sie ist) – oder Höhe je montierter Ausstattung?
+- [ ] Sichtprüfung im Browser: einen hohen Pod (Vrak Splitter-X) im Tunnel an die Decke fliegen
+- [ ] `tools/harness/papp.mjs` schreibt und liest noch den Profil-Schlüssel `podracer-profile-v1` → auf v2 umstellen (die Zeile „stored:" gibt sonst `undefined` aus und prüft nichts)
+- [ ] `tools/` ist nicht im Typecheck: 4 Typfehler in `tools/ci/unit.ts` (Parametertyp von `triCount`, Zeilen 41 / 59 / 140 / 145) – beheben und `tools/ci`, `tools/harness` in `tsconfig.json` aufnehmen?
+
+## 0. Direkt aus Session 20 (Strecken)
 - [ ] **Probefahrt + FPS-Messung auf echter GPU** (weiter offen – die Sandbox rendert nur in Software): durchgehende Höhlen und Gabelungen, neue Tunnelhöhen (27–30 m), See-Passagen, Untergrund-Physik (ist Eis mit −25 % Haftung fair?), Oovo-Mond
 - [ ] **HQ-Farne:** Wedel als Alpha-Karten mit Textur in `groundCover.ts` (Schneekiefern, Felsbrocken, Kakteen sind erledigt)
 - [ ] **Höhlen-Optik prüfen:** Felsschichtung läuft am Gewölbe stark gebogen (Textur folgt dem Bogen); Vulkan-Höhle ist ohne Zusatzlicht fast schwarz – ggf. mehr Glutadern/Lampen
@@ -9,7 +18,31 @@
 - [ ] **Build-Größe 17,5 MB** (Fotosets): optional WebP/AVIF oder 512-px-Sets für die Voreinstellung „Niedrig"
 - [ ] **Aufräumen:** `tools/harness/out/game.js` (19,6 MB Build-Artefakt) ist getrackt – aus dem Repo nehmen; `world.ts → place()`: der Früh-Ausstieg `if (count <= 0)` steht versehentlich hinter einem Kommentar
 
-## Erledigt (Session 20 – Höhlen, „Balken", Tunneldecken, Untergründe, Seen, Oovo-Mond, PBR-Fotosets, HQ-Assets)
+## 1. Session 20 (Pods) – Pod-Überholung (alle Phasen fertig; Phasen und Entscheidungen in `HANDOFF.md`)
+- [x] **Phase 0 – Setup + Sicherheitsnetz:** Node, Ausgangsmessung, Sichtprüfung im In-App-Browser, `podAssembly.ts`, Pod-Audit in `npm run check`, `CONTEXT.md`, ADR 0001/0002
+- [x] **Phase 1 – Refactoring ohne Spieländerung:** Layout-Registry, `engineExtent`, `podCockpits.ts`, `applyDamage`, Profil v2, Unit-Prüfungen
+- [x] **Phase 2 – 10 neue Cockpits + Details + Cockpit-Innenansicht** – wartet auf die Sichtung durch den Nutzer („Ultra" am Gaming-PC testen)
+- [x] **Nachbesserung aus der Sichtung: Cockpits weiter oben** (0,6–1,05 m, über der Triebwerkslinie; Fahrverhalten unverändert über `keel`) – Höhe bestätigt der Nutzer anhand `tools/harness/out/p2_hoeher_*.jpg`
+- [ ] Cockpit-Innenansicht in einem Tunnel sichten (Regen und 90°-Rolle sind gesichtet)
+- [x] **Phase 3 – 4 neue Pods:** Cyclone, Halo, Manta, Voltspire, Gegner-Auslosung aus 13, Hangar-Liste für 14, wanderndes CI-Startfeld – vom Nutzer freigegeben, Quill Voltspire danach geschlossener gebaut
+- [ ] Langlauf `SECS=120`: vereinzelt „downward teleport" (schon vor Phase 3). Seit Phase 5 genauer: ein Respawn wird nicht mehr mitgezählt; übrig bleibt der Tunnel-Fall unten
+- [x] **Phase 4 – Tuning-Optik:** Tuning-Teile (7 Werte × 2 Stufen) + Style-Teile (Finnen, Einlass, Düse, Kanzel), Hangar-Reiter „Lack | Teile", Gegner mit ausgelosten Style-Teilen
+- [ ] Teile-Kombinationen am Gaming-PC durchklicken (gesichtet sind 7; Maße und Dreiecke prüft das Audit an drei Sätzen je Pod)
+- [x] **Phase 5 – Schadensmodelle, Fahrverhalten:** Panzerzonen + je drei Bruchteile pro Seite für alle 14 Racer, HUD-Lampen, Meldungen, CI-Schalter `ARMOR=0 PARTS=0`
+- [x] **Phase 6 – Schadensmodelle, Optik:** Bruchteile fallen sichtbar ab (auch bei Gegnern, ohne zusätzliche Zeichenaufrufe), Triebwerke fallen aus, Blitze erlöschen, Treffermarken, Trümmer in Pod-Farben, Schadens-Vorschau im Hangar
+- [x] **Phase 7 – Gegner:** Ruß und sterbende Flammen in den geteilten Materialien (je Mesh, eine Pipeline), Pipeline-Zählung unverändert (100), WebGL2-Lauf fehlerfrei
+- [ ] **Am Gaming-PC prüfen (Nutzer):** „Ultra"-Bildrate mit vollen Details + Teilen + Schaden; Schadens-Balance fahren
+- [ ] Dampf- / Ölstrahlen je Modell (Fireflare-Radiator, Kühlschleifen) – im Plan vorgesehen, nicht gebaut
+- [x] Flache Bleche glühten bei Hitze wie die Düse – behoben: jedes Rumpfteil in Grund- oder Zweitfarbe trägt seine Lage längs des Triebwerks (`heatAlong`)
+- [x] **Abschluss-Durchsicht eingearbeitet:** Treffermarken sitzen exakt (Lage des aktuellen Schritts), schlagen nicht mehr auf die Klappen durch, Kit-Lichter gehen mit dem Triebwerk aus, Bruchteil-Prüfungen auch für Gegner und Teile-Sätze (69 Unit-Prüfungen)
+- [ ] **Entscheidung des Nutzers:** sollen frontale Wandtreffer als Zone „Front" zählen (dann helfen Rammbug und harte Nase auch an der Wand)? Heute zählt jede Wand als „Seite"
+- [ ] Kleinigkeiten aus der Durchsicht (Liste in `HANDOFF.md` → „Zurückgestellt"): Halo-Abschlussplatten 4 cm durch die Ringhaut · Treffermarken bei Manta / Halo / Cyclone auf dem Kernradius · keine Marke bei der Hälfte der Pod-Kontakte · Hangar baut das Modell bei jedem Tuning-Klick neu · toter Code (`cockpit.style`, `cockpitExtras`) · `loadProfile` prüft `difficulty` / `laps` nicht
+- [ ] In der ersten Rennsekunde werden 3 Pipelines nachübersetzt (Welt-Meshes, keine Pods) – ins Aufwärmen nehmen?
+- [ ] Schadens-Balance von Hand fahren (bisher nur KI-Sim): sind 5–10 % je Bruchteil richtig?
+- [ ] Tunnel-Logik: ein Pod kommt aus einem Sprung hoch über der Straße in den Tunnel und gilt als „im Tunnel" (Malastare, Sample 964). Seit dem Merge wird er nicht mehr umgesetzt, sondern sanft unter die Decke gedrückt (im 45-s-Lauf gemessen: 20,8 m über der Straße, 3 Bilder, 1,26 m). Offen ist nur noch, ob er dort nicht aufs Deck gehört: `p.upper` entscheidet mit Pod-Mitte + 1,2 m
+- [ ] `tools/harness/pui.mjs:39` prüft noch die gelöschte „Neon-Spirale" → anpassen; `tools/harness/run.sh` läuft nur unter Linux
+
+## Erledigt (Session 20 (Strecken) – Höhlen, „Balken", Tunneldecken, Untergründe, Seen, Oovo-Mond, PBR-Fotosets, HQ-Assets)
 - [x] **Bugs behoben:** „Balken" in Schrägkurven (Pfeilerkappen folgen der Überhöhung), Tunneldecken +6,5–7,5 m mit breitem Gewölbe (Superellipse) und Kamera im Gewölbe, Höhlen durchgehend und an Gabelungen verschmolzen
 - [x] **25 Untergründe mit eigener Fahrphysik** auf allen 13 Strecken (Eis, Pulverschnee, Dünen, Schlamm, Lava …), HUD-Zeile, Staubfahne in Untergrundfarbe
 - [x] **Seen und Plateaus als offene Passage:** Eissee, Lavasee, Methansee, Sumpf, Spiegelsee, Meer (Aquilaris), Felsplateau

@@ -35,7 +35,70 @@ Schwarz/Dunkelbraun, Glas-Panels, Amber-Akzent (`#ffb040`), Orbitron + Rajdhani,
 | Vulkanwelt | `lava` (Pahoehoe-Stricke + Schlackeporen) | Basaltsäulen, Lavakrusten, treibendes Magmameer, glühende Schlucht-Lavafälle |
 | Kristall / Aquilaris | `crystal` / `beach` | Kristall-Spaltstufen / Atoll-Inseln, Felsnadeln, Uferschaum, Küsten-Wasserfälle |
 
-## Untergründe, Seen, Gewölbe, Mondoberfläche (Session 20)
+## Racer: eigene Cockpits, Innenansicht, Detailstufen – Session 20 (Pods)
+Leitidee: **Jeder Racer ist an seinem Cockpit erkennbar – auch als Silhouette.** Form zuerst, Kleinteile danach; kein Cockpit teilt sich mehr Wanne, Scheibe oder Heck mit einem anderen.
+
+| Racer | Cockpit | Erkennungszeichen |
+|---|---|---|
+| Aurora XR-7 | schlanker Renn-Tropfen | flache Rundum-Scheibe, zwei Kopfstützen-Höcker, Canards wie die Triebwerksflügel, Kreisel-Stabilisator am Heck |
+| Vrak Splitter-X | gepanzerter Kriegsschlitten | Überrollkäfig, Panzerblende mit Sehschlitz, Stoßzähne, zwei Auspuffrohre |
+| Tenroc 6-Fach | lange Spindel | Glaskuppel, sechsarmiger Kabelverteiler („Spinne"), Fühler-Antennen |
+| Quadra Lumber | fliegende Untertasse | volle Glaskuppel, vier Ausleger wie das Blitz-X, Lichtring am Bauch |
+| Hollo Needle | Wurfpfeil | lange Nasensonde, hohe Finne, liegender Pilot unter schmaler Haube |
+| Tyr Vespa | Wespen-Scooter | offener Sattelrahmen mit Lenker, gestreifter Hinterleib, Stachel |
+| Beerak Fireflare | Kühler-Cockpit | Kiemen-Radiatoren an den Flanken, Kupferleitungen, Tanks und Schlote am Heck |
+| Pagali Ironclad | Panzerturm | genietete Platten, Sehschlitze, aufgeklappte Luke, Stoßstangen |
+| Mak Starling | Vogel | Schnabel, gepfeilte Schwingen, lange Rückenfinne, gespreizte Heck-Bremsklappen |
+| Mandrel Ram | Planierraupe | V-Rammbug mit Warnstreifen und Räumgitter, Hydraulikstempel, Käfig |
+
+**Die vier neuen Racer (Phase 3)** – jeder hat eine Triebwerksform, die es vorher nicht gab, und wiederholt sie im Cockpit:
+
+| Racer | Triebwerke | Cockpit | Farben |
+|---|---|---|---|
+| Tarn Cyclone | kurzer, dicker Rumpf mit offenem 5-Blatt-Rotor in einem Schutzring (Lichtband, Warnstreifen), Auspuffstutzen wie ein Sternmotor | robuste Wanne mit Überrollbügel und Rundumleuchte, Doppel-Leitwerksträger, Kufen | Sand, Oliv, Bernstein |
+| Lyss Halo-9 | schlanker Kern in einem großen Ringflügel mit Lichtbändern; Blitz springt von Ring zu Ring | Glastropfen in einem flachen Ring mit Lichtband, Chrombogen darüber | Eisweiß, Nachtblau, Türkis |
+| Dorn Manta | flache Platte: Briefschlitz-Einlass mit Stauturbine, Schlitzdüse mit flacher Flamme, Rückenwulst, Doppelleitwerk, abgesenkte Flügelspitzen | flacher Pfeilschlitten, liegender Pilot, Deltaflächen, Doppelleitwerk | Schwarz, Gold, Glutrot |
+| Quill Voltspire | Reaktor-Triebwerk: geschlossene Verkleidungen vorn und hinten (Kühlrippen, Kondensatorkästen), dazwischen ein dicht vergittertes Fenster auf die Plasmaspule mit drehendem Käfigläufer; Kastenholme, Kabelstränge, drei Elektroden je Flanke | Reaktorkugel: unten geschlossene Schale, oben Glaskugel im Reifenkäfig mit beplanktem Rücken, Gerätepaket hinter dem Sitz, Konsole am Stiel, hoher Entladungsmast | Indigo, Silber, Violett |
+
+- **Erkennbarkeit aus der Ferne:** das Fern-Modell zeigt die Sonderform (Ring um Rotor- und Ringflügel-Triebwerke, flache Kiste beim Manta, Ring ums Halo-Cockpit).
+- **Sichtachsen:** kein Bauteil in der Blickmitte der Cockpit-Kamera – die Käfigkugel hat ihre vorderen Reifen links und rechts wie A-Säulen; die drei Bögen der Voltspire liegen mindestens 2,5 m hinter der Triebwerksfront (freie Sicht von der Motorhaube).
+- **Grenzen neuer Pods:** tiefster Punkt höchstens 1,9 m unter dem Pod-Ursprung, halbe Breite höchstens 4,6 m, Ringe höchstens 1,85 m Radius.
+- **Cockpit-Höhe:** die Gondel reitet **über der Triebwerkslinie** – Wannenboden nie unter der Achse der unteren Triebwerke, Augpunkt mindestens 0,25 m über deren Oberkante. So hängt kein Cockpit im Abgasstrahl, die Kabel laufen flach nach vorn statt steil nach oben, und der Pilot blickt über die Triebwerke hinweg auf die Strecke. Bei Vier- und Sechsfach-Pods sitzt das Cockpit auf Höhe der Lücke zwischen unterer und oberer Reihe (Blick durch die Mitte).
+- **Innenansicht (Kamera „Cockpit"):** man sitzt im Pod. Die Triebwerke liegen unter dem Horizont; beim Lenken steigt das kurvenäußere Triebwerk kurz ins Bild. Unteres Bilddrittel = Armaturenbrett (Rundinstrumente mit Zeiger, Balkenanzeigen, drei Warnlampen Boost · Hitze · Schaden), darüber Scheibenrahmen bzw. Käfig, voraus Triebwerke, Kabel und Blitz. Kopf und Rumpf des Piloten sind ausgeblendet, Unterarme und Hände an den Hebeln bleiben. Der Blick auf die Strecke bleibt frei: nichts Massives auf Augenhöhe (Panzerblenden lassen einen Sehschlitz). Die freie Sicht ohne Cockpit ist die Kamera „Motorhaube".
+- **Triebwerke:** Einspritzring an der Düse, Verteilerkästen mit Statuslicht, Leitbleche an den Flanken, Griffbügel, Bremsklappen-Stempel; dazu je Pod ein eigener Anbausatz (Flügel-Endkappen, Ansaugdorne, Kühlschleifen, Rammringe, Schwanzfedern …).
+- **Detailstufen:** Spieler-Pod immer voll; Gegner unter „Ultra" mit leichtem Cockpit (Silhouette + einfacher Pilot) und damit leichter als vor der Überholung; auf „Ultra" (Ziel: Gaming-PC) nahe Gegner mit vollen Details. Fern-LOD zeigt die Cockpit-Grundform (Kiste, Scheibe, Finne, Käfig) und jeden Energieblitz.
+- **Piloten:** Hautfarbe je Spezies, Kragenring, Schulterpolster, Brustgerät.
+
+**Tuning, das man sieht (Phase 4)** – Leitidee: **Man liest einem Pod an, was sein Besitzer getunt hat.** Jede Tuning-Größe hat ihren festen Platz am Triebwerk, damit sich die Teile nie in die Quere kommen und ein Blick genügt:
+
+| Tuning-Wert | Platz am Triebwerk | kleines Teil (Stufe 2–3) | großes Teil (Stufe 4–5) |
+|---|---|---|---|
+| Höchstgeschw. | Düse | Düsenkragen mit Kupferring | Nachbrennerring mit Kühlrippen und zweitem Glühring |
+| Beschleunigung | Einlasslippe | vier Stauhutzen | + zwei Kompressorhutzen mit Kupferleitung |
+| Kühlung | Heck des Rumpfs | Kühlrippenring | + Radiatorplatten auf den Schultern mit Kühlmittelleitung |
+| Wendigkeit | hinter dem Einlass / Düse | zwei Canards | + vier Steuerflächen mit Stellstangen |
+| Traktion | Bauch | langer Repulsor-Streifen mit Kufen | + vier Ausleger-Pads |
+| Luftbremse | Bremsklappen | Klappen 25 % größer | + zweites Klappenblatt, das weiter aufgeht |
+| Reparatur | Flanken / Kabelpylon | aufgenietete Panzer-Doppler | + Reparatureinheit mit Gelenkarm und Statuslicht |
+
+- **Farbe sagt, was es ist:** Tuning-Teile sind Technik (Stahl, Kupfer, dunkles Metall, Leuchtbänder). Flächen, die zum Pod gehören sollen – Canards, Steuerflächen, Panzer-Doppler und alle Finnen –, tragen die **Sekundärfarbe** der Lackierung.
+- **Style-Teile** (frei, nur Aussehen) verändern die Silhouette an vier Stellen: **Finnen** (Haifinne · Doppel-Leitwerk · Pfeilflügel), **Einlass** (Gitter · Langer Dorn · Irisblende aus acht verdrehten Lamellen), **Düse** (Lang · Schubvektor-Paddel · Zackenkrone), **Kanzel** (klar · Rauch · Bernstein · Spiegel).
+- **Größe folgt dem Triebwerk:** alle Teile skalieren mit dem Rumpfradius; flache Triebwerke (Manta) bekommen flache Varianten (Leisten statt Ringe, Zahnleiste statt Krone). Nichts ragt tiefer als die Bodenklemme oder weiter als 0,55 m über die Kollisionsform.
+- **Gegner** tragen ausgeloste Style-Teile, aber keine Tuning-Teile – so sieht jedes Startfeld anders aus, und der eigene Pod bleibt der am weitesten ausgebaute.
+
+**Schaden, der zum Racer passt (Phase 5)** – Leitidee: **Ein Racer geht so kaputt, wie er gebaut ist.** Leichte Renner verlieren Flügel und Finnen (Haftung, Wendigkeit), schwere verlieren Panzerung oder Kühlung, Mehrmotorige verlieren einzelne Triebwerke, die Voltspire ihre Energiebögen.
+- **Lesbar in drei Stufen:** jede Schadensanzeige hat drei Lampen (50 / 35 / 20 %). Fällt die Füllung unter eine Stufe, bricht genau ein Teil – mit Meldung, Schlag und Funken. Kein Teil hat eigene Lebenspunkte.
+- **Mild:** ein Teil kostet 5–10 %, zusammen nie mehr als 15 % je Fahrwert. Der Pod bleibt fahrbar; man merkt den Schaden in schnellen Kurven und beim Beschleunigen, nicht auf der Geraden.
+- **Schutzteile:** Rammbug (Mandrel Ram) und Panzerschürzen (Pagali Ironclad) kosten nichts, wenn sie fehlen – sie haben vorher Treffer abgefangen. Wer sie verliert, steckt danach mehr ein.
+- **Reparatur ist kein Zurückspulen:** `R` heilt die Triebwerke, verlorene Teile bleiben bis zum Respawn weg.
+- **Man sieht, was fehlt (Phase 6):** ein Bruchteil reißt mit Funken ab und fliegt als Blech in der Zweitfarbe des Pods nach hinten weg; die Stelle bleibt leer (Ringflügel mit dunkler Bruchkante, Splitter-X mit offenem Ansaugrohr, Rotor mit vier statt fünf Blättern). Ausgefallene Triebwerke sind dunkel und ziehen Rauch, tote Energiebögen fehlen.
+- **Treffermarken statt Dellen:** wo der eigene Pod getroffen wird, bleibt ein Brandfleck mit blankem Metall in der Mitte – höchstens vier je Rumpfseite, der älteste wird überschrieben. Nach dem Respawn ist der Pod wieder sauber.
+- **Explosion in Pod-Farben:** ein zerstörter Pod zerlegt sich in Platten seiner Erst- und Zweitfarbe.
+- **Gegner zeigen ihren Zustand (Phase 7):** je Triebwerksseite Ruß auf dem Lack, unter 35 % schwächere, unter 15 % stotternde Flammen, dazu dieselben fehlenden Teile wie beim Spieler. So erkennt man im Zweikampf, wer angeschlagen ist – ohne Anzeige.
+- **Hitze hat einen Ort:** Glut und Ruß laufen von der Düse nach vorn – auf dem Rumpf und genauso auf Flügeln, Finnen, Platten und Klappen. Ein Blech vorn am Triebwerk bleibt kühl, eines an der Düse glüht mit. (Vorher glühte jedes flache Teil wie die Düse.)
+- **Treffermarken sitzen, wo der Treffer war** – auch bei 500 km/h in der Verfolgerkamera; eine Marke auf dem Triebwerk färbt eine Klappe nur dort, wo die Klappe wirklich liegt.
+
+## Untergründe, Seen, Gewölbe, Mondoberfläche – Session 20 (Strecken)
 Leitidee: **Der Boden erzählt den Planeten.** Eine Strecke ist kein einheitliches Band mehr: alle paar hundert Meter wechselt, worüber der Pod schwebt – und man sieht und spürt es.
 
 | Thema | Gestaltung |
@@ -47,7 +110,7 @@ Leitidee: **Der Boden erzählt den Planeten.** Eine Strecke ist kein einheitlich
 | Plateau | heller, rissiger Lehmboden; am Rand fällt eine Felskante 17 m ab |
 | Fahrgefühl | spürbar, aber fair: höchstens 25 % weniger Haftung (Eis) oder 8 % weniger Tempo (Sumpf); gilt für alle Pods; das HUD nennt Boden und Wirkung in zwei Wörtern |
 | Staubfahne | trägt die Farbe des Bodens (Schnee weiß, Asche dunkelgrau, Mondstaub grau); über Wasser, Sumpf und Spiegelsee Gischt; über Lava zusätzlich Glutfunken; auf blankem Eis, Stationsdeck und Kristall keine |
-| Tunnel-Gewölbe | Superellipse: fast senkrechte Wände, breite flache Decke – auch am Rand bleibt Luft. 27 m hoch (Ando Prime 30 m). Die Kamera bleibt immer im Gewölbe |
+| Tunnel-Gewölbe | Superellipse: fast senkrechte Wände, breite flache Decke – auch am Rand bleibt Luft. 27 m hoch (Ando Prime 30 m). Die Kamera bleibt immer im Gewölbe. Die Decke hält jeden Pod mit seiner eigenen Höhe draußen: höchster Punkt des Modells samt angehobenem Triebwerk, im Messerflug die halbe Breite |
 | Höhle | ein durchgehender Raum ohne Lücken. Kammern öffnen sich nach oben (bis 45 m) und zur Seite (die Piste wird breiter). An Gabelungen verschmelzen beide Röhren zu einer Halle mit Felspfeiler |
 | Oovo IV | Mond statt Leere: grauer Regolith, Krater, flache Kraterränder am Horizont; Stationsdecks aus hellen Metallplatten; Gasriese mit Ring tief am Himmel; flache Sonne (19°) für lange Schatten |
 | Foto-Sets | echte Materialien (Farbe, Normal-Map, Rauheit, Höhe). Die Struktur kommt vom Foto, die Farbe wird auf die Palette der Welt gezogen |

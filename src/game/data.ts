@@ -12,7 +12,9 @@ export const STAT_LABELS: Record<StatKey, string> = {
   repair: 'Reparatur',
 };
 
-export type EngineStyle = 'turbine' | 'long' | 'split' | 'heavy' | 'needle' | 'quad' | 'ring' | 'blade';
+/** The first eight styles are variants of the round turbine builder (podParts.ts); the Session 20 pods have builders of their own
+ *  (podEngines.ts): `rotor` open propfan in a guard hoop · `hoop` slim core in a ring wing · `slab` flat plate · `cage` open truss. */
+export type EngineStyle = 'turbine' | 'long' | 'split' | 'heavy' | 'needle' | 'quad' | 'ring' | 'blade' | 'rotor' | 'hoop' | 'slab' | 'cage';
 
 export interface PodDef {
   id: string;
@@ -20,88 +22,114 @@ export interface PodDef {
   pilotId: string;
   desc: string;
   stats: Record<StatKey, number>; // 0..1
-  engine: EngineStyle;
-  engineLen: number;
-  engineRad: number;
-  spread: number; // distance between engines
-  cable: number; // engine -> cockpit distance
-  cockpit: 'pod' | 'wedge' | 'saucer' | 'long';
   colors: [string, string, string]; // primary, secondary, glow
 }
+
+/** head / helmet variant of the pilot figure (podCockpits.ts → pilotParts) */
+export type PilotHead = 'goggles' | 'snout' | 'crest' | 'aero' | 'dome' | 'maul' | 'veil' | 'horn' | 'optic';
 
 export interface PilotDef {
   id: string;
   name: string;
   species: string;
+  head: PilotHead;
+  /** skin tone of the pilot figure (heads that show skin: goggles, snout, crest) */
+  skin: string;
   skill: number; // 0..1
   aggression: number; // 0..1
   color: string;
 }
 
 export const PILOTS: PilotDef[] = [
-  { id: 'kai', name: 'Kai Varrin', species: 'Mensch', skill: 0.9, aggression: 0.4, color: '#4aa3ff' },
-  { id: 'zeb', name: 'Zebulox Vrak', species: 'Dugkin', skill: 0.95, aggression: 0.95, color: '#ff9a2e' },
-  { id: 'gas', name: 'Gasvaro Ten', species: 'Xantori', skill: 0.8, aggression: 0.3, color: '#3fe0a0' },
-  { id: 'bom', name: 'Bomquad Rii', species: 'Lurbani', skill: 0.55, aggression: 0.2, color: '#e3e04a' },
-  { id: 'mav', name: 'Mavik Hollo', species: 'Gurrani', skill: 0.75, aggression: 0.6, color: '#ff4a6e' },
-  { id: 'rat', name: 'Rattis Tyr', species: 'Aleeni', skill: 0.7, aggression: 0.8, color: '#b46bff' },
-  { id: 'ald', name: 'Aldo Beerak', species: 'Kraveen', skill: 0.85, aggression: 0.7, color: '#7fd3ff' },
-  { id: 'tee', name: 'Teemo Pagali', species: 'Vexi', skill: 0.65, aggression: 0.5, color: '#ff7b2e' },
-  { id: 'ela', name: 'Elana Mak', species: 'Mensch', skill: 0.78, aggression: 0.35, color: '#ff5ad1' },
-  { id: 'ody', name: 'Odo Mandrel', species: 'Erriton', skill: 0.6, aggression: 0.55, color: '#9fff5a' },
-  { id: 'cle', name: 'Clegg Halden', species: 'Mensch', skill: 0.68, aggression: 0.45, color: '#ffd27a' },
+  { id: 'kai', name: 'Kai Varrin', species: 'Mensch', head: 'goggles', skin: '#b98c68', skill: 0.9, aggression: 0.4, color: '#4aa3ff' },
+  { id: 'zeb', name: 'Zebulox Vrak', species: 'Dugkin', head: 'snout', skin: '#b5673a', skill: 0.95, aggression: 0.95, color: '#ff9a2e' },
+  { id: 'gas', name: 'Gasvaro Ten', species: 'Xantori', head: 'crest', skin: '#7fb6a8', skill: 0.8, aggression: 0.3, color: '#3fe0a0' },
+  { id: 'bom', name: 'Bomquad Rii', species: 'Lurbani', head: 'dome', skin: '#8fa3b5', skill: 0.55, aggression: 0.2, color: '#e3e04a' },
+  { id: 'mav', name: 'Mavik Hollo', species: 'Gurrani', head: 'aero', skin: '#a4b06a', skill: 0.75, aggression: 0.6, color: '#ff4a6e' },
+  { id: 'rat', name: 'Rattis Tyr', species: 'Aleeni', head: 'crest', skin: '#a99bc0', skill: 0.7, aggression: 0.8, color: '#b46bff' },
+  { id: 'ald', name: 'Aldo Beerak', species: 'Kraveen', head: 'aero', skin: '#c9a15a', skill: 0.85, aggression: 0.7, color: '#7fd3ff' },
+  { id: 'tee', name: 'Teemo Pagali', species: 'Vexi', head: 'dome', skin: '#b8795a', skill: 0.65, aggression: 0.5, color: '#ff7b2e' },
+  { id: 'ela', name: 'Elana Mak', species: 'Mensch', head: 'goggles', skin: '#b98c68', skill: 0.78, aggression: 0.35, color: '#ff5ad1' },
+  { id: 'ody', name: 'Odo Mandrel', species: 'Erriton', head: 'aero', skin: '#8f9a8a', skill: 0.6, aggression: 0.55, color: '#9fff5a' },
+  { id: 'cle', name: 'Clegg Halden', species: 'Mensch', head: 'goggles', skin: '#b98c68', skill: 0.68, aggression: 0.45, color: '#ffd27a' },
+  // Session 20: the pilots of the four new pods
+  { id: 'bra', name: 'Brask Tarn', species: 'Ursk', head: 'maul', skin: '#7b5a3c', skill: 0.72, aggression: 0.65, color: '#c8743a' },
+  { id: 'sir', name: 'Sira Lyss', species: 'Nerai', head: 'veil', skin: '#8fc9cf', skill: 0.88, aggression: 0.3, color: '#7af0e0' },
+  { id: 'hav', name: 'Havo Dorn', species: 'Brakkan', head: 'horn', skin: '#8a7361', skill: 0.8, aggression: 0.85, color: '#d1a43a' },
+  { id: 'ixo', name: 'Ixo Quill', species: 'Synth', head: 'optic', skin: '#9aa3ad', skill: 0.82, aggression: 0.5, color: '#8f7bd6' },
 ];
 
 export const PODS: PodDef[] = [
   {
     id: 'aurora', name: 'Aurora XR-7', pilotId: 'kai', desc: 'Ausgewogener Allrounder mit großen Turbinen-Triebwerken.',
     stats: { topSpeed: 0.7, accel: 0.75, turn: 0.75, traction: 0.65, airbrake: 0.7, cooling: 0.7, repair: 0.6 },
-    engine: 'turbine', engineLen: 7, engineRad: 1.15, spread: 4.2, cable: 9, cockpit: 'pod', colors: ['#2d6fd6', '#d9dde3', '#4ad2ff'],
+    colors: ['#2d6fd6', '#d9dde3', '#4ad2ff'],
   },
   {
     id: 'brute', name: 'Vrak Splitter-X', pilotId: 'zeb', desc: 'Riesige Split-X Triebwerke – brutale Geschwindigkeit.',
     stats: { topSpeed: 0.95, accel: 0.8, turn: 0.45, traction: 0.55, airbrake: 0.5, cooling: 0.55, repair: 0.5 },
-    engine: 'split', engineLen: 10, engineRad: 1.25, spread: 5.2, cable: 10, cockpit: 'wedge', colors: ['#d07a1c', '#3a3a3a', '#ffb347'],
+    colors: ['#d07a1c', '#3a3a3a', '#ffb347'],
   },
   {
     id: 'gasvaro', name: 'Tenroc 6-Fach', pilotId: 'gas', desc: 'Sechs Triebwerke, extreme Beschleunigung, empfindlich.',
     stats: { topSpeed: 0.8, accel: 0.95, turn: 0.6, traction: 0.6, airbrake: 0.65, cooling: 0.45, repair: 0.45 },
-    engine: 'quad', engineLen: 8.5, engineRad: 0.9, spread: 4.8, cable: 11, cockpit: 'long', colors: ['#27a36d', '#e8d27a', '#5affb4'],
+    colors: ['#27a36d', '#e8d27a', '#5affb4'],
   },
   {
     id: 'bomquad', name: 'Quadra Lumber', pilotId: 'bom', desc: 'Vier schlanke Triebwerke im Quadrat, gekoppelt über ein X aus Energieblitzen. Wild, aber schnell.',
     stats: { topSpeed: 0.85, accel: 0.55, turn: 0.4, traction: 0.4, airbrake: 0.45, cooling: 0.8, repair: 0.7 },
-    engine: 'ring', engineLen: 7.6, engineRad: 0.7, spread: 4.6, cable: 12, cockpit: 'saucer', colors: ['#c9b23a', '#5d4a2c', '#fff07a'],
+    colors: ['#c9b23a', '#5d4a2c', '#fff07a'],
   },
   {
     id: 'mavik', name: 'Hollo Needle', pilotId: 'mav', desc: 'Schlanke Nadel-Triebwerke für maximale Wendigkeit.',
     stats: { topSpeed: 0.6, accel: 0.7, turn: 0.95, traction: 0.85, airbrake: 0.85, cooling: 0.65, repair: 0.6 },
-    engine: 'needle', engineLen: 8, engineRad: 0.75, spread: 3.6, cable: 8, cockpit: 'pod', colors: ['#c2263f', '#efe9e1', '#ff5a7a'],
+    colors: ['#c2263f', '#efe9e1', '#ff5a7a'],
   },
   {
     id: 'rattis', name: 'Tyr Vespa', pilotId: 'rat', desc: 'Klein, leicht und agil – hohe Traktion.',
     stats: { topSpeed: 0.65, accel: 0.85, turn: 0.85, traction: 0.9, airbrake: 0.75, cooling: 0.6, repair: 0.55 },
-    engine: 'blade', engineLen: 6.5, engineRad: 0.85, spread: 3.4, cable: 7.5, cockpit: 'wedge', colors: ['#8a3ad6', '#20212a', '#c48bff'],
+    colors: ['#8a3ad6', '#20212a', '#c48bff'],
   },
   {
     id: 'aldo', name: 'Beerak Fireflare', pilotId: 'ald', desc: 'Hochleistungskühlung – Dauer-Boost-Spezialist.',
     stats: { topSpeed: 0.75, accel: 0.65, turn: 0.6, traction: 0.7, airbrake: 0.6, cooling: 0.95, repair: 0.75 },
-    engine: 'long', engineLen: 9.5, engineRad: 1.0, spread: 4.4, cable: 9.5, cockpit: 'long', colors: ['#2a8fb5', '#c7c2b8', '#7fe8ff'],
+    colors: ['#2a8fb5', '#c7c2b8', '#7fe8ff'],
   },
   {
     id: 'teemo', name: 'Pagali Ironclad', pilotId: 'tee', desc: 'Schwer gepanzert – steckt Kollisionen weg.',
     stats: { topSpeed: 0.7, accel: 0.5, turn: 0.5, traction: 0.75, airbrake: 0.55, cooling: 0.7, repair: 0.95 },
-    engine: 'heavy', engineLen: 7.5, engineRad: 1.45, spread: 5.0, cable: 9, cockpit: 'saucer', colors: ['#7a4a2a', '#b5b5b5', '#ff8c3a'],
+    colors: ['#7a4a2a', '#b5b5b5', '#ff8c3a'],
   },
   {
     id: 'elana', name: 'Mak Starling', pilotId: 'ela', desc: 'Elegant und präzise – perfekte Luftbremse.',
     stats: { topSpeed: 0.72, accel: 0.72, turn: 0.8, traction: 0.75, airbrake: 0.95, cooling: 0.6, repair: 0.6 },
-    engine: 'needle', engineLen: 9, engineRad: 0.85, spread: 4.0, cable: 9, cockpit: 'long', colors: ['#e6e6ee', '#d63aa8', '#ff7ae0'],
+    colors: ['#e6e6ee', '#d63aa8', '#ff7ae0'],
   },
   {
     id: 'odo', name: 'Mandrel Ram', pilotId: 'ody', desc: 'Rammbock mit Turbinen – aggressive Rennen.',
     stats: { topSpeed: 0.78, accel: 0.6, turn: 0.55, traction: 0.6, airbrake: 0.5, cooling: 0.75, repair: 0.85 },
-    engine: 'heavy', engineLen: 8, engineRad: 1.3, spread: 4.6, cable: 8.5, cockpit: 'wedge', colors: ['#4c7a1e', '#2b2b2b', '#b4ff5a'],
+    colors: ['#4c7a1e', '#2b2b2b', '#b4ff5a'],
+  },
+  // ---- Session 20: four new pods (keep the ten above first – the old CI grid and saved profiles count on their order) ----
+  {
+    id: 'cyclone', name: 'Tarn Cyclone', pilotId: 'bra', desc: 'Zwei offene Riesenrotoren in Schutzringen – saugt sich förmlich an der Piste fest.',
+    stats: { topSpeed: 0.64, accel: 0.88, turn: 0.7, traction: 0.92, airbrake: 0.72, cooling: 0.62, repair: 0.6 },
+    colors: ['#b08d57', '#3b4032', '#ffc94a'],
+  },
+  {
+    id: 'halo', name: 'Lyss Halo-9', pilotId: 'sir', desc: 'Schlanke Kerntriebwerke in großen Ringflügeln – tanzt durch jede Kurve und steht auf der Bremse.',
+    stats: { topSpeed: 0.68, accel: 0.68, turn: 0.9, traction: 0.74, airbrake: 0.9, cooling: 0.66, repair: 0.55 },
+    colors: ['#cfeee6', '#1c3558', '#9bfff0'],
+  },
+  {
+    id: 'manta', name: 'Dorn Manta', pilotId: 'hav', desc: 'Flache Triebwerksplatten mit Schlitzdüsen – auf der Geraden kaum zu halten, in Kurven träge.',
+    stats: { topSpeed: 0.97, accel: 0.72, turn: 0.42, traction: 0.58, airbrake: 0.55, cooling: 0.6, repair: 0.55 },
+    colors: ['#26282e', '#c99a2e', '#ff5f2e'],
+  },
+  {
+    id: 'volt', name: 'Quill Voltspire', pilotId: 'ixo', desc: 'Reaktor-Triebwerke mit vergittertem Plasmafenster und drei Energiebögen – reißt aus dem Stand davon, verträgt aber wenig.',
+    stats: { topSpeed: 0.74, accel: 0.92, turn: 0.66, traction: 0.62, airbrake: 0.6, cooling: 0.9, repair: 0.4 },
+    colors: ['#34407a', '#c7ccd4', '#b79bff'],
   },
 ];
 

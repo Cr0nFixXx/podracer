@@ -28,7 +28,7 @@ npm run build    # erzeugt dist/index.html (alles inline, offline lauffähig, ca
 | Ansicht wechseln | `C` | Y |
 | Pause | `Esc` / `P` | Start |
 
-In der Ansicht „Cockpit" (`C`) blickt man ohne Cockpit-Rahmen frei über die Triebwerke.
+In der Ansicht „Cockpit" (`C`) sitzt man im Pod und sieht das eigene Cockpit von innen: Armaturenbrett mit drei Warnlampen (Boost, Hitze, Schaden), Scheibenrahmen und die Hände des Piloten – bei jedem Racer anders. Die Cockpits hängen über der Triebwerkslinie: man schaut über die Triebwerke hinweg auf die Strecke. Die freie Sicht ganz ohne Cockpit bietet weiterhin die Ansicht „Motorhaube".
 
 **Gamepad ändern:** Einstellungen → Steuerung → Abschnitt „Gamepad": Aktion anklicken, dann Taste drücken oder Stick bewegen. „Standard" stellt die Belegung aus der Tabelle wieder her.
 
@@ -118,14 +118,22 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 
 ## Inhalte
 
-**10 Podracer** (alle freigeschaltet, Tuning, 6 Lackiermuster, 3 Lackfinishes, 8 Vorlagen, individuelle Piloten-Spezies) · **13 Strecken: 7 Rundkurse, 6 Sprints** auf Tatooine, Ando Prime, Vulkanwelt, Dschungelmond, Aquilaris, Oovo IV, Kristallschluchten und Malastare · bis zu 10 Gegner mit vorausschauender Korridor-KI und Düsen-Hitzeflimmern, 4 Schwierigkeitsstufen · 6 Kameras.
+**14 Podracer** (alle freigeschaltet, Tuning mit sichtbaren Tuning-Teilen, frei wählbare Style-Teile, 6 Lackiermuster, 3 Lackfinishes, 8 Vorlagen, individuelle Piloten-Spezies) · **13 Strecken: 7 Rundkurse, 6 Sprints** auf Tatooine, Ando Prime, Vulkanwelt, Dschungelmond, Aquilaris, Oovo IV, Kristallschluchten und Malastare · bis zu 10 Gegner (für jedes Rennen neu aus den 13 anderen Pods ausgelost) mit vorausschauender Korridor-KI und Düsen-Hitzeflimmern, 4 Schwierigkeitsstufen · 6 Kameras.
 
 ## Landschaft & Atmosphäre
 
 - **Über-/Unterführungen & Steigungen (neu):** 10 Strecken kreuzen sich auf Hohlkasten-Viaduktbrücken und durch Unterführungstunnel (35–41 m Höhenabstand); alle 13 Strecken bieten lange Anstiege/Gefälle sowie überhöhte Kurven (bis ca. 21°).
 - **Bedienoberfläche:** alle Menüs haben dieselbe Schriftgröße und wachsen mit dem Fenster (Bezugsgröße 1180 × 720); keine Scrollbalken. In der Streckenwahl filtert ein Auswahlfeld nach Planet; die Karte markiert Brücken und Höhlenabzweige.
 - **Schnellere Folgestarts:** berechnete Texturen werden im Browser gespeichert (IndexedDB); ab dem zweiten Start einer Welt entfällt die Berechnung. `?nocache` an der Adresse schaltet das ab.
-- **Hangar & Podracer (neu):** 6 Lackiermuster (Klassik, Streifen, Flammen, Rennringe, Chevron, Rallye), 3 Finishes (Klarlack, Metallic, Matt) und 8 Vorlagen neben freier Farbwahl; individuelle Piloten-Spezies, seitengetrennte lose Schadensklappen und Hitzeflimmern auch hinter Gegner-Pods.
+- **Eigene Cockpits (neu):** jeder Racer hat ein unverwechselbares Cockpit – Renn-Tropfen mit Kreisel-Stabilisator (Aurora XR-7), gepanzerter Kriegsschlitten mit Überrollkäfig und Stoßzähnen (Vrak Splitter-X), Spindel mit Kuppel und sechsarmigem Kabelverteiler (Tenroc 6-Fach), fliegende Untertasse (Quadra Lumber), Wurfpfeil mit liegendem Piloten (Hollo Needle), Wespen-Scooter mit Lenker und Stachel (Tyr Vespa), Kühler-Cockpit mit Kiemen und Tanks (Beerak Fireflare), Panzerturm mit offener Luke (Pagali Ironclad), Vogel mit Schwingen und Rückenfinne (Mak Starling), Planierraupe mit Rammbug (Mandrel Ram). Dazu mehr Triebwerksdetails, eigene Anbauteile je Pod und Piloten mit eigener Hautfarbe.
+- **Vier neue Pods (neu, eigene Entwürfe):**
+  1. **Tarn Cyclone** (Brask Tarn, Ursk) – zwei kurze, dicke Triebwerke mit offenen Riesenrotoren in Schutzringen; die Rotoren drehen sich auch bei Gegnern. Stärke: Traktion und Beschleunigung.
+  2. **Lyss Halo-9** (Sira Lyss, Nerai) – schlanke Kerntriebwerke in großen Ringflügeln mit Lichtbändern, der Energieblitz springt von Ring zu Ring. Stärke: Wendigkeit und Luftbremse.
+  3. **Dorn Manta** (Havo Dorn, Brakkan) – flache Triebwerksplatten mit Briefschlitz-Einlass, Schlitzdüsen und Doppelleitwerk, dessen Ruder als Luftbremse aufspreizen. Stärke: Höchstgeschwindigkeit.
+  4. **Quill Voltspire** (Ixo Quill, Synth-Droide) – Reaktor-Triebwerke: vorn und hinten geschlossen verkleidet, dazwischen ein vergittertes Fenster auf die Plasmaspule, in dem ein Käfigläufer dreht; gekoppelt über drei Energiebögen. Cockpit: Glaskugel im Reifenkäfig. Stärke: Beschleunigung und Kühlung, dafür empfindlich.
+- **Tuning, das man sieht:** jede der 7 Tuning-Größen baut ab Stufe 2 ein kleines und ab Stufe 4 ein großes Teil an (Nachbrennerring, Kompressorhutzen, Radiatoren, Steuerflächen, Repulsor-Pads, Doppelklappen, Reparatureinheit). Dazu vier Steckplätze mit **Style-Teilen** im Hangar-Reiter „Teile": Finnen (Haifinne, Doppel-Leitwerk, Pfeilflügel), Einlass (Gitter, Langer Dorn, Irisblende), Düse (Lang, Schubvektor-Paddel, Zackenkrone), Kanzel (klar, Rauch, Bernstein, Spiegel). Style-Teile ändern nur das Aussehen; Gegner tragen ausgeloste.
+- **Schadensmodell je Racer:** jeder Pod ist an anderen Stellen empfindlich (z. B. Splitter-X: harte Nase, weiche Oberseite; Voltspire: schwache Hülle, aber hitzefest) und verliert eigene **Bruchteile**, wenn ein Triebwerk unter 50 / 35 / 20 % fällt – Flügelplatten, Finnen, Radiatoren, ganze Triebwerke oder Energiebögen. Jedes verlorene Teil kostet 5–10 % Haftung, Wendigkeit, Tempo, Beschleunigung, Bremse oder Kühlung (zusammen höchstens 15 % je Wert); Rammbug und Panzerschürzen fangen stattdessen Treffer ab, bis sie abfallen. Reparieren (`R`) heilt die Triebwerke, die Teile kommen erst nach einem Respawn zurück. Die drei Lampen in jeder Schadensanzeige zeigen, was noch dran ist. Man sieht es auch am Pod: Flügel und Finnen reißen ab und fliegen als Blech in Pod-Farbe davon, Ringflügel verlieren Segmente, einzelne Triebwerke gehen aus, Energiebögen erlöschen; Treffer hinterlassen Brandmarken mit blankem Metall. Im Hangar zeigt die **Schadens-Vorschau** (Regler in der Pod-Ansicht), was jeder Racer bei 50 / 35 / 20 % verliert. Auch den Gegnern sieht man ihren Zustand an: verrußte Triebwerke, fehlende Teile, schwache und stotternde Flammen. Hitze und Ruß wandern bei jedem Pod von der Düse nach vorn – auch über Flügel, Finnen und Klappen.
+- **Hangar & Podracer:** 6 Lackiermuster (Klassik, Streifen, Flammen, Rennringe, Chevron, Rallye), 3 Finishes (Klarlack, Metallic, Matt) und 8 Vorlagen neben freier Farbwahl; individuelle Piloten-Spezies, seitengetrennte lose Schadensklappen und Hitzeflimmern auch hinter Gegner-Pods.
 - **Größere Strecken:** alle 13 Kurse sind 7–16 km lang, mit S-Kurven, zwei weiten offenen Flächen je Strecke (bis über 100 m breit) und hohen Tunneln (27 m, Ando Prime 30 m).
 - **Verzweigte Höhlensysteme:** auf Vulkanwelt (2 Gabelungen), Ando Prime, Kristallschluchten und Dschungelmond – eine durchgehende Höhle ohne Lücken, bis 45 m hohe Kammern, in denen die Piste breiter wird, Felssäulen, Leuchtadern und wieder zusammenführende Seitenröhren.
 - **Untergründe, Seen und Plateaus (neu):** jede Strecke wechselt zwischen den Böden ihres Planeten – Sand, Fels und Dünen auf Tatooine; Schnee, Eis und Pulverschnee auf Ando Prime; Basalt, Lavakruste und Asche auf der Vulkanwelt; Waldboden, Schlamm und Kies im Dschungel; Strand, Riff-Fels und Plattform auf Aquilaris; Kristallfelder in den Kristallschluchten. Die offenen Flächen sind Seen (Eis, Lava, Methan, Sumpf, Spiegelsee, Meer) oder Felsplateaus. Jeder Boden fährt sich anders (Tabelle „Untergründe" oben).
@@ -163,7 +171,7 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 
 ## Git: lokale Commits und Kopie im Archiv
 
-Alle Änderungen sind lokal committet (Branch `B`, Remote `origin` = `github.com/Cr0nFixXx/podracer`). Der Stand von Session 20 ist committet und nach `origin/B` gepusht. In der Textkopie unten ist er nicht enthalten (sie steht auf Session 19; `npm run save` erneuert sie).
+Alle Änderungen sind committet (Remote `origin` = `github.com/Cr0nFixXx/podracer`). Session 20 besteht aus zwei Teilen: **Strecken** (Branch `B`, per Pull Request #1 in `main`) und **Pods** (Branch `new_pods`, Pull Request #2). In `new_pods` sind beide zusammengeführt. In der Textkopie unten ist Session 20 nicht enthalten (sie steht auf Session 19; `npm run save` erneuert sie).
 
 **Der versteckte Ordner `.git` fehlt im Download.** Er steckt deshalb als Textdatei in **`.archiv/repo-sicherung/podracer-git.tar.gz.b64.txt`**. Wiederherstellen (im Projektordner ausführen):
 
@@ -173,12 +181,18 @@ Alle Änderungen sind lokal committet (Branch `B`, Remote `origin` = `github.com
 
 Neue Änderungen sichern: `npm run save -- "Beschreibung"` (committet und erneuert die Kopie).
 
+**Achtung:** diese Textkopie steht auf dem Stand von Session 19 (Branch `B`). Der aktuelle Stand liegt auf GitHub – dort holen (`git clone`, Branch `new_pods` bzw. nach dem Merge von Pull Request #2 `main`) statt wiederherstellen.
+
 ## Für Entwickler: Prüfbefehle
 
-1. `npm run check` – Typecheck + Physik-Simulation aller 13 Strecken (11 Pods, 45 s, ca. 40 s Laufzeit, kein Browser nötig).
-2. `npm run check:gpu` – lädt Strecken im Headless-Chrome mit WebGPU und meldet jeden Shader-/Konsolenfehler (braucht Puppeteer, siehe `HANDOFF.md`). Bei wenig Arbeitsspeicher: `TRACKS=1 QUERY='?tex=256' npm run check:gpu` (eine Strecke, kleine Texturen).
-3. `npm run build` – erzeugt `dist/index.html`.
-4. Strecken-Aufbau ansehen (Tunnel, Untergründe, Seen, engste Kurven): `npx esbuild tools/ci/info.ts --bundle --platform=node --format=esm --outfile=tools/ci/out/info.mjs --log-level=error && node tools/ci/out/info.mjs frost`.
+1. `npm run check` – Typecheck + Unit-Prüfungen (`tools/ci/unit.ts`) + Pod-Audit + Physik-Simulation aller 13 Strecken (11 Pods, 45 s, ca. 40 s Laufzeit, kein Browser nötig). Das Startfeld wandert je Strecke um drei Pods weiter, damit alle 14 gefahren werden; `ROSTER_OLD=1` fährt das alte Feld der ersten zehn Pods (Vergleich mit früheren Tabellen).
+2. `npm run check:pods` – nur das Pod-Audit (1 s): baut jeden Pod ohne Browser, vergleicht Mesh- und Dreieckszahlen mit `tools/ci/pods-baseline.json` und prüft das Sichtmodell gegen die Kollisionsform und gegen den gemessenen Kasten je Pod (`POD_BOX`: Höhe und halbe Breite, damit kein Pod in einer Tunneldecke steckt).
+3. `npm run check:gpu` – lädt Strecken im Headless-Chrome mit WebGPU und meldet jeden Shader-/Konsolenfehler (braucht Puppeteer, siehe `HANDOFF.md`). Bei wenig Arbeitsspeicher: `TRACKS=1 QUERY='?tex=256' npm run check:gpu` (eine Strecke, kleine Texturen).
+4. `npm run build` – erzeugt `dist/index.html`.
+5. Pods ansehen: `npm run dev`, dann `http://localhost:5173/tools/harness/pods.dev.html` öffnen und in der Browser-Konsole z. B. `await sheet('front')` oder `await show(0)` aufrufen (Befehle im Kopf von `tools/harness/pods.ts`).
+6. Strecken-Aufbau ansehen (Tunnel, Untergründe, Seen, engste Kurven): `npx esbuild tools/ci/info.ts --bundle --platform=node --format=esm --outfile=tools/ci/out/info.mjs --log-level=error && node tools/ci/out/info.mjs frost`.
+
+Begriffe des Projekts stehen in `CONTEXT.md`, grundlegende Entscheidungen in `docs/adr/`.
 
 ## Bildnachweis
 

@@ -11,7 +11,8 @@ import { podEnvelope } from './podDesigns';
 import { WeatherFx } from './weather';
 import { CSMShadowNode } from 'three/examples/jsm/csm/CSMShadowNode.js';
 import { DIFFICULTIES, PILOTS, PODS, THEMES, TRACKS } from './data';
-import { effectiveStats, type Profile, type GfxSettings } from './settings';
+import { effectiveStats, MAX_OPPONENTS, type Profile, type GfxSettings } from './settings';
+import { pickRivals, rivalKit } from './roster';
 import { buildTrack, type TrackData } from './trackBuilder';
 import { buildWorld, type World, worldTextureSpecs } from './world';
 import { makeSky, sunDirection } from './sky';
@@ -19,7 +20,8 @@ import { buildPodModel, setPodLodScale } from './podModel';
 import { Particles } from './particles';
 import { PostFX } from './post';
 import { AudioFX, type WorldAudioState } from './audio';
-import { HOVER, aiInputs, podParams, respawn, stepPod, type PodState, collidePods } from './physics';
+import { HOVER, aiInputs, applyDamage, bodyToWorld, podParams, respawn, stepPod, worldToBody, type PodState, collidePods } from './physics';
+import { damageModel, lostMessage, partLamps } from './podDamage';
 import { applyAtmosphere } from './atmosphere';
 import type { LifeAudio } from './wildlife';
 
@@ -40,6 +42,8 @@ export interface HudState {
   surface: string; surfaceFx: string;
   /** 0..1 share of the 3 s boost overdrive that is used up */
   overdrive: number;
+  /** Bruchteil lamps of the two damage boxes (screen-left / screen-right), rows 50 / 35 / 20 %: 0 no part · 1 attached · 2 lost */
+  partsL: number[]; partsR: number[];
 }
 export interface RaceResult { place: number; name: string; pod: string; color: string; isPlayer: boolean; time: number | null; bestLap: number | null; }
 
@@ -67,7 +71,7 @@ export class Game {
   beams: ReturnType<typeof makeBeams> | null = null; private tmpE = new THREE.Euler();
   private prevNd = 1e9; private closing = 0; private flybyT = 0;
   loadMs: Record<string, number> = {};
-  debris = new DebrisPool(); dustAmt = 1;
+  debris = new DebrisPool(); /** sheet metal: Bruchteile and pieces of exploding pods */ scrap = new DebrisPool('plate'); dustAmt = 1;
   /** Session 14: 0..1 how far the player is under a roof (rain, splashes and lens drops fade out); weather-effects quality 0 / 0.5 / 1 */
   cover = 0; wxQ = 1; envDirty = false;
   private shadowTexel = 0;
@@ -178,7 +182,7 @@ export class Game {
     this.particles.initAmbient(theme.ambient, build.wind, Math.max(1, build.ambMax / 0.45));
     this.wxQ = [0, 0.5, 1][gfx.weatherFx ?? 2] ?? 1; setPodLodScale(gfx.podDetail ?? 1);
     this.weather = new WeatherFx(fx, this.particles, this.scene, theme.sunAz * Math.PI / 180 + 1.1, build.bolt); this.weather.quality = this.wxQ;
-    this.scene.add(this.particles.group); this.scene.add(this.debris.mesh);
+    this.scene.add(this.particles.group); this.scene.add(this.debris.mesh); this.scene.add(this.scrap.mesh);
 
     // pods (player = full hero detail; opponents = merged whole-pod + automatic 2-tier distance LOD!)
     this.loadMs.world = Math.round(performance.now() - tL0) - this.loadMs.init;
@@ -213,7 +217,9 @@ export class Game {
     this.updateVisuals(0.016);
     this.particles.seedWarmup(this.camera.position);
     for (const p of this.pods) if (!p.isPlayer) p.visual?.setDistance(10, true); // expose both near & far LOD once for compilation
+    this.debris.warm(true); this.scrap.warm(true); // (empty instance pools: only their pipelines get compiled)
     await this.post.warmup(r);
+    this.debris.warm(false); this.scrap.warm(false);
     this.particles.clear();
     for (const p of this.pods) if (!p.isPlayer) p.visual?.setDistance(p.pos.distanceTo(this.camera.position), false);
     if (this.disposed) return;
@@ -243,10 +249,9 @@ export class Game {
   createPods() {
     const prof = this.profile; const diff = DIFFICULTIES[prof.race.difficulty];
     const playerDef = PODS.find(p => p.id === prof.podId) ?? PODS[0];
-    const others = PODS.filter(p => p.id !== playerDef.id);
-    const n = Math.min(10, prof.race.opponents);
+    const n = Math.min(MAX_OPPONENTS, prof.race.opponents);
     const list = [{ def: playerDef, isPlayer: true }];
-    for (let i = 0; i < n; i++) list.push({ def: others[i % others.length], isPlayer: false });
+    for (const def of pickRivals(playerDef.id, n)) list.push({ def, isPlayer: false }); // Session 20: drawn afresh for every race from all other pods
     const playerGrid = Math.min(n, Math.floor(n * 0.6));
     const order = list.slice(1); order.splice(playerGrid, 0, list[0]);
     const S = this.td.main.samples; const N = this.td.N;
@@ -257,9 +262,10 @@ export class Game {
       const s = S[idx]; const lat = (col - 1) * s.hw * 0.55;
       const pilot = PILOTS.find(p => p.id === e.def.pilotId) ?? PILOTS[0];
       const custom = e.isPlayer ? prof.custom[e.def.id] : undefined;
-      const colors = custom ? custom.colors : (g > 10 ? [e.def.colors[1], e.def.colors[0], e.def.colors[2]] as [string, string, string] : e.def.colors);
+      const colors = custom ? custom.colors : e.def.colors;
       const geo = this.profile.gfx.geometry;
-      const podOpts = e.isPlayer ? { pattern: custom?.pattern, finish: custom?.finish } : { pattern: (g + 1) % 6 };
+      // player: saved paint, Style-Teile and the Tuning-Teile of the tuning steps · Gegner: paint pattern and Style-Teile by grid slot (look only)
+      const podOpts = e.isPlayer ? { pattern: custom?.pattern, finish: custom?.finish, kit: custom?.kit, tune: custom?.tuning } : { pattern: (g + 1) % 6, kit: rivalKit(g * 31 + e.def.id.length * 7 + e.def.id.charCodeAt(0)) };
       const vis = buildPodModel(e.def, colors, geo, this.profile.gfx.texRes, !e.isPlayer, podOpts);
       this.scene.add(vis.group);
       const eLat = Math.min(1, Math.abs(lat) / s.hw);
@@ -391,7 +397,7 @@ export class Game {
         const dx = p.pos.x - hz.x, dz = p.pos.z - hz.z;
         if (dx * dx + dz * dz > hz.r ** 2 || p.pos.y > hz.y + 18) continue;
         const P = podParams(p);
-        if (p.invuln <= 0) { p.hpL -= 12 * dt * P.sturdy; p.hpR -= 12 * dt * P.sturdy; }
+        if (p.invuln <= 0) applyDamage(p, 'both', 12 * dt * P.sturdy, 'heat');
         p.heat = Math.min(1, p.heat + 0.55 * dt); p.vel.y += 28 * dt; p.shake = Math.min(1, p.shake + dt * 1.5);
         if (p.isPlayer && this.messageT <= 0) this.showMsg(this.td.def.theme === 'lava' ? 'LAVA-SCHLOT!' : 'GEYSIR!', 0.8);
       }
@@ -411,7 +417,7 @@ export class Game {
     }
     // deaths / finish
     for (const p of this.pods) {
-      if (p.dead > 0) { p.dead -= dt; if (p.dead <= 0) respawn(p, this.td); }
+      if (p.dead > 0) { p.dead -= dt; if (p.dead <= 0) { respawn(p, this.td); p.visual?.clearMarks?.(); } } // a respawned pod is patched up: parts back, hit marks gone
       if (!p.finished && this.state !== 'countdown') {
         const done = this.td.main.closed ? p.lap >= this.profile.race.laps : p.rel >= this.td.finishIdx - this.td.startIdx;
         if (done) {
@@ -448,7 +454,7 @@ export class Game {
     this.updateCamera(dt);
     this.updateVisuals(dt);
     this.updateLights();
-    this.particles.update(dt, this.camera.position, this.clock); this.debris.update(dt);
+    this.particles.update(dt, this.camera.position, this.clock); this.debris.update(dt); this.scrap.update(dt);
     this.world.update(this.clock, this.camera.position, this.pods);
     this.sky.uniforms.time.value = this.clock;
     this.weather.update(dt, this.clock, this.camera, this.state === 'countdown', v => this.audio.thunder(v), near => { if (near > 0.5) this.player.shake = Math.min(1, this.player.shake + (near - 0.5) * 0.9); });
@@ -556,12 +562,21 @@ export class Game {
             if (e.type === 'wall') this.world.flashField(e.x, e.y + 0.6, e.z, e.strength);
           }
           if (p.isPlayer || dist < 140) this.audio.hit(e.strength * (p.isPlayer ? 1 : 0.28));
+          if (p.isPlayer && e.strength > 5 && v.hitMark) { // Treffermarke where the hit landed (this step's pose: the model still stands where it was last frame)
+            worldToBody(p, v.body.position.z, this.tmpV2.set(e.x, e.y, e.z)); v.hitMark(this.tmpV2.x, this.tmpV2.y, this.tmpV2.z, e.strength);
+          }
         } else if (e.type === 'break') {
           if (e.ref) this.world.breakObstacle(e.ref);
           if (dist < 420) { this.tmpC.copy(this.dustBase).multiplyScalar(0.6); this.particles.debris(this.tmpV, p.vel, this.tmpC); this.debris.spawn(e.x, e.y, e.z, e.y, p.vel, this.tmpC, e.strength, 16); }
           if (p.isPlayer || dist < 130) this.audio.hit(34 * (p.isPlayer ? 1 : 0.4));
         } else if (e.type === 'land') { if (near) this.particles.dust(this.tmpV, p.vel, this.dustCol, 8); if (p.isPlayer) this.audio.hit(e.strength * 0.5); }
-        else if (e.type === 'explode') { if (dist < 480) this.particles.explosion(this.tmpV); if (p.isPlayer) { this.audio.boom(); this.flash = 0.8; this.showMsg('TRIEBWERK ZERSTÖRT!', 2.5); } else if (near) this.audio.hit(40); }
+        else if (e.type === 'explode') {
+          if (dist < 480) { // the pod flies apart in its own colours
+            this.particles.explosion(this.tmpV); const cols = p.isPlayer ? this.profile.custom[p.def.id].colors : p.def.colors;
+            this.scrap.spawn(e.x, e.y, e.z, p.groundY, p.vel, this.tmpC.set(cols[0]), 2.6, 9); this.scrap.spawn(e.x, e.y, e.z, p.groundY, p.vel, this.tmpC.set(cols[1]), 2.6, 7);
+          }
+          if (p.isPlayer) { this.audio.boom(); this.flash = 0.8; this.showMsg('TRIEBWERK ZERSTÖRT!', 2.5); } else if (near) this.audio.hit(40);
+        }
         else if (e.type === 'field') {
           if (near) {
             this.particles.shimmer(this.tmpV, this.tmpV2.set(e.nx, 0, e.nz), this.barrierGlow);
@@ -569,6 +584,15 @@ export class Game {
           }
           if (p.isPlayer) this.audio.fieldZap(e.strength);
         } else if (e.type === 'fall' && p.isPlayer) this.showMsg('ABSTURZ!', 2);
+        else if (e.type === 'part') { // a Bruchteil broke off: sparks where it sat, a hard knock, and the player is told which part
+          v.setParts(p.parts ?? 0); bodyToWorld(p, v.body.position.z, v.partBody(e.part ?? 0, this.tmpV));
+          if (p.isPlayer || dist < 120) { // sparks and a few plates in the pod's second colour where the part sat (Gegner: only close by)
+            this.particles.sparks(this.tmpV, UP, p.vel, 14);
+            this.scrap.spawn(this.tmpV.x, this.tmpV.y, this.tmpV.z, p.groundY, p.vel, this.tmpC.set((p.isPlayer ? this.profile.custom[p.def.id].colors : p.def.colors)[1]), 0.9, 4);
+          }
+          if (p.isPlayer) { this.audio.hit(48); this.audio.beep(196, 0.22, 'sawtooth', 0.16); p.shake = Math.min(1, p.shake + 0.35); this.showMsg(lostMessage(damageModel(p.def.id).parts[e.part ?? 0]), 2.2); }
+          else if (dist < 120) this.audio.hit(18);
+        }
       }
       p.events.length = 0;
 
@@ -582,6 +606,7 @@ export class Game {
       const eyL = p.engYL ?? 0, eyR = p.engYR ?? 0;
       v.setEngineMotion(eyL, eyR, 0, 0, 0); // engines lift as a whole – no extra tilt
       v.setCockpitSway?.(p.ckX ?? 0, p.ckY ?? 0, p.ckZ ?? 0);
+      v.setParts(p.parts ?? 0); // lost Bruchteile are gone from the model (all of them return on respawn)
       v.update(this.clock, p.input.throttle, p.boosting ? 1 : 0, p.airbraking ? 1 : 0, p.hpL / 100, p.hpR / 100, p.heat + (p.overT ?? 0) / 3 * 0.25); // overdrive pushes the glow past the limit (yellow-white)
 
       // Skip exhaust/dust particle spawning while stationary on countdown grid; keep rival trails super clean for visibility!
@@ -597,6 +622,7 @@ export class Game {
         const loc = v.exhaustLocal[i]; const lz = loc.z + bz;
         const eLift = loc.x < 0 ? eyL : eyR;
         this.tmpV3.set(p.pos.x + loc.x * cy + lz * sy, p.pos.y + (loc.y + eLift) * Math.cos(p.roll) + loc.x * Math.sin(p.roll) - lz * p.pitch, p.pos.z - loc.x * sy + lz * cy);
+        if (v.engineOut[i]) { if (p.isPlayer || dist < 160) this.particles.smoke(this.tmpV3, p.vel, 0.85, rivalVis); continue; } // a flamed-out engine only trails smoke
         this.particles.exhaust(this.tmpV3, back, p.vel, this.tmpC, p.input.throttle, p.boosting ? 1 : 0, emitScale);
         // close to the heat limit the engines spit sparks (more while overdriving)
         if (p.heat > 0.86 && (p.isPlayer || dist < 160) && this.particles.chance((p.heat - 0.86) * 4 + (p.overT ?? 0) * 0.5)) this.particles.sparks(this.tmpV3, back, p.vel, 3);
@@ -745,10 +771,10 @@ export class Game {
         m.compose(pos, q0, sc.setScalar(dead ? 0 : s * lv)); im.setMatrixAt(n++, m);
         if (beam && bm) { const hpS = lx < 0 ? p.hpL : p.hpR; m.compose(pos, qb, sc.setScalar(dead || hpS < 12 ? 0 : 1)); bm.mesh.setMatrixAt(nb++, m); }
       };
-      const eL = env.engL, eR = env.engR, yL = (p.engYL ?? 0) + eL.minY + p.def.engineRad, yR = (p.engYR ?? 0) + eR.minY + p.def.engineRad;
+      const eL = env.engL, eR = env.engR, yL = (p.engYL ?? 0) + eL.axisY, yR = (p.engYR ?? 0) + eR.axisY; // nav lights sit on the (lowest) engine axis
       put(eL.x, yL, eL.frontZ + 0.15, 0.24, true); put(eR.x, yR, eR.frontZ + 0.15, 0.24, true);
       put(eL.outerX, yL, (eL.frontZ + eL.backZ) * 0.5, 0.18); put(eR.outerX, yR, (eR.frontZ + eR.backZ) * 0.5, 0.18);
-      put(0, env.cockpit.minY + 1.75, env.cockpit.z, ((this.clock * 1.3 + p.id * 0.37) % 1) < 0.16 ? 0.22 : 0);
+      put(0, env.cockpit.topY, env.cockpit.z, ((this.clock * 1.3 + p.id * 0.37) % 1) < 0.16 ? 0.22 : 0);
     }
     im.instanceMatrix.needsUpdate = true; if (bm) bm.mesh.instanceMatrix.needsUpdate = true;
     const pl = this.player;
@@ -778,8 +804,8 @@ export class Game {
 
   updateCamera(dt: number) {
     const p = this.player; const cam = this.camera; const gfx = this.profile.gfx;
-    p.visual?.setCockpitVisible?.(this.camMode !== 2); // first-person: the near plane (0.8 m) cut the cockpit in half → hidden, engines and cables stay
-    const sp = Math.hypot(p.vel.x, p.vel.z); const vmax = podParams(p).vmax;
+    p.visual?.setCockpitView?.(this.camMode === 2); // Session 20: the cockpit camera sits in the pilot's head and shows the cockpit from inside (see PodVisual.setCockpitView)
+    const sp = Math.hypot(p.vel.x, p.vel.z); const vmax = podParams(p).vmax0; // (undamaged top speed: lost parts must not widen the view)
     let fov = gfx.fov + Math.min(1.3, sp / vmax) * 16 + (p.boosting ? 8 : 0) + (p.zeroG ? 8 : 0); // zero-G: wider view = more sense of speed
     const velYaw = sp > 8 ? Math.atan2(p.vel.x, p.vel.z) : p.yaw;
     let dy = velYaw - p.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
@@ -814,12 +840,12 @@ export class Game {
     } else if (mode === 2 || mode === 3) {
       const v = p.visual!; v.group.position.copy(p.pos); v.group.rotation.set(0, p.yaw, 0); v.body.rotation.set(p.pitch, 0, p.roll); v.group.updateMatrixWorld(true);
       const src = mode === 2 ? v.eye : v.hood;
-      this.tmpV.copy(src); if (mode === 2) this.tmpV.add(this.tmpV3.set(p.ckX ?? 0, (p.ckY ?? 0) + 0.2, (p.ckZ ?? 0) + 0.5)); // the eye rides with the swaying cockpit
-      v.body.localToWorld(this.tmpV);
+      if (mode === 2 && v.eyeWorld) v.eyeWorld(this.tmpV); // the eye rides with the swaying cockpit
+      else { this.tmpV.copy(src); v.body.localToWorld(this.tmpV); }
       cam.position.set(this.tmpV.x + sx * 0.5, this.tmpV.y + sy * 0.5, this.tmpV.z);
       v.body.getWorldQuaternion(this.tmpQ);
       cam.up.copy(UP).applyQuaternion(this.tmpQ);
-      this.tmpV2.set(0, src.y - (mode === 2 ? 0.35 : 0.45), 60); v.body.localToWorld(this.tmpV2);
+      this.tmpV2.set(0, src.y - (mode === 2 ? 3.2 : 0.45), 60); v.body.localToWorld(this.tmpV2); // cockpit: look slightly down over the dashboard
       cam.lookAt(this.tmpV2);
       fov += 4;
     } else if (mode === 4) {
@@ -916,13 +942,14 @@ export class Game {
     const p = this.player; const closed = this.td.main.closed;
     const best = p.lapTimes.length ? Math.min(...p.lapTimes) : null;
     const total = closed ? this.profile.race.laps : 1;
+    const dm = damageModel(p.def.id), lostParts = p.parts ?? 0;
     return {
       speed: Math.round(Math.hypot(p.vel.x, p.vel.z) * 3.6), place: p.place, total: this.pods.length,
       lap: Math.max(1, Math.min(total, p.lap + 1)), laps: total, sprint: !closed,
       progress: closed ? 0 : Math.max(0, Math.min(1, p.rel / (this.td.finishIdx - this.td.startIdx))),
       time: this.raceTime, lastLap: p.lapTimes.length ? p.lapTimes[p.lapTimes.length - 1] : null, bestLap: closed ? best : null,
       // HUD boxes mean screen-left / screen-right. Internal "L" is local x < 0 = the RIGHT engine in the chase view → swapped here.
-      hpL: Math.max(0, p.hpR), hpR: Math.max(0, p.hpL), heat: p.heat, boosting: p.boosting, overheat: p.overheat, repairing: p.repairing, airbrake: p.airbraking,
+      hpL: Math.max(0, p.hpR), hpR: Math.max(0, p.hpL), partsL: partLamps(dm, lostParts, 1), partsR: partLamps(dm, lostParts, -1), heat: p.heat, boosting: p.boosting, overheat: p.overheat, repairing: p.repairing, airbrake: p.airbraking,
       wrongWay: p.wrongWay > 1.2, zeroG: p.zeroG, countdown: this.state === 'countdown' ? this.countdown : -1,
       message: this.messageT > 0 ? this.message : '', camName: CAMERA_NAMES[this.camMode], fps: this.fps, backend: this.backend,
       standings: [], dead: p.dead > 0, finished: p.finished,

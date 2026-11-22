@@ -1,13 +1,14 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { PILOTS, type PodDef } from './data';
-import { M4, PartBuilder, cyl, lathe, prof, rbox, tube, torus } from './podKit';
-import { engineGeo } from './podParts';
-import { cockpitGeo, podLayout, type PodLayout } from './podDesigns';
+import { assembleHero, assembleRival, segFor, visibleIndices, type BreakShow, type PartRange } from './podAssembly';
+import { damageModel } from './podDamage';
+import { tuneTiers, type KitSpec } from './podKitParts';
+import type { StatKey } from './data';
+import { LAMP_VERTS } from './podCockpits';
 import {
   binderMaterial, cableFlexMaterial, flameMaterial, hullMaterial, podSharedTime,
   sharedOpponentBinderMaterial, sharedOpponentFlameMaterial, sharedOpponentHullMaterial,
-  sharedPodMaterials, suitMaterial, type FxU, type HullU, petalMaterial } from './podMaterials';
+  sharedPodMaterials, skinMaterial, suitMaterial, canopyGlass, type FxU, type HullU, petalMaterial, HIT_MARKS } from './podMaterials';
 
 export interface PodVisual {
   group: THREE.Group;
@@ -23,162 +24,35 @@ export interface PodVisual {
   setEngineMotion: (yL: number, yR: number, pitchL: number, pitchR: number, rollBank: number) => void;
   /** Switches automatic distance LOD & shadow casting on opponent pods (use forceAll=true for shader warmup) */
   setDistance: (dist: number, forceAll?: boolean) => void;
-  /** hero pod: cockpit pendulum offset in body space (cables follow) / hide the cockpit in the first-person view */
+  /** hero pod: cockpit pendulum offset in body space (cables follow) */
   setCockpitSway?: (x: number, y: number, z: number) => void;
-  setCockpitVisible?: (v: boolean) => void;
+  /** hero pod: `true` = cockpit camera. The pilot's body is hidden and the cockpit is enlarged about his eye, so the dashboard,
+   *  frame and his hands stay in view although they sit inside the camera's 0.8 m near plane (the picture is unchanged). */
+  setCockpitView?: (inside: boolean) => void;
+  /** hero pod: world position of the pilot's eye (rides with the cockpit pendulum) */
+  eyeWorld?: (out: THREE.Vector3) => THREE.Vector3;
+  /** Shows the pod without its lost Bruchteile (bit i = part i of the racer's Schadensmodell is gone, `PodState.parts`): their
+   *  triangles are cut out of the draw, their engines flame out, their rotor loses a blade, their energy arc dies. 0 = intact. */
+  setParts: (mask: number) => void;
+  /** engines that have flamed out (same order as `exhaustLocal`) */
+  engineOut: boolean[];
+  /** the place where Bruchteil `i` sat, in body space (debris and sparks start there; to the world with `bodyToWorld` of the physics pose) */
+  partBody: (i: number, out: THREE.Vector3) => THREE.Vector3;
+  /** hero pod: leaves a Treffermarke (burn + bare metal) on the hull nearest to a hit. The point is given in BODY space
+   *  (`worldToBody` of the physics pose – never through this model's matrices, they lag one frame); `strength` = impact speed */
+  hitMark?: (x: number, y: number, z: number, strength: number) => void;
+  /** hero pod: wipes all Treffermarken (respawn) */
+  clearMarks?: () => void;
   dispose: () => void;
 }
 
 const SHADOW_KEYS = new Set<string>(['hull', 'steel', 'dark', 'chrome', 'carbon']);
+/** pseudo Bruchteil id of the pilot's body in the cockpit meshes (hidden by the cockpit camera) */
+const PILOT = '#pilot';
 const OPP_SHADOW_KEYS = new Set<string>(['hull', 'steel', 'dark']);
-const BINDER_PTS = 18;
 /** Graphics setting "Gegner-Pod-Detail": scales the distance at which rival pods switch from the detailed to the merged far model. */
 let podLodScale = 1;
 export function setPodLodScale(v: number) { podLodScale = Math.max(0.3, Math.min(4, v)); }
-
-/** Build flexible control cables tagged with `aLiv = (isRight, tEngine, 0)` so they follow moving engine pylons on GPU! */
-function buildFlexCables(L: PodLayout, seg: number, anchors: [THREE.Vector3, THREE.Vector3]) {
-  const cp = new THREE.Vector3(0, L.cockpit.y, L.cockpit.z);
-  const up = new THREE.Vector3(0, 1, 0);
-  const list: THREE.BufferGeometry[] = [];
-  const tagFlex = (g: THREE.BufferGeometry, isR: number, pA: THREE.Vector3, pB: THREE.Vector3) => {
-    const p = g.attributes.position; const n = p.count;
-    const liv = new Float32Array(n * 3);
-    const dz = pA.z - pB.z || 1;
-    for (let i = 0; i < n; i++) {
-      const w = Math.max(0, Math.min(1, (p.getZ(i) - pB.z) / dz));
-      liv[i * 3] = isR; liv[i * 3 + 1] = w; liv[i * 3 + 2] = 0;
-    }
-    g.setAttribute('aLiv', new THREE.BufferAttribute(liv, 3));
-    if (!g.attributes.normal) g.computeVertexNormals();
-    if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
-    list.push(g);
-  };
-  for (const em of L.engines) {
-    const eg = engineGeo(em.spec, seg);
-    const isR = em.x >= 0 ? 1 : 0;
-    const a = eg.pylon.clone().add(new THREE.Vector3(em.x, em.y, em.z)); // engine pylon on top of the nacelle (rigid with the engine)
-    const b = anchors[isR].clone().add(cp);                               // cockpit anchor (w=0)
-    // Session 14: the old cable ran in a straight sagging line from the cockpit to the pylon at 58 % of the engine length – straight
-    // THROUGH the rear half of the nacelle. It is now routed around it: free-hanging span to a saddle just above/behind the rear rim,
-    // then clipped along the top of the nacelle to the pylon (that part moves rigidly with the engine).
-    const rearZ = eg.exhaustZ + 0.12 * eg.L, topY = Math.max(eg.top, eg.R) + 0.14;
-    const v1 = new THREE.Vector3(em.x, em.y + topY + 0.1, em.z + rearZ - 0.3);
-    const v2 = new THREE.Vector3(em.x, em.y + topY, em.z + rearZ + (eg.pylon.z - rearZ) * 0.5);
-    const dist = v1.distanceTo(b); const sag = 0.3 + dist * 0.03;
-    for (const [r, off, s, rad] of [[0.055, 0, 1, 6], [0.024, 0.12, 1.18, 4]] as [number, number, number, number][]) {
-      const pts: THREE.Vector3[] = []; const ox = off * (isR ? -1 : 1);
-      for (let i = 0; i <= 8; i++) {
-        const t = i / 8; const p = b.clone().lerp(v1, t);
-        p.y -= sag * s * 4 * t * (1 - t) * (1 - 0.35 * t); // sag eases out towards the saddle so the cable clears the rear rim
-        p.x += ox * Math.sin(t * Math.PI * 0.5);
-        pts.push(p);
-      }
-      pts.push(v1.clone().lerp(v2, 0.5).add(new THREE.Vector3(ox, 0, 0)), v2.clone().add(new THREE.Vector3(ox, 0, 0)), a.clone().add(new THREE.Vector3(ox * 0.5, 0.03, 0)));
-      tagFlex(tube(pts, r, Math.max(16, Math.round(seg * 0.8)), rad), isR, v1, b);
-    }
-    for (const [p, q] of [[a, v2], [b, v1]] as [THREE.Vector3, THREE.Vector3][]) {
-      const dir = q.clone().sub(p).normalize();
-      const fg = cyl(0.085, 0.07, 0.24, 7);
-      fg.applyMatrix4(new THREE.Matrix4().compose(p.clone().addScaledVector(dir, 0.12), new THREE.Quaternion().setFromUnitVectors(up, dir), new THREE.Vector3(1, 1, 1)));
-      tagFlex(fg, isR, v1, b);
-    }
-    for (const sp of [v1, v2]) { const cl = torus(0.085, 0.022, 5, 8); cl.rotateY(Math.PI / 2); cl.translate(sp.x, sp.y - 0.02, sp.z); tagFlex(cl, isR, v1, b); } // cable clips on the nacelle
-  }
-  const mg = mergeGeometries(list, false)!; list.forEach(x => x.dispose());
-  mg.computeBoundingSphere(); mg.boundingSphere!.radius += 1.2;
-  return mg;
-}
-
-/** Evaluate livery paint colour on CPU for opponent hull vertices so ALL 10 rivals share 1 GPU shader pipeline! */
-function bakeHullVertexColors(g: THREE.BufferGeometry, c1Hex: string, c2Hex: string, livery: number) {
-  const c1 = new THREE.Color(c1Hex), c2 = new THREE.Color(c2Hex);
-  const liv = g.attributes.aLiv as THREE.BufferAttribute | undefined;
-  const n = g.attributes.position.count;
-  const col = new Float32Array(n * 3);
-  const band = (x: number, cc: number, w: number) => Math.abs(x - cc) < w ? 1 : 0;
-  const fr = (x: number) => x - Math.floor(x);
-  const lv = ((livery % 6) + 6) % 6;
-  for (let i = 0; i < n; i++) {
-    let m = 0;
-    if (liv) {
-      const c = liv.getX(i), a = liv.getY(i), z = liv.getZ(i);
-      const cd = Math.min(c, 1 - c);
-      if (z > 2.5) m = 1;
-      else if (z >= 0.5 && z < 1.5) {
-        if (lv === 0) m = Math.max(band(cd, 0, 0.06), band(a, 0.8, 0.035));
-        else if (lv === 1) m = Math.max(band(cd, 0.055, 0.02), band(cd, 0, 0.014), a >= 0.86 ? 1 : 0);
-        else if (lv === 2) m = (a >= 0.14 && cd < 0.12 + Math.abs(fr(a * 5) - 0.5) * 0.16) ? 1 : 0;
-        else if (lv === 3) m = Math.max(band(a, 0.25, 0.042), band(a, 0.7, 0.042), (a >= 0.3 && a <= 0.65) ? band(Math.abs(cd - 0.25), 0, 0.03) : 0);
-        else if (lv === 4) { const ch = fr(a * 3.5 - cd * 1.8); m = ((a >= 0.12 && a <= 0.9 && ch > 0.6 && ch < 0.88) || a >= 0.91) ? 1 : 0; }
-        else { const chk = (a >= 0.56 && a <= 0.86 && ((fr(cd * 8) >= 0.5) !== (fr(a * 9) >= 0.5))) ? 1 : 0; m = Math.max(chk, band(cd, 0, 0.045)); }
-      } else if (z >= 1.5) {
-        const ck0 = Math.max(band(Math.abs(cd - 0.25 + (a - 0.5) * 0.12), 0, a * 0.02 + 0.035), a >= 0.9 ? 1 : 0);
-        m = lv === 4 ? Math.max(ck0, band(fr(a * 3 - cd * 1.5), 0.5, 0.16)) : lv === 5 ? Math.max(ck0, band(cd, 0.035, 0.016), band(cd, 0.085, 0.01)) : lv >= 2 ? Math.max(ck0, band(cd, 0, 0.05)) : ck0;
-      }
-    }
-    col[i * 3] = c1.r + (c2.r - c1.r) * m;
-    col[i * 3 + 1] = c1.g + (c2.g - c1.g) * m;
-    col[i * 3 + 2] = c1.b + (c2.b - c1.b) * m;
-  }
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  return g;
-}
-
-function bakeSolidColor(g: THREE.BufferGeometry, col: THREE.Color) {
-  const n = g.attributes.position.count; const a = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { a[i * 3] = col.r; a[i * 3 + 1] = col.g; a[i * 3 + 2] = col.b; }
-  g.setAttribute('color', new THREE.BufferAttribute(a, 3));
-  return g;
-}
-
-function makeBinderGeo(a: THREE.Vector3, b: THREE.Vector3, vertCol?: THREE.Color) {
-  const pos = new Float32Array(BINDER_PTS * 4 * 3), uv = new Float32Array(BINDER_PTS * 4 * 2);
-  const idx: number[] = []; const w = 0.4; const tmp = new THREE.Vector3(); // wide ribbon = room for several fine arcs
-  for (let i = 0; i < BINDER_PTS; i++) {
-    const f = i / (BINDER_PTS - 1); tmp.copy(a).lerp(b, f);
-    for (let k = 0; k < 4; k++) { uv[(i * 4 + k) * 2] = f; uv[(i * 4 + k) * 2 + 1] = k % 2 === 0 ? 1 : 0; }
-    const o = i * 12;
-    pos[o] = tmp.x; pos[o + 1] = tmp.y + w; pos[o + 2] = tmp.z;
-    pos[o + 3] = tmp.x; pos[o + 4] = tmp.y - w; pos[o + 5] = tmp.z;
-    pos[o + 6] = tmp.x; pos[o + 7] = tmp.y; pos[o + 8] = tmp.z + w;
-    pos[o + 9] = tmp.x; pos[o + 10] = tmp.y; pos[o + 11] = tmp.z - w;
-    if (i < BINDER_PTS - 1) for (const off of [0, 2]) { const p = i * 4 + off, q = p + 4; idx.push(p, p + 1, q, p + 1, q + 1, q); }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  geo.setIndex(idx);
-  if (vertCol) bakeSolidColor(geo, vertCol);
-  geo.computeBoundingSphere(); geo.boundingSphere!.radius += 1.4;
-  return geo;
-}
-
-const oppFarCache = new Map<string, { hull: THREE.BufferGeometry; dark: THREE.BufferGeometry; glow: THREE.BufferGeometry }>();
-function buildOpponentFarGeo(def: PodDef, L: PodLayout) {
-  const hit = oppFarCache.get(def.id); if (hit) return hit;
-  const pb = new PartBuilder();
-  const cp = new THREE.Vector3(0, L.cockpit.y, L.cockpit.z);
-  for (const em of L.engines) {
-    const { L: len, R } = em.spec;
-    pb.add('hull', lathe(prof([[R * 0.72, -len * 0.5, 1], [R, -len * 0.35], [R, len * 0.42], [R * 0.88, len * 0.5, 1]]), 9, 1), M4.t(em.x, em.y, em.z));
-    pb.add('dark', new THREE.CircleGeometry(R * 0.84, 9), M4.t(em.x, em.y, em.z + len * 0.49));
-    pb.add('glow', new THREE.ConeGeometry(R * 0.46, len * 0.55, 7, 1, true).rotateX(-Math.PI / 2), M4.t(em.x, em.y, em.z - len * 0.75));
-    const a = new THREE.Vector3(em.x, em.y + R, em.z), b = cp.clone();
-    pb.add('dark', tube([a, a.clone().lerp(b, 0.5).add(new THREE.Vector3(0, -0.4, 0)), b], 0.055, 5, 4));
-  }
-  const c = L.cockpit;
-  pb.add('hull', rbox(c.hw * 1.7, c.hw * 0.82, c.len, 0.14, 1), M4.t(0, c.y, c.z), [0, 0.5, 2]);
-  pb.add('dark', rbox(c.hw * 0.9, c.hw * 0.45, c.len * 0.42, 0.05, 1), M4.t(0, c.y + c.hw * 0.42, c.z));
-  if (L.binder) {
-    const A = L.engines[L.binder[0]], B = L.engines[L.binder[1]];
-    pb.add('glow', rbox(Math.abs(B.x - A.x), 0.18, 0.18, 0.02), M4.t((A.x + B.x) * 0.5, (A.y + B.y) * 0.5 + 0.2, (A.z + B.z) * 0.5));
-  }
-  const built = pb.build();
-  const out = { hull: built.get('hull')!, dark: built.get('dark')!, glow: built.get('glow')! };
-  oppFarCache.set(def.id, out);
-  return out;
-}
 
 // Single shared vertex-coloured glow & far-hull materials for ALL opponents (zero per-pod material clones!)
 let sharedOppGlow: THREE.MeshBasicMaterial | null = null;
@@ -186,53 +60,76 @@ let sharedOppFarHull: THREE.MeshStandardMaterial | null = null;
 function getOppGlow() { return sharedOppGlow ?? (sharedOppGlow = new THREE.MeshBasicMaterial({ vertexColors: true })); }
 function getOppFarHull() { return sharedOppFarHull ?? (sharedOppFarHull = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.48, roughness: 0.34 })); }
 
-export function buildPodModel(def: PodDef, colors: [string, string, string], quality = 2, texRes = 1024, isOpponent = false, opts?: { pattern?: number; finish?: number }): PodVisual {
-  const seg = isOpponent ? (quality >= 3 ? 18 : 14) : (quality >= 3 ? 40 : quality === 2 ? 28 : 20);
+/** Cuts lost Bruchteile (or the pilot) out of one mesh without an extra draw: the index buffer of its geometry is rewritten from a
+ *  pristine copy, leaving out the hidden runs. The geometry must be owned by this model (merged buckets are). */
+class Hider {
+  private full: Uint16Array | Uint32Array; private hidden = new Set<string>(); private ids: Set<string>;
+  constructor(private mesh: THREE.Mesh, private ranges: PartRange[]) {
+    this.full = (mesh.geometry.index!.array as Uint16Array | Uint32Array).slice(); this.ids = new Set(ranges.map(r => r.id));
+  }
+  /** true when the mesh has to be rebuilt */
+  set(id: string, off: boolean) { if (!this.ids.has(id) || this.hidden.has(id) === off) return false; if (off) this.hidden.add(id); else this.hidden.delete(id); return true; }
+  apply() {
+    const idx = this.mesh.geometry.index!, n = visibleIndices(this.full, this.ranges, this.hidden, idx.array as Uint16Array | Uint32Array);
+    idx.needsUpdate = true; this.mesh.geometry.setDrawRange(0, n); this.mesh.visible = n > 0;
+  }
+}
+/** the runs of all Bruchteile that lie in bucket `key` of `where` */
+function rangesIn(breaks: Map<string, BreakShow>, where: 'cockpit' | number, key: string) {
+  const out: PartRange[] = [];
+  for (const [id, s] of breaks) for (const r of s.ranges) if (r.where === where && r.key === key) out.push({ id, start: r.start, count: r.count });
+  return out;
+}
+/** Shared part of `setParts` for both kinds of model: walks the Bruchteile whose state changed and calls `each(id, lost, show)`. */
+function partsSwitch(podId: string, breaks: Map<string, BreakShow>, hiders: Hider[], each: (id: string, lost: boolean, s: BreakShow) => void) {
+  const parts = damageModel(podId).parts; let now = 0;
+  return (mask: number) => {
+    if (mask === now) return;
+    const changed = mask ^ now; now = mask; const dirty = new Set<Hider>();
+    for (let i = 0; i < parts.length; i++) {
+      if (!((changed >> i) & 1)) continue;
+      const id = parts[i].id, lost = !!((mask >> i) & 1), s = breaks.get(id); if (!s) continue;
+      for (const h of hiders) if (h.set(id, lost)) dirty.add(h);
+      each(id, lost, s);
+    }
+    for (const h of dirty) h.apply();
+  };
+}
+
+/** Geometry comes from podAssembly.ts (material-free, audited in CI); this file adds materials, meshes and animation. */
+/** Look options of a pod model: paint pattern / finish, Style-Teile (`kit`, 0 = Werk per slot) and the tuning steps whose parts show (`tune`). */
+export interface PodLook { pattern?: number; finish?: number; kit?: { fins?: number; intake?: number; nozzle?: number; canopy?: number }; tune?: Partial<Record<StatKey, number>> }
+export function buildPodModel(def: PodDef, colors: [string, string, string], quality = 2, texRes = 1024, isOpponent = false, opts?: PodLook): PodVisual {
+  const seg = segFor(quality, isOpponent);
   const texSize = texRes >= 2048 && !isOpponent ? 2048 : 1024;
-  const L = podLayout(def);
-  const liv = opts?.pattern !== undefined && opts.pattern >= 0 ? opts.pattern : L.livery;
   const fin = opts?.finish ?? 0;
-  const shared = sharedPodMaterials(texSize) as Record<string, THREE.Material>;
+  const kit: KitSpec = { fins: opts?.kit?.fins ?? 0, intake: opts?.kit?.intake ?? 0, nozzle: opts?.kit?.nozzle ?? 0, tune: tuneTiers(opts?.tune) };
+  // the canopy tint is a Style-Teil too: one of four shared glass materials (same shader, no extra pipeline)
+  const shared: Record<string, THREE.Material> = { ...(sharedPodMaterials(texSize) as Record<string, THREE.Material>), glass: canopyGlass(opts?.kit?.canopy ?? 0) };
   const glowCol = new THREE.Color(colors[2]);
   const pilot = PILOTS.find(p => p.id === def.pilotId) ?? PILOTS[0];
-  const suit = suitMaterial(pilot.color);
+  const suit = suitMaterial(pilot.color), skin = skinMaterial(pilot.skin);
 
   const group = new THREE.Group(); const body = new THREE.Group(); group.add(body);
-  body.position.z = -L.cockpit.z * 0.25;
-
-  const exhaustLocal: THREE.Vector3[] = [];
-  let frontZ = -Infinity, topY = 0, sumY = 0;
-  for (const em of L.engines) {
-    const eg = engineGeo(em.spec, seg);
-    exhaustLocal.push(new THREE.Vector3(em.x, em.y, em.z + eg.exhaustZ));
-    frontZ = Math.max(frontZ, em.z + eg.frontZ); topY = Math.max(topY, em.y + eg.R); sumY += em.y;
-  }
-  const ckBuilt = cockpitGeo(L, seg, pilot.species);
-  const eye = new THREE.Vector3(0, L.cockpit.y, L.cockpit.z).add(ckBuilt.info.head).add(new THREE.Vector3(0, 0.24, 0.32));
-  const hood = new THREE.Vector3(0, sumY / Math.max(1, L.engines.length) + topY * 0.35 + 0.35, frontZ - 1.2);
-
-  // Split pod extras cleanly into left engine, right engine, or central cockpit bucket so Aurora's wings move with its engines!
-  const extraPB = new PartBuilder(); L.extras?.(extraPB, L); const extraParts = extraPB.build();
 
   // ==================== SHARED-PIPELINE, ARTICULATED 2-LOD OPPONENT POD ====================
   if (isOpponent) {
+    const A = assembleRival(def, seg, pilot.head, colors, opts?.pattern, kit);
+    body.position.z = A.bodyZ;
     const oppHull = sharedOpponentHullMaterial(1024);
     const oppFlame = sharedOpponentFlameMaterial();
     const oppBinder = sharedOpponentBinderMaterial();
     const oppGlow = getOppGlow();
-    const glowBoost = glowCol.clone().multiplyScalar(1.2);
-    const ownedGeos: THREE.BufferGeometry[] = [];
     const shadowMeshes: THREE.Mesh[] = [];
     const engines: THREE.Object3D[] = [];
 
     const nearGrp = new THREE.Group(); body.add(nearGrp);
-    const addBucket = (buckets: Map<string, THREE.BufferGeometry[]>, parent: THREE.Object3D) => {
-      for (const [k, list] of buckets) {
-        const mg = mergeGeometries(list, false); list.forEach(x => x.dispose()); if (!mg) continue;
-        if (k === 'hull') bakeHullVertexColors(mg, colors[0], colors[1], liv);
-        else if (k === 'glow') bakeSolidColor(mg, glowBoost);
-        mg.computeBoundingSphere(); ownedGeos.push(mg);
-        const mat = k === 'hull' ? oppHull : k === 'glow' ? oppGlow : k === 'suit' ? suit : shared[k];
+    const hiders: Hider[] = []; // meshes that carry Bruchteile
+    const sootMeshes: { m: THREE.Mesh; where: 'cockpit' | number }[] = []; // hull meshes: soot per mesh (userData.scorch)
+    const plumes: { m: THREE.Mesh; side: number }[] = [];                  // one merged plume mesh per engine side (userData.power)
+    const addBuckets = (buckets: Map<string, THREE.BufferGeometry>, parent: THREE.Object3D, where: 'cockpit' | number) => {
+      for (const [k, mg] of buckets) {
+        const mat = k === 'hull' ? oppHull : k === 'glow' ? oppGlow : k === 'suit' ? suit : k === 'skin' ? skin : shared[k];
         if (!mat) continue;
         const m = new THREE.Mesh(mg, mat);
         const fx = k === 'glow' || k === 'glass';
@@ -240,81 +137,43 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
         m.castShadow = cast; m.receiveShadow = !fx;
         if (cast) shadowMeshes.push(m);
         if (k === 'glass') m.renderOrder = 1;
+        if (k === 'hull') { m.userData.scorch = 0; sootMeshes.push({ m, where }); } // (the shared hull material reads it – every mesh on it must define it)
         parent.add(m);
+        const rg = rangesIn(A.breaks, where, k); if (rg.length) hiders.push(new Hider(m, rg));
       }
-    };
-    const pushB = (b: Map<string, THREE.BufferGeometry[]>, k: string, g: THREE.BufferGeometry, m?: THREE.Matrix4) => {
-      const c = g.clone(); if (m) c.applyMatrix4(m);
-      let l = b.get(k); if (!l) { l = []; b.set(k, l); } l.push(c);
     };
 
     // Articulated Left & Right engine groups pivoted at each bank's true 3D centroid!
-    let spanX = 4.6; const oppPetals: THREE.Mesh[] = []; let oppOpen = 0;
+    const oppPetals: THREE.Mesh[] = []; let oppOpen = 0;
+    const oppRotors: { m: THREE.Mesh; spin: number; engine: number; geo: THREE.BufferGeometry; lost?: THREE.BufferGeometry }[] = []; // open rotors turn on Gegner pods too (shared material, own mesh)
     const oppPivots: THREE.Vector3[] = [];
-    for (const side of [-1, 1]) {
-      const sideMs = L.engines.filter(e => (e.x < 0 ? -1 : 1) === side);
-      const piv = new THREE.Vector3();
-      for (const em of sideMs) { piv.x += em.x; piv.y += em.y; piv.z += em.z; }
-      if (sideMs.length) piv.divideScalar(sideMs.length);
-      oppPivots.push(piv);
-      const grp = new THREE.Group(); grp.position.copy(piv); nearGrp.add(grp); engines.push(grp);
-      const b = new Map<string, THREE.BufferGeometry[]>(); const fls: THREE.BufferGeometry[] = []; const pts: THREE.BufferGeometry[] = [];
-      for (const em of sideMs) {
-        const ox = em.x - piv.x, oy = em.y - piv.y, oz = em.z - piv.z;
-        const eg = engineGeo(em.spec, seg); const emM = M4.t(ox, oy, oz);
-        for (const [k, g] of eg.parts) pushB(b, k, g, emM);
-        pushB(b, 'dark', eg.fan, M4.t(ox, oy, oz + eg.fanZ));
-        for (const f of eg.flaps) pushB(b, 'hull', f.geo, M4.t(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z));
-        const fo = eg.flameOuter.clone(); fo.applyMatrix4(M4.t(ox, oy, oz + eg.flameZ)); fls.push(fo);
-        pts.push(eg.petals.clone().translate(ox, oy, oz));
+    A.banks.forEach((bank, bi) => {
+      oppPivots.push(bank.pivot);
+      const grp = new THREE.Group(); grp.position.copy(bank.pivot); nearGrp.add(grp); engines.push(grp);
+      addBuckets(bank.buckets, grp, bi);
+      for (const r of bank.rotors) { const rm = new THREE.Mesh(r.geo, shared[r.mat] ?? shared.dark); rm.position.copy(r.pos); rm.castShadow = false; rm.receiveShadow = true; grp.add(rm); oppRotors.push({ m: rm, spin: r.spin, engine: r.engine, geo: r.geo, lost: r.lost }); }
+      if (bank.petals) { const pm = new THREE.Mesh(bank.petals, petalMaterial()); pm.userData.open = 0; grp.add(pm); oppPetals.push(pm); }
+      if (bank.flames) {
+        const fm = new THREE.Mesh(bank.flames, oppFlame); fm.renderOrder = 2; fm.userData.power = 1; grp.add(fm); plumes.push({ m: fm, side: bank.side });
+        const rg: PartRange[] = []; for (const [id, sh] of A.breaks) for (const f of sh.flames) if (f.bank === bi) rg.push({ id, start: f.start, count: f.count }); // plumes of engines that can flame out
+        if (rg.length) hiders.push(new Hider(fm, rg));
       }
-      addBucket(b, grp);
-      if (pts.length) { const pg = mergeGeometries(pts, false)!; pts.forEach(x => x.dispose()); ownedGeos.push(pg); const pm = new THREE.Mesh(pg, petalMaterial()); pm.userData.open = 0; grp.add(pm); oppPetals.push(pm); }
-      if (fls.length) {
-        const fg = mergeGeometries(fls, false)!; fls.forEach(x => x.dispose());
-        bakeSolidColor(fg, glowCol); fg.computeBoundingSphere(); ownedGeos.push(fg);
-        const fm = new THREE.Mesh(fg, oppFlame); fm.renderOrder = 2; grp.add(fm);
-      }
-    }
+    });
     // Cockpit + cables + extras
-    {
-      const b = new Map<string, THREE.BufferGeometry[]>();
-      const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
-      for (const [k, g] of ckBuilt.parts) pushB(b, k, g, ckM);
-      for (const [k, g] of extraParts) { pushB(b, k, g); g.dispose(); }
-      const cp = new THREE.Vector3(0, L.cockpit.y, L.cockpit.z);
-      const cabPB = new PartBuilder();
-      for (const em of L.engines) {
-        const eg = engineGeo(em.spec, seg);
-        const a = eg.pylon.clone().add(new THREE.Vector3(em.x, em.y, em.z));
-        const anc = ckBuilt.info.anchors[em.x < 0 ? 0 : 1].clone().add(cp);
-        const mid = a.clone().lerp(anc, 0.5); mid.y -= 0.55;
-        cabPB.add('dark', tube([anc, mid, a], 0.055, 8, 5));
-      }
-      for (const [k, g] of cabPB.build()) { pushB(b, k, g); g.dispose(); }
-      addBucket(b, nearGrp);
-    }
+    addBuckets(A.cockpit, nearGrp, 'cockpit');
+    const spanX = A.spanX;
     const binderMeshes: { m: THREE.Mesh; y: number }[] = [];
-    for (const [ia, ib] of (L.binders ?? (L.binder ? [L.binder] : [])) as [number, number][]) {
-      let A = L.engines[ia], B = L.engines[ib]; if (A.x > B.x) { const t = A; A = B; B = t; }
-      const ea = engineGeo(A.spec, seg), eb = engineGeo(B.spec, seg);
-      const dyh = ((B.y + eb.R * 0.2) - (A.y + ea.R * 0.2)) * 0.5; // diagonal binders: the two ends sit at different heights around the mesh origin
-      const pa = new THREE.Vector3(A.x + ea.R * 0.97, -dyh, A.z + ea.L * 0.12);
-      const pb = new THREE.Vector3(B.x - eb.R * 0.97, dyh, B.z + eb.L * 0.12);
-      spanX = Math.max(1.5, Math.abs(pb.x - pa.x));
-      const baseY = (A.y + ea.R * 0.2 + B.y + eb.R * 0.2) * 0.5;
-      const bg = makeBinderGeo(pa, pb, glowCol); ownedGeos.push(bg);
-      const bm = new THREE.Mesh(bg, oppBinder); bm.position.y = baseY; bm.renderOrder = 3; nearGrp.add(bm); binderMeshes.push({ m: bm, y: baseY });
-    }
+    A.binders.forEach((b, bi) => {
+      const bm = new THREE.Mesh(b.geo, oppBinder); bm.position.y = b.baseY; bm.renderOrder = 3; nearGrp.add(bm); binderMeshes.push({ m: bm, y: b.baseY });
+      const rg: PartRange[] = []; for (const [id, sh] of A.breaks) for (const a of sh.arcs) if (a.binder === bi) rg.push({ id, start: a.start, count: a.count }); // arcs that can die
+      if (rg.length) hiders.push(new Hider(bm, rg));
+    });
 
-    // Far LOD (> 48 m): 3 shared-material draws, ~380 tris!
+    // Far LOD (> 48 m): 3 shared-material draws
     const farGrp = new THREE.Group(); farGrp.visible = false; body.add(farGrp);
-    const far = buildOpponentFarGeo(def, L);
-    const fhGeo = bakeHullVertexColors(far.hull.clone(), colors[0], colors[1], liv); ownedGeos.push(fhGeo);
-    const fgGeo = bakeSolidColor(far.glow.clone(), glowBoost); ownedGeos.push(fgGeo);
-    const fhM = new THREE.Mesh(fhGeo, getOppFarHull()); fhM.receiveShadow = true; farGrp.add(fhM);
-    farGrp.add(new THREE.Mesh(far.dark, shared.dark));
-    farGrp.add(new THREE.Mesh(fgGeo, oppGlow));
+    const fhM = new THREE.Mesh(A.far.hull, getOppFarHull()); fhM.receiveShadow = true; farGrp.add(fhM);
+    farGrp.add(new THREE.Mesh(A.far.dark, shared.dark));
+    farGrp.add(new THREE.Mesh(A.far.glow, oppGlow));
 
     const setDistance = (d: number, forceAll = false) => {
       if (forceAll) { nearGrp.visible = true; farGrp.visible = true; return; }
@@ -331,15 +190,32 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
       if (engines[1]) { engines[1].position.y = oppPivots[1].y + yR; engines[1].rotation.set(pitchR, 0, rollBank * 0.22); }
       for (const b of binderMeshes) { b.m.position.y = b.y + (yL + yR) * 0.5; b.m.rotation.z = Math.atan2(yR - yL, spanX); }
     };
-    const update = (t: number, throttle = 0, boost = 0) => { // rivals: nozzle petals open with boost (shared material, per-mesh userData)
+    // rivals: nozzle petals open with boost (shared material, per-mesh userData). `dmgL` / `dmgR` are HEALTH fractions like on the player pod.
+    const update = (t: number, throttle = 0, boost = 0, _airbrake = 0, dmgL = 1, dmgR = 1) => {
       podSharedTime.value = t; oppOpen += (boost - oppOpen) * 0.14;
+      if (nearGrp.visible) { // damage look: soot per engine side, weaker and sputtering plumes below 35 % / 15 % health
+        const hpMin = Math.min(dmgL, dmgR);
+        for (let i = 0; i < sootMeshes.length; i++) { const s = sootMeshes[i]; s.m.userData.scorch = s.where === 'cockpit' ? Math.min(0.6, (1 - hpMin) * 0.6) : Math.min(1, (1 - (A.banks[s.where].side < 0 ? dmgL : dmgR)) * 1.1); }
+        for (let i = 0; i < plumes.length; i++) { const hp = plumes[i].side < 0 ? dmgL : dmgR; plumes[i].m.userData.power = (hp < 0.35 ? 0.55 + 0.45 * hp / 0.35 : 1) * (hp < 0.15 ? 0.35 + 0.55 * Math.abs(Math.sin(t * (41 + i * 6))) : 1); }
+      }
       const o = 0.1 * throttle + 0.9 * oppOpen; for (let i = 0; i < oppPetals.length; i++) oppPetals[i].userData.open = o;
+      if (oppRotors.length && nearGrp.visible) { const ang = t * (16 + throttle * 42); for (let i = 0; i < oppRotors.length; i++) oppRotors[i].m.rotation.z = ang * oppRotors[i].spin + i * 0.7; }
     };
-    const dispose = () => { ownedGeos.forEach(g => g.dispose()); };
-    return { group, body, engines, exhaustLocal, eye, hood, update, setEngineMotion, setDistance, dispose };
+    // Bruchteile: geometry is cut out of the shared-material meshes (no extra draws, no extra pipelines); a rotor swaps to its damaged twin
+    const engineOut = A.layout.engines.map(() => false);
+    const setParts = partsSwitch(def.id, A.breaks, hiders, (_id, lost, sh) => {
+      for (const e of sh.engines) engineOut[e] = lost;
+      for (const e of sh.fans) for (const r of oppRotors) if (r.engine === e && r.lost) r.m.geometry = lost ? r.lost : r.geo;
+    });
+    const partBody = (i: number, out: THREE.Vector3) => { const sh = A.breaks.get(damageModel(def.id).parts[i]?.id ?? ''); return sh ? out.copy(sh.center) : out.set(0, 0, 0); };
+    const dispose = () => { A.owned.forEach(g => g.dispose()); };
+    return { group, body, engines, exhaustLocal: A.exhaustLocal, eye: A.eye, hood: A.hood, update, setEngineMotion, setDistance, setParts, engineOut, partBody, dispose };
   }
 
   // ==================== FULL HERO PLAYER / HANGAR POD ====================
+  const A = assembleHero(def, seg, pilot.head, kit);
+  body.position.z = A.bodyZ;
+  const liv = opts?.pattern !== undefined && opts.pattern >= 0 ? opts.pattern : A.layout.livery;
   const hullL = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
   const hullR = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
   const hullC = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin); // cockpit: own instance (no engine heat glow)
@@ -350,109 +226,86 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
   const cabMat = cableFlexMaterial();
   const cabLift = cabMat.userData.uLift as { value: THREE.Vector2 }; const cabCk = cabMat.userData.uCk as { value: THREE.Vector3 };
   const own: THREE.Material[] = [hullL, hullR, hullC, glow, flameL, coreL, flameR, coreR, cabMat];
-  const matFor = (k: string, hull: THREE.Material) => (k === 'hull' ? hull : k === 'glow' ? glow : k === 'suit' ? suit : shared[k]);
+  const matFor = (k: string, hull: THREE.Material) => (k === 'hull' ? hull : k === 'glow' ? glow : k === 'suit' ? suit : k === 'skin' ? skin : shared[k]);
 
-  const addMeshes = (parts: Map<string, THREE.BufferGeometry>, parent: THREE.Object3D, hull: THREE.Material) => {
+  const hiders: Hider[] = []; // meshes that carry Bruchteile or the pilot
+  const addMeshes = (parts: Map<string, THREE.BufferGeometry>, parent: THREE.Object3D, hull: THREE.Material, where: 'cockpit' | number) => {
+    const made: { k: string; m: THREE.Mesh }[] = [];
     for (const [k, g] of parts) {
       const mat = matFor(k, hull); if (!mat) continue;
       const m = new THREE.Mesh(g, mat); const fx = k === 'glow' || k === 'glass';
       m.castShadow = !fx && SHADOW_KEYS.has(k); m.receiveShadow = !fx;
-      if (k === 'glass') m.renderOrder = 1; parent.add(m);
+      if (k === 'glass') m.renderOrder = 1; parent.add(m); made.push({ k, m });
+      const rg = rangesIn(A.breaks, where, k);
+      if (where === 'cockpit') { const start = A.pilotStart.get(k); if (start !== undefined && g.index && start < g.index.count) rg.push({ id: PILOT, start, count: g.index.count - start }); } // the pilot's triangles are the last ones
+      if (rg.length) hiders.push(new Hider(m, rg));
     }
+    return made;
   };
 
-  // Split Aurora/Brute/Gasvaro/Teemo engine-mounted extras onto their matching L/R articulated engine group!
-  const attachExtraToEngines = def.id === 'aurora' || def.id === 'brute' || def.id === 'gasvaro' || def.id === 'bomquad' || def.id === 'teemo';
   const engines: THREE.Object3D[] = [];
-  const fans: THREE.Mesh[] = [];
-  const flaps: { m: THREE.Mesh; sign: number; side: number }[] = []; const petals: THREE.Mesh[] = [];
-  const flames: { m: THREE.Mesh; side: number }[] = [];
-  const sideGeos: THREE.BufferGeometry[] = [];
+  const fans: THREE.Mesh[] = []; const fanGeo: { fan: THREE.BufferGeometry; lost?: THREE.BufferGeometry }[] = [];
+  const flaps: { m: THREE.Object3D; sign: number; side: number; gain: number }[] = []; const petals: THREE.Mesh[] = []; // (`m`: the hinge group of a flap)
+  const flames: { m: THREE.Mesh; side: number; engine: number }[] = [];
+  /** engines that have flamed out (Bruchteile of the multi-engine racers) */
+  const engineOut = A.layout.engines.map(() => false);
   const hc = new THREE.Color(), hot = new THREE.Color('#ff5a1a');
 
   const heroPivots: THREE.Vector3[] = [];
-  for (const side of [-1, 1]) {
-    const sideMounts = L.engines.filter(e => (e.x < 0 ? -1 : 1) === side);
-    if (!sideMounts.length) continue;
-    // Pivot each engine bank around its true 3D center of mass so pitch & roll stay crisp and balanced!
-    const piv = new THREE.Vector3();
-    for (const em of sideMounts) { piv.x += em.x; piv.y += em.y; piv.z += em.z; }
-    piv.divideScalar(sideMounts.length);
-    heroPivots.push(piv);
-    const engGrp = new THREE.Group(); engGrp.position.copy(piv); body.add(engGrp); engines.push(engGrp);
+  A.banks.forEach((bank, bi) => {
+    const side = bank.side;
+    heroPivots.push(bank.pivot);
+    const engGrp = new THREE.Group(); engGrp.position.copy(bank.pivot); body.add(engGrp); engines.push(engGrp);
     const hull = side < 0 ? hullL : hullR;
-    const buckets = new Map<string, THREE.BufferGeometry[]>();
-    for (const em of sideMounts) {
-      const ox = em.x - piv.x, oy = em.y - piv.y, oz = em.z - piv.z;
-      const eg = engineGeo(em.spec, seg); const emM = M4.t(ox, oy, oz);
-      for (const [k, g] of eg.parts) {
-        const gc = g.clone(); gc.applyMatrix4(emM);
-        let l = buckets.get(k); if (!l) { l = []; buckets.set(k, l); } l.push(gc);
+    for (const { index, off, geo: eg, flaps: egFlaps } of bank.engines) {
+      const fan = new THREE.Mesh(eg.fan, shared[eg.fanMat ?? 'dark'] ?? shared.dark); fan.position.set(off.x, off.y, off.z + eg.fanZ);
+      fan.castShadow = !!eg.openRotor; fan.receiveShadow = !!eg.openRotor; fan.userData.spin = eg.fanSpin ?? 1; fan.userData.engine = index; engGrp.add(fan); fans.push(fan); fanGeo[index] = { fan: eg.fan, lost: eg.fanLost }; // a big open rotor throws a shadow, an enclosed fan does not
+      { const pm = new THREE.Mesh(eg.petals, petalMaterial()); pm.position.copy(off); pm.userData.open = 0; pm.castShadow = false; engGrp.add(pm); petals.push(pm); }
+      for (const f of egFlaps) { // a flap turns on a hinge group; its geometry stays in bank space, so the hull's Treffermarken land on it where they should
+        const hinge = new THREE.Group(); hinge.position.copy(f.hinge); const m = new THREE.Mesh(f.geo, hull); m.position.copy(f.hinge).negate();
+        m.castShadow = false; m.receiveShadow = true; hinge.add(m); engGrp.add(hinge); flaps.push({ m: hinge, sign: f.sign, side, gain: f.gain ?? 1 });
       }
-      const fan = new THREE.Mesh(eg.fan, shared.dark); fan.position.set(ox, oy, oz + eg.fanZ); fan.castShadow = false; engGrp.add(fan); fans.push(fan);
-      { const pm = new THREE.Mesh(eg.petals, petalMaterial()); pm.position.set(ox, oy, oz); pm.userData.open = 0; pm.castShadow = false; engGrp.add(pm); petals.push(pm); }
-      for (const f of eg.flaps) { const m = new THREE.Mesh(f.geo, hull); m.position.set(ox + f.pivot.x, oy + f.pivot.y, oz + f.pivot.z); m.castShadow = false; m.receiveShadow = true; engGrp.add(m); flaps.push({ m, sign: f.sign, side }); }
       for (const core of [false, true]) {
         const m = new THREE.Mesh(core ? eg.flameCore : eg.flameOuter, side < 0 ? (core ? coreL : flameL) : (core ? coreR : flameR));
-        m.position.set(ox, oy, oz + eg.flameZ); m.renderOrder = 2; engGrp.add(m); flames.push({ m, side });
+        m.position.set(off.x, off.y, off.z + eg.flameZ); m.renderOrder = 2; engGrp.add(m); flames.push({ m, side, engine: index });
       }
     }
-    if (attachExtraToEngines) {
-      const shift = M4.t(-piv.x, -piv.y, -piv.z);
-      for (const [k, eg] of extraParts) {
-        const idx = eg.index!.array; const pos = eg.attributes.position;
-        const keep: number[] = [];
-        for (let t = 0; t < idx.length; t += 3) {
-          const cx = (pos.getX(idx[t]) + pos.getX(idx[t + 1]) + pos.getX(idx[t + 2])) / 3;
-          if ((cx < 0 ? -1 : 1) === side) keep.push(idx[t], idx[t + 1], idx[t + 2]);
-        }
-        if (keep.length) {
-          const sub = eg.clone(); sub.setIndex(keep); sub.applyMatrix4(shift);
-          let l = buckets.get(k); if (!l) { l = []; buckets.set(k, l); } l.push(sub);
-        }
-      }
-    }
-    const mergedSide = new Map<string, THREE.BufferGeometry>();
-    for (const [k, list] of buckets) {
-      const mg = mergeGeometries(list, false); list.forEach(x => x.dispose());
-      if (mg) { mg.computeBoundingSphere(); mergedSide.set(k, mg); sideGeos.push(mg); }
-    }
-    addMeshes(mergedSide, engGrp, hull);
-  }
+    addMeshes(bank.buckets, engGrp, hull, bi);
+  });
 
-  // Cockpit + cockpit-mounted extras + GPU-flexing control cables
-  {
-    const ckM = M4.t(0, L.cockpit.y, L.cockpit.z);
-    const buckets = new Map<string, THREE.BufferGeometry[]>();
-    for (const [k, g] of ckBuilt.parts) { const gc = g.clone(); gc.applyMatrix4(ckM); let l = buckets.get(k); if (!l) { l = []; buckets.set(k, l); } l.push(gc); }
-    for (const [k, g] of extraParts) {
-      if (!attachExtraToEngines) { let l = buckets.get(k); if (!l) { l = []; buckets.set(k, l); } l.push(g); }
-      else g.dispose();
-    }
-    const mergedBody = new Map<string, THREE.BufferGeometry>();
-    for (const [k, list] of buckets) {
-      const mg = mergeGeometries(list, false); list.forEach(x => x.dispose());
-      if (mg) { mg.computeBoundingSphere(); mergedBody.set(k, mg); sideGeos.push(mg); }
-    }
-    body.add(ckGrp); addMeshes(mergedBody, ckGrp, hullC);
+  // Cockpit + cockpit-mounted extras + GPU-flexing control cables. `ckView` carries the enlargement of the cockpit camera.
+  const ckView = new THREE.Group(); ckGrp.add(ckView); body.add(ckGrp);
+  const ckMeshes = addMeshes(A.cockpit, ckView, hullC, 'cockpit');
+  // three live dash lamps (boost · heat · damage): one small vertex-coloured mesh
+  let lampCol: THREE.BufferAttribute | null = null; const lampNow = new Float32Array(9).fill(-1);
+  if (A.lamps) { const lm = new THREE.Mesh(A.lamps, getOppGlow()); ckView.add(lm); lampCol = A.lamps.attributes.color as THREE.BufferAttribute; }
+  const setLamp = (i: number, r: number, g: number, b: number) => {
+    if (!lampCol || (lampNow[i * 3] === r && lampNow[i * 3 + 1] === g && lampNow[i * 3 + 2] === b)) return;
+    lampNow[i * 3] = r; lampNow[i * 3 + 1] = g; lampNow[i * 3 + 2] = b;
+    for (let v = i * LAMP_VERTS; v < (i + 1) * LAMP_VERTS; v++) lampCol.setXYZ(v, r, g, b);
+    lampCol.needsUpdate = true;
+  };
+  const cabMesh = new THREE.Mesh(A.cables, cabMat); cabMesh.castShadow = false; cabMesh.receiveShadow = true; body.add(cabMesh);
 
-    const cabGeo = buildFlexCables(L, seg, ckBuilt.info.anchors); sideGeos.push(cabGeo);
-    const cabMesh = new THREE.Mesh(cabGeo, cabMat); cabMesh.castShadow = false; cabMesh.receiveShadow = true; body.add(cabMesh);
-  }
-
-  const binderGeos: THREE.BufferGeometry[] = []; let binderU: FxU | null = null; const binderSwap = false;
-  const BL: [number, number][] = L.binders ?? (L.binder ? [L.binder] : []);
-  if (BL.length) { // one material, one mesh per binder (X on the Quadra Lumber)
+  let binderU: FxU | null = null; const binderSwap = false;
+  if (A.binders.length) { // one material, one mesh per binder (X on the Quadra Lumber)
     const bMat = binderMaterial(glowCol); own.push(bMat); binderU = bMat.userData.u as FxU;
-    for (const [ia, ib] of BL) {
-      let A = L.engines[ia], B = L.engines[ib]; if (A.x > B.x) { const t = A; A = B; B = t; } // A = left-hand engine (uLift.x)
-      const ea = engineGeo(A.spec, seg), eb = engineGeo(B.spec, seg);
-      const g = makeBinderGeo(new THREE.Vector3(A.x + ea.R * 0.97, A.y + ea.R * 0.2, A.z + ea.L * 0.12), new THREE.Vector3(B.x - eb.R * 0.97, B.y + eb.R * 0.2, B.z + eb.L * 0.12));
-      binderGeos.push(g); const bm = new THREE.Mesh(g, bMat); bm.renderOrder = 3; body.add(bm);
-    }
+    A.binders.forEach((g, bi) => {
+      const bm = new THREE.Mesh(g, bMat); bm.renderOrder = 3; body.add(bm);
+      const rg: PartRange[] = []; for (const [id, sh] of A.breaks) for (const a of sh.arcs) if (a.binder === bi) rg.push({ id, start: a.start, count: a.count }); // arcs that can die
+      if (rg.length) hiders.push(new Hider(bm, rg));
+    });
   }
   const setCockpitSway = (x: number, y: number, z: number) => { ckGrp.position.set(x, y, z); ckGrp.rotation.z = -x * 0.14; ckGrp.rotation.x = z * 0.07; cabCk.value.set(x, y, z); };
-  const setCockpitVisible = (v: boolean) => { ckGrp.visible = v; };
+  let inside = false;
+  const setCockpitView = (on: boolean) => {
+    if (on === inside) return; inside = on;
+    const kS = on ? A.viewScale : 1;
+    ckView.scale.setScalar(kS); ckView.position.copy(A.eye).multiplyScalar(1 - kS); // p → eye + k·(p − eye)
+    for (const h of hiders) if (h.set(PILOT, on)) h.apply(); // the pilot is cut out of the cockpit meshes like a lost part
+    for (const { k, m } of ckMeshes) if (SHADOW_KEYS.has(k)) m.castShadow = !on; // the enlarged cockpit must not throw an enlarged shadow
+  };
+  const eyeWorld = (out: THREE.Vector3) => ckGrp.localToWorld(out.copy(A.eye));
 
   const setEngineMotion = (yL: number, yR: number, pitchL: number, pitchR: number, rollBank: number) => {
     if (engines[0]) { engines[0].position.y = heroPivots[0].y + yL; engines[0].rotation.set(pitchL, 0, rollBank * 0.22); }
@@ -469,6 +322,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     const spR = dmgR < 0.15 ? 0.35 + 0.55 * Math.abs(Math.sin(t * 47 + 1)) : 1;
     for (let i = 0; i < flames.length; i++) {
       const f = flames[i]; const sp = f.side < 0 ? spL : spR; const w = 1 + boost * 0.24;
+      f.m.visible = !engineOut[f.engine]; // a flamed-out engine has no plume
       f.m.scale.set(w, w, Math.max(0.05, fl * (0.92 + 0.1 * Math.sin(t * 53 + i * 2.1)) * sp));
     }
     hc.copy(glowCol).lerp(hot, Math.min(1, Math.max(0, heat - 0.6) * 2.5));
@@ -478,7 +332,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     }
     glow.color.copy(hc).multiplyScalar(1.1 + boost * 0.3);
     const fanAng = t * (16 + throttle * 42);
-    for (let i = 0; i < fans.length; i++) fans[i].rotation.z = fanAng + i * 0.7;
+    for (let i = 0; i < fans.length; i++) if (!engineOut[fans[i].userData.engine as number]) fans[i].rotation.z = fanAng * (fans[i].userData.spin as number) + i * 0.7; // (a dead engine's fan stands still)
     // Session 13: on a badly damaged pod the air-brake flaps rattle loose in the airstream
     // (dmgL / dmgR are HEALTH fractions: 1 = intact – the first version read them as damage and rattled on every healthy pod)
     // Per-engine battle damage: below 55 % HP on an engine, THAT engine's cowling flaps bend ajar, twist & shudder in the airstream!
@@ -489,7 +343,7 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
     for (let i = 0; i < petals.length; i++) petals[i].userData.open = open;
     for (let i = 0; i < flaps.length; i++) {
       const flp = flaps[i], df = flp.side < 0 ? dmgFL : dmgFR;
-      flp.m.rotation.y = flp.sign * (airbrake * 1.05 + (df > 0 ? (0.18 + 0.14 * Math.sin(t * 39 + i * 2.1)) * df : 0));
+      flp.m.rotation.y = flp.sign * (airbrake * 1.05 * flp.gain + (df > 0 ? (0.18 + 0.14 * Math.sin(t * 39 + i * 2.1)) * df : 0));
       flp.m.rotation.z = df > 0.25 ? flp.sign * (df - 0.25) * 0.34 : 0; // bent hinge droop when badly damaged
     }
     // The hull glow lags the heat value (metal warms up slowly and stays hot for a while) – a readable overheating indicator
@@ -502,7 +356,39 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
       binderU.uTime.value = t; binderU.uColor.value.copy(hc);
       binderU.uPower.value = (0.55 + throttle * 0.35 + boost * 0.6) * Math.min(1, Math.min(dmgL, dmgR) * 3);
     }
+    // dash lamps: boost (cyan while boosting) · heat (green → amber → red, blinks near the limit) · damage (worse engine side)
+    const blink = Math.sin(t * 14) > 0 ? 1 : 0.25, hpMin = Math.min(dmgL, dmgR);
+    if (boostK > 0.08) setLamp(0, 0.2, 1.9, 2.6); else setLamp(0, 0.02, 0.12, 0.2);
+    if (heat > 0.85) setLamp(1, 2.6 * blink, 0.16 * blink, 0.05); else if (heat > 0.55) setLamp(1, 2.2, 1.1, 0.08); else setLamp(1, 0.12, 1.3, 0.25);
+    if (hpMin < 0.3) setLamp(2, 2.6 * blink, 0.14 * blink, 0.06); else if (hpMin < 0.6) setLamp(2, 2.2, 1.1, 0.08); else setLamp(2, 0.12, 1.3, 0.25);
   };
-  const dispose = () => { own.forEach(m => m.dispose()); sideGeos.forEach(g => g.dispose()); binderGeos.forEach(g => g.dispose()); };
-  return { group, body, engines, exhaustLocal, eye, hood, update, setEngineMotion, setDistance: () => {}, setCockpitSway, setCockpitVisible, dispose };
+  // Bruchteile: geometry is cut out of its meshes (no extra draws), engines flame out, a rotor swaps to its damaged twin, arcs die
+  const setParts = partsSwitch(def.id, A.breaks, hiders, (_id, lost, sh) => {
+    for (const e of sh.engines) engineOut[e] = lost;
+    for (const e of sh.fans) { const fg = fanGeo[e], fm = fans.find(f => f.userData.engine === e); if (fg?.lost && fm) fm.geometry = lost ? fg.lost : fg.fan; }
+  });
+  const partBody = (i: number, out: THREE.Vector3) => { const sh = A.breaks.get(damageModel(def.id).parts[i]?.id ?? ''); return sh ? out.copy(sh.center) : out.set(0, 0, 0); };
+  // Treffermarken: each of the three hull materials (left bank, right bank, cockpit) remembers its last HIT_MARKS hits
+  const hulls = [hullL, hullR, hullC].map(h => (h.userData.u as HullU).uHits), hitNext = [0, 0, 0], hv = new THREE.Vector3();
+  const mark = (hull: number, x: number, y: number, z: number, k: number) => { hulls[hull][hitNext[hull]++ % HIT_MARKS].value.set(x, y, z, k); };
+  const hitMark = (bx: number, by: number, bz: number, strength: number) => {
+    const k = Math.max(0.4, Math.min(1, strength / 28)), ck = A.layout.cockpit;
+    hv.set(bx, by, bz); // body space (engines at rest – near enough for a mark)
+    const side = Math.abs(hv.x) < 0.4;   // a hit without a side (ceiling, landing, portal lip): the mark goes on top of an engine
+    if (!side && hv.z < ck.z + ck.len * 0.5 + 0.5 && Math.abs(hv.x) < ck.hw + 1.4) { // on the cockpit: pulled onto its skin
+      mark(2, Math.max(-ck.hw, Math.min(ck.hw, hv.x)), ck.y + Math.max(-0.5, Math.min(0.4, hv.y - ck.y)) * ck.hw, Math.max(ck.z - ck.len * 0.5, Math.min(ck.z + ck.len * 0.5, hv.z)), k);
+      return;
+    }
+    const bi = A.banks.length < 2 ? 0 : (side ? Math.random() < 0.5 : hv.x > 0) ? 1 : 0, bank = A.banks[bi];
+    let best = bank.engines[0], bd = Infinity; // the engine of that bank whose axis is nearest to the hit
+    for (const e of bank.engines) { const d = Math.hypot(hv.x - bank.pivot.x - e.off.x, hv.y - bank.pivot.y - e.off.y); if (d < bd) { bd = d; best = e; } }
+    const R = best.geo.R, hl = best.geo.L * 0.5;
+    let dx = hv.x - bank.pivot.x - best.off.x, dy = hv.y - bank.pivot.y - best.off.y; const dl = Math.hypot(dx, dy);
+    if (side || dl < 1e-3) { dx = 0; dy = R; } else { dx *= R / dl; dy *= R / dl; } // onto the barrel, on the side the hit came from
+    const z = side ? (Math.random() * 1.2 - 0.3) * hl : Math.max(-hl * 0.8, Math.min(hl * 0.95, hv.z - bank.pivot.z - best.off.z));
+    mark(bank.side < 0 ? 0 : 1, best.off.x + dx, best.off.y + dy, best.off.z + z, k);
+  };
+  const clearMarks = () => { for (const h of hulls) for (const u of h) u.value.set(0, 0, 0, 0); };
+  const dispose = () => { own.forEach(m => m.dispose()); A.owned.forEach(g => g.dispose()); };
+  return { group, body, engines, exhaustLocal: A.exhaustLocal, eye: A.eye, hood: A.hood, update, setEngineMotion, setDistance: () => {}, setCockpitSway, setCockpitView, eyeWorld, setParts, engineOut, partBody, hitMark, clearMarks, dispose };
 }
