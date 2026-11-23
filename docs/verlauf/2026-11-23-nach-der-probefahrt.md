@@ -73,9 +73,24 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - **Neues Werkzeug:** `pdbg.mjs`-Variante `scan` – Strahlen quer über jedes vierte Sample; nennt jedes Mesh, das in der Fahrbahn steht. Hat die Stelle in einem Lauf gefunden.
 - **Kein Fehler:** die Felstürme mit grünen Leuchtringen auf der Fahrbahn sind die Geysir-Schlote (`hazards`), sie stehen dort mit Absicht.
 
+### Fehler 2 – extrem schlechte Sicht bei Nacht + Gewitter
+- **Ursache:** Nacht und Unwetter wurden miteinander multipliziert: Mondlicht 0,30 statt 1,15, ein Viertel weniger Streulicht, Nebel und Himmel schwarz. Hinter dem Lichtfleck der Lampe war nichts zu erkennen.
+- **Behoben:** Schlechtes Wetter ändert nachts die Stimmung (kälter, flacher, dunstiger), nicht mehr die Lichtmenge. Untergrenzen für Mondlicht, Streulicht, Horizont und Nebelfarbe; der Nebel wird nachts höchstens 1,8-mal so dicht wie auf der Welt üblich; Regenböen sind dünner und nicht mehr schwarz. Gilt für jede Welt und jedes Wetter (Regen, Gewitter, Schnee, Sandsturm, Nebel).
+- **Lampe des eigenen Pods:** breiter, flacherer Abfall, zielt 60 m voraus statt 36 m – Wände, Felsen und Bögen fangen das Licht früher.
+- **Dabei gefunden:** der Dschungel-Tunnel leuchtete nachts wieder grell hellgrün (die Lampenmenge richtete sich nach dem dunklen Nachthimmel statt nach der Welt). Behoben.
+
+### Fehler 3 – Streifen wie Reifenspuren
+- **Ursache:** rund 110 „Bremsspuren"-Aufkleber je Strecke, jeder mit zehn dünnen, scharfen, dunklen Linien – auf jedem Untergrund. Auf Schnee dunkel auf weiß.
+- **Behoben:** auf Naturboden liegen keine mehr. Auf der gebauten Piste sind es jetzt Brandspuren: zwei breite, weiche Rußstreifen. Spuren auf Naturboden kommen künftig nur noch von den Pods selbst (Schnee heute, Sand und Mondstaub bestellt).
+
 ## Geprüft
 - Fehler 1: neue Prüfungen `bridges: …` (11, zuerst rot: Gelände 22,7 m über der Brücke, 309 Punkte; Wand 28 m hoch direkt neben der Brücke). Nur mit Regel (2) stand das Gelände noch 5,2 m über der Fahrbahn – Regel (1) ist nötig. `poke.ts` auf allen Strecken, Gitter 4,5 / 7 / 13,75 m, Brücken eingeschlossen: 0 Punkte (vorher 242 auf dem Methan-Derby). Bilder vorher/nachher an allen drei Stellen (WebGL2, Software).
 
+- Fehler 2: neue Prüfung `night: bad weather keeps the light of a clear night …` (zuerst rot: 39 Verstöße). Bilder aus der Sicht des Spielers (neue Harness-Ansicht `chase_<idx>`: echter Pod, echte Kamera, echte Lampe), vorher/nachher: Dschungel bei Nacht + Gewitter (offene Piste, Tunnel), dazu Nacht klar und Nacht + Regen zum Vergleich; Aquilaris Nacht + Gewitter; Frostspalt Nacht + Schnee.
+- Fehler 3: Bilder vorher/nachher, Frostspalt Schnee-Passage (Streifen weg) und Start-Piste (weiche Brandspuren). Welches Mesh die Streifen waren, hat `pick:` gezeigt.
+
 ## Nicht geprüft
+- Fehler 2: nur Standbilder in Software-WebGL2. Wie es sich bei Tempo 400 mit Regen, Gischt der Vorausfahrenden und Tropfen auf der Linse anfühlt, kann nur die Probefahrt zeigen – die Linsentropfen und der Regen selbst sind unverändert. Malastare, Kristall und Sandsturm bei Nacht nicht angesehen (die Prüfung deckt alle Welten rechnerisch ab).
+- Fehler 3: die neuen Brandspuren nur auf der Eis-Piste gesehen.
 
 ## Git

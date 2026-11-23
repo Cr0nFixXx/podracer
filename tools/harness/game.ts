@@ -88,6 +88,7 @@ let g: Game | null = null; let cur = -1;
     const tLoad = performance.now(); await g.start(); (window as unknown as Record<string, unknown>).loadInfo = `load=${Math.round(performance.now() - tLoad)}ms ` + JSON.stringify(g.world.timings) + ' ' + JSON.stringify((g as unknown as { loadMs?: unknown }).loadMs ?? {}); g.paused = true; await new Promise(r => setTimeout(r, 400));
   }
   const G = g!; G.paused = true;
+  let chase = false;
   (window as unknown as Record<string, unknown>).coverInfo = ''; // per-view info line (probe / decor views fill it) – reset so it never leaks into the next view
   if (view === 'b') {
     const S = G.td.main.samples, N = S.length; let best = 0, bc = 0;
@@ -185,10 +186,19 @@ let g: Game | null = null; let cur = -1;
     const side = wall ? -1 : 1; // (beside the wall: seen from the middle of the tunnel)
     if (view === 'topf') { G.camera.position.set(x0 - s.rx * 6 + s.tx * 26, pl.pos.y + 1, z0 - s.rz * 6 + s.tz * 26); G.camera.lookAt(x0 + s.rx * 1.5, pl.pos.y + 1.5, z0 + s.rz * 1.5); }
     else { G.camera.position.set(x0 + s.rx * side * 15 + s.tx * 9, pl.pos.y - 2.5, z0 + s.rz * side * 15 + s.tz * 9); G.camera.lookAt(x0 + s.tx * 4, pl.pos.y + 2.5, z0 + s.tz * 4); }
+  } else if (view.startsWith('chase_')) { // the player's own view: chase_<idx>[_<lat>[_<speed m/s>]] – the pod on the main road at that sample, the real chase camera, field of view and head lamp (2026-11-23: "how far can I see at night in a storm?")
+    const [, i0, l0, v0] = view.split('_'); const S = G.td.main.samples, idx = (+i0) % S.length, s = S[idx], lat = +(l0 ?? 0), speed = +(v0 ?? 100), pl = G.player;
+    const x0 = s.x + s.rx * lat, z0 = s.z + s.rz * lat;
+    pl.pos.set(x0, s.y + s.ramp + 2.85, z0); pl.yaw = Math.atan2(s.tx, s.tz); pl.path = 0; pl.idx = idx; pl.dead = 0; pl.invuln = 99; pl.grounded = true; pl.inRoof = s.roof > 0; pl.upper = false;
+    for (let k = 0; k < 40; k++) { pl.pos.x = x0; pl.pos.z = z0; pl.vel.set(s.tx * speed, 0, s.tz * speed); pl.yaw = Math.atan2(s.tx, s.tz); stepPod(pl, G.td, 1 / 60, G.clock + k / 60, 1, false); }
+    pl.pos.x = x0; pl.pos.z = z0; pl.invuln = 0; G.updateVisuals(); for (let k = 0; k < 10; k++) G.updateCamera(0.5);
+    chase = true;
+    // three seconds of weather around that camera (rain streaks, snow, gust banks need time to fill the air)
+    { const W = (G as unknown as { weather?: { update: (dt: number, t: number, cam: THREE.Camera, frozen: boolean, thunder: (v: number) => void, near: (v: number) => void) => void } }).weather; if (W) for (let k = 0; k < 90; k++) { G.clock += 1 / 30; W.update(1 / 30, G.clock, G.camera, false, () => {}, () => {}); } }
   } else if (view === 'r') { // 3.4 s of real racing (AI + player idle) so exhaust/dust particles, banking and engine heave are live
     G.state = 'race'; (G as unknown as { keys: Set<string> }).keys.add('KeyW'); for (let k = 0; k < 170; k++) { G.update(1 / 60); if (k % 3 === 0) G.updateVisuals(); } G.updateCamera(0.5);
   } else { G.updateCamera(0.5); }
-  G.camera.fov = 70; G.camera.updateProjectionMatrix(); G.sky.mesh.position.copy(G.camera.position);
+  if (!chase) G.camera.fov = 70; G.camera.updateProjectionMatrix(); G.sky.mesh.position.copy(G.camera.position);
   const fwd = G.camera.getWorldDirection(new THREE.Vector3()); const t = G.camera.position.clone().addScaledVector(fwd, 50);
   G.sun.target.position.copy(t); G.sun.position.copy(t).addScaledVector(G.sunDir, 400);
   { const rt = new URLSearchParams(location.search).get('rt'); if (rt) { G.raceTime = +rt; G.applyEnv(0, true); } }

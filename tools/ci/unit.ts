@@ -1304,6 +1304,30 @@ for (const id of ['boonta', 'frost', 'magma', 'oovo']) test(`open sections: the 
   }
 });
 
+// ---- night × bad weather (2026-11-23, reported by the user: "extrem schlechte Sicht bei Nacht + Gewitter") ----
+// A night storm was night × overcast: moonlight 0.30 instead of 1.15, a quarter less fill light, black fog. Bad weather at night may
+// change the mood, not the amount of light.
+test('night: bad weather keeps the light of a clear night – on every world, in every weather it has', () => {
+  const lum = (h: string) => { const n = parseInt(h.slice(1), 16); return 0.2126 * (n >> 16 & 255) / 255 + 0.7152 * (n >> 8 & 255) / 255 + 0.0722 * (n & 255) / 255; };
+  const bad: string[] = []; let n = 0;
+  for (const id of Object.keys(THEMES)) {
+    const clear = resolveEnvironment(THEMES[id], 'night', 'clear');
+    if (clear.fx.tod !== 'night') continue; // (a world without a climate has no night)
+    for (const wx of ['rain', 'storm', 'snow', 'dust', 'fog'] as WeatherKind[]) {
+      const r = resolveEnvironment(THEMES[id], 'night', wx), t = r.theme; if (r.fx.weather !== wx) continue; // (this world has no such weather)
+      n++;
+      if (t.sunIntensity < clear.theme.sunIntensity * 0.75) bad.push(`${id} ${wx}: moonlight ${t.sunIntensity.toFixed(2)}, clear night ${clear.theme.sunIntensity.toFixed(2)}`);
+      if (lum(t.hemiSky) < lum(clear.theme.hemiSky) * 0.95) bad.push(`${id} ${wx}: sky fill ${lum(t.hemiSky).toFixed(2)}, clear night ${lum(clear.theme.hemiSky).toFixed(2)}`);
+      if (t.exposure < clear.theme.exposure) bad.push(`${id} ${wx}: exposure ${t.exposure.toFixed(2)} below the clear night's ${clear.theme.exposure.toFixed(2)}`);
+      if (lum(t.fogColor) < 0.1) bad.push(`${id} ${wx}: fog is black (${lum(t.fogColor).toFixed(3)})`);
+      if (t.fogDensity > THEMES[id].fogDensity * 1.8 + 1e-9) bad.push(`${id} ${wx}: fog ${(t.fogDensity / THEMES[id].fogDensity).toFixed(2)} × the world's own`);
+      ok(r.fx.dark > 0.45, `${id} ${wx}: the sky must still count as dark (lights on), dark = ${r.fx.dark.toFixed(2)}`);
+    }
+  }
+  ok(n >= 14, `only ${n} combinations of world and weather`);
+  eq(bad.length, 0, `${bad.slice(0, 5).join(' · ')}${bad.length > 5 ? ` · … (${bad.length})` : ''} –`);
+});
+
 // ---- bridges: the terrain passes below the deck (2026-11-23, reported by the user after the first drive on a real GPU) ----
 // On the Methan-Derby a canyon runs straight into a bridge. Bridge samples take no part in shaping the ground, so the ground on the first
 // 40 m of the deck was judged from the last canyon sample alone – and "behind its 28 m wall" lay half of the bridge: a rock massif stood

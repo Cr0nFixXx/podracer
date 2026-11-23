@@ -58,6 +58,9 @@ interface Callbacks {
   onReady: () => void;
 }
 
+/** Candela of the player's head lamp (a real spot light; decay 1.7). */
+const HEAD_LAMP = 9000;
+
 export class Game {
   container: HTMLDivElement; profile: Profile; cb: Callbacks;
   renderer!: THREE.WebGPURenderer; backend = 'WebGL2'; scene = new THREE.Scene(); camera!: THREE.PerspectiveCamera;
@@ -202,7 +205,8 @@ export class Game {
       for (let i = 0; i < this.pods.length * 5; i++) im.setColorAt(i, cols[i % 5]);
       this.scene.add(im); this.navLights = im;
       if ((gfx.volumetrics ?? 2) > 0) { this.beams = makeBeams(this.pods.length * 2); this.scene.add(this.beams.mesh); }
-      const sl = new THREE.SpotLight('#dfeaff', 12000, 0, 0.5, 0.6, 2); this.scene.add(sl); this.scene.add(sl.target); this.headLamp = sl;
+      // (2026-11-23: wider and with a flatter falloff – decay 1.7 instead of 2 – so that walls and rock borders 150 m ahead still catch light)
+      const sl = new THREE.SpotLight('#dfeaff', HEAD_LAMP, 0, 0.62, 0.7, 1.7); this.scene.add(sl); this.scene.add(sl.target); this.headLamp = sl;
     }
 
     this.post = new PostFX(r, this.scene, this.camera, gfx, { rain: (gfx.weatherFx ?? 2) > 0 ? build.maxRain : 0, flare: build.flare });
@@ -793,9 +797,9 @@ export class Game {
     if (sl) {
       const fx = Math.sin(pl.yaw), fz = Math.cos(pl.yaw), rx = -fz, rz = fx, st = pl.steer * 9; // beam leads into the corner
       sl.position.set(pl.pos.x + fx * 6, pl.pos.y + 1.6, pl.pos.z + fz * 6);
-      sl.target.position.set(pl.pos.x + fx * 36 + rx * st, Math.min(pl.groundY, pl.pos.y - 2.5) - pl.pitch * 14, pl.pos.z + fz * 36 + rz * st);
+      sl.target.position.set(pl.pos.x + fx * 60 + rx * st * 1.6, Math.min(pl.groundY, pl.pos.y - 2.5) - pl.pitch * 22, pl.pos.z + fz * 60 + rz * st * 1.6);
       const hurt = Math.min(pl.hpL, pl.hpR) < 35 ? (Math.sin(this.clock * 47) > 0.2 ? 1 : 0.35) : 1;
-      sl.intensity = pl.dead > 0 ? 0 : 12000 * lv * (pl.boosting ? 1.2 : 1) * hurt;
+      sl.intensity = pl.dead > 0 ? 0 : HEAD_LAMP * lv * (pl.boosting ? 1.2 : 1) * hurt;
     }
   }
 

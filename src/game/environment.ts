@@ -71,6 +71,9 @@ export interface EnvFx {
   dark: number;        // 0..1 how dark the sky is (pods switch their lights on above ~0.45)
   amb: number;         // 0..1 density of the ambient weather particles
 }
+/** Floors for a night in bad weather (see `resolveOne`): moonlight, sRGB luminance of sky fill / ground fill / horizon / fog, the most
+ *  the fog may thicken (× the world's own density), exposure factor. A clear night has moon 1.15 and a fill of about 0.5. */
+export const NIGHT_WX = { moon: 0.9, fill: 0.62, ground: 0.2, horizon: 0.16, fog: 0.13, dens: 1.8, exp: 1.22 };
 export interface EnvState { theme: ThemeDef; fx: EnvFx }
 /** What must exist at build time so the whole timeline can play without recompiling anything. */
 export interface EnvBuild { rainRoad: boolean; maxRain: number; bolt: boolean; flare: boolean; lights: boolean; stars: boolean; wind: number; ambMax: number; envTheme: ThemeDef; dynamic: boolean }
@@ -166,6 +169,21 @@ function resolveOne(base: ThemeDef, tod: Tod, key: WxKey): EnvState {
   if (night) fx.flare *= 0.4;
   fx.dark = Math.max(0, Math.min(1, 1 - (lumS(rgb(th.skyTop)) + lumS(rgb(th.skyHorizon))) * 0.5 / 0.4));
   fx.heat = clim ? engineHeat(base.id, wx, k, fx.dark) : 1;
+  // 2026-11-23 – a night in bad weather was the product of two darkenings (night × overcast): moonlight 0.30 instead of 1.15, the
+  // sky fill a quarter lower, fog and sky black. Beyond the patch of the head lamp nothing could be read – reported by the user as
+  // "extrem schlechte Sicht bei Nacht + Gewitter". Bad weather at night now changes the MOOD (colder, flatter, hazier), not the amount
+  // of light: the moon keeps most of its light behind the clouds, the cloud deck glows a little (fill light and horizon), fog is a dark
+  // blue haze instead of black, and the eye adapts (exposure).
+  // (After `fx.dark` and `fx.heat`: how dark the sky IS – lights on, cooler engines – does not change with it.)
+  if (night && wx !== 'clear') {
+    const up = (c: string, min: number, to: string) => { let out = c; for (let i = 0; i < 12 && lumS(rgb(out)) < min; i++) out = mixHex(out, to, 0.18); return out; };
+    th.sunIntensity = Math.max(th.sunIntensity, NIGHT_WX.moon);
+    th.hemiSky = up(th.hemiSky, NIGHT_WX.fill, '#b9cbff'); th.hemiGround = up(th.hemiGround, NIGHT_WX.ground, '#5b6680');
+    th.skyHorizon = up(th.skyHorizon, NIGHT_WX.horizon, '#5a6e9c'); th.fogColor = up(th.fogColor, NIGHT_WX.fog, '#5a6e9c');
+    th.fogDensity = Math.min(th.fogDensity, base.fogDensity * NIGHT_WX.dens);
+    th.exposure *= NIGHT_WX.exp;
+    if (fx.gust === 'mist') { fx.gustColor = th.fogColor; fx.gustAmt *= 0.65; } // rain squalls: veils of that haze, and thinner – at night they were black curtains
+  }
   return { theme: th, fx };
 }
 

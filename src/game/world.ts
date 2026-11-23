@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { hasBuiltWall, type ThemeDef } from './data';
+import { hasBuiltWall, THEMES, type ThemeDef } from './data';
 import type { GfxSettings } from './settings';
 import { detailKindForTheme, generateTexture, generateTextures, type TexSpec } from './textures';
 import { caveMaterial, surfaceMaterial, type CaveOpts, type SurfaceOpts } from './materials';
@@ -162,8 +162,13 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   // In a bright one the fill light of the sky already lights the rock, the lamps only add a little: CAVE_LIGHT[1] – with the dark
   // amount the jungle cave glowed lime green, three to five times brighter than the land outside. Measure = the luminance of the
   // hemisphere light's ground colour (linear), that is what a roof receives: lava 0.012, moon 0.007, crystal 0.03 | jungle 0.083 and above.
-  const gLum = (() => { const c = new THREE.Color(theme.hemiGround); return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; })();
-  const gT = Math.min(1, gLum / 0.08), caveGain = CAVE_LIGHT[0] + (CAVE_LIGHT[1] - CAVE_LIGHT[0]) * gT * gT * (3 - 2 * gT);
+  // 2026-11-23: measured on the WORLD (`THEMES`), not on the theme of this race – at night every world has a dark ground colour, and
+  // the jungle tunnel glowed lime green again (amount 1.5 instead of 0.12). The night only adds a little: without the fill light of
+  // the sky the lamps show more, up to three times the day amount (jungle at night: 0.36).
+  const lumOf = (h: string) => { const c = new THREE.Color(h); return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; };
+  const gLum = lumOf((THEMES[theme.id] ?? theme).hemiGround), gNow = lumOf(theme.hemiGround);
+  const gT = Math.min(1, gLum / 0.08), dayGain = CAVE_LIGHT[0] + (CAVE_LIGHT[1] - CAVE_LIGHT[0]) * gT * gT * (3 - 2 * gT);
+  const caveGain = Math.min(CAVE_LIGHT[0], dayGain * (1 + 2 * Math.max(0, 1 - gNow / Math.max(1e-4, gLum))));
   const lampLight = new THREE.Color(theme.barrierColor).lerp(new THREE.Color('#ffffff'), 0.5).multiplyScalar(caveGain);
   const tubeWall: THREE.Material | null = builtWall ? wallMat.clone() : null;
   if (tubeWall) { tubeWall.side = THREE.DoubleSide; tubeWall.name = 'tunnelWall'; disposables.push(tubeWall); }

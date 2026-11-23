@@ -52,9 +52,7 @@ Nur offene Punkte, nach Thema. Erledigtes steht im Verlauf: `docs/verlauf/`, je 
 ## 9. Vom Nutzer am 2026-11-23 bestellt (nach der Probefahrt) – was davon noch offen ist
 Auftrag und Entscheidungen: [Protokoll](docs/verlauf/2026-11-23-nach-der-probefahrt.md). Reihenfolge: Fehler → Verbesserungen → Streckenanpassungen → TODO 2, 5, 8. Nach jedem fertigen Block wird gepusht.
 
-**Fehler**
-- [ ] Extrem schlechte Sicht bei Nacht + Gewitter
-- [ ] Bodentexturen haben Streifen wie Reifenspuren (besonders auf Schnee)
+**Fehler** – alle drei behoben (Protokoll), warten auf die Probefahrt des Nutzers
 
 **Verbesserungen**
 - [ ] Kein Fallschaden bei sanfter/normaler Landung
