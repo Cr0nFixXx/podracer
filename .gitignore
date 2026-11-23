@@ -5,3 +5,4 @@ build/
 tools/harness/out/
 tools/ci/out/
 .agents/skills/
+.git.kaputt-*/

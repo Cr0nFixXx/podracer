@@ -86,10 +86,12 @@ Was offen bleibt, steht in `TODO.md` (Abschnitte 5 und 8). Die Regeln, die darau
 - Ausgerundete Knicke: Boonta und Mos Espa angesehen, vier Strecken nur gemessen.
 - Aquilaris: die Oberkanten der Stadtmauern sind moosgrün getönt, von oben ein breites grünes Kachelband – nicht angefasst (Frage in `TODO.md` Abschnitt 5).
 - Hitzebalken: der überhitzte Zustand (Marke „BEREIT", die Klima-Anzeige ist dann ausgeblendet) und „ÜBERZOGEN" sind nicht im Bild gesehen.
-- Der optionale WebGPU-Job der GitHub-Action ist noch nie gelaufen; auf GitHub liegt von dieser Runde nichts.
+- Der optionale WebGPU-Job der GitHub-Action ist noch nie gelaufen.
 
 ## Git
-- Commits auf `dev`, nicht gepusht (der Nutzer hat keinen Push verlangt): `fec860b` Übergänge und Felsreihen · `a97f7c8` Felswände · `d7f9758` Schnee-Fotosets · `e147742` Falten · `765c551` Höhlen-Optik · `a7d18bd` Farne · `64fcf6d` Steine, `pick:` · `1ff3374` Fels ist Fels · `5886fec` Fels nach der steilsten Fläche · `af8d8f9` Buchten · `e702794` Kabel im Tunnel · `63949ae` Hitzebalken · der Commit mit diesem Protokoll.
+- Commits auf `dev`: `fec860b` Übergänge und Felsreihen · `a97f7c8` Felswände · `d7f9758` Schnee-Fotosets · `e147742` Falten · `765c551` Höhlen-Optik · `a7d18bd` Farne · `64fcf6d` Steine, `pick:` · `1ff3374` Fels ist Fels · `5886fec` Fels nach der steilsten Fläche · `af8d8f9` Buchten · `e702794` Kabel im Tunnel · `63949ae` Hitzebalken · `ec07be9` dieses Protokoll.
+- **Gepusht am 2026-11-23 auf Wunsch des Nutzers** („push"): `dev` auf GitHub `ea70d0a` → `ec07be9` (21 Commits, auch die der Runde vom 2026-11-22). Die GitHub-Action für `ec07be9` lief grün (72 s: `npm ci`, `npm run check`, beide Builds auf einem frischen Checkout).
+- **Vor dem Push war die Sandbox zurückgesetzt, und git meldete „not a git repository"** – es fehlte nur der Ordner `.git/refs` (nach `git gc` leer, leere Ordner überleben den Reset nicht); alle 21 Commits waren da. `tools/restore-git.sh` hätte in diesem Zustand `.git` gelöscht und von GitHub geholt – die 21 Commits wären weg gewesen. Das Skript repariert den Fall jetzt und löscht nie mehr (nachgestellt mit einem nur lokalen Commit: altes Skript – Commit weg, neues – Commit da); Regel in `docs/regeln/git-sandbox.md`. Eigener Commit nach dem Push, ebenfalls gepusht.
 
 ## Erledigt (aus dem Auftrag und aus `TODO.md`)
 - [x] Abschnitt 5 – **HQ-Farne:** Wedel als Alpha-Karten mit Textur

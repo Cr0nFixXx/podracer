@@ -186,7 +186,7 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 
 Alle Änderungen sind committet (Remote `origin` = `github.com/Cr0nFixXx/podracer`). Session 20 besteht aus zwei Teilen: **Strecken** (Branch `B`, per Pull Request #1 in `main`) und **Pods** (Branch `new_pods`, per Pull Request #2 in `main`). `main` enthält beide; die Weiterarbeit liegt im Zweig `dev`.
 
-**GitHub ist die Sicherung.** Den Stand holen: `git clone https://github.com/Cr0nFixXx/podracer.git` (`main` = gemergter Stand, `dev` = Weiterarbeit). Fehlt im Arbeitsordner nur der Ordner `.git`: `npm run restore-git` holt ihn von GitHub (Zweig `dev`) – nie gepushte Commits sind dann weg, lokale Änderungen erscheinen als geändert.
+**GitHub ist die Sicherung.** Den Stand holen: `git clone https://github.com/Cr0nFixXx/podracer.git` (`main` = gemergter Stand, `dev` = Weiterarbeit). Fehlt im Arbeitsordner nur der Ordner `.git`: `npm run restore-git` holt ihn von GitHub (Zweig `dev`) – nie gepushte Commits sind dann weg, lokale Änderungen erscheinen als geändert. Ist `.git` noch da und nur beschädigt, repariert das Skript, was es kann, und löscht nichts (ein unbrauchbarer Ordner wird nach `.git.kaputt-<Zeit>` verschoben).
 
 **Der versteckte Ordner `.git` fehlt im Download des Arbeitsordners.** Früher lag er deshalb als Textkopie im Repo (`.archiv/repo-sicherung/`, erneuert von `npm run save`). Diese Kopie stand auf Session 19 und ist seit dem 2026-11-22 gelöscht. Die Git-Historie behält sie: `git show ee3dc4b:.archiv/repo-sicherung/podracer-git.tar.gz.b64.txt`.
 

@@ -88,7 +88,7 @@ Der Rest sind die Falten der Fahrbahn (`TODO.md` Abschnitt 5) und zwei Becken-R�
 - Die Anzeigen zum Klima sind im Browser angesehen: das Renn-Menü passte nicht (siehe „Geprüft"), die Anzeige am Hitzebalken brach in zwei Zeilen um – beides behoben.
 
 ## Git
-- Commits auf `dev`, nicht gepusht (der Nutzer hat diesmal keinen Push verlangt): `5a21dc9` Skills · `0c03a22` Rückwärtslenkung · `7690d96` Gabelungen · `e3f739c` Klima und Boost · `f97e425` Doku · `3a809b5` Schneedecke · `e675bfb` Renn-Menü (Boost-Hitze neben „Wetter") · `cadfc78` Felsgrenzen.
+- Commits auf `dev` (am 2026-11-23 auf Wunsch des Nutzers gepusht, zusammen mit der Folgerunde): `5a21dc9` Skills · `0c03a22` Rückwärtslenkung · `7690d96` Gabelungen · `e3f739c` Klima und Boost · `f97e425` Doku · `3a809b5` Schneedecke · `e675bfb` Renn-Menü (Boost-Hitze neben „Wetter") · `cadfc78` Felsgrenzen.
 
 ## Erledigt (aus dem Auftrag)
 - [x] Skill-Set installieren → ohne Ticket-Skills eingerichtet
