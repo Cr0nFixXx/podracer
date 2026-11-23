@@ -195,6 +195,8 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
   - Boost-Alarm: Lautstärke und Klang neben den Triebwerken (`boostAlarmVoice` in `src/game/audio.ts`).
   - Controller im Menü: mit dem echten Gamepad. Meldet der Browser es nicht als „Standard"-Layout, zählt das Steuerkreuz nicht (der linke Stick geht immer).
   - Hitzeschild und Linsentropfen: nur als Standbild gesehen, nicht in Bewegung.
+  - Intro-Flug: in Bewegung auf echter Grafikkarte (ruckelt das Nachladen der Landschaft bei 420 m/s?).
+  - Lavasee und Lavakruste: Helligkeit des Sees und der Fugen auf dem echten Bildschirm; das Fließen des Sees (nur im Stand zu sehen).
   - Reset-Taste: an echten Problemstellen (Schlucht, Röhre, Gabelung) nicht von Hand ausprobiert; die Prüfung setzt auf fünf Strecken von einer geraden Stelle aus zurück.
 
 ## Git
@@ -215,6 +217,8 @@ Zweig `dev`. Jeder Punkt ein eigener Commit; nach jedem Block gepusht.
 | 2 Verbesserungen | `c5e0b07` | Reset-Taste |
 | 2 Verbesserungen | `d950095` | Controller-Bedienung in allen Menüs |
 | nebenbei | `c3234a3` | Hauptmenü: Titel „PODRACER" vollständig |
-| 3 Strecken | `ba3da24` | Intro-Flug über die Strecke bis „Rennen starten" – lokal, wird mit Block 3 gepusht |
+| 3 Strecken | `ba3da24` | Intro-Flug über die Strecke bis „Rennen starten" – gepusht am 2026-11-23 auf Wunsch des Nutzers, nicht erst am Ende des Blocks |
+| Nachmeldung | `93b342e` | Lava: See und Kruste getauscht |
+| Nachmeldung | `6d1ccc9` | Test: Intro-Flug auch auf WebGPU und mit echtem Mausklick |
 
 Block 1 wurde am 2026-11-23 gepusht (`ee20aa5..b4f1266`); der Lauf der GitHub-Action dafür war grün. Block 2 wurde am 2026-11-23 gepusht (`b4f1266..55713c7`); der Lauf der GitHub-Action für `55713c7` war grün (`npm ci`, `npm run check`, beide Builds). Der erste Versuch scheiterte: der Zugangstoken des Nutzers lag in der Sitzung nicht mehr vor (er wird nirgends gespeichert – Regel in `docs/regeln/git-sandbox.md`); der Nutzer hat ihn auf Nachfrage neu gegeben. Block 3 und 4 sind offen (`TODO.md` Abschnitt 9).
