@@ -19,7 +19,7 @@ import { engineKit, tuneTiers, NO_KIT } from '../../src/game/podKitParts';
 import { ciRoster } from './roster';
 import { applyDamage, bodyToWorld, collidePods, hullWorld, podParams, respawn, stepPod, vaultOver, worldToBody, FX_NONE, HOVER, VAULT_CLAMP, type PodState } from '../../src/game/physics';
 import { DAMAGE_RULES, damageModel, lostMessage, partLamps, partsFx, zoneFactor, type DamageZone } from '../../src/game/podDamage';
-import { buildTrack, frameAt, tunnelCeiling, DS, TUNNEL_SHOULDER, type Path, type Sample, type TrackData } from '../../src/game/trackBuilder';
+import { buildTrack, frameAt, tunnelCeiling, baySameStretch, DS, TUNNEL_SHOULDER, type Path, type Sample, type TrackData } from '../../src/game/trackBuilder';
 import { defaultProfile, effectiveStats, loadProfile, saveProfile, CAMERA_NAMES, MAX_LAPS, PRESETS, type GfxSettings } from '../../src/game/settings';
 
 let failed = 0, passed = 0;
@@ -949,15 +949,25 @@ test('steering: reversing, stick right swings the TAIL to the right – the nose
 
 // ---- forks: the mouth and the reunion of a shortcut or a cave branch (2026-11-22: user report "Höhlen/Abkürzungen haben am Anfang
 // Geometriefehler und sind teilweise versperrt") ----
-/** How far the terrain – as the mesh draws it: the field sampled every `cell` metres, each quad split as `buildTerrain` splits it –
- *  stands above the road at the fork mouths and reunions of a track. Returns [highest excess in metres, where]. */
+/** The terrain of a track as the mesh draws it: the field sampled every `cell` metres, each quad split as `buildTerrain` splits it.
+ *  One per track and cell size (building the field is the expensive part). */
+const terrainMeshes = new Map<string, (x: number, z: number) => number>();
+function terrainMeshOf(id: string, cell: number): (x: number, z: number) => number {
+  const key = id + '/' + cell; let mesh = terrainMeshes.get(key);
+  if (!mesh) {
+    const td = trackOf(id), tf = makeTerrainField(td, THEMES[TRACKS.find(t => t.id === id)!.theme], cell), memo = new Map<number, number>();
+    const H = (i: number, j: number) => { const k = i * 200003 + j; let v = memo.get(k); if (v === undefined) { v = tf.heightAt(i * cell, j * cell); memo.set(k, v); } return v; };
+    mesh = (x, z) => {
+      const fi = x / cell, fj = z / cell, i = Math.floor(fi), j = Math.floor(fj), u = fi - i, v = fj - j, a = H(i, j), b = H(i, j + 1), c = H(i + 1, j + 1), d = H(i + 1, j);
+      return u + v <= 1 ? a + u * (d - a) + v * (b - a) : c + (1 - u) * (b - c) + (1 - v) * (d - c);
+    };
+    terrainMeshes.set(key, mesh);
+  }
+  return mesh;
+}
+/** How far that terrain mesh stands above the road at the fork mouths and reunions of a track. Returns [highest excess in metres, where]. */
 function terrainOverRoadAtForks(id: string, cell: number): [number, string] {
-  const td = trackOf(id), tf = makeTerrainField(td, THEMES[TRACKS.find(t => t.id === id)!.theme], cell), memo = new Map<number, number>();
-  const H = (i: number, j: number) => { const k = i * 200003 + j; let v = memo.get(k); if (v === undefined) { v = tf.heightAt(i * cell, j * cell); memo.set(k, v); } return v; };
-  const mesh = (x: number, z: number) => {
-    const fi = x / cell, fj = z / cell, i = Math.floor(fi), j = Math.floor(fj), u = fi - i, v = fj - j, a = H(i, j), b = H(i, j + 1), c = H(i + 1, j + 1), d = H(i + 1, j);
-    return u + v <= 1 ? a + u * (d - a) + v * (b - a) : c + (1 - u) * (b - c) + (1 - v) * (d - c);
-  };
+  const td = trackOf(id), mesh = terrainMeshOf(id, cell);
   let worst = 0, where = '';
   const scan = (p: Path, i: number) => {
     const s = p.samples[i]; if (!s || s.gap || s.bridge || s.zeroG || s.lake) return;
@@ -1227,6 +1237,71 @@ test('terrain: every face of the terrain mesh is at least as rocky in all three 
   }
   ok(steep > 40, `only ${steep} steep faces among ${faces} – the check saw no cliff`);
   eq(bad.length, 0, `faces steeper than their rock weight: ${bad.join(' · ')} –`);
+});
+
+// ---- open sections: the width breathes (2026-11-23) ----
+// A rock border that follows the road at a constant distance is still a fence. Where both sides are rock borders the road opens into
+// bays (`Sample.bay` = extra half width) and closes again.
+test('open sections: the road opens into bays – a good part of the length between two rock borders is wider than designed', () => {
+  let both = 0, wide = 0, tracksWithBay = 0; const lines: string[] = [];
+  for (const def of TRACKS) {
+    const S = trackOf(def.id).main.samples; let b = 0, w = 0, mx = 0;
+    for (const q of S) { if (q.rockL && q.rockR) b++; if ((q.bay ?? 0) > 2) w++; mx = Math.max(mx, q.bay ?? 0); }
+    both += b; wide += w; if (mx >= 5) tracksWithBay++;
+    lines.push(`${def.id} ${w}/${b} max ${mx.toFixed(1)}`);
+  }
+  // (measured on 2026-11-23: 47 % of that length, a bay of 9 to 18 m on all 13 tracks)
+  ok(wide >= 0.3 * both, `only ${wide} of ${both} samples between two rock borders are more than 2 m wider per side (${lines.join(' · ')})`);
+  ok(tracksWithBay >= 11, `only ${tracksWithBay} of ${TRACKS.length} tracks have a bay of 5 m or more (${lines.join(' · ')})`);
+});
+test('open sections: a bay keeps its distance – from decks, basins, tunnels, forks and walls, from tight and banked bends and from every other piece of road', () => {
+  const bad: string[] = [], note = (m: string) => { if (bad.length < 5) bad.push(m); };
+  for (const def of TRACKS) {
+    const td = trackOf(def.id), S = td.main.samples, n = S.length, closed = def.type === 'circuit';
+    const at = (i: number) => closed ? S[((i % n) + n) % n] : i < 0 || i >= n ? undefined : S[i];
+    for (let i = 0; i < n; i++) {
+      const q = S[i], b = q.bay ?? 0; if (b <= 0) continue;
+      // nothing but rock borders on both sides within 8 samples (the rock row eases down to a kerb over these)
+      for (let k = -8; k <= 8; k++) { const o = at(i + k); if (!o || !(o.rockL && o.rockR)) { note(`${def.id} ${i}: bay of ${b.toFixed(1)} m ${Math.abs(k)} samples from the end of the rock borders`); break; } }
+      // the border turns gently: at most 0.3 m per sample (15 %)
+      const nx = at(i + 1); if (nx && Math.abs((nx.bay ?? 0) - b) > 0.31) note(`${def.id} ${i}: bay changes by ${Math.abs((nx.bay ?? 0) - b).toFixed(2)} m per sample`);
+      // no bay in a tight bend
+      if (b > 0.5 && Math.abs(q.curv) * q.hw > 0.62) note(`${def.id} ${i}: half width ${q.hw.toFixed(0)} m is ${(Math.abs(q.curv) * q.hw).toFixed(2)} × the bend radius`);
+      // a banked bend is a tilted plane: the bay may carry the border at most 1.5 m further up or down
+      if (b * Math.abs(q.bank) > 1.52) note(`${def.id} ${i}: a bay of ${b.toFixed(1)} m on a bank of ${q.bank.toFixed(3)} moves the border by ${(b * Math.abs(q.bank)).toFixed(1)} m in height`);
+    }
+    // 20 m between the border of a bay and any other piece of road: a branch, or the main road where it runs in another direction
+    // or lies more than 5 half widths + 90 m further along (`baySameStretch`)
+    for (let i = 0; i < n; i += 4) {
+      const q = S[i]; if ((q.bay ?? 0) <= 0.5) continue;
+      const same = baySameStretch(q.hw - q.bay!);
+      for (const pa of td.paths) for (let j = 0; j < pa.samples.length; j += 2) {
+        const o = pa.samples[j];
+        if (pa === td.main) { const d = Math.abs(i - j); if ((closed ? Math.min(d, n - d) : d) < same && q.tx * o.tx + q.tz * o.tz > 0.5) continue; }
+        const gap = Math.hypot(q.x - o.x, q.z - o.z) - q.hw - o.hw;
+        if (gap < 20) { note(`${def.id} ${i}: ${gap.toFixed(0)} m to path ${pa.id} sample ${j}`); break; }
+      }
+    }
+  }
+  eq(bad.length, 0, `${bad.join(' · ')} –`);
+});
+
+// A banked bend is a tilted plane: a bay carries its border further up or down, and where the bank sets in the edge twists. Without
+// the limit `BAY_TILT` the 13.75 m mesh stood 0.5 m above the road edge in a bay of Boonta (samples 4384 – 4386).
+for (const id of ['boonta', 'frost', 'magma', 'oovo']) test(`open sections: the terrain stays below the road in every bay of ${id} (terrain mesh of 7 m and of 13.75 m)`, () => {
+  const td = trackOf(id), S = td.main.samples;
+  for (const cell of [7, 13.75]) {
+    const mesh = terrainMeshOf(id, cell); let worst = 0, where = '', n = 0;
+    for (let i = 0; i < S.length; i += 2) {
+      const s = S[i], b = s.bay ?? 0; if (b <= 0.5) continue; n++;
+      for (const side of [-1, 1]) for (let d = 0.5; d <= b + 2; d += 1.5) {
+        const lat = side * (s.hw - d), over = mesh(s.x + s.rx * lat, s.z + s.rz * lat) - (s.y + s.ramp - lat * s.bank);
+        if (over > worst) { worst = over; where = `sample ${i} lat ${lat.toFixed(0)}`; }
+      }
+    }
+    ok(n > 100, `${id}: only ${n} samples with a bay`);
+    ok(worst < 0.3, `${cell} m cells: terrain ${worst.toFixed(2)} m above the road at ${where}`);
+  }
 });
 
 console.log(failed ? `\n${failed} unit check(s) FAILED, ${passed} passed.` : `All ${passed} unit checks passed.`);

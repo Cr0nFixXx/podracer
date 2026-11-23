@@ -44,6 +44,9 @@ export interface Sample {
   /** 2026-11-22: the wall on this side is a natural rock border (a low, uneven row of rock where a guard rail used to stand: every
    *  passage over natural ground) – solid like a canyon wall up to its top, and a pod that flies higher is only pushed back */
   rockL?: boolean; rockR?: boolean;
+  /** 2026-11-23: extra half width (m) of a bay – where both sides are rock borders the road opens and closes again instead of
+   *  keeping one width. Already contained in `hw`; main road only. */
+  bay?: number;
   roof: number; // tunnel ceiling height above the road (0 = open sky)
   tun?: number; // tunnel kind: 1 = standard (drivable deck), 2 = underwater tube (Aquilaris), 3 = cave, 4 = underpass tunnel beneath bridge
   caveW?: number; // extra lateral cavern width per side inside widened cave chambers (carries cave-floor mesh)
@@ -880,6 +883,75 @@ export function buildTrack(def: TrackDef): TrackData {
       }
     }
   }
+  // 2026-11-23 – open sections, the width breathes. A rock border that follows the road at a constant distance is still a fence: the
+  // road stays a band of one width. Where BOTH sides are rock borders the road now opens into bays and closes again – per side up to
+  // `BAY_GAIN` × the half width, at most `BAY_MAX` metres, by a slow noise along the track. `Sample.bay` holds the extra half width
+  // (already added to `hw`). Only ever WIDER than designed: the racing line, the reference speeds and every gate stay valid. A bay
+  //  - is 0 within 8 samples of anything else (deck, basin, tunnel, bridge, fork mouth, canyon wall – the rock row eases down to a
+  //    kerb over these 8) and grows by at most `BAY_SLOPE` per sample from there (15 %: the border turns by 8.5° at most);
+  //  - keeps the half width below 0.6 × the bend radius (the fold limit of the layout is 0.9 – no bay in a tight bend);
+  //  - lifts or lowers the border by at most `BAY_TILT` metres: a banked bend is a tilted plane, every metre of bay carries its
+  //    edge further up or down (bank 0.196 × 18 m = 3.5 m, and where the bank sets in the edge twists by that within 20 m – the
+  //    coarse terrain mesh of "Niedrig" could not follow: 0.5 m of ground above the road edge on Boonta);
+  //  - leaves `BAY_GAP` metres between its border and every other piece of road (hairpin legs, parallel stretches, branches,
+  //    crossings); two stretches that face each other share the room. "Other" = a branch, or the main road where it runs in
+  //    another direction (more than 60° off) or lies more than 5 half widths + 90 m further along – the road just ahead and behind
+  //    is the same stretch (on these 60–90 m wide roads a fixed 120 m counted the road's own continuation as a neighbour and cut
+  //    most bays).
+  // `NO_BAYS` (global, CI) = one width as before.
+  if (!(globalThis as { NO_ROCK_BORDERS?: boolean }).NO_ROCK_BORDERS && !(globalThis as { NO_BAYS?: boolean }).NO_BAYS) {
+    const n = samples.length, BAY_GAIN = 0.55, BAY_MAX = 18, BAY_SLOPE = 0.3, BAY_GAP = 24, BAY_TILT = 1.5;
+    const W = (i: number) => closed ? ((i % n) + n) % n : Math.max(0, Math.min(n - 1, i)), inside = (i: number) => closed || (i >= 0 && i < n);
+    const lim = new Float64Array(n), seed = (hashStr(def.id) % 997) * 0.37;
+    // (1) the wish: wide bays by a slow noise (about a quarter of the length stays as designed, about a quarter gets the full bay)
+    // and, so that the stretches between them are no ruler lines either, small coves of up to `BAY_COVE` metres every 50 – 100 m
+    const BAY_COVE = 5, ss = (v: number) => { const t = Math.max(0, Math.min(1, v)); return t * t * (3 - 2 * t); };
+    for (let i = 0; i < n; i++) {
+      const q = samples[i]; if (!(q.rockL && q.rockR)) continue;
+      const wide = Math.min(BAY_MAX, q.hw * BAY_GAIN * ss((fbm1(q.s * 0.0045 + seed) - 0.36) / 0.24));
+      const cove = Math.min(BAY_COVE, q.hw * 0.16) * ss((fbm1(q.s * 0.019 + seed * 1.7 + 40.3) - 0.42) / 0.2);
+      lim[i] = Math.max(wide, cove);
+    }
+    // (2) no bay in a tight bend, a small one in a banked bend
+    for (let i = 0; i < n; i++) {
+      if (lim[i] <= 0) continue;
+      let room = 1e9; for (let k = -14; k <= 14; k += 2) { const q = samples[W(i + k)]; room = Math.min(room, 0.6 / Math.max(1e-5, Math.abs(q.curv)) - q.hw, BAY_TILT / Math.max(1e-4, Math.abs(q.bank))); }
+      lim[i] = Math.max(0, Math.min(lim[i], room));
+    }
+    // (3) room to every other piece of road (half of it: the stretch opposite may open a bay as well)
+    {
+      const cell = 52, grid = new Map<number, { q: Sample; main: boolean; j: number }[]>(), key = (cx: number, cz: number) => cx * 100003 + cz;
+      for (const pa of paths) for (let j = 0; j < pa.samples.length; j += 2) {
+        const q = pa.samples[j], k = key(Math.floor(q.x / cell), Math.floor(q.z / cell)); let l = grid.get(k); if (!l) { l = []; grid.set(k, l); }
+        l.push({ q, main: pa === main, j });
+      }
+      for (let i = 0; i < n; i++) {
+        if (lim[i] <= 0) continue;
+        const a = samples[i], cx = Math.floor(a.x / cell), cz = Math.floor(a.z / cell), same = baySameStretch(a.hw); let room = 1e9;
+        for (let gx = cx - 3; gx <= cx + 3; gx++) for (let gz = cz - 3; gz <= cz + 3; gz++) {
+          const l = grid.get(key(gx, gz)); if (!l) continue;
+          for (const o of l) {
+            if (o.main && idxDist(i, o.j) < same && a.tx * o.q.tx + a.tz * o.q.tz > 0.5) continue;
+            room = Math.min(room, (Math.hypot(a.x - o.q.x, a.z - o.q.z) - a.hw - o.q.hw - BAY_GAP - 2) / 2); // (− 2: only every second sample is in the grid)
+          }
+        }
+        lim[i] = Math.max(0, Math.min(lim[i], room));
+      }
+    }
+    // (4) shape: erode by 16 samples – 8 for the kerb zone at the end of a rock border plus 8 that the smoothing below reaches, so
+    // that it can never lift a sample above its own limit or carry a bay into the kerb zone –, limit the slope, round off
+    const bay = new Float64Array(n);
+    for (let i = 0; i < n; i++) { let m = lim[i]; for (let k = 1; k <= 16 && m > 0; k++) m = Math.min(m, inside(i - k) ? lim[W(i - k)] : 0, inside(i + k) ? lim[W(i + k)] : 0); bay[i] = m; }
+    for (let pass = 0; pass < 2; pass++) { // (twice: a circuit is limited across its seam as well)
+      for (let i = 0; i < n; i++) if (inside(i - 1)) bay[i] = Math.min(bay[i], bay[W(i - 1)] + BAY_SLOPE);
+      for (let i = n - 1; i >= 0; i--) if (inside(i + 1)) bay[i] = Math.min(bay[i], bay[W(i + 1)] + BAY_SLOPE);
+    }
+    for (let pass = 0; pass < 2; pass++) {
+      const src = Float64Array.from(bay);
+      for (let i = 0; i < n; i++) { let sum = 0; for (let k = -4; k <= 4; k++) sum += inside(i + k) ? src[W(i + k)] : 0; bay[i] = sum / 9; }
+    }
+    for (let i = 0; i < n; i++) if (bay[i] > 0.01) { samples[i].bay = bay[i]; samples[i].hw += bay[i]; }
+  }
   // 2026-11-22: the canyon wall of the main road used to stop at its full height right beside a fork mouth (a rock slab of up to 50 m
   // stood beside the entrance). Now it comes down to a 1.2 m rock kerb over the 16 samples before the opening and rises again behind it –
   // as the walls of the branch roads always did (`applyShortcutWalls`).
@@ -1119,4 +1191,7 @@ export function bridgeSwing(sp: SetPiece, time: number) {
 export function bridgeWarn(sp: SetPiece, time: number) { return cycPhase(time, sp.phase, sp.period) > 0.88; }
 function h1(i: number) { const s = Math.sin(i * 127.1 + 31.7) * 43758.5453; return s - Math.floor(s); }
 function vn1(x: number) { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return h1(i) + (h1(i + 1) - h1(i)) * u; }
+/** How many samples further along the main road still count as the same stretch for a bay (see `Sample.bay`): 5 designed half
+ *  widths + 90 m – if the road runs in about the same direction there. */
+export const baySameStretch = (designedHw: number) => Math.max(60, 2.5 * designedHw + 45);
 function fbm1(x: number) { return (vn1(x) * 0.5 + vn1(x * 2.03 + 5.2) * 0.25 + vn1(x * 4.1 + 1.7) * 0.125) / 0.875; }

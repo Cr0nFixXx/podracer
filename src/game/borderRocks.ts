@@ -87,7 +87,9 @@ export function borderRocks(td: TrackData, reach: RockReach = () => 1): BorderRo
           }
           return worst;
         };
-        const size = (h: number) => { const top = Math.max(1, h * (0.82 + rnd() * 0.3)); return { top, r: Math.min(6, Math.max(1.5, top * (0.8 + rnd() * 0.4))) }; };
+        // a rock's own two random numbers (height factor, girth) and its size beside a border of height h
+        const draw = () => ({ fT: 0.82 + rnd() * 0.3, fR: 0.8 + rnd() * 0.4 });
+        const sized = (h: number, f: { fT: number; fR: number }) => { const top = Math.max(1, h * f.fT); return { top, r: Math.min(6, Math.max(1.5, top * f.fR)) }; };
         const put = (u: number, r: number, top: number, out2: number, back: boolean) => {
           const p = at(u), yaw = rnd() * Math.PI * 2, variant = Math.floor(rnd() * ROCK_VARIANTS) % ROCK_VARIANTS;
           // direction towards the road in the rock's own frame (three.js: a rotation by `yaw` about +Y turns local (x, z) into
@@ -105,14 +107,17 @@ export function borderRocks(td: TrackData, reach: RockReach = () => 1): BorderRo
           }
           out.push({ path: path.id, run: runNo, side, at: p.idx, x: p.x + p.ox * off, z: p.z + p.oz * off, lat: p.wall + off, off, ox: p.ox, oz: p.oz, r, top, yaw, variant, back });
         };
-        // the row: every rock overlaps the one before it
-        let sz = size(at(0).h), u = sz.r * 0.45;
+        // The row: every rock overlaps the one before it. A rock is as tall as the border AT THE PLACE WHERE IT ENDS UP: its size sets
+        // its distance from the rock before it, so the place is estimated first and corrected twice. (Until 2026-11-23 the estimate
+        // was final: where the border height changes quickly a rock stood up to 2 m lower than the border the physics knows.)
+        const f0 = draw(); let sz = sized(at(0).h, f0); sz = sized(at(sz.r * 0.45).h, f0); let u = sz.r * 0.45;
         for (let guard = 0; guard < 20000; guard++) {
           put(u, sz.r, sz.top, 0, false);
           if (rnd() < 0.3) { const k = 0.42 + rnd() * 0.3; put(u + (rnd() * 1.4 - 0.7) * sz.r, sz.r * k, sz.top * (0.45 + rnd() * 0.4), sz.r * (0.75 + rnd() * 0.5), true); }
           if (u >= len - sz.r * 0.5) break;
-          const nx = size(at(u + sz.r * 1.3).h);
-          u = Math.min(len, u + (sz.r + nx.r) * (ROCK_OVERLAP - 0.09 + rnd() * 0.08)); sz = nx;
+          const f = draw(), step = ROCK_OVERLAP - 0.09 + rnd() * 0.08; let nx = sized(at(u + sz.r * 1.3).h, f);
+          for (let it = 0; it < 2; it++) nx = sized(at(Math.min(len, u + (sz.r + nx.r) * step)).h, f);
+          u = Math.min(len, u + (sz.r + nx.r) * step); sz = nx;
         }
         runNo++;
       }

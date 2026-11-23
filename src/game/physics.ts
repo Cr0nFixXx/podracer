@@ -867,8 +867,11 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
 
   // 1. Ideal racing line (apex anticipation + individual pilot offset)
   let cAvg = 0; for (let k = 10; k < 60; k += 5) cAvg += at(k).curv; cAvg /= 10;
-  let idealLat = -Math.sign(cAvg) * Math.min(0.58, Math.abs(cAvg) * 34) * t.hw * ai.skill + ai.lineOff * t.hw * 0.32;
-  idealLat += Math.sin(time * 0.4 + ai.noiseT) * (1 - ai.skill) * t.hw * 0.3;
+  // (The line follows the DESIGNED road: a bay (`Sample.bay`, 2026-11-23) is room to the side, not a reason to swing out – measured
+  //  with the full `hw` the rivals wove into every bay, up to 10 m sideways within 120 m. Evading and overtaking use the bay: `safeLim`.)
+  const lineHw = t.hw - (t.bay ?? 0);
+  let idealLat = -Math.sign(cAvg) * Math.min(0.58, Math.abs(cAvg) * 34) * lineHw * ai.skill + ai.lineOff * lineHw * 0.32;
+  idealLat += Math.sin(time * 0.4 + ai.noiseT) * (1 - ai.skill) * lineHw * 0.3;
 
   // Shortcut & branching-cave entry commitment (only at branch ENTRANCE, never at its exit merge!)
   let enteringShortcut = false, entrySide = 0, entryNear = false;

@@ -13,12 +13,13 @@ import { DAMAGE_RULES, damageModel } from '../../src/game/podDamage';
 
 if (process.env.NO_TUNNELS) (globalThis as { NO_TUNNELS?: boolean }).NO_TUNNELS = true;
 if (process.env.NO_EXPAND) (globalThis as { NO_EXPAND?: boolean }).NO_EXPAND = true; // old (un-expanded) layouts for A/B comparison
+if (process.env.NO_BAYS) (globalThis as { NO_BAYS?: boolean }).NO_BAYS = true; // one road width between rock borders, as before 2026-11-23 (A/B)
 // Schadensmodelle A/B: ARMOR=0 switches the Panzerzonen off, PARTS=0 the Bruchteile – both off must print the table from before Phase 5
 if (process.env.ARMOR === '0') DAMAGE_RULES.armor = false;
 if (process.env.PARTS === '0') DAMAGE_RULES.parts = false;
 const SECS = Number(process.env.SECS ?? 45), ONLY = process.env.TRACK, GRIP = Number(process.env.GRIP ?? 1); // GRIP=0.9 ≈ storm/snow weather
 const LIMIT = { deaths: 3, wall: 0.6, clear: 0.2, minSpeed: 18, divePct: 1.5 }; // divePct: share of AI frames holding "dive"
-let seed = 1234567; Math.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; // deterministic runs
+let seed = Number(process.env.SEED ?? 1234567); Math.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; // deterministic runs
 const diff = (Object.values(DIFFICULTIES) as { skill: number; speed: number }[])[1];
 let failed = 0;
 console.log('track         deaths  NaN  wallPen  minClear  avgSpeed  slowest  airMax  rolls  slides  dive%  smashed  startTouch  tunnels  result');
