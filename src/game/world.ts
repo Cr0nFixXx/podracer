@@ -589,7 +589,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   const landmarks = addLandmarks(td, theme, group, disposables, field, rng, landRock, props.emitters, smokes);
   progress(0.92, 'Belebe Landschaft …'); await yield_();
   const smoke = buildSmoke(smokes, theme, td, field, group, disposables, rng, waterY);
-  const cover = buildGroundCover(td, theme, gfx, field, waterY, rng, group, disposables);
+  const cover = buildGroundCover(td, theme, gfx, field, waterY, rng, group, disposables, wallTex);
   const life = buildLife(td, theme, field, waterY, rng, group, disposables, gfx.detail, landmarks);
 
   // ---- Session 20: Oovo IV orbits a banded gas giant – lit by the real sun (phase), always at the same place in the sky ----

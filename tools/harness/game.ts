@@ -7,6 +7,22 @@ import { stepPod } from '../../src/game/physics';
 if (!location.search.includes('nophoto')) void loadPhotoTextures();
 const div = document.createElement('div'); div.style.cssText = 'width:1280px;height:720px;position:fixed;left:0;top:0'; document.body.style.margin = '0'; document.body.appendChild(div);
 let g: Game | null = null; let cur = -1;
+// "Which mesh is that?" – the first visible mesh under a point of the picture (x, y: 0 … 1 from the top left). Used by `pdbg.mjs pick:`.
+(window as unknown as Record<string, unknown>).pick = (nx: number, ny: number) => {
+  const G = (window as unknown as { __podracer: { scene: THREE.Scene; camera: THREE.Camera } }).__podracer;
+  const rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(nx * 2 - 1, 1 - ny * 2), G.camera);
+  const shown = (o: THREE.Object3D | null) => { for (let a = o; a; a = a.parent) if (!a.visible) return false; return true; };
+  const h = rc.intersectObjects(G.scene.children, true).find(q => shown(q.object) && (q.object as THREE.Mesh).isMesh);
+  if (!h) return 'nothing';
+  const o = h.object as THREE.Mesh, m = (Array.isArray(o.material) ? o.material[0] : o.material) as THREE.Material, g = o.geometry;
+  const col = g.attributes.color as THREE.BufferAttribute | undefined, im = o as THREE.InstancedMesh, ic = new THREE.Color();
+  if (h.instanceId !== undefined && im.instanceColor) im.getColorAt(h.instanceId, ic);
+  const mm = m as unknown as { vertexColors?: boolean; alphaTestNode?: unknown; roughness?: number; color?: THREE.Color };
+  return `${o.type} name="${o.name}" material="${m?.name ?? ''}" (${m?.type}, vertexColors=${mm.vertexColors}, dither=${!!mm.alphaTestNode}, roughness=${mm.roughness}) geometry="${g.name}" `
+    + `attrs=${Object.keys(g.attributes).join('+')} verts=${g.attributes.position.count} radius=${g.boundingSphere?.radius.toFixed(2)} dist=${h.distance.toFixed(1)}m`
+    + (col ? ` vertexColour0=${[col.getX(0), col.getY(0), col.getZ(0)].map(v => v.toFixed(2)).join('/')}` : '')
+    + (h.instanceId !== undefined ? ` instance ${h.instanceId}/${im.count}` + (im.instanceColor ? ` instanceColour=${[ic.r, ic.g, ic.b].map(v => v.toFixed(2)).join('/')}` : '') : '');
+};
 (window as unknown as Record<string, unknown>).track = async (i: number, view: string) => {
   if (cur !== i) {
     g?.dispose(); cur = i;

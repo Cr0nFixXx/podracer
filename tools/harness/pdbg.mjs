@@ -13,6 +13,8 @@
 //   wire                terrain as wireframe
 //   trails              presses test trails into the first powder snow field (three passes in the middle, one 9 m left, one weaving)
 //   race                all pods fly four seconds over the first powder snow field (real trails, real plumes)
+//   pick:<x>_<y>+<x>_<y>  no picture: names the mesh under each point of the view (x, y from 0 to 1, origin top left) –
+//                       object, material, geometry, vertex attributes, distance, instance. For "what is that white thing?".
 // query     default "?webgl" (screenshots need WebGL2: headless WebGPU frames come out white)
 //
 // Output: <out>_<view>_<variant>.png, the contact sheet <out>_grid.jpg, and per view one line
@@ -31,6 +33,10 @@ for (const v of views) {
   console.log(String(await p.evaluate(([i, d]) => window.track(+i, d), [ti, v])).replace(/^.*?(probe|WebGL2|WebGPU)/, '$1').slice(0, 170));
   let fresh = true; // (first variant of this view: remember which meshes `track()` left visible – it switches the decor and rock sectors for the new camera)
   for (const variant of variants.split(',')) {
+    if (variant.startsWith('pick:')) {
+      for (const pt of variant.slice(5).split('+')) { const [x, y] = pt.split('_').map(Number); console.log(`${v} pick ${x},${y}: ` + await p.evaluate((x, y) => window.pick(x, y), x, y)); }
+      continue;
+    }
     const info = await p.evaluate(async (variant, fresh) => {
       const G = window.__podracer, seen = {}, names = variant.includes(':') ? variant.slice(variant.indexOf(':') + 1).split('+') : [];
       G.scene.traverse(o => {
@@ -86,6 +92,7 @@ for (const v of views) {
     shots.push('data:image/png;base64,' + Buffer.from(buf).toString('base64'));
   }
 }
+if (!shots.length) { await b.close(); process.exit(0); } // (a run that only picks has no pictures)
 const g = await b.newPage(); const cols = Math.min(2, shots.length), w = 800, h = 450;
 await g.setViewport({ width: w * cols, height: Math.ceil(shots.length / cols) * h });
 await g.setContent(`<body style="margin:0;background:#000;display:grid;grid-template-columns:repeat(${cols},${w}px)">` + shots.map(s => `<img src="${s}" style="width:${w}px;height:${h}px;display:block">`).join('') + '</body>');

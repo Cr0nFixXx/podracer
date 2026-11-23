@@ -5,10 +5,11 @@ import type { ThemeDef } from './data';
 import type { GfxSettings } from './settings';
 import type { TerrainField } from './terrain';
 import type { TrackData } from './trackBuilder';
+import type { TexSet } from './textures';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
-const { clamp, color, cos, interleavedGradientNoise, length, oneMinus, positionGeometry, positionLocal, positionView, screenCoordinate, sin, smoothstep, texture, time, uv, vec3, vertexColor } = TSL;
+const { abs, clamp, color, cos, interleavedGradientNoise, length, normalWorldGeometry, oneMinus, positionGeometry, positionLocal, positionView, positionWorld, pow, screenCoordinate, sin, smoothstep, texture, time, uv, vec3, vertexColor } = TSL;
 
 /**
  * Ground cover: grass, reeds, ferns, flowers, bushes, desert agave, dry scrub, mossy logs, stones, pebbles,
@@ -204,7 +205,9 @@ function fungus(seed: number) {
   return merge(list);
 }
 
-interface Built { geo: THREE.BufferGeometry; lod?: THREE.BufferGeometry; h: number }
+/** `rock` = the stone's own colour: such a piece gets the world's rock photo set on top (see `coverMaterial`). */
+interface Built { geo: THREE.BufferGeometry; lod?: THREE.BufferGeometry; h: number; rock?: RGB }
+const rockOf = (c: RGB, mk: (c: RGB) => THREE.BufferGeometry, h: number): Built => ({ geo: mk(c), h, rock: c });
 const GEO: Record<string, (s: number) => Built> = {
   grassDry: s => ({ geo: blades(11, 0.62, 0.075, 0.5, s, [0.42, 0.34, 0.2], [0.88, 0.76, 0.48], 0.42), h: 0.62 }),
   grass: s => ({ geo: blades(14, 0.72, 0.09, 0.45, s, [0.12, 0.24, 0.06], [0.46, 0.72, 0.25], 0.6), h: 0.72 }),
@@ -225,14 +228,14 @@ const GEO: Record<string, (s: number) => Built> = {
   shrubDry: s => ({ geo: shrub(s, [0.36, 0.28, 0.2], [0.46, 0.46, 0.3]), lod: bushImpostor(0.85, 1.12, [0.3, 0.24, 0.16], [0.5, 0.48, 0.32]), h: 1.2 }),
   shrubDead: s => ({ geo: shrub(s, [0.11, 0.09, 0.08], null), h: 1.2 }),
   shrubFrost: s => ({ geo: shrub(s, [0.3, 0.26, 0.24], [0.85, 0.91, 0.96]), lod: bushImpostor(0.82, 1.1, [0.34, 0.34, 0.36], [0.86, 0.92, 0.97]), h: 1.2 }),
-  stone: s => ({ geo: stone(s, [0.55, 0.42, 0.32]), h: 0.8 }),
-  stoneGrey: s => ({ geo: stone(s, [0.42, 0.42, 0.4]), h: 0.8 }),
-  stoneViolet: s => ({ geo: stone(s, [0.36, 0.3, 0.44]), h: 0.8 }),
-  snowRock: s => ({ geo: stone(s, [0.32, 0.36, 0.42], 0.7, 0.45, true), h: 0.9 }),
-  scoria: s => ({ geo: stone(s, [0.12, 0.1, 0.09], 0.65, 0.7), h: 0.8 }),
-  ember: s => ({ geo: stone(s, [0.1, 0.08, 0.07], 0.75, 0.55), h: 0.9 }),
-  pebbles: s => ({ geo: pebbles(s, [0.5, 0.4, 0.3]), h: 0.2 }),
-  pebblesGrey: s => ({ geo: pebbles(s, [0.45, 0.45, 0.43]), h: 0.2 }),
+  stone: s => rockOf([0.55, 0.42, 0.32], c => stone(s, c), 0.8),
+  stoneGrey: s => rockOf([0.42, 0.42, 0.4], c => stone(s, c), 0.8),
+  stoneViolet: s => rockOf([0.36, 0.3, 0.44], c => stone(s, c), 0.8),
+  snowRock: s => rockOf([0.32, 0.36, 0.42], c => stone(s, c, 0.7, 0.45, true), 0.9),
+  scoria: s => rockOf([0.12, 0.1, 0.09], c => stone(s, c, 0.65, 0.7), 0.8),
+  ember: s => rockOf([0.1, 0.08, 0.07], c => stone(s, c, 0.75, 0.55), 0.9),
+  pebbles: s => rockOf([0.5, 0.4, 0.3], c => pebbles(s, c), 0.2),
+  pebblesGrey: s => rockOf([0.45, 0.45, 0.43], c => pebbles(s, c), 0.2),
   iceShard: s => ({ geo: shards(s, [0.62, 0.82, 0.98]), h: 1.3 }),
   crystal: s => ({ geo: shards(s, [0.78, 0.55, 1.0], 5, 0.12, 1.1, 6), h: 1.2 }),
   fungus: s => ({ geo: fungus(s), h: 0.4 }),
@@ -292,10 +295,23 @@ const SETS: Record<string, CoverType[]> = {
 };
 SETS.mesa = SETS.desert;
 
-function coverMaterial(t: CoverType, H: number, isImpostor = false, tex?: { map: THREE.Texture; alpha: THREE.Texture }) {
+/** Metres per repeat of the rock photo set on ground-cover stones (the walls use 15 m – a stone of half a metre would show one blurred patch of it). */
+const STONE_TILE = 3.5;
+
+function coverMaterial(t: CoverType, H: number, isImpostor = false, tex?: { map: THREE.Texture; alpha: THREE.Texture }, rock?: { set: TexSet; own: RGB }) {
   const mat = new THREE.MeshStandardNodeMaterial({ vertexColors: true, side: t.blade || isImpostor ? THREE.DoubleSide : THREE.FrontSide });
   mat.roughness = t.rough ?? 0.86; mat.metalness = 0;
   if (tex) mat.map = tex.map;
+  if (rock) {
+    // Stones and pebbles carry the rock of the world's walls (2026-11-23). Flat vertex colours made them pale lumps beside the
+    // photo-textured rock rows and spires – in the shade under a blue sky a desaturated brown turns light grey-blue. The set is
+    // projected in world space from the three axes (the pieces have no UVs). The vertex colour stays as a tint: divided by the
+    // stone's own mean colour it is ≈ 1 with the facet-to-facet variation, white snow caps, and HALF the hue of the piece (`corr`
+    // takes the other half out: with the full hue the pebbles on orange sandstone turned signal orange).
+    const k = 1 / STONE_TILE, pw = positionWorld, bw = pow(abs(normalWorldGeometry), vec3(4.0)), w = bw.div(bw.x.add(bw.y).add(bw.z).add(1e-5));
+    const m = rock.set.map, mean = (rock.own[0] + rock.own[1] + rock.own[2]) / 3, corr = rock.own.map(c => Math.sqrt(mean / c) / mean);
+    mat.colorNode = texture(m, pw.zy.mul(k)).rgb.mul(w.x).add(texture(m, pw.xz.mul(k)).rgb.mul(w.y)).add(texture(m, pw.xy.mul(k)).rgb.mul(w.z)).mul(vec3(corr[0], corr[1], corr[2]));
+  }
   // Outline of a textured card (fern frond). The step is steep: far away the smaller mip levels hold 0.5 … 0.7 over the whole frond –
   // read as is, the dither below would thin the plant out to a haze.
   const cut = tex ? smoothstep(0.25, 0.55, texture(tex.alpha, uv()).r) : null;
@@ -322,7 +338,7 @@ function coverMaterial(t: CoverType, H: number, isImpostor = false, tex?: { map:
 
 interface CoverCell { mesh: THREE.InstancedMesh; x: number; z: number; min2: number; max2: number; shadow2: number }
 
-export function buildGroundCover(td: TrackData, theme: ThemeDef, gfx: GfxSettings, field: TerrainField, waterY: number, rng: () => number, group: THREE.Group, disp: Disp) {
+export function buildGroundCover(td: TrackData, theme: ThemeDef, gfx: GfxSettings, field: TerrainField, waterY: number, rng: () => number, group: THREE.Group, disp: Disp, rockSet?: TexSet) {
   const t0 = performance.now();
   const set = SETS[theme.id];
   const cells: CoverCell[] = [];
@@ -334,7 +350,8 @@ export function buildGroundCover(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   let total = 0;
   set.forEach((t, ti) => {
     const built = GEO[t.geo](17 + ti * 31);
-    const mat = coverMaterial(t, built.h, false, t.geo === 'fern' ? frondTextures(disp) : undefined); disp.push(built.geo, mat);
+    const mat = coverMaterial(t, built.h, false, t.geo === 'fern' ? frondTextures(disp) : undefined, built.rock && rockSet ? { set: rockSet, own: built.rock } : undefined); disp.push(built.geo, mat);
+    if (built.rock) built.geo.name = t.geo; // (harness view `g_<name>`)
     const hasLod = !!(built.lod && t.farView);
     const lodMat = hasLod ? coverMaterial(t, built.h, true) : null;
     if (hasLod) disp.push(built.lod!, lodMat!);
