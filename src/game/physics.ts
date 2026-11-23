@@ -45,6 +45,8 @@ export interface AIState { /** grid lane held for the first seconds (start disci
 export const GRAVITY = 34;
 /** Generous repulsor hover altitude + hard per-engine/cockpit floor gap so no pod part EVER clips into the road! */
 export const HOVER = 2.85;
+/** Vertical speed against the ground (m/s) that a landing may have without costing hull – a free fall of 21 m (2026-11-23). */
+export const LAND_FREE = 38;
 /** height of the drivable deck above a tunnel's ceiling */
 export const TUNNEL_DECK = 1.2;
 const MIN_ROAD_CLEAR = 0.68;
@@ -368,7 +370,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   const bob = Math.sin(time * 2.8 + p.id) * 0.1;
   // Lift key raises the repulsor height (+1.6 m), dive key presses the pod down (-0.45 m); a knife-edge roll needs half the engine span as clearance
   const targetY = fr.groundY + HOVER + bob + (pc > 0 ? pc * 1.6 : pc * 0.45) + knife * halfSpan * 0.92;
-  const wasGrounded = p.grounded;
+  const wasGrounded = p.grounded, vyIn = p.vel.y; // (the sink rate the pod arrives with – the hover spring below takes a third of it off within this very step)
   let landImpulse = 0;
   p.zeroG = fr.zeroG && !fr.gap;
   if (p.zeroG) {
@@ -403,8 +405,13 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   if (p.grounded) p.air = 0; else p.air += dt;
   if (!wasGrounded && p.grounded && (p.vel.y < -14 || landImpulse > 14)) {
     const imp = Math.max(-p.vel.y, landImpulse);
-    const dmg = (imp - 14) * 0.9 * P.sturdy;
-    applyDamage(p, 0, dmg, 'belly'); p.shake = Math.min(1, p.shake + 0.4);
+    // 2026-11-23 (user: "kein Fallschaden bei sanfter/normaler Landung"): until then every landing faster than 14 m/s cost hull –
+    // a plain ramp jump comes down at about 30 m/s and lost 6 points each time. Now the repulsors take what a jump or a drop brings
+    // (`LAND_FREE`: 38 m/s, a free fall of 21 m); only what is above that hits the belly. Measured against the ground: a road that
+    // falls away softens the landing, one that climbs towards the pod hardens it.
+    const hard = Math.max(imp, -vyIn) + Math.max(-25, Math.min(12, (p.groundY - p.prevGroundY) / dt)) - LAND_FREE; // (+12 at most: a step in `groundY` – crown, a change of path – must not count as a fall)
+    if (hard > 0) applyDamage(p, 0, hard * 0.9 * P.sturdy, 'belly');
+    p.shake = Math.min(1, p.shake + (hard > 0 ? 0.4 : 0.12 + 0.2 * Math.min(1, imp / LAND_FREE)));
     landImpulse = imp;
     p.events.push({ type: 'land', strength: imp, x: p.pos.x, y: fr.groundY, z: p.pos.z, nx: 0, nz: 0 });
   }

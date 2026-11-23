@@ -1304,6 +1304,28 @@ for (const id of ['boonta', 'frost', 'magma', 'oovo']) test(`open sections: the 
   }
 });
 
+// ---- landing (2026-11-23, user: "kein Fallschaden bei sanfter/normaler Landung") ----
+/** An Aurora comes down on a straight, level stretch of the Boonta deck at `vy` m/s (100 m/s forward): hull points lost, 'land' events. */
+function landing(vy: number): [number, number] {
+  const td = trackOf('boonta'), S = td.main.samples; let idx = -1;
+  for (let k = 80; k < S.length - 80 && idx < 0; k++) { let fine = true; for (let j = k - 6; j <= k + 70 && fine; j++) { const q = S[j]; fine = Math.abs(q.curv) < 0.003 && Math.abs(q.bank) < 0.04 && !q.gap && !q.lake && !q.roof && !q.ramp && q.surf === 0 && Math.abs(q.y - S[k].y) < 1.5; } if (fine) idx = k; }
+  ok(idx > 0, 'no straight, level stretch of deck found on boonta');
+  const s = S[idx], p = racer(byId('aurora'), td, idx, 0, s.y + HOVER + 9);
+  p.invuln = 0; p.vel.set(s.tx * 100, 0, s.tz * 100);
+  stepPod(p, td, 1 / 60, 0, 1, false); // (one step in the air: the pod learns the ground below it – crown, camber)
+  p.pos.y = p.groundY + HOVER + 1.3; p.vel.y = -vy; p.events.length = 0;
+  const hp0 = p.hpL + p.hpR;
+  for (let f = 0; f < 40; f++) stepPod(p, td, 1 / 60, f / 60, 1, false);
+  ok(p.grounded, `the pod did not come down (vy ${vy})`);
+  return [hp0 - p.hpL - p.hpR, p.events.filter(e => e.type === 'land').length];
+}
+test('landing: a normal landing costs nothing – 30 m/s (a ramp jump) and 36 m/s (a drop of 18 m); a fall at 55 m/s does', () => {
+  const [jump, jumpEv] = landing(30), [drop] = landing(36), [fall, fallEv] = landing(55);
+  eq(jump, 0, 'hull points lost by landing at 30 m/s –'); eq(drop, 0, 'hull points lost by landing at 36 m/s –');
+  ok(fall > 6 && fall < 40, `a fall at 55 m/s cost ${fall.toFixed(1)} hull points – expected a clear but survivable hit`);
+  ok(jumpEv === 1 && fallEv === 1, `every landing still reports itself (dust, sound, shake): ${jumpEv} and ${fallEv} events`);
+});
+
 // ---- night × bad weather (2026-11-23, reported by the user: "extrem schlechte Sicht bei Nacht + Gewitter") ----
 // A night storm was night × overcast: moonlight 0.30 instead of 1.15, a quarter less fill light, black fog. Bad weather at night may
 // change the mood, not the amount of light.

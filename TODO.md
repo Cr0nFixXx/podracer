@@ -55,7 +55,6 @@ Auftrag und Entscheidungen: [Protokoll](docs/verlauf/2026-11-23-nach-der-probefa
 **Fehler** – alle drei behoben (Protokoll), warten auf die Probefahrt des Nutzers
 
 **Verbesserungen**
-- [ ] Kein Fallschaden bei sanfter/normaler Landung
 - [ ] Größere Schatten-Sichtweite (auf „Ultra" schiebt sich eine Schattenwand vor dem Pod her)
 - [ ] Wasserspritzer auf der Linse auch über Wasser/Pfützen ohne Regen
 - [ ] Boost-Alarm: langsam stärker werdender Ton kurz vor dem Maximum
