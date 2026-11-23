@@ -136,13 +136,16 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     surfMat.set(i, m); surfBlend.set(i, mb); disposables.push(m, mb);
   });
   // Note: displace=0 on wallMat keeps road-to-skirt joints, cliffs, tunnels, arches & pillars 100% seam-free!
-  const wallMat = surfaceMaterial(wallTex, {
+  const wallOpts: SurfaceOpts = {
     strata: STRATA[theme.id], ledge: wallLedge, detailKind: detailKindForTheme(theme.id),
     cloud: theme.clouds * 0.4, parallax: plx * 0.045, layers, normalScale: 1.5,
     macro: 0.3, detail: 0.62, bump, displace: 0, micro: 0.65, microScale: [18 / 1.7, 18 / 1.7],
     emissive: theme.id === 'crystal' ? '#c87aff' : theme.id === 'oovo' ? '#a060ff' : '#ff5a10',
     emissiveIntensity: theme.id === 'crystal' ? 0.8 : theme.id === 'oovo' ? 0.95 : 1.35,
-  });
+  };
+  const wallMat = surfaceMaterial(wallTex, wallOpts);
+  let wallBlend: THREE.Material | null = null; // the rock of the walls, alpha-blended by `aFade`: the outer half of a wall cap that runs out onto the land behind it
+  const wallBlendMat = () => { if (!wallBlend) { wallBlend = surfaceMaterial(wallTex, { ...wallOpts, parallax: 0, fade: 'soft' }); wallBlend.name = 'cliffBlend'; disposables.push(wallBlend); } return wallBlend; };
   const groundMat = terrainMaterial({
     themeId: theme.id, ground: groundTex, gravel: gravelTex, basin: basinTex, rock: cliffTex,
     groundScale: !theme.emissiveGround && hasPbr(PHOTO_GROUND[theme.id]) ? 2.7 : 1, // photo ground: ~11 m tiles instead of 30 m
@@ -352,6 +355,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     for (const side of [-1, 1]) {
       const sp: number[] = [], su: number[] = [], si: number[] = [];
       const wp: number[] = [], wu: number[] = [], wi: number[] = [];
+      const cp: number[] = [], cu: number[] = [], cf: number[] = [], ci: number[] = []; let cv = 0, prevFlat = false; // (the blended outer half of the wall caps)
       const K = geoQ >= 3 ? 16 : geoQ === 2 ? 11 : 6, KK = K + 2, capW = terrainCell(geoQ) * 1.5 + 3; // (KK: wall profile + the two points of its cap)
       const SK = 3; // curb fascia -> upper talus shelf -> deep battered embankment slope
       let sv = 0, wv = 0; let prevS = false, prevW = false; let sAcc = 0;
@@ -380,7 +384,11 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
         // (`borderRocks`, placed with the landscape) – no sheet.
         const okW = H > 0 && !open && !s.gap && s.tun !== 3 && !(side > 0 ? s.rockR : s.rockL);
         const buttress = Math.pow(ridged(sAcc * 0.022 + side * 3.7, 1.3, 3), 2.0) * 2.2, lowK = Math.min(1, H / 12);
-        let latTop = 0.6;
+        // 2026-11-23: v of the wall texture runs with the LENGTH of the profile, not with its height. The upper benches of the profile lean
+        // back up to 4.6 m per 2 m of height (and the cap runs level): measured by height the picture was stretched up to 2.5 times
+        // there – the smeared band along every rim. The length is taken on the profile without its crags and ribs (they change from
+        // one cross-section to the next: the bedding of the picture would wobble along the wall).
+        let latTop = 0.6, vLen = 0, pOff = 0, pHh = 0;
         for (let j = 0; j < K; j++) {
           const f = j / (K - 1); const pf = f * (cliffProf.length - 1);
           const pi = Math.min(cliffProf.length - 2, Math.floor(pf)); const pt = pf - pi;
@@ -392,27 +400,48 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
           const ribPush = -buttress * Math.sin(f * Math.PI) * Math.min(1, f * 4) * lowK; // protrudes slightly above driver height (keeps wall collision intact!)
           const lat = Math.max(0.55, 0.6 + off * (H / 25) + crag + ribPush);
           wp.push(ex + s.rx * side * lat, ey - 1.15 + hh * H, ez + s.rz * side * lat);
-          wu.push(sAcc / 18, hh * H / 18);
+          vLen += Math.hypot((off - pOff) * (H / 25), (hh - pHh) * H); pOff = off; pHh = hh;
+          wu.push(sAcc / 18, vLen / 18);
           latTop = lat;
         }
         // 2026-11-22 – back of the wall: the terrain's massif starts 1.5 mesh cells behind the sheet (terrain.ts), so the sheet gets a
         // cap from its rim back to the ground behind it (two more points). Without it a wall seen from the side or from the other road of
         // a fork is a paper-thin sail. The cap is shortened where it would reach over another road.
+        // 2026-11-23 – where the land behind the wall is about as high as its rim (within 3.5 m), the cap does not dive into the ground
+        // any more (a straight seam between the picture of the wall and the picture of the terrain): its outer half lies ON the drawn
+        // terrain and thins out into it (`wallBlend`, alpha 1 → 0). A wall that stands free keeps its solid back.
         {
-          let back = 0, yB = ey - 1.15 + H; const yTop = yB;
+          let back = 0, yB = ey - 1.15 + H, flat = false; const yTop = yB;
           if (okW) {
             for (const c of [capW, capW * 0.6, capW * 0.3, 2.5]) if (field.edgeDist(ex + s.rx * side * (latTop + c), ez + s.rz * side * (latTop + c)) > 1.2) { back = c; break; }
-            if (back > 0) yB = Math.min(yTop - 0.3, heightAt(ex + s.rx * side * (latTop + back), ez + s.rz * side * (latTop + back)) - 1.2);
+            if (back > 0) {
+              const g = groundY(ex + s.rx * side * (latTop + back), ez + s.rz * side * (latTop + back));
+              flat = Math.abs(g - yTop) <= 3.5;
+              yB = flat ? g + 0.25 : Math.min(yTop - 0.3, g - 1.2);
+            }
           }
-          wp.push(ex + s.rx * side * (latTop + back * 0.45), yTop + (yB - yTop) * 0.22, ez + s.rz * side * (latTop + back * 0.45));
-          wp.push(ex + s.rx * side * (latTop + back), yB, ez + s.rz * side * (latTop + back));
-          wu.push(sAcc / 18, (H + back * 0.45) / 18, sAcc / 18, (H + back + Math.abs(yB - yTop)) / 18);
+          const mx = ex + s.rx * side * (latTop + back * 0.45), my = yTop + (yB - yTop) * 0.22, mz = ez + s.rz * side * (latTop + back * 0.45);
+          const fx = ex + s.rx * side * (latTop + back), fz = ez + s.rz * side * (latTop + back);
+          const v1 = vLen + Math.hypot(back * 0.45, (yB - yTop) * 0.22), v2 = v1 + Math.hypot(back * 0.55, (yB - yTop) * 0.78);
+          // solid sheet: rim → middle of the cap → its far end (a blended cap ends in the middle: the last cell is empty)
+          wp.push(mx, my, mz); wu.push(sAcc / 18, v1 / 18);
+          if (flat) { wp.push(mx, my, mz); wu.push(sAcc / 18, v1 / 18); } else { wp.push(fx, yB, fz); wu.push(sAcc / 18, v2 / 18); }
+          // blended outer half
+          cp.push(mx, my, mz); cu.push(sAcc / 18, v1 / 18); cf.push(1);
+          if (flat) { cp.push(fx, yB, fz); cu.push(sAcc / 18, v2 / 18); cf.push(0); } else { cp.push(mx, my, mz); cu.push(sAcc / 18, v1 / 18); cf.push(1); }
+          if (okW && prevW && (flat || prevFlat)) { const a = cv - 2, b = cv; if (side > 0) ci.push(a, a + 1, b, b, a + 1, b + 1); else ci.push(a, b, a + 1, a + 1, b, b + 1); }
+          cv += 2; prevFlat = flat;
         }
         if (okW && prevW) for (let j = 0; j < KK - 1; j++) {
           const a = wv - KK + j, b = wv + j;
           if (side > 0) wi.push(a, a + 1, b, b, a + 1, b + 1); else wi.push(a, b, a + 1, a + 1, b, b + 1);
         }
         wv += KK; prevW = okW;
+      }
+      if (ci.length) {
+        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(cp, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(cu, 2));
+        g.setAttribute('aFade', new THREE.Float32BufferAttribute(cf, 1)); g.setIndex(ci); g.computeVertexNormals();
+        batcher.addStrip(g, wallBlendMat(), 5400, false, GROUND_ORDER.BODY);
       }
       const mk = (p: number[], u: number[], i: number[], mat: THREE.Material, shadow: boolean) => {
         if (!i.length) return;

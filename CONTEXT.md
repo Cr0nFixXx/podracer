@@ -1,6 +1,6 @@
 # Podracer
 
-A browser podracing game: racers fly pods over tracks on several planets. This glossary fixes the words for pods, their look and their damage.
+A browser podracing game: racers fly pods over tracks on several planets. This glossary fixes the words for pods, their look, their damage and the ground they fly over.
 
 ## Language
 
@@ -57,3 +57,33 @@ _Avoid_: Schadensteil, break part (in UI text)
 **Treffermarke**:
 A burn and bare-metal mark on the hull where a hit landed.
 _Avoid_: Delle, dent
+
+### Track
+
+**Untergrund**:
+What the track runs over in one passage: the built deck or a natural ground (sand, rock, snow, ice, mud …). It changes look, grip, top speed and engine heat.
+_Avoid_: Belag, Textur (that is only its picture), surface (in UI text)
+
+**Passage**:
+A stretch of track with one Untergrund.
+_Avoid_: Abschnitt (that is any stretch), Sektor
+
+**Felsgrenze**:
+The solid border of a natural passage where no canyon wall stands: one line for the physics, as high as the rocks are tall.
+_Avoid_: Felswand (that is a canyon wall), Leitplanke, Bande
+
+**Felsreihe**:
+The row of single rocks the player sees along a Felsgrenze.
+_Avoid_: Felsband, Felsmauer
+
+**Schulter**:
+The ground of a natural road beyond the road edge: it comes down to the terrain and thins out into it.
+_Avoid_: Randstreifen, Bankett, Böschung (that is the terrain's own slope)
+
+**Verwehung**:
+Sand or snow the wind has blown against a border; it thins out towards the middle of the road.
+_Avoid_: Düne (that is an Untergrund), Schneewehe
+
+**Schneedecke**:
+The layer of loose snow on a powder snow field. Pods press trails into it; a firm trail is faster.
+_Avoid_: Schneeschicht, Pulverschnee (that is the Untergrund)
