@@ -229,23 +229,34 @@ export function waterMaterial(themeId: string, normTex: THREE.Texture, cloud: nu
   return mat;
 }
 
-/** Flicker-free, derivative-free convecting molten lava sea with cooled basalt plates & magma channels. */
-export function lavaSeaMaterial(crust: TexSet) {
+/** Flicker-free, derivative-free molten lava: the lake the track crosses and the lava sea around the terrain.
+ *  2026-11-23 ("Lavakruste und Lavasee sehen vertauscht aus"): the liquid is drawn from the flowing-lava photo set (`LAVA_TEX`,
+ *  surfaces.ts) – a dark skin with glowing veins. Two layers of it drift against each other (the veins shear and never line up twice),
+ *  slow large patches decide where the skin is thin, and the melt shines dimly through everywhere. Before, the liquid showed generated
+ *  basalt plates with glowing joints, which is the look of the solid crust (the crust has it now). */
+export function lavaSeaMaterial(lava: TexSet) {
   const mat = new THREE.MeshStandardNodeMaterial({ polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
   const wp = positionWorld.xz; const dist = length(positionView); const m = macroTexture();
-  const flow = vec2(time.mul(0.011), time.mul(0.007));
-  const warp = texture(m, wp.mul(1 / 140).add(flow.mul(0.4))).rg.sub(0.5).mul(0.32);
-  const uv1 = wp.mul(1 / 52).add(flow).add(warp);
-  const uv2 = wp.mul(1 / 22).sub(flow.mul(0.6)).add(warp.mul(1.3));
-  const c1 = texture(crust.map, uv1), c2 = texture(crust.map, uv2);
-  const nxy = texture(crust.normalMap, uv1).xy.mul(2).sub(1).mul(ssInv(480.0, 40.0, dist)).mul(0.75);
-  const magma = clamp(ssInv(0.52, 0.2, c1.a.mul(0.65).add(c2.a.mul(0.35))), 0.0, 1.0);
-  const hotCore = smoothstep(0.55, 0.92, magma);
-  mat.colorNode = mix(c1.rgb.mul(0.85), vec3(0.28, 0.07, 0.02), magma);
+  const flow = vec2(time.mul(0.03), time.mul(0.018)); // layer 1 creeps at ≈ 1.4 m/s, layer 2 against it at ≈ 0.5 m/s
+  const warp = texture(m, wp.mul(1 / 140).add(flow.mul(0.15))).rg.sub(0.5).mul(0.3);
+  const uv1 = wp.mul(1 / 40).add(flow).add(warp);
+  const uv2 = wp.mul(1 / 17).sub(flow.mul(0.85)).add(warp.mul(1.4));
+  const glowTex = lava.emissiveMap ?? lava.map;
+  const c1 = texture(lava.map, uv1), e1 = texture(glowTex, uv1).r, e2 = texture(glowTex, uv2).r;
+  const n1 = texture(lava.normalMap, uv1).xy.mul(2).sub(1), n2 = texture(lava.normalMap, uv2).xy.mul(2).sub(1);
+  const nxy = n1.mul(0.6).add(n2.mul(0.4)).mul(ssInv(480.0, 40.0, dist)).mul(0.8);
+  // thin skin in slow patches of 60–200 m (they drift too); the far sea keeps light and dark regions instead of an even carpet
+  const patch = smoothstep(0.3, 0.72, texture(m, wp.mul(1 / 95).sub(flow.mul(0.2))).g);
+  const region = texture(m, wp.mul(1 / 620)).b.mul(0.7).add(0.55);
+  const vein = clamp(max(e1, e2.mul(0.85)).mul(1.5), 0.0, 1.0);
+  const heat = clamp(vein.mul(patch.mul(0.8).add(0.5)).mul(region), 0.0, 1.0);
+  const hotCore = smoothstep(0.5, 0.95, heat);
+  const melt = patch.mul(0.42).add(0.12).mul(region); // the glow under the skin
+  mat.colorNode = mix(c1.rgb.mul(0.7), vec3(0.3, 0.07, 0.02), clamp(heat.add(melt.mul(0.5)), 0.0, 1.0));
   mat.normalNode = transformNormalToView(normalize(vec3(nxy.x, float(1.0), nxy.y)));
-  mat.roughnessNode = mix(float(0.84), float(0.34), magma);
+  mat.roughnessNode = mix(float(0.74), float(0.3), heat);
   mat.metalness = 0.04; mat.envMapIntensity = 0.65;
   const pulse = sin(time.mul(1.6).add(wp.x.mul(0.03)).add(wp.y.mul(0.02))).mul(0.1).add(0.92);
-  mat.emissiveNode = mix(color('#cf3608'), color('#ff9424'), hotCore).mul(magma).mul(pulse).mul(1.75);
+  mat.emissiveNode = mix(color('#d83a08'), color('#ffa634'), hotCore).mul(heat).mul(1.9).add(color('#a82404').mul(melt)).mul(pulse);
   return mat;
 }

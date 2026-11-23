@@ -22,7 +22,7 @@ export interface SurfaceDef {
   /** dune waves added to the road profile (metres) */
   dune?: number;
   /** photo texture set (src/assets/pbr) + procedural fallback kind, tile size in metres, default palette */
-  tex?: { set: string; kind: TexKind; tile: number; pal: [string, string, string]; rough?: number; metal?: number; normal?: number; emissive?: string; wet?: number; env?: number };
+  tex?: { set: string; kind: TexKind; tile: number; pal: [string, string, string]; rough?: number; metal?: number; normal?: number; emissive?: string; /** strength of the glow (default 1.5) */ glow?: number; wet?: number; env?: number };
   /** wake behind the pods: 'dust' (ground colour), 'spray' (white water), 'steam', 'embers', 'none' */
   wake: 'dust' | 'spray' | 'steam' | 'embers' | 'none';
   /** colour of dust / spray */
@@ -44,7 +44,9 @@ export const SURFACES: SurfaceDef[] = [
   S({ id: 'icelake', name: 'Eissee', grip: 0.75, vmax: 1, heat: 0.9, flat: true, wake: 'none', tex: { set: 'ice', kind: 'ice', tile: 22, pal: ['#2c5878', '#5c8eb0', '#a8d0e8'], rough: 0.26, env: 1.6, normal: 0.7 } }),
   // --- volcano world ---
   S({ id: 'basalt', name: 'Basalt', grip: 1, vmax: 1, heat: 1.1, wake: 'dust', tex: { set: 'rock', kind: 'basalt', tile: 12, pal: ['#16110f', '#2c221e', '#463830'], normal: 1.3 } }),
-  S({ id: 'crust', name: 'Lavakruste', grip: 0.97, vmax: 1, heat: 1.3, wake: 'embers', tex: { set: 'lava', kind: 'basalt', tile: 16, pal: ['#0c0807', '#1c1310', '#30221c'], emissive: '#ff5a14', normal: 1.2 } }),
+  // (2026-11-23: the crust is the generated columnar basalt – dark plates, glowing joints – and no longer the flowing-lava photo:
+  //  that one is the liquid, `LAVA_TEX` below. `set: ''` = no photo.)
+  S({ id: 'crust', name: 'Lavakruste', grip: 0.97, vmax: 1, heat: 1.3, wake: 'embers', tex: { set: '', kind: 'basalt', tile: 16, pal: ['#0c0807', '#1c1310', '#30221c'], emissive: '#ffb45a', glow: 2.8, normal: 1.2 } }),
   // (2026-11-23, user request: over lava only an extremely short boost – heat 4.5: a cold engine reaches its limit in 0.6 … 1.0 s
   //  instead of 2.6 … 4.5 s, and it hardly cools while the pod is over the lake)
   S({ id: 'lavalake', name: 'Lavasee', grip: 0.95, vmax: 1, heat: 4.5, flat: true, liquid: 'lava', wake: 'embers' }),
@@ -71,6 +73,11 @@ export const surfaceOf = (i: number | undefined): SurfaceDef => SURFACES[i ?? 0]
 
 // ---- Spray on the camera lens (2026-11-23, user: drops on the lens also over water and puddles when it does not rain) ----
 /** Does a pod flying over this surface throw liquid into the air? Every lake but lava (the ice lake is frozen: no `liquid`). */
+/** Molten lava – the lake the track crosses and the lava sea around the terrain (world.ts → `lavaSeaMaterial`): the flowing-lava
+ *  photo set, with the generated basalt as fallback. 2026-11-23: until then this photo sat on the solid crust and the liquid showed
+ *  dark plates with glowing cracks – "Lavakruste und Lavasee sehen vertauscht aus". The crust now carries the plates. */
+export const LAVA_TEX = { set: 'lava', kind: 'basalt' as TexKind, pal: ['#0b0605', '#1c0e08', '#2e160b'] as [string, string, string], emissive: '#ff7a20' };
+
 export const splashes = (s: SurfaceDef) => !!s.liquid && s.liquid !== 'lava';
 /** Does the track have such a lake? (The drops are compiled into the picture only where they can appear.) */
 export const trackSplashes = (paths: { samples: { surf?: number }[] }[]) => paths.some(p => p.samples.some(q => splashes(surfaceOf(q.surf))));

@@ -157,6 +157,24 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Geprüft: fünf Unit-Prüfungen `intro:` auf allen 13 Strecken (zuerst rot), Bilder des Flugs auf dem Boonta-Kessel (Start, offene Piste, Brücke, Tunnel), Durchlauf in der echten App (`tools/harness/pintro.mjs`): Kamera fliegt, Pods stehen, Karte und Knopf, Pause hält den Flug an, Enter / Gamepad A / Start starten den Countdown, Neustart ohne Flug.
 - Nicht geprüft: der Flug in Bewegung auf echter GPU (Ruckeln beim Nachladen der Landschaft bei 420 m/s?) und die übrigen zwölf Strecken im Bild – gerechnet sind sie alle.
 
+### Nachmeldung des Nutzers – „Introfahrt geht noch nicht"
+- Wörtlich (2026-11-23, nach dem Bericht zu Block 2): „intro fahrt geht noch nicht. lavakruste und lavasee texturen sehen vertauscht aus. pushe danach und mach dann weiter mit den restlichen teil".
+- Ursache: der Intro-Flug war fertig, lag aber nur lokal (`ba3da24`). Geplant war der Push erst am Ende von Block 3. Auf GitHub fehlte er also.
+- Am Code war nichts zu ändern. Trotzdem noch einmal nachgeprüft, auf einem frischen Build der echten App:
+  - WebGL: der ganze Durchlauf `pintro.mjs` (Flug, Karte, Pause, Enter, Neustart ohne Flug, Gamepad A und Start).
+  - **WebGPU, zum ersten Mal** (`BACKEND=webgpu node pintro.mjs …`): Flug, Pause, Enter, Countdown, Rennen – ohne eine Fehlermeldung oder Warnung in der Konsole.
+  - **Echter Mausklick** auf „Rennen starten": der Knopf liegt an seiner Mitte oben (nichts darüber), der Klick startet den Countdown. Vorher war nur Tastatur, Gamepad und ein Klick per Skript geprüft – ein verdeckter Knopf wäre so nicht aufgefallen.
+- Danach sofort gepusht (Wunsch des Nutzers), nicht erst am Ende des Blocks.
+
+### Nachmeldung des Nutzers – „Lavakruste und Lavasee sehen vertauscht aus"
+- Stimmt. Auf der festen Lavakruste lag das Foto fließender Lava: rot glühende Schlieren, wie flüssig. Der Lavasee zeigte dunkle Platten mit hellen Rissen – das Bild einer Kruste. (Das Lavameer rund um die Landschaft sah aus wie der See.)
+- Getauscht:
+  - **Lavasee und Lavameer** sind jetzt die fließende Schmelze: dunkle Haut, helle Glutadern, darunter schimmert die Glut überall durch. Zwei Lagen treiben langsam gegeneinander, große Flecken sind heller oder dunkler.
+  - **Lavakruste** ist fester Boden: dunkle Basaltplatten, in den Fugen glüht es orange – stellenweise, wo die Kruste dünn ist. Nichts fließt.
+- Die Wirkung ist unverändert: auf der Kruste heizen die Triebwerke 30 % schneller auf, über dem See geht nur ein extrem kurzer Boost, der Hitzeschild leuchtet nur über dem See.
+- Geprüft: neue Unit-Prüfung `lava:` (zuerst rot – sie hält fest, welches Bild zu welchem Untergrund gehört). Bilder vorher/nachher aus Sicht des Spielers: Kruste an vier Stellen (Dämmerung und tiefe Sonne), See aus der Fahrt, von 30 m und von 120 m Höhe, dazu See und Kruste mit „Ultra" (Bloom). WebGPU-Konsolenprüfung über dem See.
+- Nicht geprüft: in Bewegung. Das Fließen ist langsam (rund 1,4 m/s) und nur im Stand oder im Intro-Flug zu sehen. Ist der See zu hell: der Faktor `1.9` in `lavaSeaMaterial` (`src/game/terrainMaterial.ts`). Glühen die Fugen der Kruste zu schwach oder zu stark: `glow: 2.8` beim Untergrund `crust` (`src/game/surfaces.ts`).
+
 ### Nebenbei gefunden – Hauptmenü: Titel las sich „PODRACE"
 - Beim Prüfen der Controller-Bedienung aufgefallen: im Hauptmenü fehlte dem Titel bei 16:9 der letzte Buchstabe. Der Titel ist breiter als seine Bildhälfte; der Farbverlauf wurde nur innerhalb seines Kastens gemalt, und die Pod-Vorschau lag darüber.
 - Behoben (Kasten so breit wie der Text, Titel liegt über der Vorschau). Die Layout-Prüfung `pui.mjs` schlägt jetzt an, wenn der Text einer Überschrift breiter ist als ihr Kasten oder verdeckt wird.

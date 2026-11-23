@@ -7,7 +7,7 @@ import { resolveEnvironment, type TimeOfDay, type WeatherKind } from '../../src/
 import { clipOutside } from '../../src/game/meshClip';
 import { SnowField } from '../../src/game/snowField';
 import { borderRocks, ROCK_PROTRUDE, type BorderRock } from '../../src/game/borderRocks';
-import { SURF, SURFACES, lensSpray, splashes, trackSplashes } from '../../src/game/surfaces';
+import { LAVA_TEX, SURF, SURFACES, lensSpray, splashes, trackSplashes } from '../../src/game/surfaces';
 import { podLayout } from '../../src/game/podLayouts';
 import { cockpitGeo } from '../../src/game/podCockpits';
 import { engineExtent, engineGeo } from '../../src/game/podParts';
@@ -1607,6 +1607,20 @@ test('lens: the drops are built into the picture on every track with a lake – 
   for (const def of TRACKS) { if (!(def.id in want)) { bad.push(`${def.id}: not listed in this check`); continue; } const has = trackSplashes(trackOf(def.id).paths); if (has !== want[def.id]) bad.push(`${def.id}: ${has}`); }
   eq(bad.length, 0, `${bad.join(' · ')} –`);
 });
+
+/* ---- 2026-11-23, after the test drive: "Lavakruste und Lavasee sehen vertauscht aus" ----
+ * The flowing-lava photo sat on the solid crust, and the lake showed dark plates with glowing cracks. The looks are decided in two
+ * places: the surface table (solid ground) and `LAVA_TEX` (the liquid) – this pins which picture belongs to which. */
+test('lava: the flowing-lava photo belongs to the liquid (lake, lava sea) – the crust is cracked plates with glowing joints', () => {
+  const crust = SURFACES[SURF.crust], lake = SURFACES[SURF.lavalake];
+  eq(LAVA_TEX.set, 'lava', 'the liquid lava is drawn from the flowing-lava photo set');
+  ok(crust.tex && crust.tex.set !== LAVA_TEX.set, `the crust must not use the liquid's photo set (it has '${crust.tex?.set}')`);
+  eq(crust.tex!.kind, 'basalt', 'the crust is generated as columnar basalt plates');
+  ok(!!crust.tex!.emissive, 'the joints of the crust glow');
+  ok(lake.liquid === 'lava' && !lake.tex, 'the lake is a liquid: no ground texture, drawn by lavaSeaMaterial');
+  for (const id of ['basalt', 'ash'] as const) ok(SURFACES[SURF[id]].tex!.set !== LAVA_TEX.set, `${id} is solid ground too`);
+});
+
 
 // ---- sun shadows (2026-11-23, user: „größere Schatten-Sichtweite – auf Ultra schiebt sich eine Schattenwand vor dem Pod her") ----
 // The far cascade's depth range ended in mid-air above the ground: it shaded nothing, every shadow stopped at the split 104 m ahead.

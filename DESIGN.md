@@ -145,8 +145,9 @@ Leitidee: **Technik leuchtet schmal und bewegt sich.** Futuristisch wirkt nicht 
 | Passagen-Rhythmus | allgemeine Passagen wechseln etwa alle 500 m zwischen zwei bis drei Böden der Welt; gebautes Renndeck nur an Start/Ziel, Brücken, Tunneln, Rampen und Zero-G-Röhren | S20 Strecken |
 | Übergang | Naturboden löst sich über 30 m fleckig in den nächsten auf, nie mit hartem Schnitt; wo das Renndeck an einen See stößt, franst es über 26 m aus | S20 Strecken |
 | See-Passage | die offene Fläche **ist** die Oberfläche: eben, bis über 100 m breit, kein Geländer. Rand = schlanke Baken mit Leuchtkopf in `barrierColor`; das Ufer ragt immer über die Flüssigkeit | S20 Strecken |
-| Flüssigkeiten | Eissee: blankes dunkles Eis, spiegelt den Himmel · Lavasee: dunkle Kruste mit Glutadern · Methansee: gelbgrün, milchig · Sumpf: dunkles Wasser mit Algenflecken · Spiegelsee: fast schwarzviolett, glatt · Meer: der Ozean von Aquilaris selbst | S20 Strecken |
+| Flüssigkeiten | Eissee: blankes dunkles Eis, spiegelt den Himmel · Lavasee und Lavameer: flüssige Schmelze – dunkle Haut mit hellen, fließenden Glutadern, darunter schimmert die Glut durch; zwei Lagen treiben gegeneinander (seit 2026-11-23, vorher sah der See wie Kruste aus) · Methansee: gelbgrün, milchig · Sumpf: dunkles Wasser mit Algenflecken · Spiegelsee: fast schwarzviolett, glatt · Meer: der Ozean von Aquilaris selbst | S20 Strecken |
 | Plateau | heller, rissiger Lehmboden; am Rand fällt eine Felskante 17 m ab | S20 Strecken |
+| Lavakruste | fester Boden: dunkle Basaltplatten, in den Fugen glüht es orange – stellenweise, wo die Kruste dünn ist. Nichts fließt (seit 2026-11-23, vorher lag hier das Foto der fließenden Lava) | 2026-11-23 |
 | Oovo IV | Mond statt Leere: grauer Regolith, Krater, flache Kraterränder am Horizont; Stationsdecks aus hellen Metallplatten; Gasriese mit Ring tief am Himmel; flache Sonne (19°) für lange Schatten | S20 Strecken |
 | Malastare | Metall-Renndeck mit Lichtlinien statt Schotter – Industrie-/Raffineriewelt | S16 |
 

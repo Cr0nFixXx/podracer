@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { hasBuiltWall, THEMES, type ThemeDef } from './data';
 import type { GfxSettings } from './settings';
-import { detailKindForTheme, generateTexture, generateTextures, type TexSpec } from './textures';
+import { detailKindForTheme, generateTexture, generateTextures, type TexSet, type TexSpec } from './textures';
 import { caveMaterial, surfaceMaterial, type CaveOpts, type SurfaceOpts } from './materials';
-import { SURF, SURFACES, surfacePalette } from './surfaces';
+import { LAVA_TEX, SURF, SURFACES, surfacePalette } from './surfaces';
 import { TUNNEL_SHOULDER, mulberry32, tunnelArc, tunnelProfile, type Path, type Sample, type TrackData, type Obstacle } from './trackBuilder';
 import { borderRocks, ROCK_VARIANTS } from './borderRocks';
 import { addProps, type Emitter } from './props';
@@ -126,13 +126,16 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   // 2026-11-23: two materials per surface. `surfMat` = the solid ground (opaque). `surfBlend` = the same picture alpha-blended by the
   // vertex attribute `aFade` (materials.ts, `fade: 'soft'`): where one surface runs into the next, and on the shoulders of a natural
   // road. (Before: one material with a hard noise dissolve – the transitions were cut-out blotches.)
+  // molten lava (lake on the track, sea around the terrain): the flowing-lava photo set – see LAVA_TEX in surfaces.ts
+  const lavaSet = T === 'lava' || td.main.samples.some(q => SURFACES[q.surf]?.liquid === 'lava')
+    ? (await generateTextures([{ kind: LAVA_TEX.kind, palette: LAVA_TEX.pal, size: Math.min(gfx.texRes, 1024), seed: 99, emissive: LAVA_TEX.emissive, photo: LAVA_TEX.set }], aniso))[0] : undefined;
   const surfMat = new Map<number, THREE.Material>(), surfBlend = new Map<number, THREE.Material>();
   usedSurf.forEach((i, k) => {
     const t = SURFACES[i].tex!;
     const so: SurfaceOpts = {
       worldUV: true, cloud: theme.clouds * 0.4, parallax: plx * 0.02, layers, macro: 0.2, detail: 0.3, detailScale: 3.7, bump,
       normalScale: t.normal ?? 1, roughness: t.rough ?? 1, metalness: t.metal ?? 0, micro: 0.5, microScale: [5, 5], detailKind: detailKindForTheme(theme.id),
-      envMapIntensity: t.env ?? 0.7, wet: t.wet ?? 0, puddles: 0.34, emissive: t.emissive, emissiveIntensity: 1.5,
+      envMapIntensity: t.env ?? 0.7, wet: t.wet ?? 0, puddles: 0.34, emissive: t.emissive, emissiveIntensity: t.glow ?? 1.5,
     };
     const m = surfaceMaterial(surfSets[k], so), mb = surfaceMaterial(surfSets[k], { ...so, fade: 'soft' });
     m.name = 'ground'; mb.name = 'groundBlend';
@@ -518,7 +521,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   // ---- elevated overpass viaduct bridges where the track crosses over itself ----
   buildBridges(td, group, abutmentMetal, wallMat, theme, disposables, heightAt, roadClear, waterY);
   // ---- Session 20: lakes, frozen lakes and plateaus of the open passages ----
-  buildBasins(td, group, theme, surfMat, wallMat, abutmentMetal, disposables, glossy);
+  buildBasins(td, group, theme, surfMat, wallMat, abutmentMetal, disposables, glossy, lavaSet);
 
   // ---- flush ramp-conforming warning chevrons (sit directly on curved ramp slope + bank, never float!) ----
   {
@@ -562,8 +565,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
 
   // ---- TSL animated water / molten lava planes + architectural viaduct piers ----
   if (T === 'lava') {
-    const lt = generateTexture('basalt', ['#0b0605', '#1c0e08', '#2e160b'], 512, 99, 8, '#ff7a20');
-    const lm = lavaSeaMaterial(lt);
+    const lm = lavaSeaMaterial(lavaSet!);
     const pg = new THREE.PlaneGeometry(W, D);
     const lp = new THREE.Mesh(pg, lm); lp.rotation.x = -Math.PI / 2; lp.position.set(cxm, waterY, czm); group.add(lp);
     disposables.push(lm, pg);
@@ -862,7 +864,7 @@ function buildBridges(
  *  Instead of rails and kerbs, floating beacons mark the course (the energy field between them is built in trackDetail). */
 function buildBasins(
   td: TrackData, group: THREE.Group, theme: ThemeDef, surfMat: Map<number, THREE.Material>, rockMat: THREE.Material, metalMat: THREE.Material,
-  disp: { dispose: () => void }[], glossy: THREE.Mesh[],
+  disp: { dispose: () => void }[], glossy: THREE.Mesh[], lavaSet?: TexSet,
 ) {
   const S = td.main.samples, N = S.length;
   const runs: [number, number][] = []; let a0 = -1;
@@ -903,7 +905,7 @@ function buildBasins(
     { const nr = new Float32Array(pos.length); for (let k = 1; k < nr.length; k += 3) nr[k] = 1; g.setAttribute('normal', new THREE.Float32BufferAttribute(nr, 3)); }
     g.setAttribute('aFade', new THREE.Float32BufferAttribute(fade, 1)); g.setIndex(ind); disp.push(g);
     let mat: THREE.Material;
-    if (liquid === 'lava') { const lm = lavaSeaMaterial(generateTexture('basalt', ['#0b0605', '#1c0e08', '#2e160b'], 512, 99, 8, '#ff7a20')); disp.push(lm); mat = lm; }
+    if (liquid === 'lava' && lavaSet) { const lm = lavaSeaMaterial(lavaSet); disp.push(lm); mat = lm; }
     else if (liquid) { const wm = waterMaterial(theme.id, generateTexture('snow', ['#8899aa', '#99aabb', '#aabbcc'], 512, 55, 8).normalMap, theme.clouds * 0.35, undefined, LIQUIDS[liquid]); disp.push(wm); mat = wm; }
     else mat = surfMat.get(S[ra].surf) ?? rockMat;
     const mesh = new THREE.Mesh(g, mat); mesh.receiveShadow = true; group.add(mesh);
