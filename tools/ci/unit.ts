@@ -2,7 +2,7 @@
 // Env: ONLY=<substring> runs only the tests whose name contains it.
 import * as THREE from 'three';
 import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, THEMES, TRACKS, type PodDef, type StatKey } from '../../src/game/data';
-import { makeTerrainField } from '../../src/game/terrain';
+import { makeTerrainField, terrainLeafMaker } from '../../src/game/terrain';
 import { resolveEnvironment, type TimeOfDay, type WeatherKind } from '../../src/game/environment';
 import { clipOutside } from '../../src/game/meshClip';
 import { SnowField } from '../../src/game/snowField';
@@ -1204,6 +1204,29 @@ test('layout: the road never folds over itself – on every track the half width
     if (worst > 0.9) bad.push(`${def.id} ${worst.toFixed(2)} at sample ${at} (half width ${S[at].hw.toFixed(0)} m, radius ${(1 / Math.abs(S[at].curv)).toFixed(0)} m)`);
   }
   eq(bad.length, 0, `tracks with half width / radius above 0.9: ${bad.join(' · ')} –`);
+});
+
+// ---- terrain: where the drawn ground is rock (2026-11-23) ----
+// The terrain material blends rock in where the ground is steep. It read the vertex normal alone – a central difference, flat at the
+// foot and at the rim of a low cliff – so steep faces ran out into sand at such corners: a row of rock teeth along every low cliff
+// (seen on Boonta). Now every vertex carries the slope of the steepest face that meets in it (attribute aSplat, w).
+test('terrain: every face of the terrain mesh is at least as rocky in all three corners as it is steep (no sand teeth on cliffs)', () => {
+  const td = trackOf('boonta'), theme = THEMES[td.def.theme], leaf = terrainLeafMaker(makeTerrainField(td, theme, 7), theme);
+  const S = td.main.samples; let faces = 0, steep = 0; const bad: string[] = [];
+  for (let k = 0; k < S.length; k += 240) {
+    const s = S[k], x0 = Math.floor((s.x + s.rx * 90) / 112) * 112, z0 = Math.floor((s.z + s.rz * 90) / 112) * 112; // a leaf of the finest kind at "Hoch", beside the road
+    const g = leaf(x0, z0, 112), P = g.attributes.position, W = g.attributes.aSplat, I = g.index!;
+    for (let t = 0; t < 16 * 16 * 6; t += 3) { // (the skirt triangles follow after the 16 × 16 cells)
+      const a = I.getX(t), b = I.getX(t + 1), c = I.getX(t + 2);
+      const ux = P.getX(b) - P.getX(a), uy = P.getY(b) - P.getY(a), uz = P.getZ(b) - P.getZ(a), vx = P.getX(c) - P.getX(a), vy = P.getY(c) - P.getY(a), vz = P.getZ(c) - P.getZ(a);
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, slope = 1 - Math.abs(ny) / Math.hypot(nx, ny, nz);
+      const w = Math.min(W.getW(a), W.getW(b), W.getW(c));
+      faces++; if (slope > 0.35) steep++;
+      if (w < slope - 1e-3 && bad.length < 4) bad.push(`face at ${P.getX(a).toFixed(0)}, ${P.getZ(a).toFixed(0)}: slope ${slope.toFixed(2)}, rock weight of one corner ${w.toFixed(2)}`);
+    }
+  }
+  ok(steep > 40, `only ${steep} steep faces among ${faces} – the check saw no cliff`);
+  eq(bad.length, 0, `faces steeper than their rock weight: ${bad.join(' · ')} –`);
 });
 
 console.log(failed ? `\n${failed} unit check(s) FAILED, ${passed} passed.` : `All ${passed} unit checks passed.`);

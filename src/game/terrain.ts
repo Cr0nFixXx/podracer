@@ -348,21 +348,13 @@ export function terrainMeshHeight(field: TerrainField, ext: Extent, geoQ: number
   };
 }
 
-/** Quadtree LOD terrain: leaves of 16×16 cells, fine near track, coarse far away; skirts hide T-junction cracks. */
-export async function buildTerrain(field: TerrainField, theme: ThemeDef, gfx: GfxSettings, mat: THREE.Material, batcher: StaticBatcher, ext: Extent, progress: (p: number, m: string) => void) {
-  const R = 16, geoQ = gfx.geometry;
-  const minLeaf = terrainLeaf(geoQ), maxLeaf = 1700;
-  const S0 = Math.max(ext.W, ext.D);
-  const rx0 = ext.cx - ext.W / 2, rx1 = ext.cx + ext.W / 2, rz0 = ext.cz - ext.D / 2, rz1 = ext.cz + ext.D / 2;
-  const leaves: [number, number, number][] = [];
-  const stack: [number, number, number][] = [[ext.cx - S0 / 2, ext.cz - S0 / 2, S0]];
-  while (stack.length) {
-    const [x0, z0, sz] = stack.pop()!;
-    if (x0 > rx1 || x0 + sz < rx0 || z0 > rz1 || z0 + sz < rz0) continue;
-    const dT = field.distToTrack(x0 + sz / 2, z0 + sz / 2) - sz * 0.7072;
-    if (sz > minLeaf && (dT < sz * 1.55 || sz > maxLeaf)) { const hs = sz / 2; stack.push([x0, z0, hs], [x0 + hs, z0, hs], [x0, z0 + hs, hs], [x0 + hs, z0 + hs, hs]); }
-    else leaves.push([x0, z0, sz]);
-  }
+/** 1 − normal.y of a right-angled terrain triangle whose legs of `c` metres along x and z rise by dx and dz. */
+const faceSlope = (dx: number, dz: number, c: number) => 1 - c / Math.sqrt(c * c + dx * dx + dz * dz);
+
+/** Builder of one terrain leaf (16 × 16 cells of `sz / 16` metres from the corner x0, z0; a skirt hangs from its four edges).
+ *  `buildTerrain` calls it for every leaf; exported so that the unit checks can look at the mesh that is really drawn. */
+export function terrainLeafMaker(field: TerrainField, theme: ThemeDef): (x0: number, z0: number, sz: number) => THREE.BufferGeometry {
+  const R = 16;
   const hueAmt = theme.id === 'desert' || theme.id === 'mesa' ? 0.11 : theme.id === 'jungle' || theme.id === 'malastare' ? 0.08 : 0.05;
   const n = R + 1, E = R + 3;
   const hg = new Float32Array(E * E), sg = new Float32Array(E * E), sb = new Float32Array(E * E), sc = new Float32Array(E * E);
@@ -370,8 +362,8 @@ export async function buildTerrain(field: TerrainField, theme: ThemeDef, gfx: Gf
   for (let j = 0; j < R; j++) for (let i = 0; i < R; i++) { const a = j * n + i, b = (j + 1) * n + i, c = (j + 1) * n + i + 1, d = j * n + i + 1; baseIdx.push(a, b, d, b, c, d); }
   const edges: number[][] = [[], [], [], []];
   for (let i = 0; i < n; i++) { edges[0].push(i); edges[1].push((n - 1) * n + i); edges[2].push(i * n); edges[3].push(i * n + n - 1); }
-  for (let li = 0; li < leaves.length; li++) {
-    const [x0, z0, sz] = leaves[li]; const c = sz / R;
+  return (x0, z0, sz) => {
+    const c = sz / R;
     for (let j = 0; j < E; j++) for (let i = 0; i < E; i++) {
       const k0 = j * E + i; hg[k0] = field.heightAt(x0 + (i - 1) * c, z0 + (j - 1) * c);
       sg[k0] = field.splat.g; sb[k0] = field.splat.b; sc[k0] = field.splat.c;
@@ -393,7 +385,16 @@ export async function buildTerrain(field: TerrainField, theme: ThemeDef, gfx: Gf
       col[k * 3] = v * (1 + hue); col[k * 3 + 1] = v; col[k * 3 + 2] = v * (1 - hue * 1.2);
       const ks = (j + 1) * E + (i + 1);
       const localCrest = Math.min(1, sc[ks] + Math.max(0, lap * 1.4));
-      spl[k * 4] = sg[ks]; spl[k * 4 + 1] = sb[ks]; spl[k * 4 + 2] = localCrest; spl[k * 4 + 3] = h2(i + x0, j + z0);
+      // Rock weight (aSplat.w, 2026-11-23): the slope (1 − normal.y) of the STEEPEST of the six faces that meet in this vertex. The
+      // material blended rock in by the vertex normal alone – a central difference, flat at the foot and at the rim of a low cliff –
+      // so steep faces ran out into sand at such corners: a row of rock teeth along every low cliff. With this value a steep face
+      // is rock in all three corners and the change to sand lies on the flat ground beside it. The faces are those of `baseIdx`
+      // (a-b-d, b-c-d); the neighbouring leaf computes the same from the same heights, so there is no seam.
+      const hA = H(i - 1, j + 1), hB = H(i + 1, j - 1);
+      const steep = Math.max(
+        faceSlope(hr - hc, hu - hc, c), faceSlope(hc - hl, hA - hl, c), faceSlope(hu - hA, hu - hc, c),
+        faceSlope(hB - hd, hc - hd, c), faceSlope(hr - hc, hr - hB, c), faceSlope(hc - hl, hc - hd, c));
+      spl[k * 4] = sg[ks]; spl[k * 4 + 1] = sb[ks]; spl[k * 4 + 2] = localCrest; spl[k * 4 + 3] = steep;
     }
     const idx = baseIdx.slice(); let v = n * n; const drop = c * 0.5 + 2.5;
     for (const e of edges) {
@@ -411,7 +412,29 @@ export async function buildTerrain(field: TerrainField, theme: ThemeDef, gfx: Gf
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('aSplat', new THREE.BufferAttribute(spl, 4)); g.setIndex(idx);
     g.computeBoundingBox(); g.computeBoundingSphere();
-    batcher.add(g, mat, false);
+    return g;
+  };
+}
+
+/** Quadtree LOD terrain: leaves of 16×16 cells, fine near track, coarse far away; skirts hide T-junction cracks. */
+export async function buildTerrain(field: TerrainField, theme: ThemeDef, gfx: GfxSettings, mat: THREE.Material, batcher: StaticBatcher, ext: Extent, progress: (p: number, m: string) => void) {
+  const geoQ = gfx.geometry;
+  const minLeaf = terrainLeaf(geoQ), maxLeaf = 1700;
+  const S0 = Math.max(ext.W, ext.D);
+  const rx0 = ext.cx - ext.W / 2, rx1 = ext.cx + ext.W / 2, rz0 = ext.cz - ext.D / 2, rz1 = ext.cz + ext.D / 2;
+  const leaves: [number, number, number][] = [];
+  const stack: [number, number, number][] = [[ext.cx - S0 / 2, ext.cz - S0 / 2, S0]];
+  while (stack.length) {
+    const [x0, z0, sz] = stack.pop()!;
+    if (x0 > rx1 || x0 + sz < rx0 || z0 > rz1 || z0 + sz < rz0) continue;
+    const dT = field.distToTrack(x0 + sz / 2, z0 + sz / 2) - sz * 0.7072;
+    if (sz > minLeaf && (dT < sz * 1.55 || sz > maxLeaf)) { const hs = sz / 2; stack.push([x0, z0, hs], [x0 + hs, z0, hs], [x0, z0 + hs, hs], [x0 + hs, z0 + hs, hs]); }
+    else leaves.push([x0, z0, sz]);
+  }
+  const leafGeo = terrainLeafMaker(field, theme);
+  for (let li = 0; li < leaves.length; li++) {
+    const [x0, z0, sz] = leaves[li];
+    batcher.add(leafGeo(x0, z0, sz), mat, false);
     if (li % 28 === 27) { progress(li / leaves.length, `Generiere Terrain (LOD ${li}/${leaves.length}) …`); await new Promise(r => setTimeout(r, 0)); }
   }
   return leaves.length;

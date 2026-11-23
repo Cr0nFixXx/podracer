@@ -123,7 +123,10 @@ export function terrainMaterial(o: TerrainMatOpts) {
   }
   const wG = smoothstep(0.34, 0.64, sp.x.add(rT.a.sub(gT.a).mul(0.72)));
   const wB = smoothstep(0.38, 0.6, sp.y.add(bT.a.sub(0.5).mul(0.28)).add(mv.sub(0.5).mul(0.24))).mul(ssInv(0.2, 0.06, slope));
-  const wK = smoothstep(0.19, 0.35, slope.add(kT.a.sub(0.5).mul(0.22)).add(mv.sub(0.5).mul(0.1)));
+  // Rock by steepness. `sp.w` = the slope of the steepest face that meets in the vertex (terrain.ts): a steep face is rock in all its
+  // corners, also where the vertex normal is flat (foot and rim of a low cliff) – read from the normal alone, such faces ran out
+  // into sand: rock teeth along every low cliff (2026-11-23). The change to the other layers lies on the flat ground beside it.
+  const wK = smoothstep(0.19, 0.35, max(slope, sp.w).add(kT.a.sub(0.5).mul(0.22)).add(mv.sub(0.5).mul(0.1)));
 
   let col: N = mix(mix(mix(gC, rC, wG), bC, wB), kC, wK);
   if (o.layers.crestTint) {

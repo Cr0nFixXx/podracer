@@ -21,7 +21,11 @@ let g: Game | null = null; let cur = -1;
   return `${o.type} name="${o.name}" material="${m?.name ?? ''}" (${m?.type}, vertexColors=${mm.vertexColors}, dither=${!!mm.alphaTestNode}, roughness=${mm.roughness}) geometry="${g.name}" `
     + `attrs=${Object.keys(g.attributes).join('+')} verts=${g.attributes.position.count} radius=${g.boundingSphere?.radius.toFixed(2)} dist=${h.distance.toFixed(1)}m`
     + (col ? ` vertexColour0=${[col.getX(0), col.getY(0), col.getZ(0)].map(v => v.toFixed(2)).join('/')}` : '')
-    + (h.instanceId !== undefined ? ` instance ${h.instanceId}/${im.count}` + (im.instanceColor ? ` instanceColour=${[ic.r, ic.g, ic.b].map(v => v.toFixed(2)).join('/')}` : '') : '');
+    + (h.instanceId !== undefined ? ` instance ${h.instanceId}/${im.count}` + (im.instanceColor ? ` instanceColour=${[ic.r, ic.g, ic.b].map(v => v.toFixed(2)).join('/')}` : '') : '')
+    // where, and how steep: the hit point (feed it to the view `at_…`), the face's normal.y and the normal.y of its three vertices
+    // (the terrain blends rock in by 1 − normal.y, interpolated from the vertices)
+    + ` at=${[h.point.x, h.point.y, h.point.z].map(v => v.toFixed(1)).join('_')}`
+    + (h.face ? ` faceNy=${h.face.normal.y.toFixed(2)}` + (g.attributes.normal ? ` vertexNy=${[h.face.a, h.face.b, h.face.c].map(k => (g.attributes.normal as THREE.BufferAttribute).getY(k).toFixed(2)).join('/')}` : '') : '');
 };
 (window as unknown as Record<string, unknown>).track = async (i: number, view: string) => {
   if (cur !== i) {
@@ -109,6 +113,8 @@ let g: Game | null = null; let cur = -1;
   } else if (view === 's') { // look from above the road towards the sun (lens flare / god-ray / glare check)
     const S = G.td.main.samples, a = S[Math.floor(S.length * 0.2)];
     G.camera.position.set(a.x, a.y + 6, a.z); G.camera.lookAt(a.x + G.sunDir.x * 100, a.y + 6 + G.sunDir.y * 60, a.z + G.sunDir.z * 100);
+  } else if (view.startsWith('at_')) { // camera at a world position looking at another: at_<x>_<y>_<z>_<tx>_<ty>_<tz> (positions as `pick` prints them)
+    const v = view.split('_').slice(1).map(Number); G.camera.position.set(v[0], v[1], v[2]); G.camera.lookAt(v[3], v[4], v[5]);
   } else if (/^p\d/.test(view)) { // generic probe: p<idx>_<lat>_<height>_<ahead>_<path>_<lookLat>_<lookHeight> – camera on sample idx looking `ahead` samples forward
     const [i0, lat = 0, hh = 5, ahead = 40, pi = 0, lLat = 0, lH = 3] = view.slice(1).split('_').map(Number);
     const P = G.td.paths[pi] ?? G.td.main, S = P.samples, N = S.length, W = (k: number) => P.closed ? S[((k % N) + N) % N] : S[Math.max(0, Math.min(N - 1, k))];

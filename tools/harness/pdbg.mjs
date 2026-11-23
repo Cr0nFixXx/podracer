@@ -44,14 +44,15 @@ for (const v of views) {
         seen[n] = (seen[n] || 0) + 1;
         if (fresh || o.userData.__vis === undefined) o.userData.__vis = o.visible;
         o.visible = o.userData.__vis;
-        if (m && m.userData.__wire === undefined) m.userData.__wire = !!m.wireframe; if (m) m.wireframe = m.userData.__wire;
+        if (m && m.userData.__wire === undefined) m.userData.__wire = !!m.wireframe;
+        if (m && m.wireframe !== m.userData.__wire) { m.wireframe = m.userData.__wire; m.needsUpdate = true; } // (without needsUpdate the wireframe of an earlier variant stayed on)
         const named = names.includes(n) || names.includes(o.name);
         if (variant.startsWith('hide:') && named) o.visible = false;
         if (variant.startsWith('only:') && !named) o.visible = false;
         if (variant === 'noterrain' && n === 'terrain') o.visible = false;
         if (variant === 'nocliff' && n === 'cliff') o.visible = false;
         if (variant === 'noroad' && n === 'road') o.visible = false;
-        if (variant === 'wire' && n === 'terrain' && m) m.wireframe = true;
+        if (variant === 'wire' && n === 'terrain' && m && !m.wireframe) { m.wireframe = true; m.needsUpdate = true; }
       });
       let extra = '';
       if (variant === 'race' && G.td.snow?.runs.length) {
