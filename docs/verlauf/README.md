@@ -7,6 +7,7 @@ Eine Datei je Aufgabe oder Sitzung, neueste zuerst. Jede Datei hält fest, was g
 
 | Datum | Datei | Inhalt |
 |---|---|---|
+| 2026-11-23 | [2026-11-23-nach-der-probefahrt.md](2026-11-23-nach-der-probefahrt.md) | Nach der Probefahrt des Nutzers: drei Fehler, Verbesserungen, Streckenanpassungen – Auftrag, Entscheidungen der Fragerunde, Stand |
 | 2026-11-23 | [2026-11-23-uebergaenge-felsreihen-buchten.md](2026-11-23-uebergaenge-felsreihen-buchten.md) | Übergänge am Pistenrand und zwischen Untergründen, Felsreihen und Buchten, keine Falten der Fahrbahn mehr, Höhlen-Optik, Farne, Schnee-Fotosets, echter Fels auf Aquilaris und Oovo IV |
 | 2026-11-22 | [2026-11-22-skills-fehler-klima.md](2026-11-22-skills-fehler-klima.md) | Skill-Set eingerichtet, Rückwärtslenkung, freie Eingänge an Höhlen und Abkürzungen, Klima wirkt auf den Boost, Schneedecke mit Spuren, Felsgrenzen statt Leitplanken |
 | 2026-11-22 | [2026-11-22-controller-und-action.md](2026-11-22-controller-und-action.md) | Controller geht beim Rennstart aus (Diagnose), GitHub-Action auf GitHub |

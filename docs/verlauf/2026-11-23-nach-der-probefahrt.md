@@ -1,0 +1,75 @@
+# Stand: 2026-11-23 – nach der Probefahrt des Nutzers: drei Fehler, Verbesserungen, Streckenanpassungen
+
+Der Nutzer ist den Stand vom 2026-11-23 (`ee20aa5`) auf echter GPU gefahren und hat eine Liste geschickt. Diese Datei hält den Auftrag, die Entscheidungen der Fragerunde und – Punkt für Punkt – fest, was gebaut und geprüft wurde. Was offen ist, steht in `TODO.md` Abschnitt 9.
+
+## Auftrag (wörtlich)
+**Bugs**
+- auf der strecke "Methan-Derby" ragen felswände (falsch positionierte geometrie) halb auf die strecke.
+- extrem schlechte sicht bei nacht + unwetter/gewitter (starker regen).
+- bodentexturen haben teilweise streifen drauf welche so aussehen wie reifenspuren (besonders auf schnee).
+
+**Verbesserungen / Soll**
+- kein fallschaden bei sanfter/normaler landung
+- erhöhte (schatten)sichtweite - ich sehe selbst auf ultra wie sich eine schattenwand vor mir her schiebt, nach der es wieder hell ist.
+- wasserspritzer auf der linse auch bei fahrten über wasser/pfützen wenn es nicht regnet.
+- boost alarm sound: langsam stärker werdener alarm sound wenn boost kurz vor maximum.
+- sichtbares plasma hitzeschild, welches sich unter dem pod bei fahrten über lava aktiviert (nur optik).
+- bei fahrten über lava extrem kurze boost möglichkeit.
+- controller support auch im menü.
+- reset taste (pod neu auf die strecke zurücksetzen)
+- **Streckenanpassungen** (mit Fragerunde, `grill-me`):
+  - bevor das rennen startet eine intro fahrt über die strecke bis man "Rennen starten" auswählt.
+  - 3D Schnee: mehr schnee / viel höherer schnee, richtig 3D volumetrisch, schnee verwirbelung / schnee fliegt auf/zur seite beim reinfahren, feine partikel
+  - dezente fahrspuren auch im sand/mondstaub.
+  - auf malastare: giftig grüner methanregen - kein normaler regen. - setting etwas düsterer.
+  - Schwerelosigkeitsüberarbeitung: zentrale mittige anziehung. wenn gelenkt wird, wird man danach zurück gezogen so wie im echten spiel auch (wie ein gummiband).
+  - mehr und weitere sprünge über schluchten. zusätzlich passagen mit springen von erhöhten auf tiefere passagen. (erweitere/verlängere die strecken falls nötig)
+  - fahreigenschaften auf verschiedenen untergründen generell kaum spürbar - etwas stärker. besonders mehr rutschen/sliden über eis(seen).
+  - ersetze die fliegenden zeppelin deko assets mit zum star wars setting passenden assets. - fliegende raumschiffe/werbetafeln/tribünen?
+
+**TODO-Punkte**
+- 1. Am echten Gerät prüfen – „Geh mit mir die punkte durch."
+- 2. Gamepad geht mitten im Rennen aus – soll das Rennen dann pausieren? **JA**
+- 5. Strecken & Optik – komplett
+- 8. Vom Nutzer am 2026-11-22 bestellt, was davon noch offen ist – komplett
+
+## Entscheidungen des Nutzers (Fragerunde `grilling`, zwei Runden, 2026-11-23)
+| Thema | Entscheidung |
+|---|---|
+| Intro-Fahrt | Durchgehender Flug in Endlosschleife: 20–35 m über der Ideallinie, etwa dreifaches Renntempo, Blick voraus. Unten Streckenname, Länge, Runden, Wetter und der Knopf „Rennen starten" (sofort aktiv, Enter oder A-Taste). Danach Schnitt auf die Startaufstellung, Countdown. |
+| 3D-Schnee, Höhe | **„dynamische Höhe 1–3 m"** (eigene Antwort): Wehen zwischen 1 und 3 m; wo es 3 m sind, schneidet der Pod eine Schlucht in den Schnee. **Nur auf den Pulverschnee-Feldern** – normale Schnee-Passagen bleiben flach. |
+| 3D-Schnee, Wirkung | Frisch 86 % Höchsttempo, im Graben eines Vorausfahrenden 99 %; die Gegner suchen die Gräben. |
+| Spuren in Sand und Mondstaub | Nur Optik, dezent: zwei flache Streifen je Pod. Im Sand verweht sie der Wind nach etwa 40 s, im Mondstaub bleiben sie das ganze Rennen. Sand, Dünen, Strand, Asche, Mondstaub. |
+| Methanregen, wann | Auf beiden Malastare-Strecken ersetzt er Regen und Gewitter vollständig (giftgrüne Tropfen, grün-gelber Dunst, grüne Nässe, grüne Linsentropfen, grünliche Blitze). „Klar" und „Methannebel" bleiben wählbar. Die Welt wird insgesamt düsterer (etwa 30 % weniger Licht). |
+| Methanregen, Wirkung | Brennbar: Haftung wie bei Regen, Boost-Hitze **+12 %** (Wasserregen: −10 %), der Boost zieht grüne Flammenfahnen. |
+| Schwerelosigkeit | Feder zur Mittelachse der Röhre, seitlich und in der Höhe. Lenken und Steigen/Sinken drücken den Pod bis etwa 70 % des Röhrenradius aus der Mitte; beim Loslassen schnellt er in rund 0,8 s zurück und schwingt leicht über. Die Nase folgt von selbst dem Röhrenverlauf. |
+| Schwerelos-Röhre, Hindernisse | Wenige langsam treibende Felsbrocken (alle 150–200 m); ein Treffer kostet Tempo und Schaden wie ein Hindernisfels. |
+| Sprünge, wo | **Nur auf den Schlucht-Strecken:** Boonta, Dünenpass, Magma, Kristall, Heuler, Malastare-100. Dort: vorhandene Lücken auf 70–90 m, EIN weiter Schluchtsprung von 130–160 m, EIN Abwurf (Kante, 12–18 m tiefer weiter). Strecken dürfen dafür länger werden. Stadt- und Seestrecken bleiben. |
+| Sprünge, Anspruch | **Weite Sprünge nur mit Boost** – wer nicht boostet, fällt und wird an die Absprungkante zurückgesetzt. |
+| Untergründe | „Deutlich": Eis und Eissee 45 % Haftung mit langem Nachrutschen · Pulverschnee 78 % · Schnee 86 % · Schlamm 80 % und 88 % Tempo · Dünen 85 % und 91 % Tempo · Sand, Geröll, Asche 90 % · Fels und Piste 100 %. |
+| Flug-Deko | **Bekannte Vorbilder möglichst genau nachbauen.** Auswahl bestätigt: Tatooine und Tafelberge – Segelbarke, aufsteigende Zuschauer-Logen wie in der Mos-Espa-Arena, leichter Frachter (Untertasse mit seitlichem Cockpit); Aquilaris – Wolkenwagen (zwei Kapseln) und Frachter; auf allen Welten Holo-Werbetafeln. |
+| TODO 8 – über den Felsreihen | Höhere Felsen (mindestens 7 m), das sichtbare Energiefeld entfällt; ganz oben bleibt ein unsichtbarer, weicher Rückdruck. |
+| TODO 8 – Seen und Plateaus | Natürliche Ufer je nach Welt; Baken nur noch als Wegweiser an Ein- und Ausfahrt, ohne Feld. |
+| TODO 5 – Aquilaris-Mauerkronen | „Bewachsen, aber richtig": echte Moospolster und Pflanzen statt grüner Tönung. |
+| Ablauf | Reihenfolge: Fehler → Verbesserungen → Streckenanpassungen → TODO 2, 5, 8. Jeder Punkt ein eigener Commit. **Nach jedem fertigen Block wird gepusht** (ausdrücklich erlaubt für diese Runde). |
+
+## TODO 1 – mit dem Nutzer durchgegangen (2026-11-23)
+| Punkt | Antwort des Nutzers |
+|---|---|
+| Probefahrt auf echter GPU (Höhlen, Gabelungen, hohe Tunnel, See-Passagen, Oovo-Mond), Bildrate | **Sieht gut aus, läuft flüssig** – außer den drei gemeldeten Fehlern |
+| Hoher Pod an Tunneldecke, Sponsor-Brücke, Checkpoint-Bogen | noch nicht geprüft |
+| „Ultra" am Gaming-PC mit vollen Details, Teilen, Schaden | **Flüssig (60 FPS oder mehr)** |
+| Hangar: Teile-Kombinationen, Lackmuster; Cockpit-Innenansicht im Tunnel | noch nicht geprüft |
+| Schadens-Balance von Hand (5–10 % je Bruchteil; Rammbock-Nase schützt frontal) | **Fühlt sich richtig an** |
+| Neues vom 22.11.: Brandmarken (Manta, Halo-9, Cyclone), Schnittkanten am Halo-9, kein Ruckler im ersten Bild des Countdowns | noch nicht geprüft |
+
+Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?" – zu schwach, siehe „Untergründe".
+
+## Was gemacht wurde
+*(wird Punkt für Punkt ergänzt)*
+
+## Geprüft
+
+## Nicht geprüft
+
+## Git

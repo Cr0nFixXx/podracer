@@ -3,18 +3,15 @@
 Nur offene Punkte, nach Thema. Erledigtes steht im Verlauf: `docs/verlauf/`, je Sitzung unter „Erledigt".
 
 ## 1. Am echten Gerät prüfen (Nutzer) – in der Sandbox rendert nur Software
-- [ ] **Probefahrt + FPS-Messung auf echter GPU** (weiter offen – die Sandbox rendert nur in Software): durchgehende Höhlen und Gabelungen, neue Tunnelhöhen (27–30 m), See-Passagen, Untergrund-Physik (ist Eis mit −25 % Haftung fair?), Oovo-Mond
 - [ ] **Auf echter GPU ansehen:** einen hohen Pod (Vrak Splitter-X) im Tunnel an die Decke fliegen – und in eine Sponsor-Brücke und einen Checkpoint-Bogen. Die echten Überkopf-Bauten entstehen erst mit der Welt; geprüft ist die Regel nur an einer künstlichen Brücke und einem künstlichen Bogen
-- [ ] **Am Gaming-PC prüfen (Nutzer):** „Ultra"-Bildrate mit vollen Details + Teilen + Schaden; Schadens-Balance fahren
 - [ ] Teile-Kombinationen am Gaming-PC durchklicken (gesichtet sind 7; Maße und Dreiecke prüft das Audit an drei Sätzen je Pod)
 - [ ] Cockpit-Innenansicht in einem Tunnel sichten (Regen und 90°-Rolle sind gesichtet)
-- [ ] Schadens-Balance von Hand fahren (bisher nur KI-Sim): sind 5–10 % je Bruchteil richtig?
-- [ ] **Neu seit dem 2026-11-22 – ansehen / probefahren:** (1) frontal in eine Felswand mit Mandrel Ram und Vrak Splitter-X: schützt die Nase spürbar, ein Streifer nicht? (2) Brandmarken bei Dorn Manta, Lyss Halo-9, Tarn Cyclone: sitzen sie jetzt auf Flanke, Ring und Rotor-Reif? (3) Lyss Halo-9 mit verlorenen Ringsegmenten aus der Nähe: Schnittkanten sauber? (4) Start eines Rennens: kein Ruckler mehr im ersten Bild des Countdowns (Einstellung „Hoch" oder „Ultra", WebGPU)
+- [ ] **Neu seit dem 2026-11-22 – ansehen:** (1) Brandmarken bei Dorn Manta, Lyss Halo-9, Tarn Cyclone: sitzen sie jetzt auf Flanke, Ring und Rotor-Reif? (2) Lyss Halo-9 mit verlorenen Ringsegmenten aus der Nähe: Schnittkanten sauber? (3) Start eines Rennens: kein Ruckler mehr im ersten Bild des Countdowns (Einstellung „Hoch" oder „Ultra", WebGPU)
 
 ## 2. Entscheidungen des Nutzers
 - [ ] Entscheidung offen: `npm run save` endgültig entfernen oder wieder einschalten? (2026-11-22, Nutzer: vorerst **abgeschaltet lassen**)
 - [ ] Soll der Web-Build (`npm run build:web` → `build/`) online gestellt werden – Vercel, GitHub Pages? Er ist gebaut und über einen lokalen Server getestet, aber nirgends hochgeladen
-- [ ] **Gamepad geht mitten im Rennen aus** (leere Batterien, Verbindung weg): heute fliegt der Pod ungesteuert weiter. Soll das Rennen dann pausieren – aber nur, wenn zuletzt mit dem Gamepad gesteuert wurde? Dazu: das Spiel nimmt immer das erste gemeldete Gamepad; hängt ein zweites Gerät davor, wird der Controller nicht gelesen → das Gerät nehmen, das Eingaben liefert
+- [ ] **Gamepad geht mitten im Rennen aus** – entschieden am 2026-11-23: **JA, das Rennen pausiert** (nur wenn zuletzt mit dem Gamepad gesteuert wurde). Noch zu bauen; dazu: das Spiel nimmt immer das erste gemeldete Gamepad – das Gerät nehmen, das Eingaben liefert
 
 ## 3. Tunnel, Decke, Überkopf-Bauten
 - [ ] Bögen (Checkpoint-Bögen, Felsbögen, einstürzender Bogen) werden an der seitlichen Position der Pod-Mitte gelesen, ihre Kollisionsform ist dafür gepolstert → Eckpunkt für Eckpunkt prüfen? Dafür müssten die Bogenformen neu vermessen werden
@@ -52,3 +49,30 @@ Nur offene Punkte, nach Thema. Erledigtes steht im Verlauf: `docs/verlauf/`, je 
 - [ ] **Textur- und Terrainübergänge – Rest.** Gebaut am 2026-11-23 ([Protokoll](docs/verlauf/2026-11-23-uebergaenge-felsreihen-buchten.md)): (1) Pistenrand ↔ Gelände (eine Naturpiste hat keinen sichtbaren Rand mehr), (2) weiche Wechsel der Untergründe und Verwehungen, (3) im Gelände: Felswände ohne gestreckte Textur, Kappen gehen ins Gelände über, steile Flächen sind durchgehend Fels (keine Felszähne), Aquilaris und Oovo IV haben echten Fels statt Wandplatten. **Offen:** die Ufer der Becken (Seen, Plateaus) · die Schwellen der übrigen Geländeschichten (Kies, Beckenboden) · Schnee auf Felsbändern nach Höhe · gemischter Boden zusammen mit Spiegelungen (SSR) nie gesehen
 - [ ] **Offenere Abschnitte – Rest.** Gebaut: Felsgrenzen statt Leitplanken (2026-11-22), Reihen einzelner Felsen und **Buchten** – zwischen zwei Felsgrenzen öffnet und schließt sich die Piste um bis zu 18 m je Seite (2026-11-23). **Offen:** (1) beide Seiten öffnen sich gemeinsam – unabhängige Seiten brauchen `wallL` / `wallR` statt `hw` in Gegner-Linie, Fahrbahn-Netz, Gelände und Schneedecke (`docs/regeln/strecken.md` → „Bays"); (2) Seen und Plateaus haben weiter Baken mit Energiefeld; (3) über dem Fels drückt weiter das (aufblitzende) Energiefeld zurück – gewollt?; (4) die Kollision ist die glatte Linie, die Felsen ragen bis 0,25 m hinein und werfen keine Schatten; (5) alles nur in Software-Bildern und in der KI-Simulation geprüft – die Probefahrt steht aus
 
+## 9. Vom Nutzer am 2026-11-23 bestellt (nach der Probefahrt) – was davon noch offen ist
+Auftrag und Entscheidungen: [Protokoll](docs/verlauf/2026-11-23-nach-der-probefahrt.md). Reihenfolge: Fehler → Verbesserungen → Streckenanpassungen → TODO 2, 5, 8. Nach jedem fertigen Block wird gepusht.
+
+**Fehler**
+- [ ] Methan-Derby: Felswände ragen halb auf die Strecke
+- [ ] Extrem schlechte Sicht bei Nacht + Gewitter
+- [ ] Bodentexturen haben Streifen wie Reifenspuren (besonders auf Schnee)
+
+**Verbesserungen**
+- [ ] Kein Fallschaden bei sanfter/normaler Landung
+- [ ] Größere Schatten-Sichtweite (auf „Ultra" schiebt sich eine Schattenwand vor dem Pod her)
+- [ ] Wasserspritzer auf der Linse auch über Wasser/Pfützen ohne Regen
+- [ ] Boost-Alarm: langsam stärker werdender Ton kurz vor dem Maximum
+- [ ] Plasma-Hitzeschild unter dem Pod über Lava (nur Optik)
+- [ ] Über Lava nur extrem kurzer Boost
+- [ ] Controller-Bedienung auch im Menü
+- [ ] Reset-Taste (Pod zurück auf die Strecke)
+
+**Streckenanpassungen** (Entscheidungen im Protokoll)
+- [ ] Intro-Flug über die Strecke bis „Rennen starten"
+- [ ] 3D-Schnee: Wehen 1–3 m auf Pulverfeldern, Pflügen, Bugwelle, feine Partikel; frisch 86 % / Graben 99 %, Gegner suchen Gräben
+- [ ] Dezente Fahrspuren in Sand und Mondstaub (nur Optik)
+- [ ] Malastare: Methanregen (brennbar, +12 % Hitze, grüne Flammen), Welt düsterer
+- [ ] Schwerelosigkeit: Feder zur Röhrenmitte, Nase folgt der Röhre; wenige treibende Brocken
+- [ ] Sprünge auf den sechs Schlucht-Strecken: Lücken 70–90 m, ein weiter Sprung (nur mit Boost), ein Abwurf
+- [ ] Untergründe „deutlich" (Eis 45 % Haftung …)
+- [ ] Flug-Deko: Segelbarke, Zuschauer-Logen, Frachter, Wolkenwagen, Holo-Werbetafeln statt Zeppelinen
