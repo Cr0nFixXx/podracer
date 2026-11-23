@@ -318,15 +318,27 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
     anim.push(t => { ringMat.opacity = 0.68 + Math.sin(t * 4) * 0.18; });
   }
 
-  // ---------- 5. turbine scorch / skid marks on the road (deterministic) ----------
+  // ---------- 5. turbine scorch on the built race deck (deterministic) ----------
+  // 2026-11-23: these decals were ten thin, sharp, dark lines – tyre tracks, on a track for hovering pods – and they lay on every
+  // ground: dark on white on the snow passages (reported by the user: "Streifen wie Reifenspuren, besonders auf Schnee"). Now: two
+  // broad, soft soot streaks (the two engines of a pod that fired up there), and only on the built deck. Natural ground gets its marks
+  // from the pods themselves (snow trails; `TODO.md` Abschnitt 9: sand and moon dust).
   {
     const tex = canvasTex(128, 512, c => {
       c.clearRect(0, 0, 128, 512);
-      for (let k = 0; k < 10; k++) {
-        const x = 10 + k * 11 + h2(k, 1) * 7; const a = 0.24 + h2(k, 2) * 0.48;
-        const g = c.createLinearGradient(0, 0, 0, 512); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.15, `rgba(10,8,6,${a})`); g.addColorStop(0.85, `rgba(10,8,6,${a})`); g.addColorStop(1, 'rgba(0,0,0,0)');
-        c.fillStyle = g; c.fillRect(x, 0, 3 + h2(k, 3) * 5, 512);
+      for (let k = 0; k < 2; k++) {
+        const x = 38 + k * 52 + (h2(k, 1) - 0.5) * 8, hw = 15 + h2(k, 3) * 7, a = 0.2 + h2(k, 2) * 0.14;
+        const g = c.createLinearGradient(x - hw, 0, x + hw, 0);
+        g.addColorStop(0, 'rgba(14,11,9,0)'); g.addColorStop(0.5, `rgba(14,11,9,${a})`); g.addColorStop(1, 'rgba(14,11,9,0)');
+        c.fillStyle = g; c.fillRect(x - hw, 0, hw * 2, 512);
       }
+      // break the soot up (unburnt specks), then let it fade in and out along its length
+      c.globalCompositeOperation = 'destination-out';
+      for (let k = 0; k < 420; k++) { c.fillStyle = `rgba(0,0,0,${0.15 + h2(k, 7) * 0.45})`; c.beginPath(); c.arc(h2(k, 5) * 128, h2(k, 6) * 512, 0.8 + h2(k, 8) * 2.6, 0, Math.PI * 2); c.fill(); }
+      c.globalCompositeOperation = 'destination-in';
+      const f = c.createLinearGradient(0, 0, 0, 512); f.addColorStop(0, 'rgba(0,0,0,0)'); f.addColorStop(0.3, 'rgba(0,0,0,1)'); f.addColorStop(0.6, 'rgba(0,0,0,0.8)'); f.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = f; c.fillRect(0, 0, 128, 512);
+      c.globalCompositeOperation = 'source-over';
     });
     const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     disp.push(mat, tex);
@@ -335,7 +347,7 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
     for (let d = 0; d < count; d++) {
       const i0 = Math.floor(rng() * N); const len = 7 + Math.floor(rng() * 14); const width = 2.6 + rng() * 3.2;
       const s0 = S[i0]; const lat0 = (rng() * 2 - 1) * (s0.hw - 5); const drift = (rng() - 0.5) * 0.4;
-      let ok = true; for (let k = 0; k <= len; k++) { const s = S[(i0 + k) % N]; if (s.gap || s.ramp > 0 || (!td.main.closed && i0 + k >= N)) ok = false; }
+      let ok = true; for (let k = 0; k <= len; k++) { const s = S[(i0 + k) % N]; if (s.gap || s.ramp > 0 || s.surf > 0 || (!td.main.closed && i0 + k >= N)) ok = false; } // (built deck only; the random numbers above are drawn either way)
       if (!ok) continue;
       for (let k = 0; k <= len; k++) {
         const s = S[(i0 + k) % N]; const lat = lat0 + drift * k;
