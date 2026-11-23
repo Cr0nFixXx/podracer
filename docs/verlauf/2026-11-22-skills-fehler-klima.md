@@ -1,4 +1,4 @@
-# Stand: 2026-11-22 – Skill-Set eingerichtet, zwei Fehler behoben, Klima wirkt auf den Boost
+# Stand: 2026-11-22 – Skill-Set eingerichtet, zwei Fehler behoben, Klima und Boost, Schneedecke mit Spuren, Felsgrenzen statt Leitplanken
 
 Auftrag des Nutzers: (1) das Skill-Set `mattpocock/skills` installieren; (2) Fehler: rückwärts ist die Lenkung nicht invertiert · Höhlen und Abkürzungen haben am Anfang Geometriefehler und sind teilweise versperrt; (3) Aufgaben: `TODO.md` Abschnitt 5 · Klima/Wetter wirkt auf den Boost · Pulverschnee als feiner 3D-Schnee mit Spuren · überarbeitete Textur-/Terrainübergänge · offenere Streckenabschnitte mit Felsen und Wänden als Grenze.
 
@@ -9,9 +9,9 @@ Diese Datei hält fest, was davon erledigt ist. Was offen bleibt, steht in `TODO
 |---|---|---|
 | Einrichtung der Skills (Tracker, Status-Namen, Glossar-Name) | **„erstmal keine ticket skills"** | kein Issue-Tracker, kein `.scratch/`; `CONTEXT.md` behält seinen Namen; `TODO.md` bleibt die Übersicht |
 | Wetter/Klima → Boost | **nur die Hitze** | umgesetzt (Punkt 4) |
-| Pulverschnee | **3D-Schneedecke mit Spuren, und die Spuren ändern das Fahren** (gespurter Schnee ist schneller) | offen, `TODO.md` Abschnitt 8 |
+| Pulverschnee | **3D-Schneedecke mit Spuren, und die Spuren ändern das Fahren** (gespurter Schnee ist schneller) | umgesetzt (Punkt 5) |
 | Textur-/Terrainübergänge | **alle drei Arten** (Pistenrand ↔ Gelände, Untergrund-Wechsel, im Gelände) | offen, `TODO.md` Abschnitt 8 |
-| Offenere Abschnitte | **auf allen Natur-Untergründen** Leitplanken, Randsteine, Pistenkante weg; Felsreihen und Felswände als feste Grenze; gebaute Decks behalten Geländer | offen, `TODO.md` Abschnitt 8 |
+| Offenere Abschnitte | **auf allen Natur-Untergründen** Leitplanken, Randsteine, Pistenkante weg; Felsreihen und Felswände als feste Grenze; gebaute Decks behalten Geländer | erster Schritt umgesetzt (Punkt 6), Rest in `TODO.md` Abschnitt 8 |
 | Wo sind die Fehler an Höhlen/Abkürzungen? | **bei (fast) allen** | Punkt 3 |
 
 ## Was gemacht wurde
@@ -46,15 +46,35 @@ Der Rest sind die Falten der Fahrbahn (`TODO.md` Abschnitt 5) und zwei Becken-R�
 - Faktor = Klima der Welt × Tageszeit × Wetter, begrenzt auf 0,75 … 1,25. Aufheizen beim Boosten × Faktor, Abkühlen ÷ Faktor. Die Boost-Kraft bleibt gleich. Gilt für Gegner.
 - Kühl: Regen −10 %, Gewitter und Schneeböen −16 %, Nebel −4 %, Nacht −8 %, Eiswelt −6 %. Heiß: Sandsturm +18 %, Aschesturm +20 %, Tag auf heißen Welten +5 %, Wüste und Vulkan +6 %. Der Untergrund zählt wie bisher dazu (Lavasee × 1,6).
 - Beispiele Tag / Nacht: Wüste klar 1,11 / 1,02 · Sandsturm 1,25 / 1,23 · Eiswelt klar 0,94 / 0,89 · Schneeböen 0,79 / 0,75 · Dschungel Gewitter 0,91 / 0,82 · Aquilaris Gewitter 0,81 / 0,76 · Oovo IV immer 1,00.
-- Anzeige: im Renn-Menü ein Satz unter Tageszeit und Wetter; im Rennen am Hitzebalken „KÜHLE LUFT −18 %" oder „HEISSE LUFT +11 %" (ab 3 %).
+- Anzeige: im Renn-Menü neben dem Wort „Wetter" („Boost-Hitze −16 %", Erklärung beim Überfahren mit der Maus). Zuerst stand dort ein eigener Satz – der machte den Bildschirm bei 1280 × 720 um 21 px zu hoch (`pui.mjs` schlug an), deshalb die kurze Form; im Rennen am Hitzebalken „KÜHLE LUFT −18 %" oder „HEISSE LUFT +11 %" (ab 3 %).
+
+### 5. Pulverschnee: eine Schneedecke, die sich die Spuren merkt
+- **Daten** (`snowField.ts`): über jedem Pulverschnee-Feld liegt ein Raster aus 1-m-Zellen. Jede Zelle hält, wie fest der Schnee ist (0 frisch … 255 fest). Frostspalt-Ring: ein Feld, 474 Streckenpunkte (0,95 km), 116 × 948 Zellen.
+- **Fahren** (`stepPod`): jeder Pod stempelt alle 0,75 m unter seinen beiden Triebwerksbänken (Radius 1,5 m). Eine Überfahrt festigt die Spur etwa zur Hälfte, vier Überfahrten zu rund 90 %. Höchsttempo: frisch 93 %, fest 98,5 %. Haftung: 90 % → 95 %. Gilt für alle Pods; die Gegner suchen die Spuren nicht, fahren sie aber entlang ihrer Linie selbst ein.
+- **Bild** (`snowDeck.ts`): eine Schneeschicht je Feld, 58 cm dick, mit flachen Wellen und feinem Korn. Spuren sind bis 39 cm tief, bläulicher und glatter; daneben ein aufgeworfener Rand. Die Schicht läuft an beiden Enden des Feldes über 24 m aus und fällt neben der Piste in den Boden ab.
+- **Wetter:** bei Schneeböen schneien die Spuren zu – eine feste Spur ist nach rund 2,5 Minuten voller Böen wieder frisch.
+- **Dazu:** dichte Schneefahne in frischem Pulver, kaum eine auf fester Spur. HUD: „Pulverschnee · gespurt – trägt besser".
+
+### 6. Offene Abschnitte: Felsgrenzen statt Leitplanken (erster Schritt)
+- Auf jedem Naturboden (alles außer dem gebauten Deck) steht statt der Leitplanke eine niedrige, unregelmäßige Felsreihe: 2,6 bis 7 m hoch, einzelne Felsnasen bis 12 m. Gebaute Decks, Tunnel, Brücken, Rampen und Zero-G behalten ihre Geländer, Seen und Plateaus ihre Baken.
+- Der Fels steht genau dort, wo die Leitplanke stand (Tore und Bögen sind für diese Breite gebaut). Er ist fest wie eine Schluchtwand; wer höher fliegt als der Fels, wird nur zurückgedrückt.
+- Entlang der Felsgrenzen gibt es keine Reflektoren, keine Wandlampen und keine Randsteine mehr.
+- Anteil der Streckenpunkte mit Leitplanke auf beiden Seiten, vorher → nachher: Boonta 69 → 9 %, Frostspalt 67 → 16 %, Magma 62 → 9 %, Dünenpass 52 → 12 %, Dschungel 59 → 11 %, Aquilaris 56 → 31 %, Oovo IV 71 → 31 %, Kristall 60 → 12 %, Malastare 48 → 25 %, Mos Espa 66 → 10 %, Howler 44 → 16 %, Methan 66 → 40 %, Executioner 55 → 30 %. Was bleibt, ist gebautes Deck (Start/Ziel, Rampen, auf Oovo IV und dem Executioner auch die Stationsdecks).
+- Nicht gebaut: schwankende Breite, einzelne Felsbrocken an der Grenze (`TODO.md` Abschnitt 8).
 
 ## Geprüft
-- `npm run check` grün: 96 Unit-Prüfungen (11 neue), Pod-Audit, Sim 13 / 13 Strecken.
-- Neue Prüfungen, vorher rot: `steering: …` (1 von 2), `forks: …` (5 von 5: Gelände bis 14,5 m über der Fahrbahn, Wand neben der Boonta-Einfahrt 36,5 m hoch), `boost climate: …` (3 von 3). `clipOutside` ist neuer Code.
+- `npm run check` grün: 103 Unit-Prüfungen (18 neue), Pod-Audit, Sim 13 / 13 Strecken – auch mit den Felsgrenzen.
+- Neue Prüfungen, vorher rot: `steering: …` (1 von 2), `forks: …` (5 von 5: Gelände bis 14,5 m über der Fahrbahn, Wand neben der Boonta-Einfahrt 36,5 m hoch), `boost climate: …` (3 von 3), `snow: …` (4 von 4). `clipOutside` ist neuer Code. `open sections: …` (3): der Schalter `NO_ROCK_BORDERS` zeigt, dass die Prüfung fallen kann.
 - Bilder (WebGL2 in Software, „Hoch"): Boonta-Kessel – Einfahrt und Ausfahrt der Abkürzung aus Pilotenhöhe, eine normale Schlucht; Frostspalt-Ring – Höhlengabelung und Wiedervereinigung. Die Platten und die verschmierten Felsbrocken sind weg, die Wege frei.
+
+- Schneedecke: Bilder in WebGL2 (frisches Feld, gestempelte Spuren aus Pilotenhöhe und von oben, vier Sekunden echtes Rennen mit acht Pods – Doppelspuren und Schneefahnen sind da). WebGPU-Check des Frostspalt-Rings (`check:gpu`): 0 Fehler, 0 Warnungen.
+- Felsgrenzen: Bilder vom Boonta-Kessel (Sandpiste, offene Dünenfläche, Felspiste).
 
 ## Nicht geprüft
 - Auf echter GPU nichts. In der Sandbox rendert nur Software.
+- Schneedecke: Bildrate, das Aussehen bei Sonne (die Eiswelt war bedeckt), die Voreinstellung „Niedrig" (Netz alle 2 m), das Zuschneien im laufenden Rennen, Howler-Schlucht.
+- Felsgrenzen: nur Boonta angesehen. Wie sie in Eis, Lava, Dschungel, Kristall und auf dem Mond aussehen, ist offen. Ihre Oberkante ist flach und zeigt die gestreckte Textur der Kappen.
+- Ob sich die Rennen mit Felsgrenzen und Schneespuren gut fahren – nur die KI-Simulation lief.
 - Gabelungen der anderen elf Strecken nur gemessen, nicht angesehen. Höhlen von Magma-Inferno, Dschungel, Kristall, Howler nicht angesehen.
 - Die Kappen auf den Felswänden zeigen aus der Nähe eine gestreckte Textur (helles Band an der Oberkante). Das gehört zu den Übergängen (`TODO.md` Abschnitt 8).
 - Die Anzeigen zum Klima (Renn-Menü, Hitzebalken) sind nicht im Browser angesehen, nur typgeprüft.
@@ -62,10 +82,12 @@ Der Rest sind die Falten der Fahrbahn (`TODO.md` Abschnitt 5) und zwei Becken-R�
 - Rückwärtslenken ist nicht von Hand gefahren.
 
 ## Git
-- Commits auf `dev`, nicht gepusht (der Nutzer hat diesmal keinen Push verlangt): `5a21dc9` Skills · `0c03a22` Rückwärtslenkung · `7690d96` Gabelungen · `e3f739c` Klima und Boost · der Commit mit dieser Datei.
+- Commits auf `dev`, nicht gepusht (der Nutzer hat diesmal keinen Push verlangt): `5a21dc9` Skills · `0c03a22` Rückwärtslenkung · `7690d96` Gabelungen · `e3f739c` Klima und Boost · `f97e425` Doku · `3a809b5` Schneedecke · der Commit mit den Felsgrenzen.
 
 ## Erledigt (aus dem Auftrag)
 - [x] Skill-Set installieren → ohne Ticket-Skills eingerichtet
 - [x] Fehler: rückwärts ist die Lenkung nicht invertiert
 - [x] Fehler: Höhlen/Abkürzungen haben am Anfang Geometriefehler und sind teilweise versperrt
 - [x] Das Klima/Wetter hat Einfluss auf die Boost-Funktion
+- [x] Pulverschnee soll feiner realistischer 3D-Schnee sein, der bei Durchfahrten dynamisch Spuren hinterlässt → Schneedecke mit Spuren, gespurter Schnee ist schneller; Feinschliff nach der Probefahrt steht in `TODO.md` Abschnitt 5
+- [x] Offenere Streckenabschnitte: keine fest abgesteckten Strecken, Begrenzungen durch Felsen oder Wände → erster Schritt: Felsgrenzen statt Leitplanken; Rest in `TODO.md` Abschnitt 8

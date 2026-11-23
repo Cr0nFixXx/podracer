@@ -5,7 +5,7 @@ import type { GfxSettings } from './settings';
 import { detailKindForTheme, generateTexture, generateTextures, type TexSpec } from './textures';
 import { surfaceMaterial, type SurfaceOpts } from './materials';
 import { SURFACES, surfacePalette } from './surfaces';
-import { TUNNEL_SHOULDER, mulberry32, tunnelArc, tunnelProfile, type Path, type Sample, type TrackData, type Obstacle } from './trackBuilder';
+import { TUNNEL_SHOULDER, mulberry32, tunnelArc, tunnelProfile, type Path, type Sample, type TrackData, type Obstacle, CANYON_OUTSET, RAIL_INSET } from './trackBuilder';
 import { addProps, type Emitter } from './props';
 import { addMechProps } from './mechProps';
 import { addSciFi, oceanWindowMaterial } from './scifi';
@@ -279,7 +279,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
         // Multi-ledge canyon cliff with vertical rock-buttress ribs & fracture fissures
         const H = side > 0 ? s.hR : s.hL;
         const okW = H > 0 && !open && !s.gap && s.tun !== 3; // caves: the cave shell is the wall (hL/hR only flag the rock barrier)
-        const buttress = Math.pow(ridged(sAcc * 0.022 + side * 3.7, 1.3, 3), 2.0) * 2.2, lowK = Math.min(1, H / 12);
+        const buttress = Math.pow(ridged(sAcc * 0.022 + side * 3.7, 1.3, 3), 2.0) * 2.2, lowK = Math.min(1, H / 12), rockIn = (side > 0 ? s.rockR : s.rockL) ? CANYON_OUTSET + RAIL_INSET + 0.1 : 0;
         let latTop = 0.6;
         for (let j = 0; j < K; j++) {
           const f = j / (K - 1); const pf = f * (cliffProf.length - 1);
@@ -290,7 +290,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
           //  a 3 m wall a row of teeth)
           const crag = (fbm(sAcc * 0.052, f * 4.5 + side * 7, 4) - 0.5) * 5.2 * Math.min(1, f * 3.2) * lowK;
           const ribPush = -buttress * Math.sin(f * Math.PI) * Math.min(1, f * 4) * lowK; // protrudes slightly above driver height (keeps wall collision intact!)
-          const lat = Math.max(0.55, 0.6 + off * (H / 25) + crag + ribPush);
+          const lat = Math.max(0.55, 0.6 + off * (H / 25) + crag + ribPush) - rockIn; // (a rock border stands 0.9 m further in: where the guard rail stood)
           wp.push(ex + s.rx * side * lat, ey - 1.15 + hh * H, ez + s.rz * side * lat);
           wu.push(sAcc / 18, hh * H / 18);
           latTop = lat;

@@ -135,6 +135,7 @@ Leitidee: **Der Boden erzählt den Planeten.** Eine Strecke ist kein einheitlich
 Leitidee: **Technik leuchtet schmal und bewegt sich.** Futuristisch wirkt nicht die Menge an Teilen, sondern Licht in Linien, das mit der Fahrtrichtung läuft. *(S16)*
 
 ### Untergründe, Seen, Welten
+- **Naturboden hat Felsgrenzen, keine Leitplanken** (2026-11-22, Wunsch des Nutzers: offenere Abschnitte, keine abgesteckte Piste): niedrige, unregelmäßige Felsreihen im Gestein der Welt, ohne Leuchten, Randsteine und Reflektoren. Technik (Geländer, Lichtbänder, Schilder) steht nur noch an gebauten Decks.
 - **Pulverschnee ist eine Schneedecke, kein Bodenbelag** (2026-11-22): 58 cm lockerer Schnee mit flachen, vom Wind gezogenen Wellen und feinem Korn. Pods pressen eine Doppelspur hinein (39 cm tief, bläulicher und glatter als frischer Schnee), daneben wirft sich ein Rand auf. Spuren bleiben das ganze Rennen und sind schneller als frischer Schnee; Schneeböen füllen sie langsam. Kein Glitzern, das überstrahlt: die Körnung ändert nur die Rauheit.
 
 | Thema | Gestaltung | Stand |

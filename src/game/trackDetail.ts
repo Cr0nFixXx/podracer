@@ -189,12 +189,12 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
           }
         }
         prev = on; prevRail = rail;
-        if (path.id === 0 && i % 6 === 0 && !s.gap && s.ramp === 0 && !s.lake && !(side > 0 ? s.openR : s.openL)) {
+        if (path.id === 0 && i % 6 === 0 && !s.gap && s.ramp === 0 && !s.lake && !(side > 0 ? s.openR : s.openL) && !(side > 0 ? s.rockR : s.rockL)) { // (no studs along a natural rock border)
           const lat = side * (s.hw - 0.72);
           (side > 0 ? studsA : studsB).push(M(s.x + s.rx * lat, surf(s, lat) + 0.015 + dOff, s.z + s.rz * lat, roadQ(i, lat)));
         }
         // Armored guide-light sconces at the foot of canyon walls (skipped across open merge mouths)
-        if ((side > 0 ? s.hR : s.hL) > 2 && !(side > 0 ? s.openR : s.openL) && !s.gap && i % 8 === 0) {
+        if ((side > 0 ? s.hR : s.hL) > 2 && !(side > 0 ? s.rockR : s.rockL) && !(side > 0 ? s.openR : s.openL) && !s.gap && i % 8 === 0) { // (canyon walls only – a rock border carries no lamps)
           const lat = side * (s.hw + 0.55); const ly = s.y + s.ramp - side * s.hw * s.bank + 0.72;
           const lx = s.x + s.rx * lat, lz = s.z + s.rz * lat, q = yawQ(s);
           canyonLights.push(M(lx, ly, lz, q));
@@ -289,7 +289,7 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
     let i = 0;
     while (i < N) {
       const c0 = S[i].curv;
-      if (Math.abs(c0) < 1 / 230 || S[i].gap || S[i].ramp > 0 || S[i].lake) { i++; continue; } // (no kerbs on lakes / plateaus)
+      if (Math.abs(c0) < 1 / 230 || S[i].gap || S[i].ramp > 0 || S[i].lake || S[i].rockL || S[i].rockR) { i++; continue; } // (no kerbs on lakes / plateaus, none on natural ground with rock borders)
       const side = c0 > 0 ? 1 : -1; let j = i;
       while (j < N && Math.abs(S[j].curv) > 1 / 300 && Math.sign(S[j].curv) === side && !S[j].gap && S[j].ramp === 0 && !S[j].lake) j++;
       if (j - i >= 12) {

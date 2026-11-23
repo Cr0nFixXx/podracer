@@ -41,6 +41,9 @@ export interface Sample {
   link: number; // linked path id
   wallL: number; wallR: number; // barrier offsets from the centreline (rails / canyon rock) used for collision
   hL: number; hR: number; // cliff wall height per side (0 = no cliff → guard rail)
+  /** 2026-11-22: the wall on this side is a natural rock border (a low, uneven row of rock where a guard rail used to stand: every
+   *  passage over natural ground) – solid like a canyon wall up to its top, and a pod that flies higher is only pushed back */
+  rockL?: boolean; rockR?: boolean;
   roof: number; // tunnel ceiling height above the road (0 = open sky)
   tun?: number; // tunnel kind: 1 = standard (drivable deck), 2 = underwater tube (Aquilaris), 3 = cave, 4 = underpass tunnel beneath bridge
   caveW?: number; // extra lateral cavern width per side inside widened cave chambers (carries cave-floor mesh)
@@ -803,6 +806,28 @@ export function buildTrack(def: TrackDef): TrackData {
     for (const pa of paths) for (const q of pa.samples) { const g = SURFACES[q.surf].grip; if (g < 1) q.vmax *= 0.45 + 0.55 * g; }
   }
 
+  // 2026-11-22 – open sections (user decision): on natural ground (sand, rock, snow, mud … every surface but the built deck) the road is
+  // no longer fenced by guard rails. Its border is a low, uneven row of rock: `hL` / `hR` between 2.6 and about 7 m, here and there an
+  // outcrop of up to 12 m, flagged `rockL` / `rockR`. Built decks (start / finish, bridges, tunnels, ramps, zero-G) keep their rails,
+  // level basins keep their beacons. `NO_ROCK_BORDERS` (global, CI) = the rails of before.
+  if (!(globalThis as { NO_ROCK_BORDERS?: boolean }).NO_ROCK_BORDERS) {
+    const n = samples.length;
+    for (const right of [false, true]) {
+      const sd = right ? 1 : -1;
+      const can = (q: Sample) => q.surf > 0 && SURFACES[q.surf].id !== 'deck' && !q.lake && !(q.roof > 0) && !q.bridge && !q.underpass && !q.zeroG && !q.gap && q.ramp === 0 && !(right ? q.openR : q.openL) && !((right ? q.hR : q.hL) > 0);
+      const on = samples.map(can), wall = samples.map(q => (right ? q.hR : q.hL) > 0); // (`wall`: a canyon wall stands there already – the border joins it without a notch)
+      for (let i = 0; i < n; i++) {
+        if (!on[i]) continue;
+        // how far into the run of border samples (so both ends come down to 1.2 m over 8 samples instead of ending as a block)
+        let d = 9; for (let k = 1; k <= 8 && d > 8; k++) { const a = closed || i - k >= 0 ? ((i - k) % n + n) % n : -1, b = closed || i + k < n ? (i + k) % n : -1; if (a < 0 || b < 0 || !(on[a] || wall[a]) || !(on[b] || wall[b])) d = k; }
+        const q = samples[i], t = Math.min(1, (d - 1) / 8), ease = t * t * (3 - 2 * t);
+        const rows = 2.6 + 2.4 * Math.pow(fbm1(q.s * 0.052 + sd * 31.7), 1.5) + 1.8 * fbm1(q.s * 0.017 + sd * 5.3);
+        const outcrop = Math.max(0, fbm1(q.s * 0.0046 + sd * 17.1) - 0.6) * 22;
+        const h = 1.2 + (rows + outcrop - 1.2) * ease;
+        if (right) { q.hR = h; q.rockR = true; } else { q.hL = h; q.rockL = true; }
+      }
+    }
+  }
   // 2026-11-22: the canyon wall of the main road used to stop at its full height right beside a fork mouth (a rock slab of up to 50 m
   // stood beside the entrance). Now it comes down to a 1.2 m rock kerb over the 16 samples before the opening and rises again behind it –
   // as the walls of the branch roads always did (`applyShortcutWalls`).
@@ -823,8 +848,9 @@ export function buildTrack(def: TrackDef): TrackData {
     if (s.openL) s.hL = 0;
     if (s.openR) s.hR = 0;
     if (s.bridge) { s.hL = 0; s.hR = 0; s.canyon = false; }
-    s.wallL = s.openL ? s.hw + 30 : s.zeroG ? s.hw + 1 : s.hL > 0 ? s.hw + CANYON_OUTSET : s.hw - RAIL_INSET;
-    s.wallR = s.openR ? s.hw + 30 : s.zeroG ? s.hw + 1 : s.hR > 0 ? s.hw + CANYON_OUTSET : s.hw - RAIL_INSET;
+    // (a rock border stands where the guard rail stood: gates, arches and gantries are built for that width)
+    s.wallL = s.openL ? s.hw + 30 : s.zeroG ? s.hw + 1 : s.hL > 0 && !s.rockL ? s.hw + CANYON_OUTSET : s.hw - RAIL_INSET;
+    s.wallR = s.openR ? s.hw + 30 : s.zeroG ? s.hw + 1 : s.hR > 0 && !s.rockR ? s.hw + CANYON_OUTSET : s.hw - RAIL_INSET;
   }
   for (const [a, b, cnt] of def.obstacles) {
     const want = Math.max(2, Math.round(cnt * 0.62)); // (tracks are ~1.55× longer since Session 18)

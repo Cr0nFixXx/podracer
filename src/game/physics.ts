@@ -435,8 +435,8 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
       const pen = Math.abs(lat) + c.r - (sg > 0 ? cs.wallR : cs.wallL);
       if (pen > best) {
         best = pen; nx = -cs.rx * sg; nz = -cs.rz * sg; hx = wx - nx * c.r; hz = wz - nz * c.r; side = c.side;
-        const cliff = (sg > 0 ? cs.hR : cs.hL) > 0;
-        const railTop = cs.y + cs.ramp - sg * cs.hw * cs.bank + 1.55;
+        const hW = sg > 0 ? cs.hR : cs.hL, rock = hW > 0 && !!(sg > 0 ? cs.rockR : cs.rockL), cliff = hW > 0 && !rock;
+        const railTop = cs.y + cs.ramp - sg * cs.hw * cs.bank + (rock ? hW : 1.55); // (2026-11-22: a rock border is solid up to its top, like a rail)
         soft = !cliff && (cs.zeroG || !!cs.lake || p.pos.y - 0.9 > railTop); // lakes have no rails – beacons carry an energy field
       }
     }

@@ -11,7 +11,7 @@ Session 20 lief in zwei Zweigen und ist zusammengeführt ([Merge](docs/verlauf/2
 2. **Pods:** alle acht Phasen (0–7) der Pod-Überholung sind fertig, die Abschluss-Durchsicht ist eingearbeitet (fünf Korrekturen, `docs/verlauf/2026-11-21-session-20-pods.md` → „Abschluss-Durchsicht"; dort stehen auch die zurückgestellten Kleinigkeiten) – Tabelle in `docs/verlauf/2026-11-21-session-20-pods.md` → „Phasen". **Selbst prüfen:** „Ultra" am Gaming-PC (Bildrate mit vollen Details, Teilen und Schaden), die Schadens-Balance von Hand fahren, die Teile-Kombinationen durchklicken. Die Listen „Nicht verifiziert" je Phase stehen in derselben Datei. Genauer Arbeitsstand der Pod-Sitzung: `.superpowers/sdd/swift-floating-kurzweil/progress.md` (git-ignoriert, nur auf dem Rechner des Nutzers). Im **Hangar** außerdem die 6 Lackiermuster & 3 Finishes testen (offen seit Session 19).
 3. Vor jeder Änderung: `npm run check` (Typecheck + Unit-Prüfungen + Pod-Audit + Sim) muss grün sein. Pods ansehen: `npm run dev` → `http://localhost:5173/tools/harness/pods.dev.html`.
 4. **Controller-Meldung des Nutzers:** erledigt – der Nutzer meldet am 2026-11-22 „geht wieder" (Verdacht war Microsoft GameInput 4.0.300, [Protokoll](docs/verlauf/2026-11-22-controller-und-action.md)). Am Spiel war nichts zu ändern.
-5. **Vom Nutzer bestellt und entschieden, noch nicht gebaut** (`TODO.md` Abschnitt 8): Pulverschnee als 3D-Schneedecke mit Spuren, die das Fahren ändern · Textur- und Terrainübergänge (alle drei Arten) · offenere Abschnitte mit Felsen und Wänden statt Leitplanken. Dazu `TODO.md` Abschnitt 5 (Farne, Höhlen-Optik, Schnee-Fotoset, Falten der Fahrbahn). Was am 2026-11-22 schon erledigt wurde: [Protokoll](docs/verlauf/2026-11-22-skills-fehler-klima.md).
+5. **Vom Nutzer bestellt und entschieden, noch offen** (`TODO.md` Abschnitt 8): Textur- und Terrainübergänge (alle drei Arten) · der Rest der offenen Abschnitte (schwankende Breite, Felsbrocken an der Grenze). Dazu `TODO.md` Abschnitt 5: Farne, Höhlen-Optik, Schnee-Fotoset, Falten der Fahrbahn – und der Feinschliff an der neuen Schneedecke nach der Probefahrt des Nutzers. Gebaut sind seit dem 2026-11-22: Schneedecke mit Spuren, Felsgrenzen statt Leitplanken. Was am 2026-11-22 schon erledigt wurde: [Protokoll](docs/verlauf/2026-11-22-skills-fehler-klima.md).
 6. **Skills:** `CLAUDE.md` → „Agent skills" (das Skill-Set liegt in `.agents/skills/`, nicht im Repo; ohne Ticket-Skills).
 
 ## Git-Stand
@@ -39,7 +39,7 @@ Session 20 lief in zwei Zweigen und ist zusammengeführt ([Merge](docs/verlauf/2
 | `CONTEXT.md`, `docs/adr/` | Begriffe, grundlegende Entscheidungen |
 
 ## Verlauf (neueste zuerst)
-- 2026-11-22 – [Skill-Set eingerichtet, Rückwärtslenkung, freie Eingänge an Höhlen und Abkürzungen, Klima wirkt auf den Boost](docs/verlauf/2026-11-22-skills-fehler-klima.md)
+- 2026-11-22 – [Skill-Set eingerichtet, Rückwärtslenkung, freie Eingänge an Höhlen und Abkürzungen, Klima wirkt auf den Boost, Schneedecke mit Spuren, Felsgrenzen statt Leitplanken](docs/verlauf/2026-11-22-skills-fehler-klima.md)
 - 2026-11-22 – [Controller geht beim Rennstart aus (Diagnose), GitHub-Action auf GitHub](docs/verlauf/2026-11-22-controller-und-action.md)
 - 2026-11-22 – [TODO-Runde: Wandtreffer, Pod-Kleinigkeiten, Aufwärmen, zweiter Build, GitHub-Action](docs/verlauf/2026-11-22-todo-runde.md)
 - 2026-11-22 – [Speicher aufgeräumt, Doku nach Thema neu geordnet](docs/verlauf/2026-11-22-speicher-und-doku.md)

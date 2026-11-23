@@ -6,7 +6,7 @@ import { makeTerrainField } from '../../src/game/terrain';
 import { resolveEnvironment, type TimeOfDay, type WeatherKind } from '../../src/game/environment';
 import { clipOutside } from '../../src/game/meshClip';
 import { SnowField } from '../../src/game/snowField';
-import { SURF } from '../../src/game/surfaces';
+import { SURF, SURFACES } from '../../src/game/surfaces';
 import { podLayout } from '../../src/game/podLayouts';
 import { cockpitGeo } from '../../src/game/podCockpits';
 import { engineExtent, engineGeo } from '../../src/game/podParts';
@@ -982,11 +982,11 @@ test('forks: the canyon wall of the main road comes down to a kerb beside a fork
     for (let i = 0; i < N; i++) for (const right of [false, true]) for (const dir of [-1, 1]) {
       const open = (q: Sample) => right ? q.openR : q.openL, h = (q: Sample) => right ? q.hR : q.hL;
       if (!open(S[i]) || open(W(i + dir)) || S[i].roof > 0) continue; // i = the last open sample of a mouth in direction `dir` (a cave fork has no canyon walls): look at the wall beyond it
-      if (!(h(W(i + dir)) > 0 && h(W(i + dir * 19)) > 6)) continue; // (no canyon wall reaches this end of the mouth)
+      if (!(h(W(i + dir)) > 0 && h(W(i + dir * 19)) > 2.5)) continue; // (no wall reaches this end of the mouth)
       walls++;
       ok(h(W(i + dir)) <= 1.21, `${id} ${i}: the wall beside the mouth is ${h(W(i + dir)).toFixed(1)} m high, expected a kerb of 1.2 m`);
       for (let k = 1; k < 18; k++) { const a = h(W(i + dir * k)), b = h(W(i + dir * (k + 1))); if (!(b > 0)) break; ok(b >= a - 2.5, `${id} ${i}: the wall drops from ${a.toFixed(1)} to ${b.toFixed(1)} m going away from the mouth (${k} → ${k + 1} samples)`); }
-      ok(h(W(i + dir * 10)) > 3, `${id} ${i}: ten samples from the mouth the wall is only ${h(W(i + dir * 10)).toFixed(1)} m high`);
+      ok(h(W(i + dir * 12)) > h(W(i + dir)) + 0.6, `${id} ${i}: twelve samples from the mouth the wall is only ${h(W(i + dir * 12)).toFixed(1)} m high (beside the mouth: ${h(W(i + dir)).toFixed(1)} m)`);
     }
   }
   ok(walls >= 3, `only ${walls} canyon walls found that reach a fork mouth – the check would prove nothing`);
@@ -1098,6 +1098,48 @@ test('snow: snowfall loosens a trail again', () => {
   const before = snow.packAt(0, mid, q.x, q.z); snow.snowIn(0.25); const after = snow.packAt(0, mid, q.x, q.z);
   ok(Math.abs(before - 200 / 255) < 0.01 && Math.abs(after - (200 / 255 - 0.25)) < 0.02, `packing ${before.toFixed(2)} → ${after.toFixed(2)} after snowIn(0.25), expected ${(200 / 255 - 0.25).toFixed(2)}`);
   snow.snowIn(5); eq(snow.packAt(0, mid, q.x, q.z), 0, 'after a lot of snow:');
+});
+
+// ---- open sections: rock borders instead of guard rails on natural ground (2026-11-22, user decision) ----
+/** Sides of main-road samples of a track by what bounds them: [natural ground with a rock border, natural ground with a rail, built deck with a rock border]. */
+function borderCount(td: TrackData): [number, number, number] {
+  let rock = 0, rail = 0, deckRock = 0;
+  for (const s of td.main.samples) {
+    if (s.lake || s.roof > 0 || s.bridge || s.underpass || s.zeroG || s.gap || s.ramp !== 0) continue;
+    for (const right of [false, true]) {
+      if (right ? s.openR : s.openL) continue;
+      const h = right ? s.hR : s.hL, flagged = !!(right ? s.rockR : s.rockL);
+      if (s.surf > 0 && SURFACES[s.surf].id !== 'deck') { if (h > 0) rock++; else rail++; } else if (flagged) deckRock++;
+    }
+  }
+  return [rock, rail, deckRock];
+}
+test('open sections: natural ground is bounded by rock, not by guard rails – the built deck keeps its rails', () => {
+  for (const id of ['boonta', 'frost', 'jungle', 'oovo']) {
+    const [rock, rail, deckRock] = borderCount(trackOf(id));
+    ok(rock > 1000, `${id}: only ${rock} sample sides of natural ground found – the check would prove nothing`);
+    eq(rail, 0, `${id}: sample sides of natural ground that still have a guard rail:`); eq(deckRock, 0, `${id}: sample sides of the built deck with a rock border:`);
+  }
+});
+test('open sections: with the switch NO_ROCK_BORDERS the rails of before come back (the check above can fail)', () => {
+  const G = globalThis as { NO_ROCK_BORDERS?: boolean }; G.NO_ROCK_BORDERS = true;
+  try { const [, rail] = borderCount(buildTrack(TRACKS.find(t => t.id === 'boonta')!)); ok(rail > 1000, `only ${rail} railed sample sides without rock borders`); } finally { delete G.NO_ROCK_BORDERS; }
+});
+/** Flies an Aurora sideways into the border of a straight natural stretch of Boonta at 20 m/s, `up` metres above the hover height. Returns [wall events, field events]. */
+function intoBorder(up: number): [number, number] {
+  const td = trackOf('boonta'), S = td.main.samples;
+  let idx = -1;
+  for (let k = 60; k < S.length - 60 && idx < 0; k++) { let fine = true; for (let j = k - 10; j <= k + 10 && fine; j++) { const q = S[j]; fine = !!q.rockR && q.hR > 2.5 && q.hR < 6 && Math.abs(q.curv) < 0.004 && Math.abs(q.bank) < 0.07 && !q.gap && !q.lake && !q.roof && !q.ramp; } if (fine) idx = k; }
+  ok(idx > 0, 'no straight stretch with a low rock border found on boonta');
+  const s = S[idx], p = racer(byId('aurora'), td, idx, s.wallR - 1, s.y + HOVER + up);
+  p.invuln = 0; p.vel.set(s.rx * 20, 0, s.rz * 20);
+  for (let f = 0; f < 6; f++) { p.pos.y = s.y + HOVER + up; stepPod(p, td, 1 / 60, f / 60, 1, false); }
+  return [p.events.filter(e => e.type === 'wall').length, p.events.filter(e => e.type === 'field').length];
+}
+test('open sections: a rock border is solid – a pod that flies above its top is only pushed back', () => {
+  const [wallLow, fieldLow] = intoBorder(0), [wallHigh, fieldHigh] = intoBorder(9);
+  ok(wallLow >= 1 && fieldLow === 0, `at hover height: ${wallLow} wall hits, ${fieldLow} field contacts – expected a wall hit`);
+  ok(wallHigh === 0 && fieldHigh >= 1, `9 m higher, above the rock: ${wallHigh} wall hits, ${fieldHigh} field contacts – expected a soft contact`);
 });
 
 console.log(failed ? `\n${failed} unit check(s) FAILED, ${passed} passed.` : `All ${passed} unit checks passed.`);
