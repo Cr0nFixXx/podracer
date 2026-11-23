@@ -2,7 +2,7 @@
 
 ## Nächster Schritt (zuerst lesen)
 **Laufender Auftrag: „nach der Probefahrt" (2026-11-23)** – [Protokoll](docs/verlauf/2026-11-23-nach-der-probefahrt.md) (Auftrag wörtlich, alle Entscheidungen des Nutzers, was je Punkt gemacht und geprüft wurde), offene Punkte in `TODO.md` Abschnitt 9.
-- **Fertig und gepusht:** Block 1 (drei Fehler) und Block 2 (acht Verbesserungen: Landung, Hitzeschild, Lava-Boost, Schatten-Sichtweite, Linsentropfen, Boost-Alarm, Reset-Taste, Controller im Menü).
+- **Fertig:** Block 1 (drei Fehler) – gepusht, GitHub-Action grün. Block 2 (acht Verbesserungen: Landung, Hitzeschild, Lava-Boost, Schatten-Sichtweite, Linsentropfen, Boost-Alarm, Reset-Taste, Controller im Menü) – **nur lokal committet, noch nicht gepusht**: der Zugangstoken des Nutzers lag in der Sitzung nicht mehr vor. Zuerst den Nutzer um den Token bitten, dann `git push origin dev` und den Lauf unter „Actions" prüfen.
 - **Als Nächstes:** Block 3 „Streckenanpassungen" (Intro-Flug zuerst), danach Block 4 (TODO 2, 5, 8). Jeder Punkt ein eigener Commit, nach jedem Block pushen (für diesen Auftrag ausdrücklich erlaubt).
 - **Der Nutzer soll nach Block 2 prüfen** (alles lief nur in Software-Grafik, ohne Ton, ohne echtes Gamepad): Bildrate auf „Ultra" (weite Schattenstufe), Lautstärke des Boost-Alarms, Menüs mit dem echten Gamepad – Liste im Protokoll unter „Nicht geprüft".
 
