@@ -164,6 +164,10 @@ export interface ThemeDef {
   stars?: number; // 0..1 night starfield (set by environment.ts)
 }
 
+/** Worlds whose wall is BUILT – metal plates with hazard marks (Aquilaris), station plating with lights (Oovo IV) – not rock.
+ *  That texture is right for wall sheets, tunnel vaults and piers and wrong for everything that grew: boulders, rock rows,
+ *  arches, stones, steep land. Those take the world's own rock set (`rockTex` in `world.ts`). */
+export const hasBuiltWall = (t: ThemeDef) => t.wall === 'metal' || t.wall === 'oovoWall';
 export const THEMES: Record<string, ThemeDef> = {
   desert: {
     id: 'desert', name: 'Tatooine', skyTop: '#3d7fd0', skyHorizon: '#f2d6a8', sunColor: '#fff1d0', sunElev: 28, sunAz: 40, clouds: 0.25,

@@ -50,7 +50,7 @@ const LAYERS: Record<string, TerrainLayers> = {
   malastare: { gravel: ['#48483b', '#666654', '#888872'], basin: ['#141e18', '#213022', '#344630'], basinRough: 0.18, basinMetal: 0.04, crestTint: [1.1, 1.08, 0.92], crestRough: 0.78, ledgeColor: '#566430', ledgeAmt: 0.58 },
   lava: { gravel: ['#14100f', '#261c18', '#3c2c24'], basin: ['#0b0806', '#160f0b', '#261812'], basinRough: 0.38, basinMetal: 0.04, basinEmissive: '#ff5210', crestTint: [1.16, 1.02, 0.94], crestRough: 0.9, ledgeColor: '#2a1e1a', ledgeAmt: 0.4 },
   crystal: { gravel: ['#241c32', '#3b3052', '#5a4a74'], basin: ['#3a2c5a', '#5e4c90', '#927ecc'], basinRough: 0.18, basinMetal: 0.1, crestTint: [1.12, 1.04, 1.2], crestRough: 0.44, ledgeColor: '#9878cc', ledgeAmt: 0.5 },
-  aquilaris: { gravel: ['#6a6256', '#8e8474', '#b4aa98'], basin: ['#7c6d56', '#988870', '#b4a690'], basinRough: 0.3, basinMetal: 0, crestTint: [1.1, 1.08, 1.02], crestRough: 0.8, ledgeColor: '#527848', ledgeAmt: 0.55 },
+  aquilaris: { gravel: ['#6a6256', '#8e8474', '#b4aa98'], basin: ['#7c6d56', '#988870', '#b4a690'], basinRough: 0.3, basinMetal: 0, cliff: ['#4e4a40', '#7a7464', '#a49c88'], crestTint: [1.1, 1.08, 1.02], crestRough: 0.8, ledgeColor: '#527848', ledgeAmt: 0.55 },
 };
 export const layersFor = (id: string): TerrainLayers => LAYERS[id] ?? { gravel: ['#3a3a3a', '#555555', '#777777'], basin: ['#444444', '#555555', '#666666'], basinRough: 0.5, basinMetal: 0 };
 

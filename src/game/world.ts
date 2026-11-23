@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { ThemeDef } from './data';
+import { hasBuiltWall, type ThemeDef } from './data';
 import type { GfxSettings } from './settings';
 import { detailKindForTheme, generateTexture, generateTextures, type TexSpec } from './textures';
 import { caveMaterial, surfaceMaterial, type CaveOpts, type SurfaceOpts } from './materials';
@@ -74,7 +74,9 @@ export function worldTextureSpecs(theme: ThemeDef, gfx: GfxSettings): TexSpec[] 
     { kind: 'gravel', palette: TL.gravel, size: lres, seed: 57, photo: 'gravel' },
     { kind: 'cracked', palette: TL.basin, size: lres, seed: 68, emissive: TL.basinEmissive, photo: TL.basinEmissive ? undefined : PHOTO_BASIN[theme.id] },
   ];
-  if (TL.cliff) specs.push({ kind: 'rock', palette: TL.cliff, size: texRes, seed: 79, photo: 'cliff' });
+  // The land's own rock where it differs from the wall. A world with a BUILT wall always gets one (grey if it names no colours):
+  // without it steep land, boulders and rock rows were plated with the wall's metal panels (Aquilaris until 2026-11-23).
+  if (TL.cliff || hasBuiltWall(theme)) specs.push({ kind: 'rock', palette: TL.cliff ?? ['#3a3a3a', '#5c5c5c', '#848484'], size: texRes, seed: 79, photo: 'cliff' });
   return specs;
 }
 
@@ -146,8 +148,15 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   const wallMat = surfaceMaterial(wallTex, wallOpts);
   let wallBlend: THREE.Material | null = null; // the rock of the walls, alpha-blended by `aFade`: the outer half of a wall cap that runs out onto the land behind it
   const wallBlendMat = () => { if (!wallBlend) { wallBlend = surfaceMaterial(wallTex, { ...wallOpts, parallax: 0, fade: 'soft' }); wallBlend.name = 'cliffBlend'; disposables.push(wallBlend); } return wallBlend; };
+  // Rock that GREW – boulders, rock rows, arches, obstacle rocks, stones – has the world's rock, not its wall: on Aquilaris and
+  // Oovo IV the wall is built (`hasBuiltWall`), there `rockMat` is a material of its own (name `rock`), elsewhere it IS `wallMat`.
+  const builtWall = hasBuiltWall(theme), rockTex = builtWall ? cliffTex : wallTex;
+  const rockMat = builtWall ? surfaceMaterial(rockTex, wallOpts) : wallMat;
+  if (builtWall) { rockMat.name = 'rock'; disposables.push(rockMat); }
   // Rock inside tunnels and caves: the walls' photo set projected in world space, lit by the tunnel's own lamps (`caveMaterial`).
   // `lit` reads the baked light per vertex (vault, shelves, end walls), `flat` has a fixed amount (instanced stalactites).
+  // A BUILT wall keeps the vault's own UVs instead (panels follow the tube; projected in world space their seams would cross it at
+  // any angle) – that is the wall material, double-sided, as before 2026-11-23.
   const caveOpts: CaveOpts = { tile: 15, strata: STRATA[theme.id], normalScale: 1.5, emissive: wallOpts.emissive, emissiveIntensity: wallOpts.emissiveIntensity };
   // How much of it depends on the world. In a dark one (lava, moon, crystal) the lamps are all the light a tunnel has: CAVE_LIGHT[0].
   // In a bright one the fill light of the sky already lights the rock, the lamps only add a little: CAVE_LIGHT[1] – with the dark
@@ -156,8 +165,11 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   const gLum = (() => { const c = new THREE.Color(theme.hemiGround); return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; })();
   const gT = Math.min(1, gLum / 0.08), caveGain = CAVE_LIGHT[0] + (CAVE_LIGHT[1] - CAVE_LIGHT[0]) * gT * gT * (3 - 2 * gT);
   const lampLight = new THREE.Color(theme.barrierColor).lerp(new THREE.Color('#ffffff'), 0.5).multiplyScalar(caveGain);
-  const caveRock: CaveRock = { lit: caveMaterial(wallTex, { ...caveOpts, light: { color: lampLight } }), flatMat: null, flat() { if (!this.flatMat) { this.flatMat = caveMaterial(wallTex, { ...caveOpts, light: { color: lampLight, level: 0.6 } }); this.flatMat.name = 'caveRockFlat'; disposables.push(this.flatMat); } return this.flatMat; } };
-  caveRock.lit.name = 'caveRock'; disposables.push(caveRock.lit);
+  const tubeWall: THREE.Material | null = builtWall ? wallMat.clone() : null;
+  if (tubeWall) { tubeWall.side = THREE.DoubleSide; tubeWall.name = 'tunnelWall'; disposables.push(tubeWall); }
+  const caveRock: CaveRock = tubeWall ? { lit: tubeWall, flatMat: tubeWall, flat: () => tubeWall }
+    : { lit: caveMaterial(wallTex, { ...caveOpts, light: { color: lampLight } }), flatMat: null, flat() { if (!this.flatMat) { this.flatMat = caveMaterial(wallTex, { ...caveOpts, light: { color: lampLight, level: 0.6 } }); this.flatMat.name = 'caveRockFlat'; disposables.push(this.flatMat); } return this.flatMat; } };
+  if (!tubeWall) { caveRock.lit.name = 'caveRock'; disposables.push(caveRock.lit); }
   const groundMat = terrainMaterial({
     themeId: theme.id, ground: groundTex, gravel: gravelTex, basin: basinTex, rock: cliffTex,
     groundScale: !theme.emissiveGround && hasPbr(PHOTO_GROUND[theme.id]) ? 2.7 : 1, // photo ground: ~11 m tiles instead of 30 m
@@ -557,27 +569,27 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     disposables.push(wm, pg);
     if (T === 'ocean') addViaductPiers(td, group, abutmentMetal, disposables, 44, s => s.bridge || s.tun === 2 ? null : ({ bot: waterY - 8, top: s.y - 1.2, w: s.hw * 1.65, r: 1.9 }), roadClear);
   } else if (T === 'prison') {
-    addAsteroidBelt(td, group, wallMat, disposables, rng);
+    addAsteroidBelt(td, group, rockMat, disposables, rng);
     // Session 20: the decks of the prison station stand on piers on the moon surface (no more stilts into the void)
     addViaductPiers(td, group, abutmentMetal, disposables, 56, s => s.zeroG || s.bridge || s.surf > 0 ? null : ({ bot: heightAt(s.x, s.z) - 3, top: s.y - 1.5, w: s.hw * 1.7, r: 2.5 }), roadClear);
   }
 
   progress(0.82, 'Platziere Landschaftsdetails …'); await yield_();
   const distToTrack = (x: number, z: number) => nearest(x, z);
-  const decorCells = scatterDecor(theme, group, td, heightAt, distToTrack, gfx, disposables, rng, wallTex, roadClear, waterY);
-  addArches(td, group, wallMat, disposables, rng, roadClear, heightAt, waterY, T === 'prison');
+  const decorCells = scatterDecor(theme, group, td, heightAt, distToTrack, gfx, disposables, rng, rockTex, roadClear, waterY);
+  addArches(td, group, rockMat, disposables, rng, roadClear, heightAt, waterY, T === 'prison');
   // obstacle rocks on the track are the closest rocks of all → HQ boulder (wallMat has no uv repeat: 2.4 rock units per tile)
-  const obstRockH = gfx.geometry >= 2 ? heightSampler(wallTex) : undefined;
-  const obstFx = addObstacles(td, group, theme, wallMat, disposables, gfx.geometry >= 2 ? boulderGeometry(gfx.geometry >= 3 ? 6 : 5, 9, 1.05, obstRockH, 2.4) : undefined);
-  decorCells.push(...addBorderRocks(td, group, wallMat, gfx, field.edgeDist, groundY, obstRockH, disposables));
+  const obstRockH = gfx.geometry >= 2 ? heightSampler(rockTex) : undefined;
+  const obstFx = addObstacles(td, group, theme, rockMat, disposables, gfx.geometry >= 2 ? boulderGeometry(gfx.geometry >= 3 ? 6 : 5, 9, 1.05, obstRockH, 2.4) : undefined);
+  decorCells.push(...addBorderRocks(td, group, rockMat, gfx, field.edgeDist, groundY, obstRockH, disposables));
   progress(0.9, 'Platziere Streckendetails …'); await yield_();
   // Session 15: objects are seated on the LOWEST ground point under their footprint (sampling only the centre left them floating on slopes)
   const groundMin = (x: number, z: number, r: number) => Math.min(heightAt(x, z), heightAt(x + r, z), heightAt(x - r, z), heightAt(x, z + r), heightAt(x, z - r));
   const props = addProps(td, theme, group, gfx, (x, z) => groundMin(x, z, 1.4), disposables, rng, roadClear, roadDispOff);
   addSciFi(td, theme, group as never, disposables, (x, z) => groundMin(x, z, 1.6), roadDispOff);
   const mech = addMechProps(td, theme, group, disposables, (x, z) => groundMin(x, z, 2.8), roadClear, waterY, gfx.detail);
-  const setPieces = buildSetPieces(td, theme, group, disposables, wallMat, (x, z) => groundMin(x, z, 2.5));
-  const landRock = surfaceMaterial(wallTex, {
+  const setPieces = buildSetPieces(td, theme, group, disposables, rockMat, (x, z) => groundMin(x, z, 2.5));
+  const landRock = surfaceMaterial(rockTex, {
     strata: STRATA[theme.id], ledge: wallLedge, cloud: theme.clouds * 0.4,
     macro: 0.35, detail: 0.3, normalScale: 1.35, bump,
     emissive: theme.id === 'lava' ? '#ff5a10' : '#c87aff',
@@ -589,7 +601,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   const landmarks = addLandmarks(td, theme, group, disposables, field, rng, landRock, props.emitters, smokes);
   progress(0.92, 'Belebe Landschaft …'); await yield_();
   const smoke = buildSmoke(smokes, theme, td, field, group, disposables, rng, waterY);
-  const cover = buildGroundCover(td, theme, gfx, field, waterY, rng, group, disposables, wallTex);
+  const cover = buildGroundCover(td, theme, gfx, field, waterY, rng, group, disposables, rockTex);
   const life = buildLife(td, theme, field, waterY, rng, group, disposables, gfx.detail, landmarks);
 
   // ---- Session 20: Oovo IV orbits a banded gas giant – lit by the real sun (phase), always at the same place in the sky ----
@@ -618,7 +630,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   // (drifts: the loose ground of the world – sand, snow – blown against the borders; none on passages that are that ground themselves)
   const driftSurf = theme.id === 'ice' ? SURF.snow : theme.id === 'desert' || theme.id === 'mesa' ? SURF.sand : -1;
   const drift = surfBlend.has(driftSurf) ? { mat: surfBlend.get(driftSurf)!, tile: SURFACES[driftSurf].tex!.tile, same: [driftSurf, theme.id === 'ice' ? SURF.powder : SURF.dunes] } : undefined;
-  const detail = addTrackDetail(td, theme, group, disposables, rng, wallMat, { across, disp: roadDispOff, detail: gfx.detail, tvCams, batcher, groundTex, heightAt: (x, z) => groundMin(x, z, 1.8), drift });
+  const detail = addTrackDetail(td, theme, group, disposables, rng, rockMat, { across, disp: roadDispOff, detail: gfx.detail, tvCams, batcher, groundTex, heightAt: (x, z) => groundMin(x, z, 1.8), drift });
   batcher.build(group, disposables);
 
   const timings: WorldTimings = {
