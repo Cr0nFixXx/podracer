@@ -8,7 +8,7 @@ import type { TrackData } from './trackBuilder';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
-const { clamp, color, cos, interleavedGradientNoise, length, oneMinus, positionGeometry, positionLocal, positionView, screenCoordinate, sin, smoothstep, time, vec3, vertexColor } = TSL;
+const { clamp, color, cos, interleavedGradientNoise, length, oneMinus, positionGeometry, positionLocal, positionView, screenCoordinate, sin, smoothstep, texture, time, uv, vec3, vertexColor } = TSL;
 
 /**
  * Ground cover: grass, reeds, ferns, flowers, bushes, desert agave, dry scrub, mossy logs, stones, pebbles,
@@ -22,10 +22,10 @@ type Disp = { dispose: () => void }[];
 type RGB = [number, number, number];
 function h2(x: number, y: number) { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
 
-function part(g: THREE.BufferGeometry, m: THREE.Matrix4 | null, colFn: (x: number, y: number, z: number) => RGB, upNormals = false) {
+function part(g: THREE.BufferGeometry, m: THREE.Matrix4 | null, colFn: (x: number, y: number, z: number) => RGB, upNormals = false, keepUv = false) {
   const ng = g.index ? g.toNonIndexed() : g; if (ng !== g) g.dispose();
   if (m) ng.applyMatrix4(m);
-  if (ng.attributes.uv) ng.deleteAttribute('uv');
+  if (ng.attributes.uv && !keepUv) ng.deleteAttribute('uv');
   if (!ng.attributes.normal) ng.computeVertexNormals();
   const p = ng.attributes.position as THREE.BufferAttribute; const c = new Float32Array(p.count * 3);
   for (let i = 0; i < p.count; i++) { const [r, gg, b] = colFn(p.getX(i), p.getY(i), p.getZ(i)); c[i * 3] = r; c[i * 3 + 1] = gg; c[i * 3 + 2] = b; }
@@ -66,22 +66,70 @@ function blades(n: number, h: number, w: number, lean: number, seed: number, bas
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
   return part(g, null, (_x, y) => { const f = Math.min(1, y / h); return [base[0] + (tip[0] - base[0]) * f, base[1] + (tip[1] - base[1]) * f, base[2] + (tip[2] - base[2]) * f]; }, true);
 }
+/** Fern (2026-11-23, `TODO.md` section 5 „HQ-Farne"): every frond is ONE arching card of four segments; its outline – the stalk
+ *  and some 26 pairs of leaflets – comes from the drawn frond texture (`frondTextures`: u across the frond, v from the stalk to the
+ *  tip). An outer ring of eight long fronds that arch outwards and droop, four young ones standing steeper in the middle.
+ *  96 triangles (the plain ribbons before had 90). The vertex colour only shades (dark in the heart of the plant). */
 function fern(seed: number, base: RGB, tip: RGB) {
-  const list: THREE.BufferGeometry[] = []; const fr = 9;
-  for (let k = 0; k < fr; k++) {
-    const a = (k / fr) * Math.PI * 2 + h2(k, seed) * 0.45, L = 0.8 + h2(k + 3, seed) * 0.55; const pos: number[] = []; let prev: number[][] | null = null;
-    for (let i = 0; i <= 5; i++) {
-      const t = i / 5, r = t * L, y = Math.sin(t * Math.PI * 0.86) * 0.48 * L + 0.04;
-      // Serrated pinna width modulation along frond
-      const w = (Math.sin(t * Math.PI) * 0.17 * L * (0.82 + 0.22 * (i % 2))) + 0.008;
-      const cx = Math.cos(a) * r, cz = Math.sin(a) * r, px = -Math.sin(a) * w, pz = Math.cos(a) * w;
-      const cur = [[cx - px, y, cz - pz], [cx + px, y, cz + pz]];
-      if (prev) pos.push(...prev[0], ...prev[1], ...cur[1], ...prev[0], ...cur[1], ...cur[0]);
+  const pos: number[] = [], uvs: number[] = [], SEG = 4;
+  const frond = (a: number, L: number, rise: number, droop: number, wid: number) => {
+    const ca = Math.cos(a), sa = Math.sin(a), px = -sa * wid * L, pz = ca * wid * L;
+    let r = 0.03, y = 0.02, prev: number[][] | null = null;
+    for (let i = 0; i <= SEG; i++) {
+      const t = i / SEG, cur = [[ca * r - px, y, sa * r - pz], [ca * r + px, y, sa * r + pz]];
+      if (prev) {
+        const t0 = (i - 1) / SEG;
+        pos.push(...prev[0], ...prev[1], ...cur[1], ...prev[0], ...cur[1], ...cur[0]);
+        uvs.push(0, t0, 1, t0, 1, t, 0, t0, 1, t, 0, t);
+      }
       prev = cur;
+      const ang = rise - (rise + droop) * Math.pow((i + 0.5) / SEG, 1.6); // the frond leaves the stalk steeply, bends over and droops at the tip
+      r += Math.cos(ang) * L / SEG; y += Math.sin(ang) * L / SEG;
     }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); list.push(g);
+  };
+  for (let k = 0; k < 8; k++) frond((k / 8) * Math.PI * 2 + h2(k, seed) * 0.45, 1.0 + h2(k + 3, seed) * 0.6, 0.95 + h2(k + 5, seed) * 0.2, 0.42 + h2(k + 7, seed) * 0.3, 0.17);
+  for (let k = 0; k < 4; k++) frond((k / 4) * Math.PI * 2 + 0.4 + h2(k + 11, seed) * 0.6, 0.6 + h2(k + 13, seed) * 0.3, 1.3 + h2(k + 15, seed) * 0.12, 0.1 + h2(k + 17, seed) * 0.2, 0.15);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); g.computeVertexNormals();
+  const out = part(g, null, (x, _y, z) => { const f = Math.min(1, Math.hypot(x, z) / 1.05); return [base[0] + (tip[0] - base[0]) * f, base[1] + (tip[1] - base[1]) * f, base[2] + (tip[2] - base[2]) * f]; }, true, true);
+  out.computeBoundingSphere(); out.name = 'fern'; // (the name lets the harness find it: view `g_fern`)
+  return out;
+}
+
+/** Drawn fern frond, 128 × 512, the tip at the top: a stalk with 26 pairs of leaflets – short at the foot, longest at a third of the
+ *  length, running out to the tip. Colour and alpha are two canvases, as in the tree atlas (`foliage.ts`); the colour canvas is leaf
+ *  green all over, so the smaller mip levels get no dark fringe. */
+function frondTextures(disp: Disp) {
+  const W = 128, H = 512, N = 26, y0 = H - 5, y1 = 14, mid = W / 2;
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d')!;
+  const a = document.createElement('canvas'); a.width = W; a.height = H; const ax = a.getContext('2d')!;
+  x.fillStyle = '#3d7424'; x.fillRect(0, 0, W, H); ax.fillStyle = '#000'; ax.fillRect(0, 0, W, H);
+  const leaflet = (cx: number, cy: number, len: number, wid: number, ang: number, lig: number) => {
+    for (const ctx of [x, ax]) {
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(len * 0.3, -wid * 1.25, len * 0.72, -wid * 0.55); ctx.lineTo(len, 0); ctx.lineTo(len * 0.72, wid * 0.55); ctx.quadraticCurveTo(len * 0.3, wid * 1.25, 0, 0);
+      if (ctx === ax) ctx.fillStyle = '#fff';
+      else { const gr = ctx.createLinearGradient(0, 0, len, 0); gr.addColorStop(0, `hsl(104,52%,${lig - 5}%)`); gr.addColorStop(0.6, `hsl(98,54%,${lig + 3}%)`); gr.addColorStop(1, `hsl(88,56%,${lig + 11}%)`); ctx.fillStyle = gr; }
+      ctx.fill();
+      if (ctx === x) { ctx.strokeStyle = `hsla(84,46%,${lig + 22}%,0.6)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(1, 0); ctx.lineTo(len * 0.9, 0); ctx.stroke(); }
+      ctx.restore();
+    }
+  };
+  const step = (y0 - y1) / (N - 1);
+  for (let k = 0; k < N; k++) {
+    const t = k / (N - 1), y = y0 - step * k;
+    const p = t < 0.3 ? 0.4 + 0.6 * Math.sin(t / 0.3 * Math.PI / 2) : 0.05 + 0.95 * Math.pow(Math.cos((t - 0.3) / 0.7 * Math.PI / 2), 0.85);
+    const len = W * 0.485 * p, wid = Math.min(step * 0.4, 2 + len * 0.16), lean = 0.42 + 0.3 * t; // the leaflets lean towards the tip, more so near it
+    const lig = 27 + 9 * t + (k % 2 ? 2.5 : -2.5);
+    leaflet(mid + 1, y, len, wid, -lean, lig); leaflet(mid - 1, y - step * 0.5, len, wid, Math.PI + lean, lig + 1.5);
   }
-  return part(merge(list), null, (x, _y, z) => { const f = Math.min(1, Math.hypot(x, z) / 1.15); return [base[0] + (tip[0] - base[0]) * f, base[1] + (tip[1] - base[1]) * f, base[2] + (tip[2] - base[2]) * f]; }, true);
+  for (const ctx of [x, ax]) { // the stalk
+    ctx.strokeStyle = ctx === ax ? '#fff' : '#7d9440'; ctx.lineCap = 'round';
+    for (let k = 0; k < 8; k++) { ctx.lineWidth = 3.4 - k * 0.3; ctx.beginPath(); ctx.moveTo(mid, y0 + 5 - (y0 - y1) * k / 8); ctx.lineTo(mid, y0 + 5 - (y0 - y1 + 6) * (k + 1) / 8); ctx.stroke(); }
+  }
+  const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
+  const alpha = new THREE.CanvasTexture(a); alpha.anisotropy = 4;
+  disp.push(map, alpha);
+  return { map, alpha };
 }
 function agave(seed: number, base: RGB, tip: RGB) {
   // Desert succulent rosette: thick fleshy sword-leaves radiating from center
@@ -169,7 +217,7 @@ const GEO: Record<string, (s: number) => Built> = {
     for (let k = 0; k < 6; k++) { const a = h2(k, s) * 6.28, d = 0.09 + h2(k + 1, s) * 0.14; const c = pal[(k + Math.floor(s)) % pal.length]; heads.push(part(new THREE.OctahedronGeometry(0.055, 0), M(Math.cos(a) * d, 0.32 + h2(k + 2, s) * 0.14, Math.sin(a) * d, 0, a, 0, 1.2, 0.7, 1.2), () => c)); }
     return { geo: merge(heads), h: 0.46 };
   },
-  fern: s => ({ geo: fern(s, [0.08, 0.2, 0.05], [0.34, 0.62, 0.18]), h: 0.58 }),
+  fern: s => ({ geo: fern(s, [0.42, 0.5, 0.36], [1.0, 1.0, 0.9]), h: 0.6 }),
   agave: s => ({ geo: agave(s, [0.24, 0.34, 0.2], [0.54, 0.62, 0.4]), h: 0.8 }),
   log: s => ({ geo: mossyLog(s), h: 0.4 }),
   bush: s => ({ geo: bush(s, [0.19, 0.39, 0.11]), lod: bushImpostor(0.95, 1.32, [0.1, 0.22, 0.06], [0.28, 0.5, 0.16]), h: 1.4 }),
@@ -244,9 +292,13 @@ const SETS: Record<string, CoverType[]> = {
 };
 SETS.mesa = SETS.desert;
 
-function coverMaterial(t: CoverType, H: number, isImpostor = false) {
+function coverMaterial(t: CoverType, H: number, isImpostor = false, tex?: { map: THREE.Texture; alpha: THREE.Texture }) {
   const mat = new THREE.MeshStandardNodeMaterial({ vertexColors: true, side: t.blade || isImpostor ? THREE.DoubleSide : THREE.FrontSide });
   mat.roughness = t.rough ?? 0.86; mat.metalness = 0;
+  if (tex) mat.map = tex.map;
+  // Outline of a textured card (fern frond). The step is steep: far away the smaller mip levels hold 0.5 … 0.7 over the whole frond –
+  // read as is, the dither below would thin the plant out to a haze.
+  const cut = tex ? smoothstep(0.25, 0.55, texture(tex.alpha, uv()).r) : null;
   if (t.wind && !isImpostor) {
     const k = clamp(positionGeometry.y.div(H), 0, 1); const ph = positionLocal.x.mul(0.07).add(positionLocal.z.mul(0.05));
     mat.positionNode = positionLocal.add(vec3(sin(time.mul(1.9).add(ph)), 0, cos(time.mul(1.4).add(ph.mul(1.3)))).mul(k.mul(k)).mul(t.wind));
@@ -257,7 +309,8 @@ function coverMaterial(t: CoverType, H: number, isImpostor = false) {
     mat.opacityNode = oneMinus(smoothstep(far * 0.78, far, d));
     mat.alphaTestNode = interleavedGradientNoise(screenCoordinate.xy).mul(0.96).add(0.02);
   } else if (!t.shadow) {
-    mat.opacityNode = oneMinus(smoothstep(t.view * 0.74, t.view, d));
+    const fade = oneMinus(smoothstep(t.view * 0.74, t.view, d));
+    mat.opacityNode = cut ? cut.mul(fade) : fade;
     mat.alphaTestNode = interleavedGradientNoise(screenCoordinate.xy).mul(0.96).add(0.02);
   }
   if (t.glow === 'crystal') mat.emissiveNode = vertexColor().mul(0.5);
@@ -281,7 +334,7 @@ export function buildGroundCover(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   let total = 0;
   set.forEach((t, ti) => {
     const built = GEO[t.geo](17 + ti * 31);
-    const mat = coverMaterial(t, built.h, false); disp.push(built.geo, mat);
+    const mat = coverMaterial(t, built.h, false, t.geo === 'fern' ? frondTextures(disp) : undefined); disp.push(built.geo, mat);
     const hasLod = !!(built.lod && t.farView);
     const lodMat = hasLod ? coverMaterial(t, built.h, true) : null;
     if (hasLod) disp.push(built.lod!, lodMat!);
