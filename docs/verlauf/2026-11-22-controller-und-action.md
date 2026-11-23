@@ -64,3 +64,4 @@ Quellen (nur als Suchtreffer gelesen; reddit ließ sich nicht abrufen):
 
 ## Erledigt (aus `TODO.md`)
 - [x] **GitHub-Action auf GitHub bringen:** `.github/workflows/check.yml` ist fertig und lokal committet, aber GitHub hat den Push abgelehnt – dem Zugangstoken des Nutzers fehlt das Recht, Workflow-Dateien zu schreiben. Danach: pushen, den ersten Lauf unter „Actions" ansehen, den optionalen WebGPU-Job einmal von Hand starten → gepusht, erster Lauf grün; der WebGPU-Job bleibt als eigener Punkt in `TODO.md` Abschnitt 7
+- [x] **Xbox-Controller geht beim Rennstart aus** (Gegenprobe des Nutzers) → der Nutzer meldet am 2026-11-22: „geht wieder". Welche der Abhilfen geholfen hat, hat er nicht gesagt; am Spiel wurde nichts geändert

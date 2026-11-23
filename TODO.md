@@ -10,7 +10,6 @@ Nur offene Punkte, nach Thema. Erledigtes steht im Verlauf: `docs/verlauf/`, je 
 - [ ] Cockpit-Innenansicht in einem Tunnel sichten (Regen und 90°-Rolle sind gesichtet)
 - [ ] Schadens-Balance von Hand fahren (bisher nur KI-Sim): sind 5–10 % je Bruchteil richtig?
 - [ ] **Neu seit dem 2026-11-22 – ansehen / probefahren:** (1) frontal in eine Felswand mit Mandrel Ram und Vrak Splitter-X: schützt die Nase spürbar, ein Streifer nicht? (2) Brandmarken bei Dorn Manta, Lyss Halo-9, Tarn Cyclone: sitzen sie jetzt auf Flanke, Ring und Rotor-Reif? (3) Lyss Halo-9 mit verlorenen Ringsegmenten aus der Nähe: Schnittkanten sauber? (4) Start eines Rennens: kein Ruckler mehr im ersten Bild des Countdowns (Einstellung „Hoch" oder „Ultra", WebGPU)
-- [ ] **Xbox-Controller geht beim Rennstart aus** (gemeldet 2026-11-22: drahtlos, Edge; nach dem Einschalten nach 1–2 s wieder aus). Das Spiel liest den Controller nur, im Code steht nichts, was ihn ausschalten kann. Verdacht, nicht bestätigt: Microsoft GameInput 4.0.300 unter Windows. **Gegenprobe:** geht er auch aus (a) im Spiel unter Einstellungen → Steuerung, (b) auf einer Gamepad-Testseite in Edge? Version: `winget list Microsoft.GameInput`; Abhilfe: `winget upgrade Microsoft.GameInput`, PC neu starten. Ergebnis melden. Bestätigt sich der Verdacht: einen Hinweis für Spieler in `README.md` (Abschnitt „Steuerung") ergänzen. Bleibt der Controller auf der Testseite an und geht nur im Spiel aus: weiter suchen – [Protokoll](docs/verlauf/2026-11-22-controller-und-action.md)
 
 ## 2. Entscheidungen des Nutzers
 - [ ] Entscheidung offen: `npm run save` endgültig entfernen oder wieder einschalten? (2026-11-22, Nutzer: vorerst **abgeschaltet lassen**)
@@ -48,3 +47,9 @@ Nur offene Punkte, nach Thema. Erledigtes steht im Verlauf: `docs/verlauf/`, je 
 - [ ] **Harness:** WebGPU-Screenshots im headless Chrome reparieren (weiß; nur Konsolencheck möglich)
 - [ ] **Regeln inhaltlich durchsehen** (`docs/regeln/`, `DESIGN.md`): beim Umbau am 2026-11-22 ist nur umsortiert worden. Ältere Regeln, denen eine jüngere widerspricht, stehen noch da → je Thema prüfen und streichen
 - [ ] `tools/harness/shot.mjs` und `tools/harness/app.mjs` (Playwright) ruft nichts mehr auf, seit `run.sh` gelöscht ist – `pshot.mjs` / `papp.mjs` (Puppeteer) ersetzen sie. Löschen?
+
+## 8. Vom Nutzer am 2026-11-22 bestellt und entschieden – noch nicht gebaut
+- [ ] **Pulverschnee als 3D-Schneedecke mit Spuren** (Entscheidung: die Spuren ändern auch das Fahren). Die Pulverschnee-Felder der zwei Eiswelt-Strecken (je ≈ 1 km) bekommen eine echte Schneedecke mit feinem Relief. Jeder Pod pflügt eine Spur mit aufgeworfenen Rändern; sie bleibt das ganze Rennen und schneit bei Schneeböen langsam zu. Gespurter Schnee ist schneller als frischer – es entsteht eine Ideallinie. Dazu feine Schneefahnen
+- [ ] **Textur- und Terrainübergänge überarbeiten** (Entscheidung: alle drei Arten): (1) Pistenrand ↔ Gelände, (2) Wechsel der Untergründe entlang der Strecke, (3) im Gelände selbst (Fels ↔ Sand ↔ Schnee an Hängen und Felswänden). Dazu gehört die gestreckte Textur auf den neuen Kappen der Felswände
+- [ ] **Offenere Abschnitte** (Entscheidung: auf allen Natur-Untergründen): Leitplanken, Randsteine und die sichtbare Pistenkante weg; der Boden geht ins Gelände über; die Grenze bilden unregelmäßige Felsreihen und Felswände (fest, man prallt ab), die Breite schwankt. Gebaute Decks (Start/Ziel, Brücken, Tunnel) behalten ihre Geländer. Heute stehen an 44–71 % jeder Strecke Leitplanken. Vorher die Falten aus Abschnitt 5 beheben
+
