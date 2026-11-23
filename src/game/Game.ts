@@ -8,7 +8,7 @@ import { DebrisPool } from './debris';
 import { DS, TUNNEL_SHOULDER, roadSurfaceAt, tunnelCeiling } from './trackBuilder';
 import { SURF, lensSpray, splashes, surfaceOf, surfacePalette, trackSplashes, type SurfaceDef } from './surfaces';
 import { SnowField } from './snowField';
-import { normalizeKeys, normalizePad, padValue, type Action, type KeyMap, type PadMap } from './keymap';
+import { keysLabel, normalizeKeys, normalizePad, padLabel, padValue, type Action, type KeyMap, type PadMap } from './keymap';
 import { podEnvelope } from './podDesigns';
 import { WeatherFx } from './weather';
 import { SH_BACK, setupSunShadow, type SunShadow } from './sunShadow';
@@ -22,7 +22,7 @@ import { buildPodModel, setPodLodScale } from './podModel';
 import { Particles } from './particles';
 import { PostFX } from './post';
 import { AudioFX, boostAlarmLevel, type WorldAudioState } from './audio';
-import { HOVER, aiInputs, applyDamage, bodyToWorld, podParams, respawn, stepPod, worldToBody, type PodState, collidePods } from './physics';
+import { HOVER, aiInputs, applyDamage, bodyToWorld, manualReset, podParams, stepPod, tickRespawn, worldToBody, type PodState, collidePods } from './physics';
 import { damageModel, lostMessage, partLamps } from './podDamage';
 import { applyAtmosphere } from './atmosphere';
 import type { LifeAudio } from './wildlife';
@@ -103,7 +103,8 @@ export class Game {
   tmpQ = new THREE.Quaternion(); tmpQ2 = new THREE.Quaternion(); tmpC = new THREE.Color(); dustCol = new THREE.Color(); barrierGlow = new THREE.Color();
   lifeAudio: LifeAudio = { bird: 0, herd: 0, crawler: 0 };
   worldAudio: WorldAudioState = { themeId: 'desert', geyser: 0, rotor: 0, rotorHz: 2, crawler: 0, bird: 0, herd: 0 };
-  prevCamBtn = false;
+  prevCamBtn = false; prevResetBtn = false;
+  /** seconds the player has been standing or flying the wrong way (the HUD then names the reset key once) */ private stuckT = 0; private stuckShown = false;
 
   constructor(container: HTMLDivElement, profile: Profile, cb: Callbacks) {
     this.container = container; this.profile = profile; this.cb = cb; this.camMode = profile.race.camera;
@@ -305,12 +306,31 @@ export class Game {
     if (e.repeat) return;
     this.keys.add(e.code);
     if (this.keymap.view.includes(e.code)) this.cycleCamera();
+    if (this.keymap.reset.includes(e.code)) { e.preventDefault(); this.resetPlayer(); } // (Backspace must not page back in the browser)
     if (e.code === 'Escape' || e.code === 'KeyP') this.setPaused(!this.paused);
     if (!this.paused) this.audio?.resume(); // (was unconditional: pressing Esc suspended the audio and resumed it right away)
   };
   onKeyUp = (e: KeyboardEvent) => { this.keys.delete(e.code); };
 
   cycleCamera() { this.camMode = (this.camMode + 1) % CAMERA_NAMES.length; this.camInit = false; this.showMsg(CAMERA_NAMES[this.camMode], 1.2); }
+  /** Reset key (2026-11-23): puts the player's pod back on the track – only while the race runs (`manualReset` in physics.ts). */
+  resetPlayer() {
+    if (this.paused || this.state !== 'race') return;
+    if (manualReset(this.player)) { this.stuckT = 0; this.stuckShown = true; this.showMsg('ZURÜCK AUF DIE STRECKE', 1.6); this.audio.beep(330, 0.18, 'triangle', 0.2); }
+  }
+  /** What the player has to press for a reset: the key, and the gamepad button when a gamepad is connected ('' = nothing is bound). */
+  private resetHint() {
+    let pad = false; for (const g of navigator.getGamepads ? navigator.getGamepads() : []) if (g) { pad = true; break; }
+    const k = keysLabel(this.keymap.reset), b = padLabel(this.padmap.reset), ks = k === '—' ? '' : k, bs = pad && b !== '—' ? b : '';
+    return ks && bs ? `${ks} / ${bs}` : ks || bs;
+  }
+  /** Stuck or lost: after three seconds at walking pace or the wrong way round, the HUD names the reset key – once per episode. */
+  private watchStuck(dt: number) {
+    const pl = this.player, lost = this.state === 'race' && pl.dead <= 0 && !pl.finished && (Math.hypot(pl.vel.x, pl.vel.z) < 6 || pl.wrongWay > 1.2);
+    if (!lost) { this.stuckT = 0; this.stuckShown = false; return; }
+    this.stuckT += dt;
+    if (this.stuckT > 3 && !this.stuckShown) { this.stuckShown = true; const h = this.resetHint(); if (h) this.showMsg(`${h} = ZURÜCK AUF DIE STRECKE`, 3.5); }
+  }
   showMsg(m: string, t = 2) { this.message = m; this.messageT = t; }
 
   setPaused(p: boolean) {
@@ -351,6 +371,7 @@ export class Game {
       const rl = pv('rollRight') - pv('rollLeft'); if (Math.abs(rl) > 0.02) roll = rl;
       const pt = pv('pitchUp') - pv('pitchDown'); if (Math.abs(pt) > 0.02) pitch = pt;
       const cam = pv('view') > 0.5; if (cam && !this.prevCamBtn) this.cycleCamera(); this.prevCamBtn = cam;
+      const rs = pv('reset') > 0.5; if (rs && !this.prevResetBtn) this.resetPlayer(); this.prevResetBtn = rs;
       if (gp.buttons[9]?.pressed && !this.paused) this.setPaused(true);
       break;
     }
@@ -429,7 +450,7 @@ export class Game {
     }
     // deaths / finish
     for (const p of this.pods) {
-      if (p.dead > 0) { p.dead -= dt; if (p.dead <= 0) { respawn(p, this.td); p.visual?.clearMarks?.(); } } // a respawned pod is patched up: parts back, hit marks gone
+      if (tickRespawn(p, this.td, dt) === 'patched') p.visual?.clearMarks?.(); // a pod that comes back from a crash is patched up: parts back, hit marks gone (after a manual reset it is as it was)
       if (!p.finished && this.state !== 'countdown') {
         const done = this.td.main.closed ? p.lap >= this.profile.race.laps : p.rel >= this.td.finishIdx - this.td.startIdx;
         if (done) {
@@ -473,7 +494,7 @@ export class Game {
     { const pl = this.player, ps = this.td.paths[pl.path].samples[pl.idx]; this.cover += ((ps && ps.roof > 0 && !pl.upper ? 1 : 0) - this.cover) * Math.min(1, dt * 5); this.particles.setAmbientFade(1 - this.cover); }
     this.applyEnv(dt);
     if (this.env.wind > 0.6 && this.cover < 0.5 && this.state === 'race') this.player.shake = Math.max(this.player.shake, this.weather.gust * (this.env.wind - 0.5) * 0.22); // storm gusts buffet the pod
-    this.updateLens(dt);
+    this.updateLens(dt); this.watchStuck(dt);
     if (this.messageT > 0) this.messageT -= dt;
     this.flash = Math.max(0, this.flash - dt * 2);
 

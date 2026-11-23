@@ -29,7 +29,7 @@ export function KeyBindings({ profile, update }: { profile: Profile; update: Upd
             className={`px-3 py-1.5 text-xs border ${same(keys, KEY_PRESETS[id].keys) ? 'border-amber-400 text-amber-200 bg-amber-900/30' : 'border-stone-600 text-stone-300 hover:border-amber-500'}`}>{KEY_PRESETS[id].name}</button>
         ))}
       </div>
-      <div className="grid grid-cols-4 gap-3 text-sm">
+      <div className="grid grid-cols-4 gap-x-3 gap-y-2 text-sm">{/* 13 actions = four rows since the reset key: the rows sit closer so that the screen still fits 720 px (pui.mjs) */}
         {ACTIONS.map(([a, label]) => (
           <button key={a} onClick={() => setListen(listen === a ? null : a)} data-action={a}
             className={`flex items-center gap-3 bg-black/40 border p-2 text-left ${listen === a ? 'border-amber-400' : keys[a].length ? 'border-stone-800 hover:border-stone-500' : 'border-red-500/70'}`}>
@@ -70,7 +70,7 @@ export function PadBindings({ profile, update }: { profile: Profile; update: Upd
         <span className={`text-[11px] ${found ? 'text-emerald-300' : 'text-stone-500'}`}>{found ? 'verbunden' : 'nicht erkannt – eine Taste am Gamepad drücken'}</span>
         <button onClick={() => { setListen(null); setPad(defaultPad()); }} className="ml-auto px-3 py-1.5 text-xs border border-stone-600 text-stone-300 hover:border-amber-500">Standard</button>
       </div>
-      <div className="grid grid-cols-4 gap-3 text-sm">
+      <div className="grid grid-cols-4 gap-x-3 gap-y-2 text-sm">{/* 13 actions = four rows since the reset key: the rows sit closer so that the screen still fits 720 px (pui.mjs) */}
         {ACTIONS.map(([a, label]) => (
           <button key={a} onClick={() => setListen(listen === a ? null : a)} data-pad={a}
             className={`flex items-center gap-3 bg-black/40 border p-2 text-left ${listen === a ? 'border-amber-400' : pad[a].length ? 'border-stone-800 hover:border-stone-500' : 'border-red-500/70'}`}>

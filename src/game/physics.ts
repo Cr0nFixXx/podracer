@@ -33,6 +33,9 @@ export interface PodState {
   /** Session 20: lost Bruchteile (bit i = part i of the racer's Schadensmodell is gone) and the handling multipliers that follow
    *  from them (undefined = intact). Both change only in `applyDamage` (a part breaks) and `respawn` (all parts return). */
   parts?: number; fx?: PodFx;
+  /** 2026-11-23, reset key: the pod is off the track because the player asked for it (`manualReset`) – `respawn` then repairs nothing;
+   *  seconds until the key works again. */
+  manualReset?: boolean; resetCd?: number;
   /** `part`: a Bruchteil broke off (`part` = its index in the Schadensmodell) */
   events: { type: 'wall' | 'obstacle' | 'land' | 'explode' | 'pod' | 'fall' | 'field' | 'break' | 'part'; strength: number; x: number; y: number; z: number; nx: number; nz: number; ref?: Obstacle; part?: number }[];
   visual: PodVisual | null;
@@ -812,7 +815,31 @@ export function kill(p: PodState, t: number, explode: boolean) {
   if (explode) { p.hpL = 0; p.hpR = 0; }
 }
 
+// ---- Reset key (2026-11-23, user request: a key that puts the pod back on the track) ----
+/** A manual reset takes the pod off the track for this long; the key then rests for the cooldown (seconds). */
+export const RESET_WAIT = 0.8, RESET_COOLDOWN = 3;
+/** The player asks to be put back on the track. The pod is taken off for `RESET_WAIT` seconds, then `respawn` puts it at its last
+ *  safe place – centred, along the track, rolling at 35 m/s, protected for 2.2 s. Unlike a crash respawn it repairs nothing: hull,
+ *  lost parts and engine heat stay as they are, and the wait costs more than flying on – a reset is never a shortcut. Returns false
+ *  when it is not possible right now (the pod is already off the track, has finished, or the key is resting). */
+export function manualReset(p: PodState): boolean {
+  if (p.dead > 0 || p.finished || (p.resetCd ?? 0) > 0) return false;
+  kill(p, RESET_WAIT, false); p.manualReset = true; p.resetCd = RESET_WAIT + RESET_COOLDOWN;
+  return true;
+}
+/** Every frame, for every pod: counts down the time a pod is off the track (crash, fall, manual reset) and the rest of the reset key,
+ *  and puts the pod back when the time is up. Returns 'patched' in the frame a crashed pod comes back (repaired), 'reset' after a
+ *  manual reset, otherwise ''. */
+export function tickRespawn(p: PodState, td: TrackData, dt: number): '' | 'patched' | 'reset' {
+  if ((p.resetCd ?? 0) > 0) p.resetCd = Math.max(0, p.resetCd! - dt);
+  if (p.dead <= 0) return '';
+  p.dead -= dt; if (p.dead > 0) return '';
+  const manual = !!p.manualReset; respawn(p, td);
+  return manual ? 'reset' : 'patched';
+}
+
 export function respawn(p: PodState, td: TrackData) {
+  const keep = !!p.manualReset; p.manualReset = false; // (a manual reset moves the pod and nothing else)
   const path = td.paths[p.lastSafePath] ?? td.main;
   let idx = p.lastSafeIdx;
   const n = path.samples.length;
@@ -825,10 +852,12 @@ export function respawn(p: PodState, td: TrackData) {
   p.path = path.id; p.idx = idx;
   p.pos.set(s.x, s.y + HOVER + 1.2, s.z); p.yaw = Math.atan2(s.tx, s.tz); p.yawRate = 0; p.steer = 0;
   p.engYL = 0; p.engYR = 0; p.engVL = 0; p.engVR = 0; p.engPL = 0; p.engPR = 0;
-  p.upper = false; p.inRoof = false; p.overT = 0; p.ckX = 0; p.ckY = 0; p.ckZ = 0; p.ckVX = 0; p.ckVY = 0; p.ckVZ = 0;
+  p.upper = false; p.inRoof = false; p.ckX = 0; p.ckY = 0; p.ckZ = 0; p.ckVX = 0; p.ckVY = 0; p.ckVZ = 0;
   p.vel.set(s.tx * 35, 0, s.tz * 35);
-  p.hpL = Math.max(p.hpL, 55); p.hpR = Math.max(p.hpR, 55); p.heat = 0; p.overheat = false;
-  p.parts = 0; p.fx = undefined; // every Bruchteil is back (ADR 0001: parts return only here)
+  if (!keep) {
+    p.hpL = Math.max(p.hpL, 55); p.hpR = Math.max(p.hpR, 55); p.heat = 0; p.overheat = false; p.overT = 0;
+    p.parts = 0; p.fx = undefined; // every Bruchteil is back (ADR 0001: parts return only here)
+  }
   p.dead = 0; p.invuln = 2.2; p.grounded = false; p.groundY = s.y; p.prevGroundY = s.y;
 }
 

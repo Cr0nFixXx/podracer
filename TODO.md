@@ -54,9 +54,8 @@ Auftrag und Entscheidungen: [Protokoll](docs/verlauf/2026-11-23-nach-der-probefa
 
 **Fehler** – alle drei behoben (Protokoll), warten auf die Probefahrt des Nutzers
 
-**Verbesserungen** – erledigt (Protokoll): kein Fallschaden bei normaler Landung · Plasma-Hitzeschild über Lava · über Lava nur extrem kurzer Boost · größere Schatten-Sichtweite (Schattenwand auf „Ultra" behoben – **bitte FPS auf „Ultra" prüfen**, die weite Schattenstufe arbeitet jetzt erst wirklich) · Wasserspritzer auf der Linse über Seen und Pfützen ohne Regen · Boost-Alarm (**bitte Lautstärke anhören**)
+**Verbesserungen** – erledigt (Protokoll): kein Fallschaden bei normaler Landung · Plasma-Hitzeschild über Lava · über Lava nur extrem kurzer Boost · größere Schatten-Sichtweite (Schattenwand auf „Ultra" behoben – **bitte FPS auf „Ultra" prüfen**, die weite Schattenstufe arbeitet jetzt erst wirklich) · Wasserspritzer auf der Linse über Seen und Pfützen ohne Regen · Boost-Alarm (**bitte Lautstärke anhören**) · Reset-Taste (Rücktaste / Back)
 - [ ] Controller-Bedienung auch im Menü
-- [ ] Reset-Taste (Pod zurück auf die Strecke)
 
 **Streckenanpassungen** (Entscheidungen im Protokoll)
 - [ ] Intro-Flug über die Strecke bis „Rennen starten"

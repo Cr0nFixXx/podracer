@@ -127,6 +127,16 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Geprüft: vier Unit-Prüfungen `alarm:` (zuerst rot; eine fährt jeden Pod mit gehaltenem Boost bis zur Abschaltung). Der Ton selbst wurde ohne Lautsprecher im Browser gerechnet und gemessen (`tools/harness/palarm.mjs`): bei Stufe 0 still, Lautstärke, Pulsrate und Tonhöhe steigen, kein Knacken. Im Spiel startet der Ton ohne Fehler.
 - **Nicht geprüft: wie laut er sich neben den Triebwerken anfühlt** – das kann nur das Ohr. Stellschraube: `boostAlarmVoice` in `src/game/audio.ts` (Wert `0.11`).
 
+### Verbesserung – Reset-Taste
+- Neue Aktion „Zurück auf die Strecke": **Rücktaste (⌫)** auf der Tastatur, **Back / Select** am Gamepad. Beide lassen sich unter „Einstellungen → Steuerung" umlegen.
+- Der Pod verschwindet für 0,8 s und steht dann an der letzten sicheren Stelle: mittig, in Fahrtrichtung, 35 m/s, gut zwei Sekunden Schutz.
+- **Repariert wird nichts** – Triebwerkszustand, verlorene Teile und Hitze bleiben, wie sie waren (ein Unfall-Respawn flickt weiterhin auf 55 %). So ist ein Reset nie billiger als weiterfliegen. Danach ruht die Taste drei Sekunden.
+- Geht nur im laufenden Rennen: nicht im Countdown, nicht in der Pause, nicht nach dem Ziel.
+- Wer drei Sekunden steht oder falsch herum fliegt, bekommt die Taste eingeblendet („⌫ = ZURÜCK AUF DIE STRECKE").
+- Alte gespeicherte Tastenbelegungen bekommen die Taste automatisch – außer die Rücktaste liegt dort schon auf etwas anderem; dann bleibt Reset frei und der Steuerungs-Bildschirm zeigt es rot.
+- Der Steuerungs-Bildschirm hat jetzt 13 Aktionen (vier Reihen); die Reihen stehen etwas enger, damit er weiter auf 720 px passt.
+- Geprüft: vier Unit-Prüfungen `reset:` (zuerst rot; fünf Strecken), im Browser mit echtem Tastendruck (Pod 80 m neben der Strecke, rückwärts → nach 1 s mittig auf der Piste, Schaden unverändert; zweiter Druck und Druck in der Pause wirkungslos; Hinweis nach 3 s Stillstand), Steuerungs-Bildschirm bei 1280 × 720 und 1024 × 600.
+
 ## Geprüft
 - Fehler 1: neue Prüfungen `bridges: …` (11, zuerst rot: Gelände 22,7 m über der Brücke, 309 Punkte; Wand 28 m hoch direkt neben der Brücke). Nur mit Regel (2) stand das Gelände noch 5,2 m über der Fahrbahn – Regel (1) ist nötig. `poke.ts` auf allen Strecken, Gitter 4,5 / 7 / 13,75 m, Brücken eingeschlossen: 0 Punkte (vorher 242 auf dem Methan-Derby). Bilder vorher/nachher an allen drei Stellen (WebGL2, Software).
 

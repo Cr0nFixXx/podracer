@@ -29,9 +29,12 @@ npm run build:web  # erzeugt den Ordner build/ für einen Webserver (mehrere Dat
 | Rolle nach links / rechts (90°) | `←` / `→` | rechter Stick links / rechts |
 | Reparatur (langsamer fahren) | `R` | X |
 | Ansicht wechseln | `C` | Y |
+| Zurück auf die Strecke (Reset) | `⌫` Rücktaste | Back / Select |
 | Pause | `Esc` / `P` | Start |
 
 Rückwärts (Umkehrschub halten, bis der Pod zurücksetzt) lenkt der Pod wie ein Auto im Rückwärtsgang: das Heck schwenkt zur gelenkten Seite.
+
+**Reset:** Festgefahren, verirrt oder falsch herum? Die Reset-Taste setzt den Pod nach 0,8 Sekunden an die letzte sichere Stelle zurück – mittig, in Fahrtrichtung, mit 35 m/s und gut zwei Sekunden Schutz. Repariert wird dabei nichts: Triebwerkszustand, verlorene Teile und Hitze bleiben. Danach ruht die Taste drei Sekunden. Wer drei Sekunden steht oder falsch herum fliegt, bekommt die Taste eingeblendet.
 
 In der Ansicht „Cockpit" (`C`) sitzt man im Pod und sieht das eigene Cockpit von innen: Armaturenbrett mit drei Warnlampen (Boost, Hitze, Schaden), Scheibenrahmen und die Hände des Piloten – bei jedem Racer anders. Die Cockpits hängen über der Triebwerkslinie: man schaut über die Triebwerke hinweg auf die Strecke. Die freie Sicht ganz ohne Cockpit bietet weiterhin die Ansicht „Motorhaube".
 

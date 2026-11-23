@@ -1,29 +1,33 @@
 // ===== Session 12: rebindable keyboard controls =====
-export type Action = 'thrust' | 'brake' | 'left' | 'right' | 'boost' | 'airbrake' | 'pitchDown' | 'pitchUp' | 'rollLeft' | 'rollRight' | 'repair' | 'view';
+export type Action = 'thrust' | 'brake' | 'left' | 'right' | 'boost' | 'airbrake' | 'pitchDown' | 'pitchUp' | 'rollLeft' | 'rollRight' | 'repair' | 'view' | 'reset';
 export type KeyMap = Record<Action, string[]>; // KeyboardEvent.code values
 
 export const ACTIONS: [Action, string][] = [
   ['thrust', 'Schub'], ['brake', 'Umkehrschub / Bremse'], ['left', 'Links lenken'], ['right', 'Rechts lenken'],
   ['boost', 'Boost'], ['airbrake', 'Luftbremse / Sliden'], ['pitchDown', 'Neigung (Nase runter)'], ['pitchUp', 'Anheben (Nase hoch)'],
   ['rollLeft', 'Rolle nach links'], ['rollRight', 'Rolle nach rechts'], ['repair', 'Reparatur'], ['view', 'Ansicht'],
+  ['reset', 'Zurück auf die Strecke'], // 2026-11-23 (user request): puts the pod back on the track – physics.ts `manualReset`
 ];
 
 export const KEY_PRESETS: Record<'flight' | 'classic', { name: string; keys: KeyMap }> = {
   flight: {
     name: 'Standard (WASD + Pfeile = Fluglage)',
-    keys: { thrust: ['KeyW'], brake: ['KeyS'], left: ['KeyA'], right: ['KeyD'], boost: ['ShiftLeft', 'ShiftRight'], airbrake: ['Space'], pitchDown: ['ArrowUp'], pitchUp: ['ArrowDown'], rollLeft: ['ArrowLeft'], rollRight: ['ArrowRight'], repair: ['KeyR'], view: ['KeyC'] },
+    keys: { thrust: ['KeyW'], brake: ['KeyS'], left: ['KeyA'], right: ['KeyD'], boost: ['ShiftLeft', 'ShiftRight'], airbrake: ['Space'], pitchDown: ['ArrowUp'], pitchUp: ['ArrowDown'], rollLeft: ['ArrowLeft'], rollRight: ['ArrowRight'], repair: ['KeyR'], view: ['KeyC'], reset: ['Backspace'] },
   },
   classic: {
     name: 'Klassisch (Pfeile lenken, IJKL = Fluglage)',
-    keys: { thrust: ['KeyW', 'ArrowUp'], brake: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'], boost: ['ShiftLeft', 'ShiftRight'], airbrake: ['Space'], pitchDown: ['KeyI'], pitchUp: ['KeyK'], rollLeft: ['KeyJ'], rollRight: ['KeyL'], repair: ['KeyR'], view: ['KeyC'] },
+    keys: { thrust: ['KeyW', 'ArrowUp'], brake: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'], boost: ['ShiftLeft', 'ShiftRight'], airbrake: ['Space'], pitchDown: ['KeyI'], pitchUp: ['KeyK'], rollLeft: ['KeyJ'], rollRight: ['KeyL'], repair: ['KeyR'], view: ['KeyC'], reset: ['Backspace'] },
   },
 };
 export const defaultKeys = (): KeyMap => JSON.parse(JSON.stringify(KEY_PRESETS.flight.keys)) as KeyMap;
 
-/** Fills gaps of a stored (possibly older / partial) key map with the defaults. */
+/** Fills gaps of a stored (possibly older / partial) key map with the defaults. An action that is new to the stored map gets its
+ *  default key only where the player has not put that key on something else – one key never does two things. */
 export function normalizeKeys(k?: Partial<KeyMap> | null): KeyMap {
   const d = defaultKeys(); if (!k) return d;
-  for (const [a] of ACTIONS) if (Array.isArray(k[a])) d[a] = (k[a] as string[]).filter(c => typeof c === 'string');
+  const used = new Set<string>();
+  for (const [a] of ACTIONS) if (Array.isArray(k[a])) { d[a] = (k[a] as string[]).filter(c => typeof c === 'string'); d[a].forEach(c => used.add(c)); }
+  for (const [a] of ACTIONS) if (!Array.isArray(k[a])) d[a] = d[a].filter(c => !used.has(c));
   return d;
 }
 /** Binds `code` to `action` (single key) and removes it from every other action so one key never does two things. */
@@ -51,14 +55,18 @@ export type PadMap = Record<Action, PadBind[]>;
 export const defaultPad = (): PadMap => ({
   thrust: [{ b: 7 }], brake: [{ b: 6 }], left: [{ a: 0, d: -1 }], right: [{ a: 0, d: 1 }], boost: [{ b: 0 }], airbrake: [{ b: 1 }, { b: 4 }, { b: 5 }],
   pitchDown: [{ a: 3, d: -1 }], pitchUp: [{ a: 3, d: 1 }], rollLeft: [{ a: 2, d: -1 }], rollRight: [{ a: 2, d: 1 }], repair: [{ b: 2 }], view: [{ b: 3 }],
+  reset: [{ b: 8 }], // Back / Select
 });
 const isBind = (x: unknown): x is PadBind => !!x && typeof x === 'object' && (typeof (x as { b?: unknown }).b === 'number' || typeof (x as { a?: unknown }).a === 'number');
+const sameBind = (x: PadBind, y: PadBind) => 'b' in x ? 'b' in y && x.b === y.b : 'a' in y && x.a === y.a && x.d === y.d;
+/** Fills gaps of a stored gamepad map with the defaults – like `normalizeKeys`, a new action never takes a button the player uses. */
 export function normalizePad(p?: Partial<PadMap> | null): PadMap {
   const d = defaultPad(); if (!p) return d;
-  for (const [a] of ACTIONS) if (Array.isArray(p[a])) d[a] = (p[a] as unknown[]).filter(isBind);
+  const used: PadBind[] = [];
+  for (const [a] of ACTIONS) if (Array.isArray(p[a])) { d[a] = (p[a] as unknown[]).filter(isBind); used.push(...d[a]); }
+  for (const [a] of ACTIONS) if (!Array.isArray(p[a])) d[a] = d[a].filter(x => !used.some(y => sameBind(x, y)));
   return d;
 }
-const sameBind = (x: PadBind, y: PadBind) => 'b' in x ? 'b' in y && x.b === y.b : 'a' in y && x.a === y.a && x.d === y.d;
 export function bindPad(map: PadMap, action: Action, bind: PadBind): PadMap {
   const out = {} as PadMap;
   for (const [a] of ACTIONS) out[a] = a === action ? [bind] : map[a].filter(x => !sameBind(x, bind));

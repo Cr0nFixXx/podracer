@@ -17,7 +17,8 @@ import { assembleHero, assembleRival, segFor, skinPoint, visibleIndices, type Br
 import { pickRivals, rivalKit } from '../../src/game/roster';
 import { engineKit, tuneTiers, NO_KIT } from '../../src/game/podKitParts';
 import { ciRoster } from './roster';
-import { applyDamage, bodyToWorld, collidePods, hullWorld, podParams, respawn, stepPod, vaultOver, worldToBody, FX_NONE, HOVER, VAULT_CLAMP, type PodState } from '../../src/game/physics';
+import { applyDamage, bodyToWorld, collidePods, hullWorld, kill, manualReset, podParams, respawn, stepPod, tickRespawn, vaultOver, worldToBody, FX_NONE, HOVER, RESET_COOLDOWN, RESET_WAIT, VAULT_CLAMP, type PodState } from '../../src/game/physics';
+import { ACTIONS, KEY_PRESETS, defaultPad, normalizeKeys, normalizePad, type KeyMap, type PadMap } from '../../src/game/keymap';
 import { DAMAGE_RULES, damageModel, lostMessage, partLamps, partsFx, zoneFactor, type DamageZone } from '../../src/game/podDamage';
 import { buildTrack, frameAt, tunnelCeiling, baySameStretch, DS, TUNNEL_SHOULDER, type Path, type Sample, type TrackData } from '../../src/game/trackBuilder';
 import { defaultProfile, effectiveStats, loadProfile, saveProfile, CAMERA_NAMES, MAX_LAPS, PRESETS, type GfxSettings } from '../../src/game/settings';
@@ -1305,6 +1306,76 @@ for (const id of ['boonta', 'frost', 'magma', 'oovo']) test(`open sections: the 
     ok(n > 100, `${id}: only ${n} samples with a bay`);
     ok(worst < 0.3, `${cell} m cells: terrain ${worst.toFixed(2)} m above the road at ${where}`);
   }
+});
+
+// ---- reset key (2026-11-23, user: „Reset-Taste (Pod neu auf die Strecke zurücksetzen)") ----
+/** A pod that has been racing along the main road up to `idx` (so its last safe place is known), then thrown `off` metres beside the road, facing backwards. */
+function strayPod(trackId: string, idx: number, off: number) {
+  const td = trackOf(trackId), S = td.main.samples, s = S[idx], p = racer(PODS[0], td, idx, 0, s.y + HOVER);
+  p.invuln = 0; p.input.throttle = 1;
+  for (let f = 0; f < 40; f++) { p.pos.x = s.x; p.pos.z = s.z; p.vel.set(s.tx * 60, 0, s.tz * 60); p.yaw = Math.atan2(s.tx, s.tz); stepPod(p, td, 1 / 60, f / 60, 1, false); }
+  const safe = p.lastSafeIdx;
+  p.pos.x += s.rx * off; p.pos.z += s.rz * off; p.yaw += Math.PI; p.vel.set(-s.tx * 12, 0, -s.tz * 12);
+  return { td, p, safe };
+}
+const plainIdx = (trackId: string) => { const S = trackOf(trackId).main.samples; return S.findIndex((q, k) => k > 60 && !q.gap && !q.ramp && !q.roof && !q.zeroG && !S[k + 30]?.gap && !S[k + 30]?.ramp); };
+test('reset: the key takes the pod off for a moment and puts it back on the road – centred, along the track, at the last safe place (several tracks)', () => {
+  const bad: string[] = [];
+  for (const id of ['boonta', 'frost', 'aquilaris', 'oovo', 'methane']) {
+    const idx = plainIdx(id); if (idx < 0) { bad.push(`${id}: no plain stretch`); continue; }
+    const { td, p, safe } = strayPod(id, idx, 90);
+    if (Math.abs(safe - idx) > 6) bad.push(`${id}: last safe place ${safe}, the pod was at ${idx}`);
+    if (!manualReset(p)) { bad.push(`${id}: the reset was refused`); continue; }
+    if (!(p.dead > 0 && Math.abs(p.dead - RESET_WAIT) < 1e-6)) bad.push(`${id}: the pod is not off the track for ${RESET_WAIT} s (dead ${p.dead})`);
+    let t = 0, back = ''; while (t < 3 && !back) { back = tickRespawn(p, td, 1 / 60); t += 1 / 60; }
+    if (back !== 'reset') { bad.push(`${id}: came back as '${back}' after ${t.toFixed(2)} s`); continue; }
+    if (Math.abs(t - RESET_WAIT) > 0.05) bad.push(`${id}: back after ${t.toFixed(2)} s`);
+    const s = td.main.samples[p.idx], lat = (p.pos.x - s.x) * s.rx + (p.pos.z - s.z) * s.rz, along = p.vel.x * s.tx + p.vel.z * s.tz, head = Math.cos(p.yaw - Math.atan2(s.tx, s.tz));
+    if (p.path !== 0 || p.idx < safe || p.idx > safe + 40) bad.push(`${id}: put at sample ${p.idx} of path ${p.path} (last safe ${safe})`);
+    if (Math.abs(lat) > 0.5) bad.push(`${id}: ${lat.toFixed(1)} m beside the centre line`);
+    if (head < 0.99) bad.push(`${id}: not facing along the track (cos ${head.toFixed(2)})`);
+    if (along < 20 || along > 50) bad.push(`${id}: rolls on at ${along.toFixed(0)} m/s`);
+    if (s.gap || s.ramp) bad.push(`${id}: put on a ramp or over a gap`);
+    if (!(p.invuln > 1)) bad.push(`${id}: not protected after the reset (invuln ${p.invuln})`);
+  }
+  eq(bad.length, 0, `${bad.join(' · ')} –`);
+});
+test('reset: no free repair – hull, lost parts and engine heat stay as they are (a crash respawn still patches the pod up)', () => {
+  const idx = plainIdx('boonta'), a = strayPod('boonta', idx, 90), p = a.p;
+  p.hpL = 20; p.hpR = 31; p.heat = 0.8; p.overT = 1.2; p.parts = 5;
+  ok(manualReset(p), 'the reset was refused'); while (p.dead > 0) tickRespawn(p, a.td, 1 / 60);
+  eq(p.hpL, 20, 'left engine after the reset –'); eq(p.hpR, 31, 'right engine after the reset –'); eq(p.parts, 5, 'lost parts after the reset –');
+  ok(Math.abs(p.heat - 0.8) < 1e-9 && Math.abs((p.overT ?? 0) - 1.2) < 1e-9, `heat ${p.heat}, overdrive ${p.overT} after the reset`);
+  const b = strayPod('boonta', idx, 90), q = b.p; q.hpL = 20; q.hpR = 31; q.heat = 0.8; q.parts = 5;
+  kill(q, 1.6, false); let back = ''; while (!back) back = tickRespawn(q, b.td, 1 / 60);
+  eq(back, 'patched', 'a crash respawn reports –'); ok(q.hpL >= 55 && q.hpR >= 55 && q.parts === 0 && q.heat === 0, `after a crash: hull ${q.hpL} / ${q.hpR}, parts ${q.parts}, heat ${q.heat}`);
+});
+test('reset: refused while the pod is off the track, after the finish and for three seconds after a reset', () => {
+  const idx = plainIdx('boonta'), { td, p } = strayPod('boonta', idx, 90);
+  ok(manualReset(p), 'first reset refused'); ok(!manualReset(p), 'a second reset while the pod is off the track');
+  while (p.dead > 0) tickRespawn(p, td, 1 / 60);
+  ok(!manualReset(p), 'a reset right after the reset'); ok(RESET_COOLDOWN >= 2 && RESET_COOLDOWN <= 5, `cooldown ${RESET_COOLDOWN} s`);
+  for (let t = 0; t < RESET_COOLDOWN + 0.05; t += 1 / 60) tickRespawn(p, td, 1 / 60);
+  ok(manualReset(p), 'refused after the cooldown'); while (p.dead > 0) tickRespawn(p, td, 1 / 60);
+  const f = strayPod('boonta', idx, 90).p; f.finished = true; ok(!manualReset(f), 'a reset after the finish');
+  const d = strayPod('boonta', idx, 90).p; kill(d, 2.6, true); const dead0 = d.dead; ok(!manualReset(d) && d.dead === dead0, 'a reset shortened the wait after a crash');
+});
+test('reset: the key is in both keyboard layouts and on the gamepad, free of other actions; old stored layouts get it without a double binding', () => {
+  ok(ACTIONS.some(([a]) => a === 'reset'), 'no action "reset" in the list');
+  for (const [name, pre] of Object.entries(KEY_PRESETS)) {
+    const mine = pre.keys.reset; ok(mine && mine.length > 0, `${name}: no key`);
+    for (const [a] of ACTIONS) if (a !== 'reset') for (const c of pre.keys[a]) ok(!mine.includes(c), `${name}: ${c} is also "${a}"`);
+  }
+  const pad = defaultPad(), mine = pad.reset; ok(mine && mine.length === 1 && 'b' in mine[0] && mine[0].b !== 9, `gamepad: ${JSON.stringify(mine)}`);
+  for (const [a] of ACTIONS) if (a !== 'reset') for (const x of pad[a]) ok(!('b' in x && 'b' in mine[0] && x.b === mine[0].b), `gamepad: button ${JSON.stringify(x)} is also "${a}"`);
+  const old = JSON.parse(JSON.stringify(KEY_PRESETS.flight.keys)) as Partial<KeyMap>; delete old.reset;
+  eq(normalizeKeys(old).reset.join(), KEY_PRESETS.flight.keys.reset.join(), 'an old layout gets –');
+  const taken = JSON.parse(JSON.stringify(old)) as Partial<KeyMap>; taken.repair = [KEY_PRESETS.flight.keys.reset[0]];
+  const nk = normalizeKeys(taken); eq(nk.repair.join(), KEY_PRESETS.flight.keys.reset[0], 'the stored binding stays –'); eq(nk.reset.length, 0, 'the key the player already uses is not bound twice –');
+  const oldPad = JSON.parse(JSON.stringify(defaultPad())) as Partial<PadMap>; delete oldPad.reset;
+  eq(JSON.stringify(normalizePad(oldPad).reset), JSON.stringify(defaultPad().reset), 'an old gamepad layout gets –');
+  const takenPad = JSON.parse(JSON.stringify(oldPad)) as Partial<PadMap>; takenPad.view = [defaultPad().reset[0]];
+  eq(normalizePad(takenPad).reset.length, 0, 'gamepad: the button the player already uses is not bound twice –');
 });
 
 // ---- boost alarm (2026-11-23, user: „langsam stärker werdender Alarm-Sound, wenn Boost kurz vor Maximum") ----
