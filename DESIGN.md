@@ -309,3 +309,4 @@ Leitidee: **Wetter verändert die Lesbarkeit, nie die Fairness.** Sicht wird wei
 | Ebene | Regel | Stand |
 |---|---|---|
 | Klang | Schichten statt Lautstärke: Sub + Sägezahn + Whine + Rauschen; Echo nur zwischen Wänden; Kompressor auf dem Master | S11 |
+| Boost-Alarm | Warnton wie ein Abstandswarner: Pulse werden mit der Hitze schneller (3 → 12 je Sekunde), höher (620 → 1160 Hz) und lauter; still ohne Boost und nach der Abschaltung | 2026-11-23 |

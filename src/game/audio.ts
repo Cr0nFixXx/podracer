@@ -15,12 +15,51 @@ export interface WorldAudioState {
   herd: number;    // 0..1 proximity to bantha herd / long-necked giant
 }
 
+// ---- Boost alarm (2026-11-23, user request: a warning tone that slowly swells when the boost is close to its maximum) ----
+/** Engine heat (0 … 1) from which the alarm sounds while the pod boosts. (The hatched danger zone of the HUD's heat bar starts at 0.8.) */
+export const ALARM_FROM = 0.7;
+/** How urgent, 0 … 1. Silent below `ALARM_FROM`, when the pod is not boosting and after the engines have cut out. Rises to 0.6 as the
+ *  heat reaches its limit, then to 1 over the three seconds of overdrive (`overT`) – right before the cut-out. */
+export function boostAlarmLevel(heat: number, boosting: boolean, overT: number, overheat: boolean): number {
+  if (!boosting || overheat) return 0;
+  const h = Math.min(1, heat);
+  return h < 1 ? Math.max(0, (h - ALARM_FROM) / (1 - ALARM_FROM)) * 0.6 : 0.6 + 0.4 * Math.min(1, Math.max(0, overT) / 3);
+}
+/** What the alarm sounds like at a level: pulses per second, pitch (Hz), loudness (gain). All three rise with the level – a slow low
+ *  beep at the start of the zone, a fast high trill before the cut-out. */
+export function boostAlarmVoice(level: number): { rate: number; freq: number; gain: number } {
+  const u = Math.max(0, Math.min(1, level));
+  return { rate: 2.6 + 9.4 * u, freq: 620 * Math.pow(2, 0.9 * u), gain: 0.11 * Math.pow(u, 0.8) };
+}
+/** The alarm's voice on any audio context (the game's – or an offline one in a test): a band-passed square tone, chopped into pulses
+ *  by a slow square oscillator on the gain. That oscillator is low-passed: soft edges, no clicks. Call `set(level, now)` every frame. */
+export function makeBoostAlarm(ctx: BaseAudioContext, out: AudioNode) {
+  const osc = ctx.createOscillator(); osc.type = 'square'; osc.frequency.value = 620;
+  const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 620; bp.Q.value = 1.4;
+  const chop = ctx.createGain(); chop.gain.value = 0.5; // + the pulse oscillator (±0.5) → 0 … 1
+  const vol = ctx.createGain(); vol.gain.value = 0;
+  const lfo = ctx.createOscillator(); lfo.type = 'square'; lfo.frequency.value = 2.6;
+  const soft = ctx.createBiquadFilter(); soft.type = 'lowpass'; soft.frequency.value = 45; soft.Q.value = 0;
+  const depth = ctx.createGain(); depth.gain.value = 0.5;
+  lfo.connect(soft); soft.connect(depth); depth.connect(chop.gain);
+  osc.connect(bp); bp.connect(chop); chop.connect(vol); vol.connect(out);
+  osc.start(); lfo.start();
+  return {
+    set(level: number, t: number) {
+      const v = boostAlarmVoice(level);
+      vol.gain.setTargetAtTime(v.gain, t, v.gain > 0 ? 0.07 : 0.03);
+      if (v.gain > 0) { osc.frequency.setTargetAtTime(v.freq, t, 0.06); bp.frequency.setTargetAtTime(v.freq, t, 0.06); lfo.frequency.setTargetAtTime(v.rate, t, 0.1); }
+    },
+  };
+}
+
 export class AudioFX {
   ctx: AudioContext | null = null;
   master!: GainNode;
   eng1!: OscillatorNode; eng2!: OscillatorNode; engGain!: GainNode; engFilter!: BiquadFilterNode;
   wind!: AudioBufferSourceNode; windGain!: GainNode; windFilter!: BiquadFilterNode;
   boostGain!: GainNode; boostOsc!: OscillatorNode;
+  private alarm: ReturnType<typeof makeBoostAlarm> | null = null;
   noiseBuf!: AudioBuffer;
   others!: OscillatorNode; othersGain!: GainNode;
   // Continuous proximity-driven world ambience channels
@@ -86,6 +125,7 @@ export class AudioFX {
       this.crawlGain = ctx.createGain(); this.crawlGain.gain.value = 0;
       this.crawlOsc.connect(cf); cf.connect(this.crawlGain); this.crawlGain.connect(this.master); this.crawlOsc.start();
       this.initLayers(ctx);
+      this.alarm = makeBoostAlarm(ctx, this.master);
     } catch { this.ctx = null; }
   }
 
@@ -93,7 +133,7 @@ export class AudioFX {
   private whine!: OscillatorNode; private whineGain!: GainNode; private sub!: OscillatorNode; private subGain!: GainNode;
   private roarGain!: GainNode; private roarFilter!: BiquadFilterNode; private slideGain!: GainNode; private slideFilter!: BiquadFilterNode;
   private rainGain!: GainNode; private howlGain!: GainNode; private howlFilter!: BiquadFilterNode; private echoSend!: GainNode;
-  private ext = { slide: 0, enclosure: 0, rain: 0, wind: 0 };
+  private ext = { slide: 0, enclosure: 0, rain: 0, wind: 0, alarm: 0 };
   private rival = { closing: 0, pack: 0 }; private thunderBus!: GainNode; private othersFilter!: BiquadFilterNode;
   private others2!: OscillatorNode; private rivalRoarGain!: GainNode; private rivalRoarFilter!: BiquadFilterNode;
   private initLayers(ctx: AudioContext) {
@@ -117,6 +157,8 @@ export class AudioFX {
   }
   /** Per-frame driving/weather state: slide 0..1, enclosure 0..1 (canyon/tunnel), rain 0..1, wind 0..1 */
   setEnv(slide: number, enclosure: number, rain: number, wind: number) { const x = this.ext; x.slide = slide; x.enclosure = enclosure; x.rain = rain; x.wind = wind; }
+  /** Boost alarm of the player's pod, 0 … 1 (`boostAlarmLevel`) – every frame before `update`. */
+  setBoostAlarm(level: number) { this.ext.alarm = level; }
   /** Thunder (Session 13): sharp crack for near strikes → heavy boom → long rolling rumble with 3–4 swells + sub-bass. `vol` 0..1 by distance. */
   thunder(vol: number) {
     if (!this.ctx || this.ctx.state !== 'running') return;
@@ -192,6 +234,7 @@ export class AudioFX {
     this.rainGain.gain.setTargetAtTime(x.rain * (0.11 + 0.1 * x.rain) * (1 - x.enclosure * 0.6), t, 0.3);
     this.howlGain.gain.setTargetAtTime(x.wind * 0.12, t, 0.25); this.howlFilter.frequency.setTargetAtTime(260 + x.wind * 320 + Math.sin(t * 0.7) * 70, t, 0.3);
     this.echoSend.gain.setTargetAtTime(x.enclosure * 0.5, t, 0.15);
+    this.alarm?.set(x.alarm, t);
 
     if (world) {
       // Geyser / lava-vent / canyon waterfall roar

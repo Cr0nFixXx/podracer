@@ -21,6 +21,7 @@ import { applyDamage, bodyToWorld, collidePods, hullWorld, podParams, respawn, s
 import { DAMAGE_RULES, damageModel, lostMessage, partLamps, partsFx, zoneFactor, type DamageZone } from '../../src/game/podDamage';
 import { buildTrack, frameAt, tunnelCeiling, baySameStretch, DS, TUNNEL_SHOULDER, type Path, type Sample, type TrackData } from '../../src/game/trackBuilder';
 import { defaultProfile, effectiveStats, loadProfile, saveProfile, CAMERA_NAMES, MAX_LAPS, PRESETS, type GfxSettings } from '../../src/game/settings';
+import { ALARM_FROM, boostAlarmLevel, boostAlarmVoice } from '../../src/game/audio';
 import * as GPU3 from 'three/webgpu';
 import { setupSunShadow, CSM_FAR, CSM_SPLIT, SH_BACK, SH_BOX } from '../../src/game/sunShadow';
 
@@ -1304,6 +1305,51 @@ for (const id of ['boonta', 'frost', 'magma', 'oovo']) test(`open sections: the 
     ok(n > 100, `${id}: only ${n} samples with a bay`);
     ok(worst < 0.3, `${cell} m cells: terrain ${worst.toFixed(2)} m above the road at ${where}`);
   }
+});
+
+// ---- boost alarm (2026-11-23, user: „langsam stärker werdender Alarm-Sound, wenn Boost kurz vor Maximum") ----
+test('alarm: silent below the warning zone, when the pod is not boosting and after the engines have cut out', () => {
+  eq(boostAlarmLevel(0.3, true, 0, false), 0, 'boosting at 30 % heat –'); eq(boostAlarmLevel(ALARM_FROM, true, 0, false), 0, 'at the start of the zone –');
+  eq(boostAlarmLevel(0.95, false, 0, false), 0, 'hot but not boosting –'); eq(boostAlarmLevel(1, false, 2, false), 0, 'overdrive time left over, not boosting –');
+  eq(boostAlarmLevel(1, true, 3, true), 0, 'cut out –');
+  ok(ALARM_FROM >= 0.6 && ALARM_FROM <= 0.8, `the alarm starts at ${ALARM_FROM * 100} % heat`);
+});
+test('alarm: grows with the heat up to the limit and keeps growing through the three seconds of overdrive', () => {
+  const seq = [boostAlarmLevel(ALARM_FROM + 0.02, true, 0, false), boostAlarmLevel(0.85, true, 0, false), boostAlarmLevel(0.95, true, 0, false), boostAlarmLevel(0.999, true, 0, false),
+    boostAlarmLevel(1, true, 0.5, false), boostAlarmLevel(1, true, 1.5, false), boostAlarmLevel(1, true, 2.5, false), boostAlarmLevel(1, true, 3, false)];
+  for (let i = 1; i < seq.length; i++) ok(seq[i] > seq[i - 1], `step ${i}: ${seq[i - 1].toFixed(3)} → ${seq[i].toFixed(3)}`);
+  ok(seq[0] > 0 && seq[0] < 0.1, `just inside the zone: ${seq[0]}`); eq(seq[seq.length - 1], 1, 'at the end of the overdrive –');
+  ok(Math.abs(boostAlarmLevel(0.9999, true, 0, false) - boostAlarmLevel(1, true, 0, false)) < 0.01, 'a jump at the heat limit');
+});
+test('alarm: the voice gets faster, higher and louder with the level – silent at 0, never shrill or deafening', () => {
+  eq(boostAlarmVoice(0).gain, 0, 'gain at level 0 –');
+  let prev = boostAlarmVoice(0.02);
+  for (let u = 0.1; u <= 1.0001; u += 0.1) { const v = boostAlarmVoice(u); ok(v.rate > prev.rate && v.freq > prev.freq && v.gain > prev.gain, `level ${u.toFixed(1)}: ${JSON.stringify(v)} after ${JSON.stringify(prev)}`); prev = v; }
+  const lo = boostAlarmVoice(0.02), hi = boostAlarmVoice(1);
+  ok(lo.rate >= 2 && hi.rate <= 14, `pulses per second ${lo.rate.toFixed(1)} … ${hi.rate.toFixed(1)}`); ok(lo.freq >= 500 && hi.freq <= 1400, `pitch ${lo.freq.toFixed(0)} … ${hi.freq.toFixed(0)} Hz`);
+  ok(lo.gain < 0.02 && hi.gain <= 0.12 && hi.gain >= 0.08, `gain ${lo.gain.toFixed(3)} … ${hi.gain.toFixed(3)}`);
+  ok(hi.rate >= 2.5 * lo.rate, 'the pulse rate hardly changes');
+});
+test('alarm: a held boost on the plain deck – the alarm starts at least 0.6 s before the heat limit, never falls back, and stops with the cut-out (every pod)', () => {
+  const td = trackOf('magma'), S = td.main.samples, idx = S.findIndex((q, k) => k > 40 && q.surf === 0 && !q.roof && !q.gap && !q.ramp), s = S[idx];
+  ok(idx > 0, 'magma has a stretch of plain deck'); const bad: string[] = [];
+  for (const def of PODS) {
+    const p = racer(def, td, idx, 0, s.y + HOVER); p.invuln = 0; p.heat = 0; p.input.throttle = 1; p.input.boost = true;
+    let start = -1, limit = -1, cut = -1, last = 0, fell = 0;
+    for (let f = 0; f < 60 * 14 && cut < 0; f++) {
+      p.pos.set(s.x, s.y + HOVER, s.z); p.vel.set(s.tx * 120, 0, s.tz * 120); p.yaw = Math.atan2(s.tx, s.tz); p.idx = idx; p.lat = 0; p.hpL = p.hpR = 100;
+      stepPod(p, td, 1 / 60, f / 60, 1, false);
+      const lv = boostAlarmLevel(p.heat, p.boosting, p.overT ?? 0, p.overheat), t = (f + 1) / 60;
+      if (start < 0 && lv > 0) start = t; if (limit < 0 && p.heat >= 1) limit = t;
+      if (p.overheat) { cut = t; if (lv !== 0) bad.push(`${def.id}: level ${lv} after the cut-out`); } else { if (lv < last - 1e-9) fell++; last = lv; }
+    }
+    if (start < 0 || limit < 0 || cut < 0) { bad.push(`${def.id}: start ${start}, limit ${limit}, cut ${cut}`); continue; }
+    if (limit - start < 0.6) bad.push(`${def.id}: only ${(limit - start).toFixed(2)} s of warning before the limit`);
+    if (cut - limit < 2.5) bad.push(`${def.id}: only ${(cut - limit).toFixed(2)} s from the limit to the cut-out`);
+    if (fell) bad.push(`${def.id}: the level fell ${fell} times during the boost`);
+    if (last < 0.97) bad.push(`${def.id}: level ${last.toFixed(2)} right before the cut-out`);
+  }
+  eq(bad.length, 0, `${bad.length} · ${bad.slice(0, 4).join(' · ')} –`);
 });
 
 // ---- drops on the lens from spray (2026-11-23, user: „Wasserspritzer auf der Linse auch bei Fahrten über Wasser/Pfützen, wenn es nicht regnet") ----

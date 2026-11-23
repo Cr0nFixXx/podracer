@@ -120,6 +120,13 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Betroffene Strecken: Dschungelfluss, Aquilaris, Kristallschlucht, Malastare 100, Methan-Derby – und jede Strecke nach einem Regen.
 - Geprüft: fünf Unit-Prüfungen `lens:` (zuerst rot), Bilder auf Aquilaris (über dem See Tropfen, an Land keine, Vergleich mit Regen), WebGPU-Konsolenprüfung über dem See.
 
+### Verbesserung – Boost-Alarm
+- Beim Boosten warnt jetzt ein Piepton, sobald die Triebwerkshitze 70 % erreicht. Er wird mit der Hitze schneller, höher und lauter: von 3 langsamen tiefen Tönen je Sekunde bis zu 8 je Sekunde am Hitzelimit.
+- Beim Überziehen (die 3 Sekunden nach „MAX") steigt er weiter bis zu einem schnellen hohen Trillern (12 je Sekunde). Schalten die Triebwerke ab, ist er still. Ohne Boost ist er immer still.
+- Vorwarnzeit auf normaler Piste: bei jedem Pod mindestens 0,6 s bis zum Limit, danach die 3 s Überziehen. Über dem Lavasee ist alles dreimal bis viermal so schnell – dort kommt der Alarm fast sofort.
+- Geprüft: vier Unit-Prüfungen `alarm:` (zuerst rot; eine fährt jeden Pod mit gehaltenem Boost bis zur Abschaltung). Der Ton selbst wurde ohne Lautsprecher im Browser gerechnet und gemessen (`tools/harness/palarm.mjs`): bei Stufe 0 still, Lautstärke, Pulsrate und Tonhöhe steigen, kein Knacken. Im Spiel startet der Ton ohne Fehler.
+- **Nicht geprüft: wie laut er sich neben den Triebwerken anfühlt** – das kann nur das Ohr. Stellschraube: `boostAlarmVoice` in `src/game/audio.ts` (Wert `0.11`).
+
 ## Geprüft
 - Fehler 1: neue Prüfungen `bridges: …` (11, zuerst rot: Gelände 22,7 m über der Brücke, 309 Punkte; Wand 28 m hoch direkt neben der Brücke). Nur mit Regel (2) stand das Gelände noch 5,2 m über der Fahrbahn – Regel (1) ist nötig. `poke.ts` auf allen Strecken, Gitter 4,5 / 7 / 13,75 m, Brücken eingeschlossen: 0 Punkte (vorher 242 auf dem Methan-Derby). Bilder vorher/nachher an allen drei Stellen (WebGL2, Software).
 

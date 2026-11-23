@@ -21,7 +21,7 @@ import { makeSky, sunDirection } from './sky';
 import { buildPodModel, setPodLodScale } from './podModel';
 import { Particles } from './particles';
 import { PostFX } from './post';
-import { AudioFX, type WorldAudioState } from './audio';
+import { AudioFX, boostAlarmLevel, type WorldAudioState } from './audio';
 import { HOVER, aiInputs, applyDamage, bodyToWorld, podParams, respawn, stepPod, worldToBody, type PodState, collidePods } from './physics';
 import { damageModel, lostMessage, partLamps } from './podDamage';
 import { applyAtmosphere } from './atmosphere';
@@ -514,6 +514,7 @@ export class Game {
       this.audio.setEnv(pl.sliding ? 1 : 0, enc, this.env.rain * (1 - 0.85 * this.cover), Math.min(1, this.env.wind * (0.55 + 0.45 * this.weather.gust) + (this.env.gust !== 'none' ? 0.15 : 0)));
       const rc = Math.abs(pl.rollCtl ?? 0); if (rc > 0.5 && this.prevRoll <= 0.5) this.audio.whoosh(); this.prevRoll = rc;
     }
+    { const pl = this.player; this.audio.setBoostAlarm(this.state === 'race' ? boostAlarmLevel(pl.heat, pl.boosting, pl.overT ?? 0, pl.overheat) : 0); } // warning tone: the boost is close to its maximum
     this.audio.update(Math.hypot(this.player.vel.x, this.player.vel.z), this.player.input.throttle, this.player.boosting, nd, os, wa, dt);
 
     this.hudTimer += dt;

@@ -4,9 +4,29 @@ import { TRACKS } from '../../src/game/data';
 import { PRESETS, defaultProfile } from '../../src/game/settings';
 import { loadPhotoTextures } from '../../src/game/photoAssets';
 import { stepPod } from '../../src/game/physics';
+import { makeBoostAlarm } from '../../src/game/audio';
 if (!location.search.includes('nophoto')) void loadPhotoTextures();
 const div = document.createElement('div'); div.style.cssText = 'width:1280px;height:720px;position:fixed;left:0;top:0'; document.body.style.margin = '0'; document.body.appendChild(div);
 let g: Game | null = null; let cur = -1;
+// Boost alarm without speakers (2026-11-23): renders the alarm's voice at one level on an offline audio context and measures it –
+// loudness, pulses per second, pitch, how much of the time it sounds, and the largest step between two samples (a click shows there).
+// `tools/harness/palarm.mjs` prints the table. No track needs to be loaded.
+(window as unknown as Record<string, unknown>).alarmProbe = async (level: number, seconds = 2.5) => {
+  const sr = 24000, ctx = new OfflineAudioContext(1, sr * seconds, sr);
+  makeBoostAlarm(ctx, ctx.destination).set(level, 0);
+  const d = (await ctx.startRendering()).getChannelData(0), i0 = Math.floor(sr * 0.5), n = d.length - i0; // (the first half second: the parameters glide to their targets)
+  let sum = 0, peak = 0, jump = 0; for (let i = i0; i < d.length; i++) { sum += d[i] * d[i]; peak = Math.max(peak, Math.abs(d[i])); if (i > i0) jump = Math.max(jump, Math.abs(d[i] - d[i - 1])); }
+  const win = Math.floor(sr * 0.004), env = new Float32Array(d.length); let acc = 0; // envelope: |x| averaged over 4 ms
+  for (let i = 0; i < d.length; i++) { acc += Math.abs(d[i]); if (i >= win) acc -= Math.abs(d[i - win]); env[i] = acc / win; }
+  let emax = 0; for (let i = i0; i < d.length; i++) emax = Math.max(emax, env[i]);
+  let pulses = 0, on = 0, zc = 0, high = env[i0] >= emax * 0.5;
+  for (let i = i0 + 1; i < d.length; i++) {
+    if (!high && env[i] >= emax * 0.65) { high = true; pulses++; } else if (high && env[i] < emax * 0.3) high = false; // (two thresholds: the ripple of the tone must not count twice)
+    if (env[i] >= emax * 0.5) { on++; if (d[i - 1] < 0 && d[i] >= 0) zc++; }
+  }
+  const r = (v: number, k = 1000) => Math.round(v * k) / k;
+  return { level, rms: r(Math.sqrt(sum / n), 1e4), peak: r(peak, 1e4), pulsesPerSecond: r(pulses / (n / sr), 10), hz: on ? Math.round(zc / (on / sr)) : 0, sounding: r(emax > 1e-5 ? on / n : 0, 100), maxStep: r(jump, 1e4) };
+};
 // "Which mesh is that?" – the first visible mesh under a point of the picture (x, y: 0 … 1 from the top left). Used by `pdbg.mjs pick:`.
 (window as unknown as Record<string, unknown>).pick = (nx: number, ny: number) => {
   const G = (window as unknown as { __podracer: { scene: THREE.Scene; camera: THREE.Camera } }).__podracer;
