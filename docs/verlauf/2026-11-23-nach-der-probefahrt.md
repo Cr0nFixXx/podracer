@@ -148,6 +148,15 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Geprüft: sieben Unit-Prüfungen `padnav:` (zuerst rot) und ein Durchlauf der echten App mit einem nachgebildeten Gamepad (`tools/harness/ppad.mjs`): jedes Bedienelement jedes Bildschirms ist erreichbar (Hangar: 89), Auswahl, Zurück, Regler, Listen, Tastenbelegung, Pause und Fortsetzen ohne Prellen, Reset-Knopf, Ergebnis.
 - **Nicht geprüft: ein echtes Gamepad.** Der Test bildet das Standard-Layout nach (Xbox-Art). Bei Gamepads, die der Browser nicht als „Standard" meldet, zählt das Steuerkreuz nicht – der linke Stick geht immer.
 
+### Strecken – Intro-Flug über die Strecke
+- Nach dem Laden fliegt die Kamera in einer Endlosschleife über die Strecke, bis „Rennen starten" gewählt wird (Knopf, `Enter`, Gamepad A oder Start). Dann Schnitt auf die Startaufstellung und Countdown.
+- Flug: 20–35 m über der Mittellinie (langsame Welle), 420 m/s auf Geraden; vor Kurven und steilen Stücken wird er langsamer, damit das Bild nicht herumreißt. Im Schnitt 2,6- bis 3-faches Renntempo, eine Runde dauert 20–50 s. Die Kamera legt sich leicht in die Kurven.
+- Was über der Fahrbahn ist, wird umflogen: in Tunneln und Höhlen auf halber Deckenhöhe, in Schwerelos-Röhren auf der Achse, unter den Brücken der Strecke hindurch, über Tore, Sponsor-Brücken und Startportal hinweg, unter hohen Felsbögen durch.
+- Unten links die Karte der Strecke (Welt, Name, Länge, Runden, Wetter, Gegner), rechts der Knopf. Die Pods warten solange auf der Startaufstellung, die Rennzeit steht. Pause geht.
+- **Eigene Festlegung (nicht abgefragt):** der Flug kommt nur vor dem ersten Start. „Neustart" und „Nochmal" gehen direkt zur Startaufstellung. Umstellen: `intro: runId === 0` in `src/ui/RaceView.tsx`.
+- Geprüft: fünf Unit-Prüfungen `intro:` auf allen 13 Strecken (zuerst rot), Bilder des Flugs auf dem Boonta-Kessel (Start, offene Piste, Brücke, Tunnel), Durchlauf in der echten App (`tools/harness/pintro.mjs`): Kamera fliegt, Pods stehen, Karte und Knopf, Pause hält den Flug an, Enter / Gamepad A / Start starten den Countdown, Neustart ohne Flug.
+- Nicht geprüft: der Flug in Bewegung auf echter GPU (Ruckeln beim Nachladen der Landschaft bei 420 m/s?) und die übrigen zwölf Strecken im Bild – gerechnet sind sie alle.
+
 ### Nebenbei gefunden – Hauptmenü: Titel las sich „PODRACE"
 - Beim Prüfen der Controller-Bedienung aufgefallen: im Hauptmenü fehlte dem Titel bei 16:9 der letzte Buchstabe. Der Titel ist breiter als seine Bildhälfte; der Farbverlauf wurde nur innerhalb seines Kastens gemalt, und die Pod-Vorschau lag darüber.
 - Behoben (Kasten so breit wie der Text, Titel liegt über der Vorschau). Die Layout-Prüfung `pui.mjs` schlägt jetzt an, wenn der Text einer Überschrift breiter ist als ihr Kasten oder verdeckt wird.
@@ -188,5 +197,6 @@ Zweig `dev`. Jeder Punkt ein eigener Commit; nach jedem Block gepusht.
 | 2 Verbesserungen | `c5e0b07` | Reset-Taste |
 | 2 Verbesserungen | `d950095` | Controller-Bedienung in allen Menüs |
 | nebenbei | `c3234a3` | Hauptmenü: Titel „PODRACER" vollständig |
+| 3 Strecken | (Commit „Intro-Flug") | Intro-Flug über die Strecke bis „Rennen starten" – lokal, wird mit Block 3 gepusht |
 
 Block 1 wurde am 2026-11-23 gepusht (`ee20aa5..b4f1266`); der Lauf der GitHub-Action dafür war grün. Block 2 wurde am 2026-11-23 gepusht (`b4f1266..fc04fa3`, dazu der Commit mit diesem Satz). Der erste Versuch scheiterte: der Zugangstoken des Nutzers lag in der Sitzung nicht mehr vor (er wird nirgends gespeichert – Regel in `docs/regeln/git-sandbox.md`); der Nutzer hat ihn auf Nachfrage neu gegeben. Block 3 und 4 sind offen (`TODO.md` Abschnitt 9).

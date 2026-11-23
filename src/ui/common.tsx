@@ -2,12 +2,13 @@ import type { ReactNode } from 'react';
 
 /** `pad`: roles for the gamepad in the menus (usePadNav.tsx), space-separated – `default` (gets the focus when the screen appears),
  *  `back` (pressed by B), `start` (pressed by Start). */
-export function Btn({ children, onClick, active, className = '', big, disabled, pad = '' }: { children: ReactNode; onClick?: () => void; active?: boolean; className?: string; big?: boolean; disabled?: boolean; pad?: string }) {
+export function Btn({ children, onClick, active, className = '', big, disabled, pad = '', autoFocus }: { children: ReactNode; onClick?: () => void; active?: boolean; className?: string; big?: boolean; disabled?: boolean; pad?: string; autoFocus?: boolean }) {
   const role = (r: string) => pad.split(' ').includes(r) ? '' : undefined;
   return (
     <button
       disabled={disabled}
       onClick={onClick}
+      autoFocus={autoFocus}
       data-pad-default={role('default')} data-pad-back={role('back')} data-pad-start={role('start')}
       className={`font-display uppercase tracking-[0.18em] transition-all duration-150 border clip-corner
         ${big ? 'px-8 py-4 text-lg' : 'px-4 py-2 text-xs'}

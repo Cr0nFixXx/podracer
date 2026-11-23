@@ -22,6 +22,7 @@ import { buildPodModel, setPodLodScale } from './podModel';
 import { Particles } from './particles';
 import { PostFX } from './post';
 import { AudioFX, boostAlarmLevel, type WorldAudioState } from './audio';
+import { buildIntroFlight, type FlightPose, type IntroFlight } from './introFlight';
 import { HOVER, aiInputs, applyDamage, bodyToWorld, manualReset, podParams, stepPod, tickRespawn, worldToBody, type PodState, collidePods } from './physics';
 import { damageModel, lostMessage, partLamps } from './podDamage';
 import { applyAtmosphere } from './atmosphere';
@@ -36,6 +37,8 @@ export interface HudState {
   speed: number; place: number; total: number; lap: number; laps: number; sprint: boolean; progress: number;
   time: number; lastLap: number | null; bestLap: number | null;
   hpL: number; hpR: number; heat: number; boosting: boolean; overheat: boolean; repairing: boolean; airbrake: boolean;
+  /** 2026-11-23: the intro flight is showing (RaceView then shows the track's card and „Rennen starten" instead of the HUD); length of the main path */
+  intro: boolean; trackKm: number;
   wrongWay: boolean; zeroG: boolean; countdown: number; message: string; camName: string; fps: number; backend: string; standings: Standing[]; dead: boolean;
   finished: boolean;
   /** Session 12: flight attitude (roll -1..1 = ∓90°, pitch -1 dive..+1 lift), slide state/charge, weather label */
@@ -57,6 +60,9 @@ interface Callbacks {
   onFinish: (r: RaceResult[]) => void;
   onPause: (p: boolean) => void;
   onReady: () => void;
+  /** 2026-11-23: show the intro flight over the track before the countdown (state 'intro', ended by `beginRace`). Off by default:
+   *  the test harness and a restarted race go straight to the countdown. */
+  intro?: boolean;
 }
 
 /** Candela of the player's head lamp (a real spot light; decay 1.7). */
@@ -89,7 +95,9 @@ export class Game {
   pods: PodState[] = []; player!: PodState;
   keys = new Set<string>();
   running = false; paused = false; disposed = false;
-  state: 'loading' | 'countdown' | 'race' | 'post' = 'loading';
+  state: 'loading' | 'intro' | 'countdown' | 'race' | 'post' = 'loading';
+  /** intro flight (introFlight.ts): the path, metres flown, the camera's pose and its smoothed bank */
+  flight: IntroFlight | null = null; flightDist = 0; private flightPose: FlightPose = { x: 0, y: 0, z: 0, lx: 0, ly: 0, lz: 0, roll: 0 }; private flightRoll = 0; private flightSpeed = 0;
   countdown = 4; raceTime = 0; clock = 0; acc = 0; lastT = 0;
   camMode = 0; camYaw = 0; camY = 0; camInit = false; tvIdx = -1; flash = 0;
   hudTimer = 0; mapTimer = 0; fps = 60; fpsAcc = 0; fpsCount = 0;
@@ -234,7 +242,7 @@ export class Game {
 
     window.addEventListener('keydown', this.onKey); window.addEventListener('keyup', this.onKeyUp);
     this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(this.container);
-    this.state = 'countdown'; this.countdown = 4;
+    if (this.cb.intro) this.startIntro(); else { this.state = 'countdown'; this.countdown = 4; }
     this.running = true;
     this.cb.onReady();
     // Wait one browser paint after hiding the loading overlay so frame 1 dt is smooth & unstalled
@@ -307,11 +315,25 @@ export class Game {
     this.keys.add(e.code);
     if (this.keymap.view.includes(e.code)) this.cycleCamera();
     if (this.keymap.reset.includes(e.code)) { e.preventDefault(); this.resetPlayer(); } // (Backspace must not page back in the browser)
+    if (this.state === 'intro' && (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space')) { e.preventDefault(); this.beginRace(); return; }
     if (e.code === 'Escape' || e.code === 'KeyP') this.setPaused(!this.paused);
     if (!this.paused) this.audio?.resume(); // (was unconditional: pressing Esc suspended the audio and resumed it right away)
   };
   onKeyUp = (e: KeyboardEvent) => { this.keys.delete(e.code); };
 
+  /** Intro flight (2026-11-23): the camera flies along the track in a loop, the pods wait on the grid, until `beginRace`. */
+  startIntro() {
+    this.flight = buildIntroFlight(this.td); this.flightDist = 0; this.flightRoll = 0; this.state = 'intro';
+    this.audio?.setFlyover(true);
+  }
+  /** „Rennen starten": cut from the flight to the starting grid, countdown. Does nothing outside the intro (button, Enter, gamepad can all call it). */
+  beginRace() {
+    if (this.state !== 'intro' || this.paused) return;
+    this.state = 'countdown'; this.countdown = 4; this.lastBeep = -1; this.camInit = false; this.cover = 0;
+    this.prevStartBtn = true; this.prevResetBtn = true; this.prevCamBtn = true; // (the button that started the race is still held)
+    this.audio.setFlyover(false); this.audio.resume();
+    this.updateCamera(0.016); this.camera.fov = this.profile.gfx.fov; this.camera.updateProjectionMatrix();
+  }
   cycleCamera() { this.camMode = (this.camMode + 1) % CAMERA_NAMES.length; this.camInit = false; this.showMsg(CAMERA_NAMES[this.camMode], 1.2); }
   /** Reset key (2026-11-23): puts the player's pod back on the track – only while the race runs (`manualReset` in physics.ts). */
   resetPlayer() {
@@ -398,15 +420,18 @@ export class Game {
       this.snowAcc += dt * this.env.gustAmt / 150;
       if (this.snowAcc >= 1 / 255) { const n = Math.floor(this.snowAcc * 255); this.td.snow.snowIn(n / 255); this.snowAcc -= n / 255; }
     }
-    const frozen = this.state === 'countdown';
-    if (this.state === 'countdown') {
+    const frozen = this.state === 'countdown' || this.state === 'intro';
+    if (this.state === 'intro') {
+      this.flightSpeed = this.flight!.speedAt(this.flightDist); this.flightDist += this.flightSpeed * dt;
+    } else if (this.state === 'countdown') {
       this.countdown -= dt;
       const c = Math.ceil(this.countdown);
       if (c !== this.lastBeep && c <= 3 && c >= 1) { this.audio.beep(440, 0.25, 'square', 0.25); this.lastBeep = c; }
       if (this.countdown <= 0) { this.state = 'race'; this.audio.beep(880, 0.6, 'square', 0.3); this.showMsg('LOS!', 1.2); for (const p of this.pods) p.lapStart = 0; }
     } else this.raceTime += dt;
 
-    if (this.player.finished || this.state === 'post') { if (!this.player.ai) this.player.ai = { skill: 0.9, speedF: 0.9, lineOff: 0, takeShortcut: false, boostUntil: 0, repairMode: false, noiseT: 0, rubber: 1 }; }
+    if (this.state === 'intro') { /* the pods wait; the overlay's button, Enter and the gamepad's Start / A end the intro (RaceView, onKey, usePadNav) */ }
+    else if (this.player.finished || this.state === 'post') { if (!this.player.ai) this.player.ai = { skill: 0.9, speedF: 0.9, lineOff: 0, takeShortcut: false, boostUntil: 0, repairMode: false, noiseT: 0, rubber: 1 }; }
     else this.readInput();
     for (const p of this.pods) {
       if (p.ai && (!p.isPlayer || p.finished)) aiInputs(p, this.td, this.pods, this.raceTime, p.isPlayer ? null : this.player);
@@ -452,7 +477,7 @@ export class Game {
     // deaths / finish
     for (const p of this.pods) {
       if (tickRespawn(p, this.td, dt) === 'patched') p.visual?.clearMarks?.(); // a pod that comes back from a crash is patched up: parts back, hit marks gone (after a manual reset it is as it was)
-      if (!p.finished && this.state !== 'countdown') {
+      if (!p.finished && !frozen) {
         const done = this.td.main.closed ? p.lap >= this.profile.race.laps : p.rel >= this.td.finishIdx - this.td.startIdx;
         if (done) {
           p.finished = true; p.finishTime = this.raceTime;
@@ -491,8 +516,11 @@ export class Game {
     this.particles.update(dt, this.camera.position, this.clock); this.debris.update(dt); this.scrap.update(dt);
     this.world.update(this.clock, this.camera.position, this.pods);
     this.sky.uniforms.time.value = this.clock;
-    this.weather.update(dt, this.clock, this.camera, this.state === 'countdown', v => this.audio.thunder(v), near => { if (near > 0.5) this.player.shake = Math.min(1, this.player.shake + (near - 0.5) * 0.9); });
-    { const pl = this.player, ps = this.td.paths[pl.path].samples[pl.idx]; this.cover += ((ps && ps.roof > 0 && !pl.upper ? 1 : 0) - this.cover) * Math.min(1, dt * 5); this.particles.setAmbientFade(1 - this.cover); }
+    this.weather.update(dt, this.clock, this.camera, frozen, v => this.audio.thunder(v), near => { if (near > 0.5) this.player.shake = Math.min(1, this.player.shake + (near - 0.5) * 0.9); });
+    { // roof over the viewer (the player – in the intro the flying camera): fades rain, lens drops, rain audio
+      const pl = this.player, fly = this.state === 'intro', ps = fly ? this.td.main.samples[this.flight!.sampleAt(this.flightDist)] : this.td.paths[pl.path].samples[pl.idx];
+      this.cover += ((ps && ps.roof > 0 && (fly || !pl.upper) ? 1 : 0) - this.cover) * Math.min(1, dt * 5); this.particles.setAmbientFade(1 - this.cover);
+    }
     this.applyEnv(dt);
     if (this.env.wind > 0.6 && this.cover < 0.5 && this.state === 'race') this.player.shake = Math.max(this.player.shake, this.weather.gust * (this.env.wind - 0.5) * 0.22); // storm gusts buffet the pod
     this.updateLens(dt); this.watchStuck(dt);
@@ -500,7 +528,7 @@ export class Game {
     this.flash = Math.max(0, this.flash - dt * 2);
 
     // audio
-    const pp = this.player.pos;
+    const fly = this.state === 'intro', pp = fly ? this.camera.position : this.player.pos; // the listener: the player's pod – in the intro the flying camera
     let nd = 1e9, os = 0, pack = 0, rvx = 0, rvz = 0;
     for (const p of this.pods) if (p !== this.player && p.dead <= 0) { const d = p.pos.distanceTo(pp); if (d < 70) pack++; if (d < nd) { nd = d; os = Math.hypot(p.vel.x, p.vel.z); rvx = p.vel.x; rvz = p.vel.z; } }
     { // rival audio: Doppler from the closing speed, pack rumble, fly-by whoosh when a pod shoots past within 17 m
@@ -531,13 +559,13 @@ export class Game {
     wa.themeId = this.td.def.theme; wa.geyser = geyserW; wa.rotor = rotorW; wa.rotorHz = rotorHz;
     wa.bird = this.lifeAudio.bird; wa.herd = this.lifeAudio.herd; wa.crawler = this.lifeAudio.crawler;
     {
-      const pl = this.player, ps = this.td.paths[pl.path].samples[pl.idx];
+      const pl = this.player, ps = fly ? this.td.main.samples[this.flight!.sampleAt(this.flightDist)] : this.td.paths[pl.path].samples[pl.idx];
       const enc = ps ? (ps.roof > 0 ? 1 : (ps.hL > 0 ? 0.35 : 0) + (ps.hR > 0 ? 0.35 : 0)) : 0; // tunnel / canyon walls → slap-back echo
       this.audio.setEnv(pl.sliding ? 1 : 0, enc, this.env.rain * (1 - 0.85 * this.cover), Math.min(1, this.env.wind * (0.55 + 0.45 * this.weather.gust) + (this.env.gust !== 'none' ? 0.15 : 0)));
       const rc = Math.abs(pl.rollCtl ?? 0); if (rc > 0.5 && this.prevRoll <= 0.5) this.audio.whoosh(); this.prevRoll = rc;
     }
     { const pl = this.player; this.audio.setBoostAlarm(this.state === 'race' ? boostAlarmLevel(pl.heat, pl.boosting, pl.overT ?? 0, pl.overheat) : 0); } // warning tone: the boost is close to its maximum
-    this.audio.update(Math.hypot(this.player.vel.x, this.player.vel.z), this.player.input.throttle, this.player.boosting, nd, os, wa, dt);
+    this.audio.update(fly ? this.flightSpeed * 0.3 : Math.hypot(this.player.vel.x, this.player.vel.z), fly ? 0 : this.player.input.throttle, !fly && this.player.boosting, nd, os, wa, dt);
 
     this.hudTimer += dt;
     if (this.hudTimer > 0.085) { this.hudTimer = 0; this.cb.onHud(this.hud()); }
@@ -645,7 +673,7 @@ export class Game {
       v.update(this.clock, p.input.throttle, p.boosting ? 1 : 0, p.airbraking ? 1 : 0, p.hpL / 100, p.hpR / 100, p.heat + (p.overT ?? 0) / 3 * 0.25); // overdrive pushes the glow past the limit (yellow-white)
 
       // Skip exhaust/dust particle spawning while stationary on countdown grid; keep rival trails super clean for visibility!
-      if (this.state === 'countdown') continue;
+      if (this.state === 'countdown' || this.state === 'intro') continue;
       const emitScale = p.isPlayer ? 0.85 : (dist > 16 && dist < 68) ? (1 - dist / 68) * 0.22 : 0;
       if (emitScale <= 0.02) continue;
       const back = this.tmpV2.set(-Math.sin(p.yaw), 0, -Math.cos(p.yaw));
@@ -884,7 +912,19 @@ export class Game {
     return { surface: p.zeroG ? 'Schwerelos' : sf.name, surfaceFx: p.zeroG ? '' : fx };
   }
 
+  /** Intro flight: the camera follows the path of introFlight.ts; bank and field of view are eased. */
+  private updateFlightCamera(dt: number) {
+    const cam = this.camera, P = this.flight!.pose(this.flightDist, this.flightPose);
+    this.flightRoll += (P.roll - this.flightRoll) * Math.min(1, dt * 3);
+    cam.position.set(P.x, P.y, P.z); cam.up.set(0, 1, 0); cam.lookAt(P.lx, P.ly, P.lz); cam.rotateZ(this.flightRoll);
+    cam.fov += (this.profile.gfx.fov + 4 - cam.fov) * Math.min(1, dt * 4); cam.updateProjectionMatrix();
+    this.sky.mesh.position.copy(cam.position);
+    const fx = P.lx - P.x, fz = P.lz - P.z, k = Math.hypot(fx, fz) || 1;
+    this.placeShadow(P.x, P.ly, P.z, fx / k, fz / k); // the shadow box lies on the road below and ahead of the camera
+  }
+
   updateCamera(dt: number) {
+    if (this.state === 'intro' && this.flight) { this.player.visual?.setCockpitView?.(false); this.updateFlightCamera(dt); return; }
     const p = this.player; const cam = this.camera; const gfx = this.profile.gfx;
     p.visual?.setCockpitView?.(this.camMode === 2); // Session 20: the cockpit camera sits in the pilot's head and shows the cockpit from inside (see PodVisual.setCockpitView)
     const sp = Math.hypot(p.vel.x, p.vel.z); const vmax = podParams(p).vmax0; // (undamaged top speed: lost parts must not widen the view)
@@ -1037,7 +1077,7 @@ export class Game {
       time: this.raceTime, lastLap: p.lapTimes.length ? p.lapTimes[p.lapTimes.length - 1] : null, bestLap: closed ? best : null,
       // HUD boxes mean screen-left / screen-right. Internal "L" is local x < 0 = the RIGHT engine in the chase view → swapped here.
       hpL: Math.max(0, p.hpR), hpR: Math.max(0, p.hpL), partsL: partLamps(dm, lostParts, 1), partsR: partLamps(dm, lostParts, -1), heat: p.heat, boosting: p.boosting, overheat: p.overheat, repairing: p.repairing, airbrake: p.airbraking,
-      wrongWay: p.wrongWay > 1.2, zeroG: p.zeroG, countdown: this.state === 'countdown' ? this.countdown : -1,
+      wrongWay: p.wrongWay > 1.2, zeroG: p.zeroG, countdown: this.state === 'countdown' ? this.countdown : -1, intro: this.state === 'intro', trackKm: this.td.main.length / 1000,
       message: this.messageT > 0 ? this.message : '', camName: CAMERA_NAMES[this.camMode], fps: this.fps, backend: this.backend,
       standings: [], dead: p.dead > 0, finished: p.finished,
       roll: p.rollCtl ?? 0, pitch: p.pitchCtl ?? 0, sliding: !!p.sliding, slideCharge: Math.min(1, (p.slideT ?? 0) / 1.6), airborne: !p.grounded && !p.zeroG, env: this.envLabel, ...this.surfaceHud(), heatEnv: this.heatMul, overdrive: Math.min(1, (p.overT ?? 0) / 3),

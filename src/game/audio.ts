@@ -133,7 +133,7 @@ export class AudioFX {
   private whine!: OscillatorNode; private whineGain!: GainNode; private sub!: OscillatorNode; private subGain!: GainNode;
   private roarGain!: GainNode; private roarFilter!: BiquadFilterNode; private slideGain!: GainNode; private slideFilter!: BiquadFilterNode;
   private rainGain!: GainNode; private howlGain!: GainNode; private howlFilter!: BiquadFilterNode; private echoSend!: GainNode;
-  private ext = { slide: 0, enclosure: 0, rain: 0, wind: 0, alarm: 0 };
+  private ext = { slide: 0, enclosure: 0, rain: 0, wind: 0, alarm: 0, own: 1 };
   private rival = { closing: 0, pack: 0 }; private thunderBus!: GainNode; private othersFilter!: BiquadFilterNode;
   private others2!: OscillatorNode; private rivalRoarGain!: GainNode; private rivalRoarFilter!: BiquadFilterNode;
   private initLayers(ctx: AudioContext) {
@@ -157,6 +157,8 @@ export class AudioFX {
   }
   /** Per-frame driving/weather state: slide 0..1, enclosure 0..1 (canyon/tunnel), rain 0..1, wind 0..1 */
   setEnv(slide: number, enclosure: number, rain: number, wind: number) { const x = this.ext; x.slide = slide; x.enclosure = enclosure; x.rain = rain; x.wind = wind; }
+  /** Intro flight: the listener is a camera far from the player's pod – its own engine layers are silent, wind and world stay. */
+  setFlyover(on: boolean) { this.ext.own = on ? 0 : 1; }
   /** Boost alarm of the player's pod, 0 … 1 (`boostAlarmLevel`) – every frame before `update`. */
   setBoostAlarm(level: number) { this.ext.alarm = level; }
   /** Thunder (Session 13): sharp crack for near strikes → heavy boom → long rolling rumble with 3–4 swells + sub-bass. `vol` 0..1 by distance. */
@@ -212,7 +214,8 @@ export class AudioFX {
     const f = 45 + speed * 0.9 + throttle * 20;
     this.eng1.frequency.setTargetAtTime(f, t, 0.05); this.eng2.frequency.setTargetAtTime(f * 1.505, t, 0.05);
     this.engFilter.frequency.setTargetAtTime(500 + speed * 12 + throttle * 600, t, 0.05);
-    this.engGain.gain.setTargetAtTime(0.12 + throttle * 0.1, t, 0.08);
+    const own = this.ext.own; // 0 in the intro flight
+    this.engGain.gain.setTargetAtTime((0.12 + throttle * 0.1) * own, t, 0.08);
     this.windGain.gain.setTargetAtTime(Math.min(0.35, speed / 500), t, 0.1);
     this.windFilter.frequency.setTargetAtTime(300 + speed * 8, t, 0.1);
     this.boostGain.gain.setTargetAtTime(boost ? 0.08 : 0, t, 0.1);
@@ -226,8 +229,8 @@ export class AudioFX {
     this.rivalRoarGain.gain.setTargetAtTime(near * near * 0.13, t, 0.08); this.rivalRoarFilter.frequency.setTargetAtTime((600 + otherSpeed * 6) * dop, t, 0.1);
     const x = this.ext;
     this.whine.frequency.setTargetAtTime(900 + speed * 14 + throttle * 300, t, 0.08);
-    this.whineGain.gain.setTargetAtTime(Math.min(0.034, 0.008 + speed / 6000) * (0.6 + throttle * 0.4), t, 0.1);
-    this.sub.frequency.setTargetAtTime(f * 0.5, t, 0.05); this.subGain.gain.setTargetAtTime(0.05 + throttle * 0.05, t, 0.1);
+    this.whineGain.gain.setTargetAtTime(Math.min(0.034, 0.008 + speed / 6000) * (0.6 + throttle * 0.4) * own, t, 0.1);
+    this.sub.frequency.setTargetAtTime(f * 0.5, t, 0.05); this.subGain.gain.setTargetAtTime((0.05 + throttle * 0.05) * own, t, 0.1);
     this.roarGain.gain.setTargetAtTime(throttle * 0.035 + (boost ? 0.11 : 0), t, 0.08);
     this.roarFilter.frequency.setTargetAtTime(500 + speed * 5 + (boost ? 900 : 0), t, 0.1);
     this.slideGain.gain.setTargetAtTime(x.slide * 0.09, t, 0.05); this.slideFilter.frequency.setTargetAtTime(1500 + speed * 6, t, 0.1);

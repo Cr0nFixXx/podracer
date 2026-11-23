@@ -24,6 +24,9 @@ let p = await open();
 await has(p, 'Rennen starten'); await click(p, 'Rennen starten');
 await has(p, 'Wetter'); await p.screenshot({ path: out + '_setup.png' });
 await click(p, '▶ Start');
+// (2026-11-23: the intro flight comes first – its card carries the button „Rennen starten"; tools/harness/pintro.mjs tests the flight itself)
+const pastIntro = async q => { await q.waitForSelector('[data-intro]', { timeout: 240000 }); await click(q, 'Rennen starten'); };
+await pastIntro(p);
 await has(p, 'FLUGLAGE'); console.log('HUD up');
 // The boost gauge is 230 px wide and its labels are absolutely placed: every label must stay on ONE line, inside the gauge, and clear of
 // its neighbours in the row. (2026-11-23: the climate label "KÜHLE LUFT −21 %" stood in the line of the heat label – both broke in two.)
@@ -50,7 +53,7 @@ const gaugeFit = async () => {
 await sleep(1500); await gaugeFit();
 if (process.env.TWICE) { // persistent texture cache: wait for the deferred write, then load the same race again in a fresh page
   await sleep(9000); await p.close(); p = await open();
-  await has(p, 'Rennen starten'); await click(p, 'Rennen starten'); await has(p, 'Wetter'); await click(p, '▶ Start'); await has(p, 'FLUGLAGE'); console.log('second load done');
+  await has(p, 'Rennen starten'); await click(p, 'Rennen starten'); await has(p, 'Wetter'); await click(p, '▶ Start'); await pastIntro(p); await has(p, 'FLUGLAGE'); console.log('second load done');
 }
 if (process.env.LOAD_ONLY) { await b.close(); process.exit(errs ? 1 : 0); } // only the [load] timing line(s) and the checks up to here wanted
 await has(p, 'LOS!', 600000); console.log('race started'); // software rendering runs the countdown in slow motion

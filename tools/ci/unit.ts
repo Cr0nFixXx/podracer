@@ -24,6 +24,7 @@ import { buildTrack, frameAt, tunnelCeiling, baySameStretch, DS, TUNNEL_SHOULDER
 import { defaultProfile, effectiveStats, loadProfile, saveProfile, CAMERA_NAMES, MAX_LAPS, PRESETS, type GfxSettings } from '../../src/game/settings';
 import { ALARM_FROM, boostAlarmLevel, boostAlarmVoice } from '../../src/game/audio';
 import { PadRepeater, nextFocus, readPadNav, stepRange, type NavRect, type PadSnapshot } from '../../src/ui/padNav';
+import { FLIGHT_BAND, FLIGHT_LOOK, FLIGHT_SPEED, buildIntroFlight, type FlightPose } from '../../src/game/introFlight';
 import * as GPU3 from 'three/webgpu';
 import { setupSunShadow, CSM_FAR, CSM_SPLIT, SH_BACK, SH_BOX } from '../../src/game/sunShadow';
 
@@ -1306,6 +1307,102 @@ for (const id of ['boonta', 'frost', 'magma', 'oovo']) test(`open sections: the 
     }
     ok(n > 100, `${id}: only ${n} samples with a bay`);
     ok(worst < 0.3, `${cell} m cells: terrain ${worst.toFixed(2)} m above the road at ${where}`);
+  }
+});
+
+// ---- intro flight over the track (2026-11-23, user: „bevor das Rennen startet eine Intro-Fahrt über die Strecke, bis man ‚Rennen starten' auswählt") ----
+const RACE_PACE = 118; // m/s – what the field averages in the simulation (tools/ci/sim.ts, "avg … m/s outside")
+test('intro: over open road the camera flies 20–35 m above the centre line; under a roof it stays below the ceiling; in a zero-G tube it flies on the axis (every track)', () => {
+  const bad: string[] = []; eq(FLIGHT_BAND.join(), '20,35', 'the band –');
+  for (const t of TRACKS) {
+    const td = trackOf(t.id), S = td.main.samples, N = S.length, fl = buildIntroFlight(td); let open = 0, lo = 1e9, hi = 0;
+    const at = (i: number) => S[td.main.closed ? ((i % N) + N) % N : Math.max(0, Math.min(N - 1, i))];
+    for (let i = 0; i < N; i++) {
+      const s = S[i], h = fl.heightAt(i);
+      if (!(h > 0)) { bad.push(`${t.id} ${i}: height ${h}`); continue; }
+      if (s.zeroG) { if (Math.abs(h - 7) > 2.5) bad.push(`${t.id} ${i}: ${h.toFixed(1)} m in the zero-G tube (axis at 7 m)`); continue; }
+      if (s.roof > 0) { if (h > s.roof - 2 || h < 3) bad.push(`${t.id} ${i}: ${h.toFixed(1)} m under a roof of ${s.roof.toFixed(1)} m`); continue; }
+      let free = true; for (let k = -90; k <= 90 && free; k += 5) { const q = at(i + k); if (q.roof > 0 || q.zeroG || q.underpass) free = false; }
+      if (!free) continue;
+      open++; lo = Math.min(lo, h); hi = Math.max(hi, h);
+      if (h < 20 - 0.01 || h > 35 + 0.01) bad.push(`${t.id} ${i}: ${h.toFixed(1)} m over open road`);
+    }
+    if (open < N * 0.25) bad.push(`${t.id}: only ${open} of ${N} samples count as open road`);
+    else if (hi - lo < 8) bad.push(`${t.id}: the height hardly changes over open road (${lo.toFixed(1)} … ${hi.toFixed(1)} m)`);
+  }
+  eq(bad.length, 0, `${bad.length} · ${bad.slice(0, 5).join(' · ')} –`);
+});
+test('intro: under a bridge of the track itself the camera passes below the deck (crossings without a tunnel)', () => {
+  const bad: string[] = []; let n = 0;
+  for (const t of TRACKS) {
+    const td = trackOf(t.id), fl = buildIntroFlight(td);
+    for (const c of td.crossings) {
+      if (c.tunnelUnder) continue; n++;
+      for (let i = c.lowerFrom; i <= c.lowerTo; i++) { const h = fl.heightAt(i); if (h > c.clearance - 6) bad.push(`${t.id} ${i}: ${h.toFixed(1)} m, the deck hangs at ${c.clearance.toFixed(1)} m`); }
+    }
+  }
+  ok(n >= 4, `only ${n} open crossings found`); eq(bad.length, 0, `${bad.length} · ${bad.slice(0, 4).join(' · ')} –`);
+});
+test('intro: what stands across the road – the camera flies over a gate (start portal, sponsor bridge) and under a tall rock arch', () => {
+  const td = buildTrack(TRACKS[0]), S = td.main.samples; // (a fresh copy: the checks above share theirs)
+  const free = (from: number) => { for (let i = from; i < S.length - 200; i += 10) { let okk = true; for (let k = -60; k <= 60 && okk; k += 4) { const q = S[i + k]; if (q.roof > 0 || q.zeroG || q.underpass || q.bridge || q.gap) okk = false; } if (okk) return i; } return -1; };
+  const a = free(200), b = free(a + 400); ok(a > 0 && b > 0, `two open stretches (${a}, ${b})`);
+  td.overheads = [{ idx: a, y0: S[a].y + 15.8, y1: S[a].y + 21.3, half: 1.7 }, { idx: b, y0: 0, y1: 0, half: 6, arch: { R: 30, sy: 1.4, inner: 5.5, yOff: -2.5, thick: 12 } }];
+  const fl = buildIntroFlight(td);
+  for (let k = -2; k <= 2; k++) ok(fl.heightAt(a + k) >= 21.3 + 3, `over the gate: ${fl.heightAt(a + k).toFixed(1)} m (its top is at 21.3 m)`);
+  const under = -2.5 + 1.4 * (30 - 5.5); // the arch's underside over the centre line: 31.8 m, its top 43.8 m
+  for (let k = -4; k <= 4; k++) ok(fl.heightAt(b + k) <= under - 3 && fl.heightAt(b + k) >= 5, `under the arch: ${fl.heightAt(b + k).toFixed(1)} m (underside at ${under.toFixed(1)} m)`);
+  ok(fl.heightAt(b + 150) >= 20, `back in the band 300 m after the arch: ${fl.heightAt(b + 150).toFixed(1)} m`);
+});
+test('intro: a calm flight – about three times race pace, no hard turns, no steps in height, one pass takes 20 to 70 seconds (every track)', () => {
+  const bad: string[] = []; const P: FlightPose = { x: 0, y: 0, z: 0, lx: 0, ly: 0, lz: 0, roll: 0 }, Q = { ...P };
+  ok(FLIGHT_SPEED / RACE_PACE >= 3 && FLIGHT_SPEED / RACE_PACE <= 4, `top flight speed ${FLIGHT_SPEED} m/s = ${(FLIGHT_SPEED / RACE_PACE).toFixed(1)} × race pace`);
+  for (const t of TRACKS) {
+    const td = trackOf(t.id), fl = buildIntroFlight(td), N = td.main.samples.length;
+    for (let i = 0; i < N - 1; i++) { const d = Math.abs(fl.heightAt(i + 1) - fl.heightAt(i)); if (d > 0.36 * DS + 1e-6) { bad.push(`${t.id} ${i}: the height steps by ${d.toFixed(2)} m in ${DS} m`); break; } }
+    let time = 0, dist = 0, maxTurn = 0, maxV = 0, minV = 1e9, maxClimb = 0; const dt = 1 / 60;
+    fl.pose(0, P);
+    while (dist < fl.length && time < 200) {
+      const v = fl.speedAt(dist); maxV = Math.max(maxV, v); minV = Math.min(minV, v);
+      dist += v * dt; time += dt; fl.pose(dist, Q);
+      if (dist < fl.length) { // (a sprint cuts back to its start at the end of the pass)
+        const a0 = Math.atan2(P.lx - P.x, P.lz - P.z), a1 = Math.atan2(Q.lx - Q.x, Q.lz - Q.z); let da = a1 - a0; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+        maxTurn = Math.max(maxTurn, Math.abs(da) / dt); maxClimb = Math.max(maxClimb, Math.abs(Q.y - P.y) / dt);
+      }
+      P.x = Q.x; P.y = Q.y; P.z = Q.z; P.lx = Q.lx; P.ly = Q.ly; P.lz = Q.lz;
+    }
+    const avg = fl.length / time;
+    if (process.env.DEBUG) console.log(`   ${t.id.padEnd(12)} pass ${time.toFixed(1)} s · avg ${avg.toFixed(0)} m/s (${(avg / RACE_PACE).toFixed(2)} ×) · speed ${minV.toFixed(0)}–${maxV.toFixed(0)} · turn ${maxTurn.toFixed(2)} rad/s · climb ${maxClimb.toFixed(0)} m/s`);
+    if (time < 20 || time > 70) bad.push(`${t.id}: one pass takes ${time.toFixed(0)} s`);
+    if (avg < 2.3 * RACE_PACE || avg > 3.6 * RACE_PACE) bad.push(`${t.id}: average ${avg.toFixed(0)} m/s = ${(avg / RACE_PACE).toFixed(1)} × race pace`);
+    if (maxV > FLIGHT_SPEED + 0.01 || minV < 60) bad.push(`${t.id}: speed ${minV.toFixed(0)} … ${maxV.toFixed(0)} m/s`);
+    if (maxTurn > 2.4) bad.push(`${t.id}: the view turns at ${maxTurn.toFixed(2)} rad/s`);
+    if (maxClimb > 140) bad.push(`${t.id}: climbs or sinks at ${maxClimb.toFixed(0)} m/s`);
+  }
+  eq(bad.length, 0, `${bad.length} · ${bad.slice(0, 6).join(' · ')} –`);
+});
+test('intro: the pass starts just before the grid, looks ahead along the road, loops on a circuit and reaches the finish line of a sprint', () => {
+  const P: FlightPose = { x: 0, y: 0, z: 0, lx: 0, ly: 0, lz: 0, roll: 0 }, Q = { ...P };
+  for (const id of ['boonta', 'dunepass', 'oovo', 'executioner']) {
+    const td = trackOf(id), S = td.main.samples, N = S.length, fl = buildIntroFlight(td);
+    eq(fl.closed, td.main.closed, `${id}: closed –`);
+    fl.pose(0, P); const i0 = fl.sampleAt(0), s0 = S[i0];
+    const before = td.main.closed ? ((td.startIdx - i0) % N + N) % N : td.startIdx - i0;
+    ok(before >= 15 && before <= 80, `${id}: the pass starts ${before} samples before the start line`);
+    ok(Math.hypot(P.x - s0.x, P.z - s0.z) < 0.5 && Math.abs(P.y - (s0.y + fl.heightAt(i0))) < 0.5, `${id}: the camera is not over the centre line at the start`);
+    for (const d of [0, fl.length * 0.21, fl.length * 0.5, fl.length * 0.83]) {
+      fl.pose(d, P); const s = S[fl.sampleAt(d)], ahead = (P.lx - P.x) * s.tx + (P.lz - P.z) * s.tz, dist = Math.hypot(P.lx - P.x, P.ly - P.y, P.lz - P.z);
+      ok(ahead > FLIGHT_LOOK * 0.3 && dist < FLIGHT_LOOK * 1.3 && dist > FLIGHT_LOOK * 0.5, `${id} at ${d.toFixed(0)} m: looks ${ahead.toFixed(0)} m ahead, target ${dist.toFixed(0)} m away`);
+      ok(P.ly < P.y, `${id} at ${d.toFixed(0)} m: the view does not point down to the road`); ok(Math.abs(P.roll) <= 0.36, `${id}: banks ${P.roll.toFixed(2)} rad`);
+    }
+    if (td.main.closed) {
+      ok(Math.abs(fl.length - N * DS) < DS, `${id}: one pass is ${fl.length} m, the lap ${N * DS} m`);
+      fl.pose(137, P); fl.pose(fl.length + 137, Q); ok(Math.hypot(P.x - Q.x, P.y - Q.y, P.z - Q.z) < 1e-6, `${id}: the second pass is not the first`);
+    } else {
+      ok(fl.sampleAt(fl.length - 1) >= td.finishIdx, `${id}: the pass ends at sample ${fl.sampleAt(fl.length - 1)}, the finish line is at ${td.finishIdx}`);
+      fl.pose(fl.length + 137, Q); fl.pose(137, P); ok(Math.hypot(P.x - Q.x, P.y - Q.y, P.z - Q.z) < 1e-6, `${id}: after the last metre the pass does not begin again`);
+      fl.pose(fl.length - 2, P); ok(Number.isFinite(P.lx + P.ly + P.lz) && Math.hypot(P.lx - P.x, P.lz - P.z) > FLIGHT_LOOK * 0.5, `${id}: no look-at point at the end of the path`);
+    }
   }
 });
 

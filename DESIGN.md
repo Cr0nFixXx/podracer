@@ -124,6 +124,7 @@ Leitidee: **Lenken hebt, Tasten neigen.** Der Pod kippt nie von selbst – jede 
 | Ego-Ansicht | kein Cockpit-Rahmen, freier Blick auf Triebwerke, Leitungen und Blitz | S17 |
 
 - **Kamera:** rollt nur 20 % der Pod-Rolle mit (Horizont bleibt lesbar, 90°-Rolle ≈ 18° Kamerarolle). *(S10)*
+- **Intro-Flug:** vor dem ersten Start fliegt die Kamera in einer Endlosschleife über die Strecke – 20–35 m über der Mittellinie, etwa dreifaches Renntempo, langsamer in Kurven (das Bild dreht höchstens 1,9 rad/s), leicht in die Kurve gelegt. Tunnel und Röhren werden durchflogen, Tore überflogen. Der Knopf „Rennen starten" ist sofort aktiv; danach harter Schnitt auf die Startaufstellung. *(2026-11-23)*
 - **Drift:** der Pod darf weit quer stehen (bis ~50°), bleibt aber abfangbar; Staub-/Gischtfahne und seitliche Staubwolke machen den Drift sichtbar. *(S15)*
 - **Start:** Feld bleibt die ersten Sekunden in Formation und fächert erst dann auf. *(S16)*
 - **Aktive Triebwerks-Aufhängung:** Repulsor-Schwebehöhe 2,85 m + 5-Punkt-Bodenkollision (mind. 0,68 m Abstand über Straßenwölbung, Curbs und Rampen). Beim Lenken und Luftbremsen steigt das kurvenäußere Triebwerk dynamisch auf (~1 m, Nase leicht hoch), das innere taucht in den Scheitelpunkt (~0,5 m) – Energie-Binder und Steuerseile folgen live. *(≤ S9)*

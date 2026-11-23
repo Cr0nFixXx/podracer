@@ -57,7 +57,7 @@ Auftrag und Entscheidungen: [Protokoll](docs/verlauf/2026-11-23-nach-der-probefa
 **Verbesserungen** – erledigt (Protokoll): kein Fallschaden bei normaler Landung · Plasma-Hitzeschild über Lava · über Lava nur extrem kurzer Boost · größere Schatten-Sichtweite (Schattenwand auf „Ultra" behoben – **bitte FPS auf „Ultra" prüfen**, die weite Schattenstufe arbeitet jetzt erst wirklich) · Wasserspritzer auf der Linse über Seen und Pfützen ohne Regen · Boost-Alarm (**bitte Lautstärke anhören**) · Reset-Taste (Rücktaste / Back) · Controller-Bedienung in allen Menüs (**bitte mit dem echten Gamepad prüfen**)
 
 **Streckenanpassungen** (Entscheidungen im Protokoll)
-- [ ] Intro-Flug über die Strecke bis „Rennen starten"
+- [x] Intro-Flug über die Strecke bis „Rennen starten" (nur vor dem ersten Start, nicht bei „Neustart" – eigene Festlegung)
 - [ ] 3D-Schnee: Wehen 1–3 m auf Pulverfeldern, Pflügen, Bugwelle, feine Partikel; frisch 86 % / Graben 99 %, Gegner suchen Gräben
 - [ ] Dezente Fahrspuren in Sand und Mondstaub (nur Optik)
 - [ ] Malastare: Methanregen (brennbar, +12 % Hitze, grüne Flammen), Welt düsterer

@@ -128,6 +128,10 @@ if (!process.env.MENUS_ONLY) {
   // (software rendering draws about one frame of the race per second: a small window, no countdown, and all waits counted in frames)
   await p.setViewport({ width: 640, height: 360 }); await sleep(300);
   await press('start'); // = "▶ Start"
+  // the intro flight: its button „Rennen starten" has the focus; A starts the race (tools/harness/pintro.mjs tests the flight itself)
+  await p.waitForSelector('[data-intro]', { timeout: 600000 }); await frames(3);
+  check((await focus()).includes('Rennen starten'), `intro: the focus is on "${await focus()}", expected „Rennen starten"`);
+  await reach('intro'); await press('a');
   await has('FLUGLAGE', 600000); console.log('race is up');
   await p.evaluate(() => { window.__podracer.countdown = 0.04; });
   await p.waitForFunction(() => window.__podracer && window.__podracer.state === 'race', { timeout: 240000, polling: 250 });

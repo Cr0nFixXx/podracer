@@ -34,6 +34,7 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
 
   useEffect(() => {
     const g = new Game(ref.current!, profile, {
+      intro: runId === 0, // the flight over the track comes before the first start only – „Neustart" and „Nochmal" go straight to the grid
       onHud: setHud,
       onLoading: (p, msg) => setLoading({ p, msg }),
       onReady: () => setLoading(null),
@@ -62,7 +63,31 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
     <div className="relative w-full h-full bg-black overflow-hidden select-none">
       <div ref={ref} className="absolute inset-0" />
 
-      {h && !loading && !results && (
+      {/* 2026-11-23 – intro flight: the camera flies over the track until „Rennen starten" (Game.beginRace; also Enter, gamepad A / Start) */}
+      {h && h.intro && !loading && !results && !paused && (
+        <div className="absolute inset-0 z-10" data-intro="1">
+          <PadLegend />
+          <Fit>
+            <div className="mt-auto p-6 flex items-end justify-between gap-6">
+              <div className="bg-black/60 border border-amber-500/25 clip-corner px-6 py-4 backdrop-blur-sm">
+                <div className="font-display text-amber-400/80 tracking-[0.5em] text-xs mb-1">{theme.name.toUpperCase()} · {track.type === 'circuit' ? 'RUNDKURS' : 'SPRINT'}</div>
+                <h2 className="font-display text-4xl text-amber-100 tracking-widest">{track.name}</h2>
+                <div className="flex gap-8 mt-3 text-[11px] uppercase tracking-widest text-stone-400">
+                  {[['Länge', h.trackKm.toFixed(2).replace('.', ',') + ' km'], ['Runden', h.sprint ? '– (Sprint)' : String(h.laps)], ['Wetter', h.env || '—'], ['Gegner', String(h.total - 1)]].map(([a, b]) => (
+                    <div key={a}>{a}<div className="font-display text-base text-amber-200 normal-case tracking-wider">{b}</div></div>
+                  ))}
+                </div>
+              </div>
+              <div className="text-center">
+                <Btn big autoFocus pad="default start" onClick={() => gameRef.current?.beginRace()}>▶ Rennen starten</Btn>
+                <div className="mt-2 text-[11px] uppercase tracking-[0.25em] text-white" style={{ textShadow: '0 1px 3px #000, 0 0 6px #000' }}>Enter · Gamepad A</div>
+              </div>
+            </div>
+          </Fit>
+        </div>
+      )}
+
+      {h && !h.intro && !loading && !results && (
         <div className="absolute left-0 top-0 pointer-events-none text-white" style={{ fontFamily: 'Orbitron, sans-serif', width: vp.w / hs, height: vp.h / hs, transform: `scale(${hs})`, transformOrigin: 'top left' }}>
           {/* ===== top status bar (original style) ===== */}
           <div className="absolute top-0 inset-x-0 h-16">

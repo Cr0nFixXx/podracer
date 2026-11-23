@@ -107,7 +107,7 @@ let g: Game | null = null; let cur = -1;
     (window as unknown as Record<string, unknown>).__podracer = g; // debug / test handle, as in the app (RaceView.tsx)
     const tLoad = performance.now(); await g.start(); (window as unknown as Record<string, unknown>).loadInfo = `load=${Math.round(performance.now() - tLoad)}ms ` + JSON.stringify(g.world.timings) + ' ' + JSON.stringify((g as unknown as { loadMs?: unknown }).loadMs ?? {}); g.paused = true; await new Promise(r => setTimeout(r, 400));
   }
-  const G = g!; G.paused = true;
+  const G = g!; G.paused = true; if (G.state === 'intro') G.state = 'countdown'; // (a fly_ view of an earlier call)
   let chase = false;
   G.lensWet = 0; G.updateLens(0); // a dry lens for every view (spray of an earlier view must not leak into this one)
   (window as unknown as Record<string, unknown>).coverInfo = ''; // per-view info line (probe / decor views fill it) – reset so it never leaks into the next view
@@ -216,6 +216,10 @@ let g: Game | null = null; let cur = -1;
     chase = true;
     // three seconds of weather around that camera (rain streaks, snow, gust banks need time to fill the air)
     { const W = (G as unknown as { weather?: { update: (dt: number, t: number, cam: THREE.Camera, frozen: boolean, thunder: (v: number) => void, near: (v: number) => void) => void } }).weather; if (W) for (let k = 0; k < 90; k++) { G.clock += 1 / 30; W.update(1 / 30, G.clock, G.camera, false, () => {}, () => {}); } }
+  } else if (view.startsWith('fly_')) { // the intro flight (2026-11-23): fly_<metres into the pass> – the game's own flight camera, field of view and shadows
+    G.startIntro(); G.flightDist = +view.slice(4); for (let k = 0; k < 12; k++) G.updateCamera(0.5);
+    chase = true;
+    (window as unknown as Record<string, unknown>).coverInfo = `intro flight at ${G.flightDist} m of ${G.flight!.length} m: sample ${G.flight!.sampleAt(G.flightDist)}, ${G.flight!.heightAt(G.flight!.sampleAt(G.flightDist)).toFixed(1)} m above the road, ${G.flight!.speedAt(G.flightDist).toFixed(0)} m/s`;
   } else if (view === 'r') { // 3.4 s of real racing (AI + player idle) so exhaust/dust particles, banking and engine heave are live
     G.state = 'race'; (G as unknown as { keys: Set<string> }).keys.add('KeyW'); for (let k = 0; k < 170; k++) { G.update(1 / 60); if (k % 3 === 0) G.updateVisuals(); } G.updateCamera(0.5);
   } else { G.updateCamera(0.5); }
