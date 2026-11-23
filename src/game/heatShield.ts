@@ -27,7 +27,8 @@ export function makeHeatShields(count: number) {
   const hd = max(dot(ag, vec2(0.5, 0.8660254)), ag.x); // 0 at a cell's centre … 0.5 on its border
   const cell = smoothstep(0.4, 0.5, hd);
   const ring = pow(sin(r.mul(15.0).sub(time.mul(11.0))).mul(0.5).add(0.5), 3.0);
-  const rim = pow(r, 6.0);
+  // (a narrow rim: `pow(r, 6)` still lit the outer 30 % of the radius – half of the bowl's area – and the bowl came out milky)
+  const rim = pow(r, 14.0);
   const flick = sin(time.mul(41.0)).mul(0.07).add(0.93);
   // (additive light on dark basalt reads far stronger than its number: 0.14 linear is already a medium blue – keep the fill low,
   //  the lava has to stay visible through the bowl)

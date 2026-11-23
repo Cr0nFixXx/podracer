@@ -92,6 +92,7 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Reine Optik: an Hitze, Schaden und Fahrverhalten ändert sie nichts. Ein Zeichenaufruf für alle Pods (`src/game/heatShield.ts`, `Game.updateShields`).
 - Größe aus der Hülle des jeweiligen Pods: Triebwerksnasen bis Cockpit-Heck plus 1 m, Triebwerks-Außenkanten plus 1 m.
 - Erster Versuch war eine schwarze Scheibe: Muster auf `positionLocal` gebaut – bei instanzierten Netzen sind das schon Weltmeter. Regel dazu in `docs/regeln/grafik.md`.
+- Nachgebessert: die Schale war noch milchig und verdeckte die Lava. Ursache war der Rand – sein Leuchten reichte über das äußere Drittel des Radius, das ist die halbe Fläche. Jetzt ist der Rand schmal: leuchtende Waben und ein heller Ring, die Lava bleibt darunter sichtbar.
 - Geprüft: Bilder auf Magma über dem Lavasee (Verfolgerkamera, Seite, von oben), `tsc`, WebGPU-Konsolenprüfung mit der neuen Option `VIEW=chase_3600 TRACKS=2` (0 Fehler).
 
 ### Verbesserung – über Lava nur extrem kurzer Boost
