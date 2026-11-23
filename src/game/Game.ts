@@ -6,7 +6,7 @@ import { makeBeams } from './lights';
 import { makeHeatShields } from './heatShield';
 import { DebrisPool } from './debris';
 import { DS, TUNNEL_SHOULDER, roadSurfaceAt, tunnelCeiling } from './trackBuilder';
-import { SURF, surfaceOf, surfacePalette, type SurfaceDef } from './surfaces';
+import { SURF, lensSpray, splashes, surfaceOf, surfacePalette, trackSplashes, type SurfaceDef } from './surfaces';
 import { SnowField } from './snowField';
 import { normalizeKeys, normalizePad, padValue, type Action, type KeyMap, type PadMap } from './keymap';
 import { podEnvelope } from './podDesigns';
@@ -68,6 +68,8 @@ export class Game {
   post!: PostFX; world!: World; td!: TrackData; particles!: Particles; audio!: AudioFX;
   sky!: ReturnType<typeof makeSky>; sun!: THREE.DirectionalLight; sunDir = new THREE.Vector3();
   sunShadow!: SunShadow; csmFov = 0;
+  /** drops on the lens from spray (0 … 1), what this frame's wakes throw at it, does the track have water at all */
+  lensWet = 0; private lensSplashIn = 0; private sprayTrack: boolean | null = null;
   env!: EnvFx; weather!: WeatherFx; hemi!: THREE.HemisphereLight; prevRoll = 0;
   keymap: KeyMap = normalizeKeys(null); padmap: PadMap = normalizePad(null); envLabel = '';
   fog!: ReturnType<typeof applyAtmosphere>;
@@ -206,7 +208,7 @@ export class Game {
 
     if (this.td.paths.some(pa => pa.samples.some(q => surfaceOf(q.surf).liquid === 'lava'))) { this.shields = makeHeatShields(this.pods.length); this.shieldAmt = new Float32Array(this.pods.length); this.scene.add(this.shields.mesh); }
 
-    this.post = new PostFX(r, this.scene, this.camera, gfx, { rain: (gfx.weatherFx ?? 2) > 0 ? build.maxRain : 0, flare: build.flare });
+    this.post = new PostFX(r, this.scene, this.camera, gfx, { rain: this.lensRainMax(gfx), flare: build.flare }); this.updateLens(0);
     this.applyEnv(0);
     this.post.lens.sunColor?.value.set(theme.sunColor);
     this.particles.setScale(h0 * r.getPixelRatio());
@@ -471,7 +473,7 @@ export class Game {
     { const pl = this.player, ps = this.td.paths[pl.path].samples[pl.idx]; this.cover += ((ps && ps.roof > 0 && !pl.upper ? 1 : 0) - this.cover) * Math.min(1, dt * 5); this.particles.setAmbientFade(1 - this.cover); }
     this.applyEnv(dt);
     if (this.env.wind > 0.6 && this.cover < 0.5 && this.state === 'race') this.player.shake = Math.max(this.player.shake, this.weather.gust * (this.env.wind - 0.5) * 0.22); // storm gusts buffet the pod
-    if (this.post) this.post.lens.rain.value = this.wxQ > 0 ? this.env.rain * (1 - this.cover) : 0;
+    this.updateLens(dt);
     if (this.messageT > 0) this.messageT -= dt;
     this.flash = Math.max(0, this.flash - dt * 2);
 
@@ -652,6 +654,13 @@ export class Game {
         this.tmpC.copy(this.dustCol).lerp(WHITE_C, 0.3); // a little lighter than the ground, otherwise the wake is invisible on its own surface
         const powder = (smp?.surf ?? 0) === SURF.powder && !!this.td.snow ? 1 + 1.5 * (1 - (p.snowPack ?? 0)) : 1; // fresh powder flies up in a plume, a firm trail hardly at all
         const sfw = surfaceOf(smp?.surf), wk = sfw.liquid && sfw.liquid !== 'lava' && sfw.liquid !== 'methane' ? 'spray' : sfw.wake === 'spray' ? 'dust' : sfw.wake, wkCol = this.wakeColor(sfw);
+        { // 2026-11-23 (user): spray reaches the lens without rain – from the player's own wake and from a pod close ahead (surfaces.ts)
+          const lake = splashes(sfw), pl = this.player;
+          if (lake || wet) {
+            const ax = p.pos.x - pl.pos.x, az = p.pos.z - pl.pos.z, fX = Math.sin(pl.yaw), fZ = Math.cos(pl.yaw);
+            this.lensSplashIn = Math.max(this.lensSplashIn, lensSpray(lake, wet ? this.wet : 0, sp, p.isPlayer ? null : ax * fX + az * fZ, ax * fZ - az * fX));
+          }
+        }
         for (const e of [envP.engL, envP.engR]) {
           const lz = p.isPlayer ? (e.frontZ + e.backZ) * 0.5 : e.backZ - 1.2, lx = e.outerX * 1.1, sg = e.x < 0 ? -1 : 1;
           this.tmpV.set(p.pos.x + lx * cyD + lz * syD, p.groundY + 0.25, p.pos.z - lx * syD + lz * cyD);
@@ -709,7 +718,7 @@ export class Game {
     }
     if (Game.POST_KEYS.some(k => g[k] !== prev[k])) { // rebuild the post-processing chain with the new options
       const old = this.post;
-      this.post = new PostFX(this.renderer, this.scene, this.camera, { ...g, ssr: prev.ssr && g.ssr }, { rain: (g.weatherFx ?? 2) > 0 ? this.envBuild.maxRain : 0, flare: this.envBuild.flare });
+      this.post = new PostFX(this.renderer, this.scene, this.camera, { ...g, ssr: prev.ssr && g.ssr }, { rain: this.lensRainMax(g), flare: this.envBuild.flare }); this.updateLens(0);
       old.dispose(); // no async warm-up here: it would interleave with running frames and compile pipelines for the wrong target layout
     }
   }
@@ -820,6 +829,20 @@ export class Game {
       const hurt = Math.min(pl.hpL, pl.hpR) < 35 ? (Math.sin(this.clock * 47) > 0.2 ? 1 : 0.35) : 1;
       sl.intensity = pl.dead > 0 ? 0 : HEAD_LAMP * lv * (pl.boosting ? 1.2 : 1) * hurt;
     }
+  }
+
+  /** Can drops land on the lens in this race? (PostFX compiles the drops only then.) Rain – or a track with a lake to fly over. */
+  private lensRainMax(g: GfxSettings) {
+    if (this.sprayTrack === null) this.sprayTrack = trackSplashes(this.td.paths);
+    return Math.max((g.weatherFx ?? 2) > 0 ? this.envBuild.maxRain : 0, this.sprayTrack ? 0.6 : 0);
+  }
+
+  /** Drops on the lens: rain, or spray from lakes and puddles (collected from this frame's wakes in `updateVisuals`). Spray builds
+   *  up in half a second and dries off in about three. */
+  updateLens(dt: number) {
+    const tgt = this.lensSplashIn; this.lensSplashIn = 0;
+    this.lensWet += tgt > this.lensWet ? (tgt - this.lensWet) * Math.min(1, dt * 2.4) : -Math.min(this.lensWet, dt * 0.2);
+    if (this.post) this.post.lens.rain.value = Math.max(this.wxQ > 0 ? this.env.rain * (1 - this.cover) : 0, this.lensWet);
   }
 
   /** wake / dust colour of a ground surface (null = the world's default dust colour) */

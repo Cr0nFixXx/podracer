@@ -69,6 +69,21 @@ export const SURFACES: SurfaceDef[] = [
 export const SURF: Record<string, number> = Object.fromEntries(SURFACES.map((s, i) => [s.id, i]));
 export const surfaceOf = (i: number | undefined): SurfaceDef => SURFACES[i ?? 0] ?? SURFACES[0];
 
+// ---- Spray on the camera lens (2026-11-23, user: drops on the lens also over water and puddles when it does not rain) ----
+/** Does a pod flying over this surface throw liquid into the air? Every lake but lava (the ice lake is frozen: no `liquid`). */
+export const splashes = (s: SurfaceDef) => !!s.liquid && s.liquid !== 'lava';
+/** Does the track have such a lake? (The drops are compiled into the picture only where they can appear.) */
+export const trackSplashes = (paths: { samples: { surf?: number }[] }[]) => paths.some(p => p.samples.some(q => splashes(surfaceOf(q.surf))));
+/** How much one pod's wake throws at the player's lens, 0 … 1 (1 = a downpour). `lake`: the pod is over a lake; `puddles`: wetness of
+ *  a rained-on road (0 … 1, counts half); `ahead` / `side`: where that pod is relative to the player in metres along / across the
+ *  player's heading – `null` = the player's own wake. */
+export function lensSpray(lake: boolean, puddles: number, speed: number, ahead: number | null, side = 0): number {
+  const amt = (lake ? 1 : 0.5 * Math.max(0, Math.min(1, puddles))) * Math.min(1, speed / 70);
+  if (amt <= 0) return 0;
+  if (ahead === null) return 0.6 * amt;
+  return ahead > 2 && ahead < 36 && Math.abs(side) < 8 ? 0.85 * amt * (1 - ahead / 36) : 0;
+}
+
 /** Which surfaces a world uses: `general` passages alternate in this order, `open` = the two wide open flats, `cave` = cave floor. */
 export interface ThemeSurfaces { general: string[]; open: [string, string]; cave?: string; pal?: Record<string, [string, string, string]> }
 export const THEME_SURFACES: Record<string, ThemeSurfaces> = {

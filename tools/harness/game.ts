@@ -89,6 +89,7 @@ let g: Game | null = null; let cur = -1;
   }
   const G = g!; G.paused = true;
   let chase = false;
+  G.lensWet = 0; G.updateLens(0); // a dry lens for every view (spray of an earlier view must not leak into this one)
   (window as unknown as Record<string, unknown>).coverInfo = ''; // per-view info line (probe / decor views fill it) – reset so it never leaks into the next view
   if (view === 'b') {
     const S = G.td.main.samples, N = S.length; let best = 0, bc = 0;
@@ -191,7 +192,7 @@ let g: Game | null = null; let cur = -1;
     const x0 = s.x + s.rx * lat, z0 = s.z + s.rz * lat;
     pl.pos.set(x0, s.y + s.ramp + 2.85, z0); pl.yaw = Math.atan2(s.tx, s.tz); pl.path = 0; pl.idx = idx; pl.dead = 0; pl.invuln = 99; pl.grounded = true; pl.inRoof = s.roof > 0; pl.upper = false;
     for (let k = 0; k < 40; k++) { pl.pos.x = x0; pl.pos.z = z0; pl.vel.set(s.tx * speed, 0, s.tz * speed); pl.yaw = Math.atan2(s.tx, s.tz); stepPod(pl, G.td, 1 / 60, G.clock + k / 60, 1, false); }
-    pl.pos.x = x0; pl.pos.z = z0; pl.invuln = 0; G.updateVisuals(); for (let k = 0; k < 10; k++) G.updateCamera(0.5);
+    pl.pos.x = x0; pl.pos.z = z0; pl.invuln = 0; G.lensWet = 0; G.updateVisuals(); G.updateLens(1); for (let k = 0; k < 10; k++) G.updateCamera(0.5); // (updateLens: spray of the pod's own wake has settled on the lens)
     chase = true;
     // three seconds of weather around that camera (rain streaks, snow, gust banks need time to fill the air)
     { const W = (G as unknown as { weather?: { update: (dt: number, t: number, cam: THREE.Camera, frozen: boolean, thunder: (v: number) => void, near: (v: number) => void) => void } }).weather; if (W) for (let k = 0; k < 90; k++) { G.clock += 1 / 30; W.update(1 / 30, G.clock, G.camera, false, () => {}, () => {}); } }

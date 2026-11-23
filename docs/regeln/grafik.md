@@ -40,7 +40,7 @@ Part of the agent manual (`CLAUDE.md`). Read this before you change the renderer
 - **`reflRes`** (0.35–1) scales the SSR buffer; restart-only like SSR. *(S17)*
 - **SSR:** MRT channel `metalrough.r` is *reflectivity* (`max(metalness, smooth-dielectric term)`); SSRNode discards pixels where it is 0. New glossy non-metal surfaces need roughness < 0.3 to reflect. *(S15)*
 - **Heat haze:** `post.heat` (2 screen positions, radius, strength), set in `Game.render`. UV offset only – keep it free of extra samples and control flow. *(S12)*
-- **Lens effects (`post.ts`):** compiled in only when needed (`env.rain > 0.05`, `env.flare`), gated by `gfx.lensFx`. Flare peak add < 0.85; do not raise (spec: no overexposure). Lightning must not use the full-screen `flash` uniform. *(S11)*
+- **Lens effects (`post.ts`):** compiled in only when needed (`env.rain > 0.05` – since 2026-11-23 also on tracks with a lake: spray, see `umwelt.md`; `env.flare`), gated by `gfx.lensFx`. Flare peak add < 0.85; do not raise (spec: no overexposure). Lightning must not use the full-screen `flash` uniform. *(S11)*
 - **PostFX & warmup (`post.ts`):** AO = 4-pair symmetric `textureLoad` depth concavity (0 MRT, 0 flat-plane striping, 0 halos, immune to transparents). Bloom runs at `0.5×` resolution (`threshold = 2.1`). God rays = 14-tap `textureLoad` sky-depth shafts. SSR (opt-in) masks transparents with compile-time `alpha = 0` + `NormalBlending` in MRT. Always run `await post.warmup(renderer)` (with seeded particles & revealed pod LODs) before `onReady()` so countdown frame 1 never stalls. Never use full-screen CSS `filter: drop-shadow` on HUD text (`textShadow` only). *(≤ S9)*
 
 ## Graphics settings: live or restart

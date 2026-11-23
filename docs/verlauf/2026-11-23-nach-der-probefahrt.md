@@ -112,6 +112,13 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Geprüft: drei neue Unit-Prüfungen `shadow:` (mit den alten Werten lagen 2801 von 4640 sichtbaren Bodenpunkten außerhalb ihrer Schattenstufe – jetzt 0), Bildvergleich vorher/nachher auf Boonta (Ultra: Wandschatten und Bogenschatten jetzt auch in der Ferne), WebGPU-Konsolenprüfung mit einer Karte und mit Kaskaden (0 Fehler).
 - **Nicht gemessen:** die Kosten auf einer echten Grafikkarte. Die weite Stufe zeichnet jetzt wirklich (in jedem zweiten Bild). Fällt „Ultra" unter 60 FPS: `CSM_FAR` in `sunShadow.ts` kleiner stellen.
 
+### Verbesserung – Wasserspritzer auf der Linse auch ohne Regen
+- Tropfen landen jetzt auf der Linse, wenn du über einen See fliegst (Wasser, Sumpf, Spiegelsee, Methansee – nicht Lava), durch Pfützen nach einem Regen fährst oder dicht hinter einem Pod durch dessen Gischt.
+- Stärke: die eigene Gischtfahne etwas schwächer als Regen, ein Pod dicht voraus stärker. Im Stand keine Tropfen. Nach etwa drei Sekunden über trockenem Boden ist die Linse wieder klar.
+- Es sind dieselben Tropfen wie im Regen (gleiches Aussehen, gleicher Schalter „Linseneffekte").
+- Betroffene Strecken: Dschungelfluss, Aquilaris, Kristallschlucht, Malastare 100, Methan-Derby – und jede Strecke nach einem Regen.
+- Geprüft: fünf Unit-Prüfungen `lens:` (zuerst rot), Bilder auf Aquilaris (über dem See Tropfen, an Land keine, Vergleich mit Regen), WebGPU-Konsolenprüfung über dem See.
+
 ## Geprüft
 - Fehler 1: neue Prüfungen `bridges: …` (11, zuerst rot: Gelände 22,7 m über der Brücke, 309 Punkte; Wand 28 m hoch direkt neben der Brücke). Nur mit Regel (2) stand das Gelände noch 5,2 m über der Fahrbahn – Regel (1) ist nötig. `poke.ts` auf allen Strecken, Gitter 4,5 / 7 / 13,75 m, Brücken eingeschlossen: 0 Punkte (vorher 242 auf dem Methan-Derby). Bilder vorher/nachher an allen drei Stellen (WebGL2, Software).
 

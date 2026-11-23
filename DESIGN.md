@@ -255,6 +255,7 @@ Leitidee: **Wetter verändert die Lesbarkeit, nie die Fairness.** Sicht wird wei
 | Sonnenbahn | Aufgang 40° vor, Untergang 70° nach dem Mittags-Azimut der Welt; der Mond steht gegenüber. Beim Wechsel wird das Licht kurz dunkel statt über den Himmel zu wandern. | S13 |
 | Regenstreifen | Länge und Richtung folgen der Relativgeschwindigkeit: im Stand fast senkrecht, in Fahrt vom Fluchtpunkt nach außen. Breite ~3 cm, Deckkraft ≤ 0,6. | S13 |
 | Linsentropfen | langsam: laufen herab; schnell: werden nach außen gedrückt, Spuren werden länger, Perlen werden weniger. Nie größer als 2,5 % der Bildhöhe. | S13 |
+| Linsentropfen ohne Regen | Gischt über Seen (nicht Lava) und Pfützen: eigene Gischtfahne etwas schwächer als Regen, die eines Pods dicht voraus stärker. Trocknet in etwa 3 s. | 2026-11-23 |
 | Gischt / Spritzer | Gischt weißgrau, hinter dem Pod, wächst mit Tempo; für Gegner unter 24 m aus (Sicht). Spritzer: winzige Kronen, 0,15 s. | S13 |
 | Blitz | weißer Kern, sechsmal so breites weiches Glühen, 3 Äste, 2–4 Folgeblitze in 0,3 s. Erhellt Wolken und Umgebungslicht, kein Vollbild-Weiß. | S13 |
 | Donner | Knall nur bei nahen Einschlägen, sonst Schlag + Grollen; Verzögerung = Entfernung / 343 m/s (max. 3 s). | S13 |

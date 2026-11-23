@@ -7,7 +7,7 @@ import { resolveEnvironment, type TimeOfDay, type WeatherKind } from '../../src/
 import { clipOutside } from '../../src/game/meshClip';
 import { SnowField } from '../../src/game/snowField';
 import { borderRocks, ROCK_PROTRUDE, type BorderRock } from '../../src/game/borderRocks';
-import { SURF, SURFACES } from '../../src/game/surfaces';
+import { SURF, SURFACES, lensSpray, splashes, trackSplashes } from '../../src/game/surfaces';
 import { podLayout } from '../../src/game/podLayouts';
 import { cockpitGeo } from '../../src/game/podCockpits';
 import { engineExtent, engineGeo } from '../../src/game/podParts';
@@ -1304,6 +1304,35 @@ for (const id of ['boonta', 'frost', 'magma', 'oovo']) test(`open sections: the 
     ok(n > 100, `${id}: only ${n} samples with a bay`);
     ok(worst < 0.3, `${cell} m cells: terrain ${worst.toFixed(2)} m above the road at ${where}`);
   }
+});
+
+// ---- drops on the lens from spray (2026-11-23, user: „Wasserspritzer auf der Linse auch bei Fahrten über Wasser/Pfützen, wenn es nicht regnet") ----
+test('lens: every lake but lava (and the frozen lake) throws drops at the lens; solid ground never does', () => {
+  const wet = SURFACES.filter(splashes).map(s => s.id).sort();
+  eq(wet.join(','), ['methane', 'mirror', 'swamp', 'water'].sort().join(','), 'surfaces that splash –');
+});
+test('lens: the player\'s own wake over a lake wets the lens at racing speed, not when standing; a dry road never does', () => {
+  ok(lensSpray(true, 0, 100, null) >= 0.45, `over a lake at 100 m/s: ${lensSpray(true, 0, 100, null)}`);
+  ok(lensSpray(true, 0, 100, null) <= 0.7, `over a lake at 100 m/s: ${lensSpray(true, 0, 100, null)} – more than heavy rain`);
+  eq(lensSpray(true, 0, 0, null), 0, 'standing over the lake –');
+  ok(lensSpray(true, 0, 30, null) < lensSpray(true, 0, 100, null), 'slow is not less than fast');
+  eq(lensSpray(false, 0, 100, null), 0, 'dry road –');
+});
+test('lens: puddles after rain wet the lens too – less than a lake, more the wetter the road', () => {
+  const half = lensSpray(false, 0.5, 100, null), full = lensSpray(false, 1, 100, null), lake = lensSpray(true, 1, 100, null);
+  ok(full >= 0.2, `soaked road: ${full}`); ok(half > 0 && half < full, `half-dry road ${half}, soaked ${full}`); ok(full < lake, `soaked road ${full}, lake ${lake}`);
+});
+test('lens: a pod close ahead throws more at the lens than the own wake; none from behind, from far ahead or from the side', () => {
+  const own = lensSpray(true, 0, 100, null);
+  ok(lensSpray(true, 0, 100, 6, 0) > own, `6 m ahead: ${lensSpray(true, 0, 100, 6, 0)}, own ${own}`);
+  ok(lensSpray(true, 0, 100, 30, 0) < lensSpray(true, 0, 100, 10, 0), 'no fall-off with distance');
+  eq(lensSpray(true, 0, 100, -8, 0), 0, 'a pod behind –'); eq(lensSpray(true, 0, 100, 60, 0), 0, 'a pod 60 m ahead –'); eq(lensSpray(true, 0, 100, 10, 14), 0, 'a pod 14 m to the side –');
+});
+test('lens: the drops are built into the picture on every track with a lake – and only there (dry weather)', () => {
+  const want: Record<string, boolean> = { boonta: false, frost: false, magma: false, dunepass: false, jungle: true, aquilaris: true, oovo: false, crystal: true, malastare: true, mosespa: false, howler: false, methane: true, executioner: false };
+  const bad: string[] = [];
+  for (const def of TRACKS) { if (!(def.id in want)) { bad.push(`${def.id}: not listed in this check`); continue; } const has = trackSplashes(trackOf(def.id).paths); if (has !== want[def.id]) bad.push(`${def.id}: ${has}`); }
+  eq(bad.length, 0, `${bad.join(' · ')} –`);
 });
 
 // ---- sun shadows (2026-11-23, user: „größere Schatten-Sichtweite – auf Ultra schiebt sich eine Schattenwand vor dem Pod her") ----
