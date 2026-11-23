@@ -148,6 +148,10 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Geprüft: sieben Unit-Prüfungen `padnav:` (zuerst rot) und ein Durchlauf der echten App mit einem nachgebildeten Gamepad (`tools/harness/ppad.mjs`): jedes Bedienelement jedes Bildschirms ist erreichbar (Hangar: 89), Auswahl, Zurück, Regler, Listen, Tastenbelegung, Pause und Fortsetzen ohne Prellen, Reset-Knopf, Ergebnis.
 - **Nicht geprüft: ein echtes Gamepad.** Der Test bildet das Standard-Layout nach (Xbox-Art). Bei Gamepads, die der Browser nicht als „Standard" meldet, zählt das Steuerkreuz nicht – der linke Stick geht immer.
 
+### Nebenbei gefunden – Hauptmenü: Titel las sich „PODRACE"
+- Beim Prüfen der Controller-Bedienung aufgefallen: im Hauptmenü fehlte dem Titel bei 16:9 der letzte Buchstabe. Der Titel ist breiter als seine Bildhälfte; der Farbverlauf wurde nur innerhalb seines Kastens gemalt, und die Pod-Vorschau lag darüber.
+- Behoben (Kasten so breit wie der Text, Titel liegt über der Vorschau). Die Layout-Prüfung `pui.mjs` schlägt jetzt an, wenn der Text einer Überschrift breiter ist als ihr Kasten oder verdeckt wird.
+
 ## Geprüft
 - Fehler 1: neue Prüfungen `bridges: …` (11, zuerst rot: Gelände 22,7 m über der Brücke, 309 Punkte; Wand 28 m hoch direkt neben der Brücke). Nur mit Regel (2) stand das Gelände noch 5,2 m über der Fahrbahn – Regel (1) ist nötig. `poke.ts` auf allen Strecken, Gitter 4,5 / 7 / 13,75 m, Brücken eingeschlossen: 0 Punkte (vorher 242 auf dem Methan-Derby). Bilder vorher/nachher an allen drei Stellen (WebGL2, Software).
 

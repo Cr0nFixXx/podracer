@@ -43,9 +43,11 @@ export function MainMenu({ profile, go }: { profile: Profile; go: (s: string) =>
       <Background />
       <Fit>
       <div className="relative z-10 flex flex-1 min-h-0">
-      <div className="flex flex-col justify-center pl-24 w-1/2">
+      {/* 2026-11-23: at 16:9 the title is wider than this half and read "PODRACE": the gradient of `bg-clip-text` is painted only inside
+          the heading's box (→ `w-max` on the h1), and the pod preview lay on top of the overflow (→ `relative z-20` here) */}
+      <div className="relative z-20 flex flex-col justify-center pl-24 w-1/2">
         <div className="font-display text-amber-400/80 tracking-[0.6em] text-xs mb-3">OUTER RIM CHAMPIONSHIP</div>
-        <h1 className="font-display text-6xl @3xl:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-orange-600 leading-none drop-shadow-[0_0_40px_rgba(251,146,60,0.35)]">PODRACER</h1>
+        <h1 className="w-max font-display text-6xl @3xl:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-orange-600 leading-none drop-shadow-[0_0_40px_rgba(251,146,60,0.35)]">PODRACER</h1>
         <div className="font-display text-xl @3xl:text-2xl text-amber-100/90 tracking-[0.4em] mt-2 mb-12">HYPERSPEED LEGENDS</div>
         <div className="flex flex-col gap-3 w-72">
           <Btn big pad="default start" onClick={() => go('setup')}>Rennen starten</Btn>

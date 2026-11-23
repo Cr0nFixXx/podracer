@@ -17,6 +17,19 @@ const audit = p => p.evaluate(() => {
   }
   // every button / heading must lie inside the window
   for (const el of document.querySelectorAll('button, h1, h2, select, input')) { const q = el.getBoundingClientRect(); if (q.width && (q.right > vw + 2 || q.bottom > vh + 2 || q.left < -2 || q.top < -2)) { r.push('outside: ' + el.tagName + ' "' + el.textContent.trim().slice(0, 20) + '" ' + Math.round(q.right) + 'x' + Math.round(q.bottom)); break; } }
+  // the text of every heading must be visible to its last letter (2026-11-23: at 16:9 the title "PODRACER" ran behind the pod preview
+  // of the main menu – the heading's box was inside the window, its text was not on top)
+  for (const el of document.querySelectorAll('h1, h2')) {
+    const rg = document.createRange(); rg.selectNodeContents(el); const rects = [...rg.getClientRects()].filter(q => q.width > 1 && q.height > 1); if (!rects.length) continue;
+    // … and inside the heading's own box: a title painted with `bg-clip-text` gets its colour only inside the box – a letter that
+    // overflows it is invisible although nothing covers it
+    const box = el.getBoundingClientRect(), wide = rects.find(q => q.right > box.right + 2 || q.left < box.left - 2);
+    if (wide) { r.push('heading text wider than its box: ' + el.tagName + ' "' + el.textContent.trim().slice(0, 20) + '" text to x ' + Math.round(wide.right) + ', box to ' + Math.round(box.right)); continue; }
+    for (const q of rects) for (const x of [q.left + 3, q.right - 3]) {
+      const top = document.elementFromPoint(Math.min(vw - 1, Math.max(0, x)), q.top + q.height / 2);
+      if (top && top !== el && !el.contains(top) && !top.contains(el)) { r.push('covered: ' + el.tagName + ' "' + el.textContent.trim().slice(0, 20) + '" at x ' + Math.round(x) + ' by ' + top.tagName); break; }
+    }
+  }
   return r;
 });
 for (const [w, h] of sizes) {
