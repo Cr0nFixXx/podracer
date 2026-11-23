@@ -29,13 +29,14 @@ await p.waitForFunction(() => typeof window.track === 'function', { timeout: 120
 const shots = [], views = view.split(',');
 for (const v of views) {
   console.log(String(await p.evaluate(([i, d]) => window.track(+i, d), [ti, v])).replace(/^.*?(probe|WebGL2|WebGPU)/, '$1').slice(0, 170));
+  let fresh = true; // (first variant of this view: remember which meshes `track()` left visible – it switches the decor and rock sectors for the new camera)
   for (const variant of variants.split(',')) {
-    const info = await p.evaluate(async (variant) => {
+    const info = await p.evaluate(async (variant, fresh) => {
       const G = window.__podracer, seen = {}, names = variant.includes(':') ? variant.slice(variant.indexOf(':') + 1).split('+') : [];
       G.scene.traverse(o => {
         if (!o.isMesh) return; const m = Array.isArray(o.material) ? o.material[0] : o.material, n = m?.name || '';
         seen[n] = (seen[n] || 0) + 1;
-        if (o.userData.__vis === undefined) o.userData.__vis = o.visible; // (the state `track()` left: decor cells are switched there)
+        if (fresh || o.userData.__vis === undefined) o.userData.__vis = o.visible;
         o.visible = o.userData.__vis;
         if (m && m.userData.__wire === undefined) m.userData.__wire = !!m.wireframe; if (m) m.wireframe = m.userData.__wire;
         const named = names.includes(n) || names.includes(o.name);
@@ -76,7 +77,8 @@ for (const v of views) {
         meshes++; tris += n; const q = by[key] ?? (by[key] = [0, 0]); q[0]++; q[1] += n;
       });
       return JSON.stringify({ seen, drawn: `${meshes} meshes, ${Math.round(tris)} triangles`, by: Object.entries(by).filter(([k]) => k !== 'other').map(([k, q]) => `${k} ${q[0]}/${Math.round(q[1] / 1000)}k`).join(' ') + extra });
-    }, variant);
+    }, variant, fresh);
+    fresh = false;
     const r = JSON.parse(info);
     if (variant === variants.split(',')[0] && v === views[0]) console.log('materials:', JSON.stringify(r.seen).slice(0, 300));
     console.log(`${v} [${variant}] drawn: ${r.drawn} · ${r.by}`);

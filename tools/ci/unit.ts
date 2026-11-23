@@ -1195,5 +1195,16 @@ test('rock rows: a rock is about as tall as the border the physics knows, and ne
   ok(gaps <= pairs * 0.01, `${gaps} of ${pairs} neighbours in a row do not touch`);
 });
 
+// ---- no fold (2026-11-23): a road wider than its bend allows lies over itself on the inside of the bend ----
+test('layout: the road never folds over itself – on every track the half width stays below 0.9 × the curve radius', () => {
+  const bad: string[] = [];
+  for (const def of TRACKS) {
+    const S = trackOf(def.id).main.samples; let worst = 0, at = 0;
+    for (let i = 0; i < S.length; i++) { const k = Math.abs(S[i].curv) * S[i].hw; if (k > worst) { worst = k; at = i; } }
+    if (worst > 0.9) bad.push(`${def.id} ${worst.toFixed(2)} at sample ${at} (half width ${S[at].hw.toFixed(0)} m, radius ${(1 / Math.abs(S[at].curv)).toFixed(0)} m)`);
+  }
+  eq(bad.length, 0, `tracks with half width / radius above 0.9: ${bad.join(' · ')} –`);
+});
+
 console.log(failed ? `\n${failed} unit check(s) FAILED, ${passed} passed.` : `All ${passed} unit checks passed.`);
 process.exit(failed ? 1 : 0);

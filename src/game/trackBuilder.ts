@@ -261,6 +261,54 @@ export function buildTrack(def: TrackDef): TrackData {
       samples[i].x = sx / c; samples[i].z = sz / c; samples[i].hw = sw / c;
     }
   }
+  // 2026-11-23 – no fold. Where the road is wider than its bend allows (half width > radius), its inner edge runs backwards and the
+  // ribbon lies over itself: the wide flats of Boonta (a 121° turn of 20 m radius on a road 108 m wide), Mos Espa and Aquilaris did
+  // (seen since Session 18: overlapping road mesh, beacons bunched up, nothing can stand on that inner edge). Such a bend is now
+  // rounded: the centre line is smoothed there, and only there, until the half width is at most 0.85 × the radius – the road keeps
+  // its width, the corner becomes a sweeping curve. Tracks without such a bend are not touched (bit-identical).
+  // (Tried first and dropped: moving the centre line outwards and narrowing the road on the inside. The sideways shift has to run in
+  //  and out somewhere, and on a road this wide those S-bends folded the road again a hundred metres further on.)
+  {
+    const ACT = 0.85, W = (i: number) => closed ? ((i % N) + N) % N : Math.max(0, Math.min(N - 1, i)), inside = (j: number) => closed || (j >= 0 && j < N);
+    const tx = new Float64Array(N), tz = new Float64Array(N), raw = new Float64Array(N), cv = new Float64Array(N), mask = new Float64Array(N), xs = new Float64Array(N), zs = new Float64Array(N);
+    for (let pass = 0; pass < 120; pass++) {
+      // curvature the way `finalize` measures it later (tangent over ±1 sample, turn over ±2, mean over ±8)
+      for (let i = 0; i < N; i++) { const a = samples[W(i - 1)], b = samples[W(i + 1)], l = Math.hypot(b.x - a.x, b.z - a.z) || 1; tx[i] = (b.x - a.x) / l; tz[i] = (b.z - a.z) / l; }
+      for (let i = 0; i < N; i++) {
+        const a = W(i - 2), b = W(i + 2); let len = 0;
+        for (let k = -2; k < 2; k++) { const p = samples[W(i + k)], q = samples[W(i + k + 1)]; len += Math.hypot(q.x - p.x, q.z - p.z); }
+        raw[i] = Math.atan2(tx[a] * tz[b] - tz[a] * tx[b], tx[a] * tx[b] + tz[a] * tz[b]) / Math.max(1e-6, len);
+      }
+      for (let i = 0; i < N; i++) { let sum = 0, c = 0; for (let k = -8; k <= 8; k++) if (inside(i + k)) { sum += raw[W(i + k)]; c++; } cv[i] = sum / c; }
+      // where to smooth: fully within 20 samples of a bend that is too tight, fading out over the next 30
+      mask.fill(0); let any = false;
+      for (let i = 0; i < N; i++) {
+        if (Math.abs(cv[i]) * samples[i].hw <= ACT) continue; any = true;
+        for (let k = -50; k <= 50; k++) if (inside(i + k)) { const j = W(i + k), m = Math.min(1, (50 - Math.abs(k)) / 30); if (m > mask[j]) mask[j] = m; }
+      }
+      if (!any) break;
+      if (!closed) for (let i = 0; i < N; i++) if (i < 8 || i > N - 9) mask[i] = 0; // (the ends of a sprint stay where they are)
+      for (let i = 0; i < N; i++) { xs[i] = samples[i].x; zs[i] = samples[i].z; }
+      for (let i = 0; i < N; i++) {
+        if (mask[i] <= 0) continue;
+        let sx = 0, sz = 0, c = 0; for (let k = -12; k <= 12; k++) { const j = W(i + k), w = 13 - Math.abs(k); sx += xs[j] * w; sz += zs[j] * w; c += w; }
+        samples[i].x = xs[i] + mask[i] * (sx / c - xs[i]); samples[i].z = zs[i] + mask[i] * (sz / c - zs[i]);
+      }
+      // Smoothing draws the samples of the bend together; the next step would then smooth over fewer metres and the bend would
+      // hardly open any further. So the samples are spread evenly along the line again after every step (x, z, y, half width).
+      {
+        const M = closed ? N + 1 : N, cum = new Float64Array(M), px = new Float64Array(M), pz = new Float64Array(M), py = new Float64Array(M), pw = new Float64Array(M);
+        for (let i = 0; i < M; i++) { const q = samples[i % N]; px[i] = q.x; pz[i] = q.z; py[i] = q.y; pw[i] = q.hw; if (i > 0) cum[i] = cum[i - 1] + Math.hypot(px[i] - px[i - 1], pz[i] - pz[i - 1]); }
+        const total = cum[M - 1]; let seg = 0;
+        for (let i = 0; i < N; i++) {
+          const d = closed ? total * i / N : total * i / (N - 1);
+          while (seg < M - 2 && cum[seg + 1] < d) seg++;
+          const span = cum[seg + 1] - cum[seg], f = span > 1e-9 ? (d - cum[seg]) / span : 0, q = samples[i];
+          q.x = px[seg] + (px[seg + 1] - px[seg]) * f; q.z = pz[seg] + (pz[seg + 1] - pz[seg]) * f; q.y = py[seg] + (py[seg + 1] - py[seg]) * f; q.hw = pw[seg] + (pw[seg + 1] - pw[seg]) * f;
+        }
+      }
+    }
+  }
   // re-space samples evenly after smoothing
   {
     const pts2: THREE.Vector3[] = []; const wArr: number[] = [];
@@ -469,7 +517,11 @@ export function buildTrack(def: TrackDef): TrackData {
     const lims: number[] = [];
     for (let i = r.a; i <= r.b; i++) {
       let lim = 1e9; for (let k = -14; k <= 14; k += 2) { const q = samples[Math.max(0, Math.min(N - 1, i + k))]; lim = Math.min(lim, 1 / Math.max(1e-5, Math.abs(q.curv)) - q.hw); }
-      lims.push(lim < 0 ? 34 : Math.max(0, lim - 12));
+      // (2026-11-23: also where the radius is only a little larger than the half width – since the folds are rounded that is the
+      //  tightest bend a wide flat can have, half width = 0.85 × radius. With `lim − 12` the sheet ended AT the inner road edge there
+      //  and left a rock-lined pit of 10 m between the beacons and the centre of the bend. A plateau closes every gap of less than
+      //  30 m – a pit in the rock beside the road is never wanted; a lake keeps its bank inside the bend from 12 m on.)
+      lims.push(lim < (SURFACES[r.surf].id === 'plateau' ? 30 : 12) ? 34 : lim - 12);
     }
     for (let i = r.a; i <= r.b; i++) {
       let sum = 0, n = 0; for (let k = -6; k <= 6; k++) { const v = lims[i - r.a + k]; if (v !== undefined) { sum += v; n++; } }
