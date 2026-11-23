@@ -197,6 +197,6 @@ Zweig `dev`. Jeder Punkt ein eigener Commit; nach jedem Block gepusht.
 | 2 Verbesserungen | `c5e0b07` | Reset-Taste |
 | 2 Verbesserungen | `d950095` | Controller-Bedienung in allen Menüs |
 | nebenbei | `c3234a3` | Hauptmenü: Titel „PODRACER" vollständig |
-| 3 Strecken | (Commit „Intro-Flug") | Intro-Flug über die Strecke bis „Rennen starten" – lokal, wird mit Block 3 gepusht |
+| 3 Strecken | `ba3da24` | Intro-Flug über die Strecke bis „Rennen starten" – lokal, wird mit Block 3 gepusht |
 
-Block 1 wurde am 2026-11-23 gepusht (`ee20aa5..b4f1266`); der Lauf der GitHub-Action dafür war grün. Block 2 wurde am 2026-11-23 gepusht (`b4f1266..fc04fa3`, dazu der Commit mit diesem Satz). Der erste Versuch scheiterte: der Zugangstoken des Nutzers lag in der Sitzung nicht mehr vor (er wird nirgends gespeichert – Regel in `docs/regeln/git-sandbox.md`); der Nutzer hat ihn auf Nachfrage neu gegeben. Block 3 und 4 sind offen (`TODO.md` Abschnitt 9).
+Block 1 wurde am 2026-11-23 gepusht (`ee20aa5..b4f1266`); der Lauf der GitHub-Action dafür war grün. Block 2 wurde am 2026-11-23 gepusht (`b4f1266..55713c7`); der Lauf der GitHub-Action für `55713c7` war grün (`npm ci`, `npm run check`, beide Builds). Der erste Versuch scheiterte: der Zugangstoken des Nutzers lag in der Sitzung nicht mehr vor (er wird nirgends gespeichert – Regel in `docs/regeln/git-sandbox.md`); der Nutzer hat ihn auf Nachfrage neu gegeben. Block 3 und 4 sind offen (`TODO.md` Abschnitt 9).
