@@ -72,10 +72,11 @@ Jede Strecke wechselt zwischen mehreren Untergründen. Unter der Wetterzeile im 
 | Sand, Schnee, Waldboden, Geröll, Strand, Mondstaub, Kristallfeld | fast wie Fels: 2–8 % weniger Haftung, bis 4 % weniger Höchsttempo |
 | Eis, Eissee | 25 % weniger Haftung – früher einlenken, Slides tragen weiter |
 | Dünen (tiefer Sand), Pulverschnee, Schlamm, Sumpf, Aschefeld | 5–8 % weniger Höchsttempo, 6–10 % weniger Haftung |
-| Lavakruste, Lavasee | Triebwerke heizen 30 % bzw. 60 % schneller auf – Boost kürzer halten |
+| Lavakruste | Triebwerke heizen 30 % schneller auf – Boost kürzer halten |
+| Lavasee | Boost nur ganz kurz: ein kaltes Triebwerk ist nach 0,6–1 s am Hitzelimit, der Überlast-Boost hält 1 s statt 3 s, und über dem See kühlt fast nichts ab. Unter dem Pod leuchtet solange ein Plasma-Hitzeschild |
 | See (Aquilaris), Spiegelsee, Methansee | 4–5 % weniger Haftung; der Pod zieht Gischt. Methan heizt 15 % schneller auf |
 
-Kalte Untergründe (Schnee, Eis, Wasser) kühlen: die Triebwerke heizen dort 10 % langsamer auf. Haftung und Höchsttempo ändern sich nur am Boden – nicht in der Luft und nicht in den Zero-G-Röhren. Die HUD-Zeile nennt den Untergrund und einen Hinweis („wenig Haftung", „bremst", „rutschig", „Triebwerke heizen auf").
+Kalte Untergründe (Schnee, Eis, Wasser) kühlen: die Triebwerke heizen dort 10 % langsamer auf. Haftung und Höchsttempo ändern sich nur am Boden – nicht in der Luft und nicht in den Zero-G-Röhren. Die HUD-Zeile nennt den Untergrund und einen Hinweis („wenig Haftung", „bremst", „rutschig", „Triebwerke heizen auf", „Boost nur ganz kurz").
 
 **Pulverschnee merkt sich die Spuren:** Auf den Pulverschnee-Feldern von Ando Prime liegt eine echte Schneedecke. Jeder Pod pflügt mit seinen beiden Triebwerksbänken eine Doppelspur hinein, mit aufgeworfenen Rändern. Gespurter Schnee trägt besser: in frischem Pulver verliert man 7 % Höchsttempo, auf einer fest gefahrenen Spur nur noch 1,5 % (Haftung 95 % statt 90 %). Eine Überfahrt festigt die Spur etwa zur Hälfte, nach drei bis vier ist sie fest – über die Runden entsteht eine Ideallinie, die allen nützt. Bei Schneeböen schneit sie langsam wieder zu (eine feste Spur in rund zweieinhalb Minuten). In frischem Pulver fliegt hinter dem Pod eine dichte Schneefahne auf, auf der Spur kaum noch. Die HUD-Zeile zeigt „Pulverschnee · gespurt".
 

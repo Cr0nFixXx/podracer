@@ -54,11 +54,10 @@ Auftrag und Entscheidungen: [Protokoll](docs/verlauf/2026-11-23-nach-der-probefa
 
 **Fehler** – alle drei behoben (Protokoll), warten auf die Probefahrt des Nutzers
 
-**Verbesserungen** – erledigt (Protokoll): kein Fallschaden bei normaler Landung · Plasma-Hitzeschild über Lava
+**Verbesserungen** – erledigt (Protokoll): kein Fallschaden bei normaler Landung · Plasma-Hitzeschild über Lava · über Lava nur extrem kurzer Boost
 - [ ] Größere Schatten-Sichtweite (auf „Ultra" schiebt sich eine Schattenwand vor dem Pod her)
 - [ ] Wasserspritzer auf der Linse auch über Wasser/Pfützen ohne Regen
 - [ ] Boost-Alarm: langsam stärker werdender Ton kurz vor dem Maximum
-- [ ] Über Lava nur extrem kurzer Boost
 - [ ] Controller-Bedienung auch im Menü
 - [ ] Reset-Taste (Pod zurück auf die Strecke)
 

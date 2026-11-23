@@ -265,7 +265,10 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   // After 3 s the engines cut out (lock-out until they have cooled to 55 %). Releasing early cools down normally; the used time recovers below 90 %.
   if (p.heat >= 1) {
     p.heat = 1;
-    if (p.boosting && (p.overT ?? 0) < 3) { p.overT = (p.overT ?? 0) + dt; applyDamage(p, 'both', 3.2 * dt * P.sturdy, 'heat'); }
+    // 2026-11-23 (user: over lava only an extremely short boost): the overdrive burns faster over a very hot surface – over the lava
+    // lake (heat 4.5) three times as fast: one second instead of three, the same engine damage in a third of the time.
+    const od = Math.max(1, SF.heat / 1.5);
+    if (p.boosting && (p.overT ?? 0) < 3) { p.overT = (p.overT ?? 0) + dt * od; applyDamage(p, 'both', 3.2 * dt * od * P.sturdy, 'heat'); }
     if ((p.overT ?? 0) >= 3) { p.overheat = true; p.boosting = false; }
   } else if (!p.boosting && (p.overT ?? 0) > 0 && p.heat < 0.9) p.overT = Math.max(0, p.overT! - dt * 1.5);
   if (p.overheat && p.heat < 0.55) { p.overheat = false; p.overT = 0; }

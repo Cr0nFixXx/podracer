@@ -94,6 +94,14 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Erster Versuch war eine schwarze Scheibe: Muster auf `positionLocal` gebaut – bei instanzierten Netzen sind das schon Weltmeter. Regel dazu in `docs/regeln/grafik.md`.
 - Geprüft: Bilder auf Magma über dem Lavasee (Verfolgerkamera, Seite, von oben), `tsc`, WebGPU-Konsolenprüfung mit der neuen Option `VIEW=chase_3600 TRACKS=2` (0 Fehler).
 
+### Verbesserung – über Lava nur extrem kurzer Boost
+- Lavasee: Hitzefaktor 4,5 statt 1,6. Ein kaltes Triebwerk ist nach 0,6–1,0 s Boost am Limit (auf der Piste 2,6–4,5 s).
+- Der Überlast-Boost (Boost am Limit halten, kostet Triebwerk) läuft über dem See dreimal so schnell ab: 1 s statt 3 s, gleicher Schaden in einem Drittel der Zeit. Danach schalten die Triebwerke ab.
+- Über dem See kühlt fast nichts ab (22 % der normalen Kühlung). Wer heiß ankommt, hat dort keinen Boost.
+- Die Lavakruste bleibt bei +30 %. Gegner nutzen die Überlast nie – sie boosten über dem See nur kurz an.
+- HUD-Hinweis über dem See: „Boost nur ganz kurz". README-Tabelle angepasst.
+- Geprüft: zwei neue Unit-Prüfungen `lava:` (vorher rot: 2,1–2,3 s bis zum Limit, 3,8–4,0 s bis zur Abschaltung; jetzt ≤ 1,1 s und ≤ 2,3 s).
+
 ## Geprüft
 - Fehler 1: neue Prüfungen `bridges: …` (11, zuerst rot: Gelände 22,7 m über der Brücke, 309 Punkte; Wand 28 m hoch direkt neben der Brücke). Nur mit Regel (2) stand das Gelände noch 5,2 m über der Fahrbahn – Regel (1) ist nötig. `poke.ts` auf allen Strecken, Gitter 4,5 / 7 / 13,75 m, Brücken eingeschlossen: 0 Punkte (vorher 242 auf dem Methan-Derby). Bilder vorher/nachher an allen drei Stellen (WebGL2, Software).
 

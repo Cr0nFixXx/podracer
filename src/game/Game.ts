@@ -841,7 +841,7 @@ export class Game {
   /** HUD hint for the ground under the player */
   private surfaceHud(): { surface: string; surfaceFx: string } {
     const p = this.player, sf = surfaceOf(this.td.paths[p.path]?.samples[p.idx]?.surf);
-    const fx = sf.grip <= 0.8 ? 'wenig Haftung' : sf.heat >= 1.25 ? 'Triebwerke heizen auf' : sf.vmax <= 0.95 ? 'bremst' : sf.grip < 0.95 ? 'rutschig' : '';
+    const fx = sf.heat >= 3 ? 'Boost nur ganz kurz' : sf.grip <= 0.8 ? 'wenig Haftung' : sf.heat >= 1.25 ? 'Triebwerke heizen auf' : sf.vmax <= 0.95 ? 'bremst' : sf.grip < 0.95 ? 'rutschig' : '';
     if (sf.id === 'powder' && (p.snowPack ?? 0) > 0.45 && !p.zeroG) return { surface: 'Pulverschnee · gespurt', surfaceFx: 'trägt besser' };
     return { surface: p.zeroG ? 'Schwerelos' : sf.name, surfaceFx: p.zeroG ? '' : fx };
   }

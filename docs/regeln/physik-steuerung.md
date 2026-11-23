@@ -22,7 +22,8 @@ Part of the agent manual (`CLAUDE.md`). Read this before you change `physics.ts`
 
 ## Surfaces, slide, boost
 - **Handling per surface (`stepPod`):** `SF = surfaceOf(sample.surf)`; grip and top speed apply only when `grounded && !zeroG`, heat scales boost heat-up and cool-down. Rival reference speeds: `q.vmax *= 0.45 + 0.55 · grip`. World base grip lives in `Game.baseGrip` (ice 0.8, jungle 0.9). Retune → `npm run check` and `GRIP=0.88 npm run check`. HUD: `HudState.surface` / `surfaceFx`. *(S20 Strecken)*
-- **Boost overdrive:** `PodState.overT` (0..3 s) in the heat block of `stepPod`; HUD field `overdrive`. *(S17)*
+- **Boost overdrive:** `PodState.overT` (0..3 s) in the heat block of `stepPod`; HUD field `overdrive`. *(S17)* Over a very hot surface it burns faster: `overT` and the engine damage advance × `max(1, SurfaceDef.heat / 1.5)` – three times as fast over the lava lake. *(2026-11-23)*
+- **Lava lake = an extremely short boost (user, 2026-11-23).** `SURFACES` lavalake `heat` 4.5 (was 1.6): a cold engine reaches the limit in 0.6 … 1.0 s (deck: 2.6 … 4.5 s), the overdrive adds one second instead of three, and cooling over the lake runs at 22 %. The crust stays at 1.3. Rivals never use the overdrive (they stop at 60 … 90 % heat), so they only boost for a moment there. Unit checks `lava:` hold both numbers; the HUD line says „Boost nur ganz kurz" for any surface with `heat ≥ 3`.
 - **Slide strength** is `sk` (player) / `sk × 0.45` (AI). Retune grip (`0.035`), return rate (`1.4`), slip limiter (`0.88` rad) together and rerun `npm run check`. *(S15)*
 - **Slide** (`physics.ts`): state `slideK` 0..1; all slide effects scale with it (grip, yaw boost, decel, body lean). No hard on/off switches. *(S14)*
 - **Slide** = `airbraking && |steer| > 0.25 && grounded`. AI adds brake while sliding too fast; keep that when retuning grip (`0.24`). *(S10)*

@@ -1304,6 +1304,44 @@ for (const id of ['boonta', 'frost', 'magma', 'oovo']) test(`open sections: the 
   }
 });
 
+// ---- lava (2026-11-23, user: "bei Fahrten über Lava extrem kurze Boost-Möglichkeit") ----
+test('lava: over the lava lake a cold engine reaches its heat limit within about a second of boost – every pod', () => {
+  const lake = SURFACES[SURF.lavalake].heat, bad: string[] = [];
+  for (const def of PODS) {
+    const P = podParams(pod({ def, stats: effectiveStats(def.id, undefined) })), deck = 1 / P.heatRate, over = 1 / (P.heatRate * lake);
+    if (!(over >= 0.45 && over <= 1.1)) bad.push(`${def.id}: ${over.toFixed(2)} s over the lake (deck ${deck.toFixed(1)} s)`);
+    if (!(over < deck / 4)) bad.push(`${def.id}: the lake should cut the boost to under a quarter (${over.toFixed(2)} s against ${deck.toFixed(1)} s)`);
+  }
+  eq(bad.length, 0, `${bad.slice(0, 4).join(' · ')} –`);
+});
+
+/** Boost held from a cold engine on a treadmill at one sample: [seconds to the heat limit, seconds until the engines cut out]. */
+function boostWindow(def: PodDef, trackId: string, idx: number): [number, number] {
+  const td = trackOf(trackId), s = td.main.samples[idx], p = racer(def, td, idx, 0, s.y + HOVER);
+  p.invuln = 0; p.heat = 0; p.input.throttle = 1; p.input.boost = true;
+  let clean = -1, cut = -1;
+  for (let f = 0; f < 60 * 14 && cut < 0; f++) {
+    p.pos.set(s.x, s.y + HOVER, s.z); p.vel.set(s.tx * 120, 0, s.tz * 120); p.yaw = Math.atan2(s.tx, s.tz); p.idx = idx; p.lat = 0; p.hpL = p.hpR = 100;
+    stepPod(p, td, 1 / 60, f / 60, 1, false);
+    if (clean < 0 && p.heat >= 1) clean = (f + 1) / 60;
+    if (p.overheat) cut = (f + 1) / 60;
+  }
+  return [clean, cut];
+}
+test('lava: held boost over the lava lake ends after about two seconds (clean second + overdrive), on the deck it lasts three times as long', () => {
+  const magma = trackOf('magma').main.samples, lake = magma.findIndex((q, k) => k > 40 && q.surf === SURF.lavalake && magma[k + 40]?.surf === SURF.lavalake);
+  const deck = magma.findIndex((q, k) => k > 40 && q.surf === 0 && !q.roof && !q.gap && !q.ramp);
+  ok(lake > 0 && deck > 0, `magma has a lava lake and a stretch of plain deck (${lake}, ${deck})`);
+  const bad: string[] = [];
+  for (const id of ['aurora', 'brute', 'volt', 'manta']) {
+    const [c1, t1] = boostWindow(byId(id), 'magma', lake), [c0, t0] = boostWindow(byId(id), 'magma', deck);
+    if (!(c1 > 0 && c1 <= 1.15)) bad.push(`${id}: heat limit over the lake after ${c1.toFixed(2)} s`);
+    if (!(t1 > 0 && t1 <= 2.3)) bad.push(`${id}: engines cut out over the lake after ${t1.toFixed(2)} s`);
+    if (!(t0 >= t1 * 2.5)) bad.push(`${id}: deck ${t0.toFixed(2)} s (limit after ${c0.toFixed(2)} s) against lake ${t1.toFixed(2)} s`);
+  }
+  eq(bad.length, 0, `${bad.join(' · ')} –`);
+});
+
 // ---- landing (2026-11-23, user: "kein Fallschaden bei sanfter/normaler Landung") ----
 /** An Aurora comes down on a straight, level stretch of the Boonta deck at `vy` m/s (100 m/s forward): hull points lost, 'land' events. */
 function landing(vy: number): [number, number] {

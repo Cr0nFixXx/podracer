@@ -45,7 +45,9 @@ export const SURFACES: SurfaceDef[] = [
   // --- volcano world ---
   S({ id: 'basalt', name: 'Basalt', grip: 1, vmax: 1, heat: 1.1, wake: 'dust', tex: { set: 'rock', kind: 'basalt', tile: 12, pal: ['#16110f', '#2c221e', '#463830'], normal: 1.3 } }),
   S({ id: 'crust', name: 'Lavakruste', grip: 0.97, vmax: 1, heat: 1.3, wake: 'embers', tex: { set: 'lava', kind: 'basalt', tile: 16, pal: ['#0c0807', '#1c1310', '#30221c'], emissive: '#ff5a14', normal: 1.2 } }),
-  S({ id: 'lavalake', name: 'Lavasee', grip: 0.95, vmax: 1, heat: 1.6, flat: true, liquid: 'lava', wake: 'embers' }),
+  // (2026-11-23, user request: over lava only an extremely short boost – heat 4.5: a cold engine reaches its limit in 0.6 … 1.0 s
+  //  instead of 2.6 … 4.5 s, and it hardly cools while the pod is over the lake)
+  S({ id: 'lavalake', name: 'Lavasee', grip: 0.95, vmax: 1, heat: 4.5, flat: true, liquid: 'lava', wake: 'embers' }),
   S({ id: 'ash', name: 'Aschefeld', grip: 0.94, vmax: 0.95, heat: 1.1, wake: 'dust', wakeColor: '#4a4440', tex: { set: 'ash', kind: 'basalt', tile: 10, pal: ['#1c1816', '#34302c', '#4e4842'] } }),
   // --- jungle moon / Malastare ---
   S({ id: 'soil', name: 'Waldboden', grip: 0.98, vmax: 1, heat: 1, wake: 'dust', tex: { set: 'soil', kind: 'jungle', tile: 7, pal: ['#3a3220', '#5a4c30', '#7c6a44'] } }),
