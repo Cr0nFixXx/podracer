@@ -189,4 +189,4 @@ Zweig `dev`. Jeder Punkt ein eigener Commit; nach jedem Block gepusht.
 | 2 Verbesserungen | `d950095` | Controller-Bedienung in allen Menüs |
 | nebenbei | `c3234a3` | Hauptmenü: Titel „PODRACER" vollständig |
 
-Block 1 wurde am 2026-11-23 gepusht (`ee20aa5..b4f1266`); der Lauf der GitHub-Action dafür war grün. **Block 2 liegt nur lokal** (`36d7873` … bis zum Commit mit dieser Tabelle): der Push am Ende von Block 2 scheiterte, weil der Zugangstoken des Nutzers in der Sitzung nicht mehr vorlag (er wird nirgends gespeichert – Regel in `docs/regeln/git-sandbox.md`). Sobald der Nutzer ihn wieder gibt: `git push origin dev`, danach den Lauf unter „Actions" ansehen. Block 3 und 4 sind offen (`TODO.md` Abschnitt 9).
+Block 1 wurde am 2026-11-23 gepusht (`ee20aa5..b4f1266`); der Lauf der GitHub-Action dafür war grün. Block 2 wurde am 2026-11-23 gepusht (`b4f1266..fc04fa3`, dazu der Commit mit diesem Satz). Der erste Versuch scheiterte: der Zugangstoken des Nutzers lag in der Sitzung nicht mehr vor (er wird nirgends gespeichert – Regel in `docs/regeln/git-sandbox.md`); der Nutzer hat ihn auf Nachfrage neu gegeben. Block 3 und 4 sind offen (`TODO.md` Abschnitt 9).
