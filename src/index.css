@@ -13,6 +13,15 @@ body { font-family: var(--font-sans); }
 @keyframes kenburns { from { transform: scale(1.1) translate(0, 0); } to { transform: scale(1.22) translate(-2%, -1%); } }
 @keyframes pop { 0% { transform: scale(1.8); opacity: 0; } 30% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.95); opacity: 0.9; } }
 
+/* Gamepad in the menus (ui/usePadNav.tsx): while the pad is in use the body carries .pad-nav – the focused control gets a cyan ring
+   and a line at the bottom of the window names the buttons. Both go when the mouse moves. */
+/* (the ring is drawn INSIDE the control: the buttons are cut with clip-path, which would swallow an outline around them) */
+body.pad-nav :focus { outline: 2px solid #67e8f9 !important; outline-offset: -2px; box-shadow: inset 0 0 0 2px #67e8f9, inset 0 0 14px rgba(103, 232, 249, 0.65) !important; filter: brightness(1.3); }
+.pad-legend { display: none; position: fixed; left: 50%; bottom: 0.5vh; transform: translateX(-50%); z-index: 60; pointer-events: none; white-space: nowrap;
+  font-size: clamp(10px, 1.7vh, 30px); letter-spacing: 0.1em; color: #cffafe; background: rgba(0, 0, 0, 0.78); border: 1px solid rgba(103, 232, 249, 0.4); padding: 0.25vh 1.4vh; }
+.pad-legend b { color: #67e8f9; font-weight: 700; }
+body.pad-nav .pad-legend { display: block; }
+
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-thumb { background: #78350f; }
 ::-webkit-scrollbar-track { background: #0c0a09; }

@@ -103,7 +103,7 @@ export class Game {
   tmpQ = new THREE.Quaternion(); tmpQ2 = new THREE.Quaternion(); tmpC = new THREE.Color(); dustCol = new THREE.Color(); barrierGlow = new THREE.Color();
   lifeAudio: LifeAudio = { bird: 0, herd: 0, crawler: 0 };
   worldAudio: WorldAudioState = { themeId: 'desert', geyser: 0, rotor: 0, rotorHz: 2, crawler: 0, bird: 0, herd: 0 };
-  prevCamBtn = false; prevResetBtn = false;
+  prevCamBtn = false; prevResetBtn = false; prevStartBtn = false;
   /** seconds the player has been standing or flying the wrong way (the HUD then names the reset key once) */ private stuckT = 0; private stuckShown = false;
 
   constructor(container: HTMLDivElement, profile: Profile, cb: Callbacks) {
@@ -336,7 +336,7 @@ export class Game {
   setPaused(p: boolean) {
     if (this.state === 'loading' || this.state === 'post' && this.finishShown) return;
     this.paused = p; this.cb.onPause(p);
-    if (p) this.audio?.suspend(); else { this.audio?.resume(); this.lastT = performance.now(); }
+    if (p) this.audio?.suspend(); else { this.audio?.resume(); this.lastT = performance.now(); this.prevStartBtn = true; this.prevResetBtn = true; this.prevCamBtn = true; } // (a button held while resuming is not a new press)
   }
 
   resize() {
@@ -372,7 +372,8 @@ export class Game {
       const pt = pv('pitchUp') - pv('pitchDown'); if (Math.abs(pt) > 0.02) pitch = pt;
       const cam = pv('view') > 0.5; if (cam && !this.prevCamBtn) this.cycleCamera(); this.prevCamBtn = cam;
       const rs = pv('reset') > 0.5; if (rs && !this.prevResetBtn) this.resetPlayer(); this.prevResetBtn = rs;
-      if (gp.buttons[9]?.pressed && !this.paused) this.setPaused(true);
+      // Start pauses on the press, not while held: the menu's own Start = „Weiter" would otherwise pause again at once (usePadNav.tsx)
+      { const st = !!gp.buttons[9]?.pressed; if (st && !this.prevStartBtn && !this.paused) this.setPaused(true); this.prevStartBtn = st; }
       break;
     }
     inp.steer = steer; inp.throttle = throttle; inp.brake = brake; inp.boost = boost; inp.airbrake = airbrake; inp.repair = repair; inp.pitch = pitch; inp.roll = roll;

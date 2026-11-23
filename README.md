@@ -32,6 +32,8 @@ npm run build:web  # erzeugt den Ordner build/ für einen Webserver (mehrere Dat
 | Zurück auf die Strecke (Reset) | `⌫` Rücktaste | Back / Select |
 | Pause | `Esc` / `P` | Start |
 
+**Gamepad im Menü:** Alle Menüs lassen sich mit dem Gamepad bedienen – auch Pause und Ergebnis. Steuerkreuz oder linker Stick bewegen die Markierung (türkiser Rahmen), **A** wählt aus, **B** geht zurück, **Start** startet das Rennen bzw. setzt es fort. Auf Schiebereglern und Auswahllisten ändern links / rechts den Wert; **LB / RB** springen von dort zur Nachbarspalte. Unten im Fenster steht die Tastenhilfe, solange das Gamepad benutzt wird; bewegt man die Maus, verschwindet sie.
+
 Rückwärts (Umkehrschub halten, bis der Pod zurücksetzt) lenkt der Pod wie ein Auto im Rückwärtsgang: das Heck schwenkt zur gelenkten Seite.
 
 **Reset:** Festgefahren, verirrt oder falsch herum? Die Reset-Taste setzt den Pod nach 0,8 Sekunden an die letzte sichere Stelle zurück – mittig, in Fahrtrichtung, mit 35 m/s und gut zwei Sekunden Schutz. Repariert wird dabei nichts: Triebwerkszustand, verlorene Teile und Hitze bleiben. Danach ruht die Taste drei Sekunden. Wer drei Sekunden steht oder falsch herum fliegt, bekommt die Taste eingeblendet.

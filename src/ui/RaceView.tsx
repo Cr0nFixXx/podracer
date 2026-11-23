@@ -6,6 +6,7 @@ import type { Profile } from '../game/settings';
 import { Btn } from './common';
 import { Fit } from './Fit';
 import { GfxPanels } from './GfxPanels';
+import { PadLegend } from './usePadNav';
 import { Background } from './screens';
 
 interface Props { profile: Profile; update: (fn: (p: Profile) => Profile) => void; onExit: () => void; onBest: (trackId: string, t: number) => void; }
@@ -189,18 +190,19 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
             <div className="w-96 h-2 bg-white/10 overflow-hidden mx-auto"><div className="h-full bg-gradient-to-r from-amber-600 to-amber-300 transition-all" style={{ width: `${loading.p * 100}%` }} /></div>
             <div className="mt-3 text-stone-300 text-sm tracking-widest">{loading.msg}</div>
             <div className="mt-10 text-stone-400 text-xs max-w-md mx-auto leading-relaxed">Tipp: Boost erhitzt die Triebwerke. Lass rechtzeitig los, bevor sie Feuer fangen – {kl('airbrake')} = Luftbremse, mit Lenken ein Slide durch Haarnadeln. {kl('pitchUp')} anheben (weiter springen), {kl('pitchDown')} neigen (schneller landen), {kl('rollLeft')} / {kl('rollRight')} 90°-Rolle durch enge Lücken.</div>
-            {error && <div className="mt-6 text-red-400 text-sm max-w-lg">Fehler: {error}<div className="mt-3"><Btn onClick={onExit}>Zurück</Btn></div></div>}
+            {error && <div className="mt-6 text-red-400 text-sm max-w-lg">Fehler: {error}<div className="mt-3"><Btn pad="default back" onClick={onExit}>Zurück</Btn></div></div>}
           </div>
         </div>
       )}
 
       {paused && !results && (
         <div className="absolute inset-0 z-30 bg-black/70 backdrop-blur-sm">
+          <PadLegend />
           <Fit>
             {!showGfx ? (
               <div className="flex flex-col gap-3 w-72 text-center m-auto py-10">
                 <div className="font-display text-4xl text-amber-200 tracking-[0.4em] mb-6">PAUSE</div>
-                <Btn big onClick={() => gameRef.current?.setPaused(false)}>Weiter</Btn>
+                <Btn big pad="default back start" onClick={() => gameRef.current?.setPaused(false)}>Weiter</Btn>
                 <Btn big onClick={() => { gameRef.current?.cycleCamera(); }}>Kamera wechseln</Btn>
                 <Btn big onClick={() => setShowGfx(true)}>Grafik-Einstellungen</Btn>
                 <Btn big onClick={restart}>Neustart</Btn>
@@ -213,7 +215,7 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
                   <h2 className="font-display text-2xl text-amber-200 tracking-[0.3em]">GRAFIK</h2>
                   <div className="text-[11px] text-stone-300 flex-1">Sofort wirksam: alle Effekte, Schatten, Kantenglättung, Textur-Filter, Volumetrie, Partikel, Sichtweite, LOD, Render-Skalierung, Sichtfeld, Lautstärke. Neustart nötig: Texturauflösung, Geometrie/Detaildichte, Tessellation, Material-Optionen, Spiegelungen (SSR), Kaskaden-Schatten, Renderer.</div>
                   {needRestart && <Btn onClick={restart}>↻ Übernehmen &amp; neu starten</Btn>}
-                  <Btn onClick={() => setShowGfx(false)}>‹ Zurück</Btn>
+                  <Btn pad="back" onClick={() => setShowGfx(false)}>‹ Zurück</Btn>
                 </div>
                 <div className="grid grid-cols-3 gap-4 content-start"><GfxPanels profile={profile} update={update} /></div>
               </div>
@@ -224,6 +226,7 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
 
       {results && (
         <div className="absolute inset-0 z-30 bg-black/70 backdrop-blur-md">
+          <PadLegend />
           <Fit><div className="w-full max-w-3xl m-auto p-6">
             <div className="font-display text-amber-400/80 tracking-[0.5em] text-xs text-center">{track.name.toUpperCase()}</div>
             <div className="font-display text-5xl text-center text-amber-200 tracking-[0.3em] mb-8">ERGEBNIS</div>
@@ -239,7 +242,7 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
               ))}
             </div>
             <div className="flex gap-3 justify-center mt-8">
-              <Btn big onClick={restart}>Nochmal</Btn>
+              <Btn big pad="default" onClick={restart}>Nochmal</Btn>
               <Btn big onClick={onExit}>Hauptmenü</Btn>
             </div>
           </div></Fit>

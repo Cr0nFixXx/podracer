@@ -61,7 +61,9 @@ export function PadBindings({ profile, update }: { profile: Profile; update: Upd
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    // while a button is being bound the menu navigation must not act on the same press (usePadNav.tsx)
+    if (listen) document.body.dataset.padCapture = '1'; else delete document.body.dataset.padCapture;
+    return () => { cancelAnimationFrame(raf); delete document.body.dataset.padCapture; };
   });
   return (
     <div className="mt-4">

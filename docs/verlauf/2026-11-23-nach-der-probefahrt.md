@@ -137,6 +137,17 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Der Steuerungs-Bildschirm hat jetzt 13 Aktionen (vier Reihen); die Reihen stehen etwas enger, damit er weiter auf 720 px passt.
 - Geprüft: vier Unit-Prüfungen `reset:` (zuerst rot; fünf Strecken), im Browser mit echtem Tastendruck (Pod 80 m neben der Strecke, rückwärts → nach 1 s mittig auf der Piste, Schaden unverändert; zweiter Druck und Druck in der Pause wirkungslos; Hinweis nach 3 s Stillstand), Steuerungs-Bildschirm bei 1280 × 720 und 1024 × 600.
 
+### Verbesserung – Controller-Bedienung auch im Menü
+- Alle Menüs lassen sich jetzt mit dem Gamepad bedienen: Hauptmenü, Rennen, Hangar, Einstellungen (beide Reiter), Pause, Grafik in der Pause, Ergebnis.
+- Steuerkreuz oder linker Stick bewegen die Markierung (türkiser Rahmen). **A** wählt aus, **B** geht zurück, **Start** startet das Rennen bzw. setzt es fort.
+- Auf Schiebereglern und Auswahllisten ändern links / rechts den Wert; **LB / RB** springen von dort zur Nachbarspalte.
+- Unten im Fenster steht eine Tastenhilfe, solange das Gamepad benutzt wird. Bewegt man die Maus, verschwinden Rahmen und Hilfe.
+- Im Rennen pausiert Start jetzt beim Drücken, nicht mehr beim Halten – sonst hätte „Weiter" per Start sofort wieder pausiert.
+- Die Menü-Tasten sind fest (A, B, Start, LB, RB, Steuerkreuz, linker Stick) und unabhängig von der frei belegbaren Fahr-Steuerung.
+- Technik: ein Baustein für alle Bildschirme (`src/ui/usePadNav.tsx`, reine Logik in `src/ui/padNav.ts`); neue Bildschirme brauchen keinen eigenen Code. Regeln in `docs/regeln/ui.md`.
+- Geprüft: sieben Unit-Prüfungen `padnav:` (zuerst rot) und ein Durchlauf der echten App mit einem nachgebildeten Gamepad (`tools/harness/ppad.mjs`): jedes Bedienelement jedes Bildschirms ist erreichbar (Hangar: 89), Auswahl, Zurück, Regler, Listen, Tastenbelegung, Pause und Fortsetzen ohne Prellen, Reset-Knopf, Ergebnis.
+- **Nicht geprüft: ein echtes Gamepad.** Der Test bildet das Standard-Layout nach (Xbox-Art). Bei Gamepads, die der Browser nicht als „Standard" meldet, zählt das Steuerkreuz nicht – der linke Stick geht immer.
+
 ## Geprüft
 - Fehler 1: neue Prüfungen `bridges: …` (11, zuerst rot: Gelände 22,7 m über der Brücke, 309 Punkte; Wand 28 m hoch direkt neben der Brücke). Nur mit Regel (2) stand das Gelände noch 5,2 m über der Fahrbahn – Regel (1) ist nötig. `poke.ts` auf allen Strecken, Gitter 4,5 / 7 / 13,75 m, Brücken eingeschlossen: 0 Punkte (vorher 242 auf dem Methan-Derby). Bilder vorher/nachher an allen drei Stellen (WebGL2, Software).
 

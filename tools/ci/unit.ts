@@ -23,6 +23,7 @@ import { DAMAGE_RULES, damageModel, lostMessage, partLamps, partsFx, zoneFactor,
 import { buildTrack, frameAt, tunnelCeiling, baySameStretch, DS, TUNNEL_SHOULDER, type Path, type Sample, type TrackData } from '../../src/game/trackBuilder';
 import { defaultProfile, effectiveStats, loadProfile, saveProfile, CAMERA_NAMES, MAX_LAPS, PRESETS, type GfxSettings } from '../../src/game/settings';
 import { ALARM_FROM, boostAlarmLevel, boostAlarmVoice } from '../../src/game/audio';
+import { PadRepeater, nextFocus, readPadNav, stepRange, type NavRect, type PadSnapshot } from '../../src/ui/padNav';
 import * as GPU3 from 'three/webgpu';
 import { setupSunShadow, CSM_FAR, CSM_SPLIT, SH_BACK, SH_BOX } from '../../src/game/sunShadow';
 
@@ -1306,6 +1307,64 @@ for (const id of ['boonta', 'frost', 'magma', 'oovo']) test(`open sections: the 
     ok(n > 100, `${id}: only ${n} samples with a bay`);
     ok(worst < 0.3, `${cell} m cells: terrain ${worst.toFixed(2)} m above the road at ${where}`);
   }
+});
+
+// ---- gamepad in the menus (2026-11-23, user: „Controller-Support auch im Menü") ----
+const R = (x: number, y: number, w: number, h: number): NavRect => ({ x, y, w, h });
+const NONE: PadSnapshot = { up: false, down: false, left: false, right: false, a: false, b: false, lb: false, rb: false, start: false };
+const fakePad = (o: { btn?: number[]; axes?: number[]; mapping?: string }) => ({ buttons: Array.from({ length: 17 }, (_, i) => ({ pressed: !!o.btn?.includes(i), value: o.btn?.includes(i) ? 1 : 0 })), axes: o.axes ?? [0, 0, 0, 0], mapping: o.mapping ?? 'standard' });
+test('padnav: a column of buttons – down and up step through it, the ends stay put, there is no way sideways', () => {
+  const col = [R(100, 100, 200, 40), R(100, 150, 200, 40), R(100, 200, 200, 40)];
+  eq(nextFocus(col, 0, 'down'), 1, 'down from the first –'); eq(nextFocus(col, 1, 'down'), 2, 'down from the second –'); eq(nextFocus(col, 2, 'down'), -1, 'down from the last –');
+  eq(nextFocus(col, 2, 'up'), 1, 'up from the last –'); eq(nextFocus(col, 0, 'up'), -1, 'up from the first –');
+  eq(nextFocus(col, 1, 'left'), -1, 'left –'); eq(nextFocus(col, 1, 'right'), -1, 'right –');
+});
+test('padnav: a grid – every direction goes to the neighbour, not diagonally', () => {
+  const g = [R(0, 0, 90, 30), R(100, 0, 90, 30), R(200, 0, 90, 30), R(0, 40, 90, 30), R(100, 40, 90, 30), R(200, 40, 90, 30)];
+  eq(nextFocus(g, 0, 'right'), 1, 'right from 0 –'); eq(nextFocus(g, 1, 'right'), 2, 'right from 1 –'); eq(nextFocus(g, 4, 'left'), 3, 'left from 4 –');
+  eq(nextFocus(g, 1, 'down'), 4, 'down from 1 –'); eq(nextFocus(g, 5, 'up'), 2, 'up from 5 –'); eq(nextFocus(g, 2, 'right'), -1, 'right from the last column –');
+});
+test('padnav: across an empty middle – from a list on the left to the control at the same height on the right, not to the nearest corner', () => {
+  // a list of five rows on the left, a tall empty preview in the middle, four controls on the right, a "back" button top right
+  const list = [0, 1, 2, 3, 4].map(i => R(20, 100 + i * 60, 220, 50)), right = [R(900, 110, 300, 30), R(900, 230, 300, 30), R(900, 350, 300, 30), R(900, 500, 300, 60)], back = R(1100, 20, 120, 36);
+  const all = [...list, ...right, back];
+  eq(nextFocus(all, 0, 'right'), 5, 'right from row 1 –'); eq(nextFocus(all, 2, 'right'), 6, 'right from row 3 –'); eq(nextFocus(all, 4, 'right'), 7, 'right from row 5 –');
+  eq(nextFocus(all, 8, 'left'), 4, 'left from the big button at the bottom –'); eq(nextFocus(all, 5, 'left'), 0, 'left from the first control –');
+  eq(nextFocus(all, 9, 'down'), 5, 'down from "back" –'); eq(nextFocus(all, 5, 'up'), 9, 'up from the first control –');
+});
+test('padnav: a small button beside a wide one, rows of different widths – the nearest in the direction wins, a covered element is skipped', () => {
+  const rows = [R(0, 0, 400, 30), R(0, 40, 120, 30), R(130, 40, 120, 30), R(260, 40, 140, 30), R(0, 80, 400, 30)];
+  eq(nextFocus(rows, 0, 'down'), 1, 'down from the wide row lands on the first below –'); eq(nextFocus(rows, 3, 'down'), 4, 'down from the right cell –'); eq(nextFocus(rows, 4, 'up'), 1, 'up from the wide row –');
+  eq(nextFocus(rows, 2, 'up'), 0, 'up from the middle cell –');
+  const nested = [R(0, 0, 100, 100), R(10, 10, 30, 30), R(200, 0, 100, 100)];
+  eq(nextFocus(nested, 0, 'right'), 2, 'an element inside the current one is not "to the right" –');
+});
+test('padnav: reading the pad – stick beyond 55 % counts, the stronger axis wins, it lets go below 35 %; the D-pad only in the standard layout', () => {
+  ok(readPadNav(fakePad({ axes: [0.7, 0.1, 0, 0] })).right, 'stick right'); ok(!readPadNav(fakePad({ axes: [0.5, 0, 0, 0] })).right, 'stick at 50 % counts');
+  const diag = readPadNav(fakePad({ axes: [0.7, -0.9, 0, 0] })); ok(diag.up && !diag.right, `diagonal: ${JSON.stringify(diag)}`);
+  const held = readPadNav(fakePad({ axes: [0.45, 0, 0, 0] }), { ...NONE, right: true }); ok(held.right, 'held stick let go at 45 %');
+  ok(!readPadNav(fakePad({ axes: [0.3, 0, 0, 0] }), { ...NONE, right: true }).right, 'held stick still counts at 30 %');
+  const d = readPadNav(fakePad({ btn: [13, 0, 9] })); ok(d.down && d.a && d.start && !d.up && !d.b, `D-pad down + A + Start: ${JSON.stringify(d)}`);
+  ok(!readPadNav(fakePad({ btn: [13], mapping: '' })).down, 'button 13 of an unknown layout counts as D-pad');
+  const sh = readPadNav(fakePad({ btn: [4, 5, 1] })); ok(sh.lb && sh.rb && sh.b, `LB RB B: ${JSON.stringify(sh)}`);
+});
+test('padnav: one press = one step; a held direction repeats after a pause; nothing counts until the pad has been let go once', () => {
+  const rep = new PadRepeater();
+  // the button that opened this menu is still held: it must not act
+  eq(rep.step({ ...NONE, start: true }, 0).length, 0, 'Start still held from before –'); eq(rep.step({ ...NONE, start: true }, 100).length, 0, 'Start still held –');
+  eq(rep.step(NONE, 200).length, 0, 'released –');
+  eq(rep.step({ ...NONE, start: true }, 300).join(), 'start', 'a fresh press of Start –'); eq(rep.step({ ...NONE, start: true }, 400).length, 0, 'Start held does not repeat –');
+  rep.step(NONE, 500);
+  eq(rep.step({ ...NONE, down: true }, 1000).join(), 'down', 'first step –');
+  eq(rep.step({ ...NONE, down: true }, 1200).length, 0, 'no repeat after 200 ms –');
+  let n = 0; for (let t = 1216; t <= 2000; t += 16) n += rep.step({ ...NONE, down: true }, t).length;
+  ok(n >= 3 && n <= 7, `${n} repeats in the first second of holding`);
+  rep.step(NONE, 2100); eq(rep.step({ ...NONE, a: true }, 2200).join(), 'a', 'A –'); eq(rep.step({ ...NONE, a: true, down: true }, 2300).join(), 'down', 'a direction while A is held –');
+  rep.reset(); eq(rep.step({ ...NONE, a: true }, 2400).length, 0, 'after reset() a held button does not count –');
+});
+test('padnav: slider steps – one step per press, clamped to the range, no rounding dust', () => {
+  eq(stepRange(3, 1, 9, 1, 1), 4, '3 + 1 –'); eq(stepRange(9, 1, 9, 1, 1), 9, 'at the top –'); eq(stepRange(1, 1, 9, 1, -1), 1, 'at the bottom –');
+  eq(stepRange(0.3, 0, 1, 0.1, 1), 0.4, '0.3 + 0.1 –'); eq(stepRange(0.7, 0.5, 1.5, 0.05, -1), 0.65, '0.7 − 0.05 –'); eq(stepRange(100, 0, 100, 5, -1), 95, '100 − 5 –');
 });
 
 // ---- reset key (2026-11-23, user: „Reset-Taste (Pod neu auf die Strecke zurücksetzen)") ----

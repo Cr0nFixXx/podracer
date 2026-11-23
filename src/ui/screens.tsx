@@ -48,7 +48,7 @@ export function MainMenu({ profile, go }: { profile: Profile; go: (s: string) =>
         <h1 className="font-display text-6xl @3xl:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-orange-600 leading-none drop-shadow-[0_0_40px_rgba(251,146,60,0.35)]">PODRACER</h1>
         <div className="font-display text-xl @3xl:text-2xl text-amber-100/90 tracking-[0.4em] mt-2 mb-12">HYPERSPEED LEGENDS</div>
         <div className="flex flex-col gap-3 w-72">
-          <Btn big onClick={() => go('setup')}>Rennen starten</Btn>
+          <Btn big pad="default start" onClick={() => go('setup')}>Rennen starten</Btn>
           <Btn big onClick={() => go('garage')}>Hangar & Tuning</Btn>
           <Btn big onClick={() => go('settings')}>Einstellungen</Btn>
         </div>
@@ -117,7 +117,7 @@ export function RaceSetup({ profile, update, go, start }: { profile: Profile; up
       <div className="relative z-10 flex-1 flex flex-col min-h-0 w-full p-6 max-w-[1720px] mx-auto">
         <div className="flex items-center justify-between mb-4 shrink-0">
           <h2 className="font-display text-3xl text-amber-200 tracking-[0.3em]">RENNEN</h2>
-          <Btn onClick={() => go('menu')}>‹ Zurück</Btn>
+          <Btn pad="back" onClick={() => go('menu')}>‹ Zurück</Btn>
         </div>
         <div className="grid grid-cols-[330px_1fr_330px] gap-4 flex-1 min-h-0">
           <Panel title="Strecken">
@@ -187,7 +187,7 @@ export function RaceSetup({ profile, update, go, start }: { profile: Profile; up
               <div className="font-display text-amber-200 text-lg">{PODS.find(p => p.id === profile.podId)!.name}</div>
               <button onClick={() => go('garage')} className="text-xs text-cyan-300 hover:underline">Pod wechseln / tunen ›</button>
             </div>
-            <Btn big className="w-full" onClick={start}>▶ Start</Btn>
+            <Btn big pad="default start" className="w-full" onClick={start}>▶ Start</Btn>
           </Panel>
         </div>
       </div>
@@ -219,14 +219,14 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
       <div className="relative z-10 flex-1 flex flex-col min-h-0 w-full p-6 max-w-[1720px] mx-auto">
         <div className="flex items-center justify-between mb-4 shrink-0">
           <h2 className="font-display text-3xl text-amber-200 tracking-[0.3em]">HANGAR</h2>
-          <div className="flex gap-2"><Btn active={profile.podId === sel} onClick={() => update(p => ({ ...p, podId: sel }))}>{profile.podId === sel ? '✓ Ausgewählt' : 'Diesen Pod fahren'}</Btn><Btn onClick={() => go('menu')}>‹ Zurück</Btn></div>
+          <div className="flex gap-2"><Btn active={profile.podId === sel} onClick={() => update(p => ({ ...p, podId: sel }))}>{profile.podId === sel ? '✓ Ausgewählt' : 'Diesen Pod fahren'}</Btn><Btn pad="back" onClick={() => go('menu')}>‹ Zurück</Btn></div>
         </div>
         <div className="grid grid-cols-[230px_1fr_320px] gap-4 flex-1 min-h-0">
           <Panel title="Racer">
             {/* one line per racer: 14 rows fit the panel without scrolling (pod name left, pilot right) */}
             <div className="flex flex-col gap-1">
               {PODS.map(p => (
-                <button key={p.id} onClick={() => setSel(p.id)} className={`text-left px-2.5 py-[5px] border transition flex items-center gap-2 ${p.id === sel ? 'border-amber-300 bg-amber-400/15' : 'border-stone-800 bg-black/30 hover:border-amber-500/50'}`}>
+                <button key={p.id} onClick={() => setSel(p.id)} data-pad-default={p.id === sel ? '' : undefined} className={`text-left px-2.5 py-[5px] border transition flex items-center gap-2 ${p.id === sel ? 'border-amber-300 bg-amber-400/15' : 'border-stone-800 bg-black/30 hover:border-amber-500/50'}`}>
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: profile.custom[p.id].colors[0], boxShadow: `0 0 8px ${p.colors[2]}` }} />
                   <span className="font-display text-[13px] leading-4 text-amber-100 whitespace-nowrap">{p.name}</span>
                   <span className="flex-1 text-right text-[9px] leading-4 text-stone-400 whitespace-nowrap overflow-hidden text-ellipsis">{PILOTS.find(x => x.id === p.pilotId)!.name.split(' ')[0]}</span>
@@ -355,7 +355,7 @@ export function SettingsScreen({ profile, update, go }: { profile: Profile; upda
       <div className="relative z-10 flex-1 flex flex-col min-h-0 w-full p-6 max-w-[1720px] mx-auto">
         <div className="flex items-center justify-between mb-4 shrink-0">
           <h2 className="font-display text-3xl text-amber-200 tracking-[0.3em]">EINSTELLUNGEN</h2>
-          <div className="flex gap-2"><Btn active={tab === 'gfx'} onClick={() => setTab('gfx')}>Grafik &amp; Ton</Btn><Btn active={tab === 'keys'} onClick={() => setTab('keys')}>Steuerung</Btn><Btn onClick={() => go('menu')}>‹ Zurück</Btn></div>
+          <div className="flex gap-2"><Btn active={tab === 'gfx'} onClick={() => setTab('gfx')}>Grafik &amp; Ton</Btn><Btn active={tab === 'keys'} onClick={() => setTab('keys')}>Steuerung</Btn><Btn pad="back" onClick={() => go('menu')}>‹ Zurück</Btn></div>
         </div>
         <div className="grid grid-cols-3 gap-4 content-start">
           {tab === 'gfx' && <GfxPanels profile={profile} update={update} />}
