@@ -209,7 +209,7 @@ Begriffe des Projekts stehen in `CONTEXT.md`, grundlegende Entscheidungen in `do
 ## Bildnachweis
 
 1. **PBR-Texturen (CC0, gemeinfrei):**
-   - [Poly Haven](https://polyhaven.com): `aerial_beach_01` (Sand), `sandstone_cracks` (Fels), `cliff_side` (Klippen, Höhlen), `mud_cracked_dry_03` (Plateau), `snow_02` (Schnee), `snow_01` (Pulverschnee), `burned_ground_01` (Asche), `moon_02` (Mondstaub), `brown_mud_02` (Schlamm), `forest_floor` (Waldboden), `river_small_rocks` (Kies), `metal_plate_02` (Stationsdeck), `coast_land_rocks_01` (Riff).
-   - [ambientCG](https://ambientcg.com): `Ice003` (Eis), `Lava001` (Lavakruste).
+   - [Poly Haven](https://polyhaven.com): `aerial_beach_01` (Sand), `sandstone_cracks` (Fels), `cliff_side` (Klippen, Höhlen), `mud_cracked_dry_03` (Plateau), `burned_ground_01` (Asche), `moon_02` (Mondstaub), `brown_mud_02` (Schlamm), `forest_floor` (Waldboden), `river_small_rocks` (Kies), `metal_plate_02` (Stationsdeck), `coast_land_rocks_01` (Riff).
+   - [ambientCG](https://ambientcg.com): `Ice003` (Eis), `Lava001` (Lavakruste), `Snow010A` (Schnee), `Snow008A` (Pulverschnee).
    - Neu laden und umwandeln: `python3 tools/photos/pbr.py` (braucht Pillow und Internet).
 2. **Foto-Details von Pexels (freie Lizenz):** Fels – Alfo Medeiros, Rinde – Marina Leonova, Sand – Alejandro Henriquez, Boden – Engin Akyurt.

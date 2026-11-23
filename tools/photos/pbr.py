@@ -24,8 +24,8 @@ SETS = {
     'rock':     ('ph', 'sandstone_cracks'),     # slickrock / plateau rock floor
     'cliff':    ('ph', 'cliff_side'),           # stratified cliff: canyon walls, caves
     'cracked':  ('ph', 'mud_cracked_dry_03'),   # dry cracked pan: plateaus, salt flats
-    'snow':     ('ph', 'snow_02'),              # packed snow
-    'powder':   ('ph', 'snow_01'),              # wind-sculpted powder snow
+    'snow':     ('acg', 'Snow010A'),            # clean packed snow (2026-11-23; before: Poly Haven snow_02 – dark dents that read as footprints, repeated every tile)
+    'powder':   ('acg', 'Snow008A'),            # wind-sculpted powder snow (2026-11-23; before: Poly Haven snow_01 – boot prints all over)
     'ice':      ('acg', 'Ice003'),              # glacier / lake ice
     'lava':     ('acg', 'Lava001'),             # dark lava crust with glowing cracks (emission map)
     'ash':      ('ph', 'burned_ground_01'),     # ash / basalt ground
