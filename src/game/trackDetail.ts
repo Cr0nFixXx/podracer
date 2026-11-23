@@ -4,7 +4,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { ThemeDef } from './data';
 import type { TexSet } from './textures';
 import type { Sample, TrackData } from './trackBuilder';
-import type { StaticBatcher } from './trackMesh';
+import { GROUND_ORDER, type StaticBatcher } from './trackMesh';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSL = TSLmod as any;
@@ -23,7 +23,13 @@ const ssInv = (a: number, b: number, x: N) => oneMinus(smoothstep(b, a, x));
  *  - TV camera towers, angled space-truss sponsor gantries, and mineral-crater geyser/lava vents
  */
 type Disp = { dispose: () => void }[];
-export interface DetailOpts { across: number; disp: number; detail: number; tvCams: THREE.Vector3[]; batcher: StaticBatcher; groundTex?: TexSet; heightAt?: (x: number, z: number) => number; }
+export interface DetailOpts {
+  across: number; disp: number; detail: number; tvCams: THREE.Vector3[]; batcher: StaticBatcher; groundTex?: TexSet; heightAt?: (x: number, z: number) => number;
+  /** 2026-11-23: the wind-blown drifts are strips of the world's loose ground (sand, snow): `mat` = its alpha-blended surface material
+   *  (world-space UVs with `tile` metres per repeat, vertex attribute `aFade`), `same` = the surfaces that are this ground themselves
+   *  (no drift there). Absent: the opaque drift of before. */
+  drift?: { mat: THREE.Material; tile: number; same: number[] };
+}
 
 function canvasTex(w: number, h: number, draw: (c: CanvasRenderingContext2D) => void, srgb = true) {
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h; draw(cv.getContext('2d')!);
@@ -242,35 +248,48 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
     inst(new THREE.OctahedronGeometry(0.34, 0), glowMat, beaconMats, false);
   }
 
-  // ---------------- textured wind-rippled snow / sand drifts against rails and cliffs ----------------
+  // ---------------- wind-blown drifts of sand / snow against rails, rocks and cliffs ----------------
+  // 2026-11-23: a drift is a strip of the world's loose ground (`o.drift`) that thins out towards the middle of the road – its alpha
+  // falls from the wall inwards and with the strength of the drift along the track, so drifts come and go without an edge. (Before:
+  // an opaque band in a texture of its own with a straight inner edge – on a sand road a darker stripe of sand along both sides.)
+  // No drift where the road is that ground itself.
   if (theme.id === 'ice' || theme.id === 'desert' || theme.id === 'mesa') {
+    const soft = o.drift, PR = 7, FADE = [1, 1, 0.92, 0.74, 0.5, 0.24, 0];
     const gt = o.groundTex;
-    const driftMap = gt?.map.clone(), driftNrm = gt?.normalMap.clone();
-    if (driftMap) { driftMap.needsUpdate = true; disp.push(driftMap); }
-    if (driftNrm) { driftNrm.needsUpdate = true; disp.push(driftNrm); }
-    const snowMat = new THREE.MeshStandardMaterial({
-      color: theme.id === 'ice' ? '#f0f6fc' : '#f5e4cc',
-      map: driftMap, normalMap: driftNrm,
-      normalScale: new THREE.Vector2(0.85, 0.85),
-      roughness: theme.id === 'ice' ? 0.68 : 0.94, metalness: 0,
-    });
-    disp.push(snowMat);
-    const sp: number[] = [], su: number[] = [], si: number[] = []; let sv = 0; const PR = 7;
+    let snowMat: THREE.Material | null = null;
+    if (!soft) {
+      const driftMap = gt?.map.clone(), driftNrm = gt?.normalMap.clone();
+      if (driftMap) { driftMap.needsUpdate = true; disp.push(driftMap); }
+      if (driftNrm) { driftNrm.needsUpdate = true; disp.push(driftNrm); }
+      snowMat = new THREE.MeshStandardMaterial({
+        color: theme.id === 'ice' ? '#f0f6fc' : '#f5e4cc',
+        map: driftMap, normalMap: driftNrm,
+        normalScale: new THREE.Vector2(0.85, 0.85),
+        roughness: theme.id === 'ice' ? 0.68 : 0.94, metalness: 0,
+      });
+      disp.push(snowMat);
+    }
+    const sp: number[] = [], su: number[] = [], si: number[] = [], sf: number[] = []; let sv = 0;
     for (const path of td.paths) {
       const P = path.samples, n = P.length;
       for (const side of [-1, 1]) {
         let prev = false;
         for (let i = 0; i < n; i += 2) {
-          const s = P[i]; const on = !s.gap && s.ramp === 0 && !(side > 0 ? s.openR : s.openL) && !s.zeroG && !s.lake;
+          const s = P[i]; const on = !s.gap && s.ramp === 0 && !(side > 0 ? s.openR : s.openL) && !s.zeroG && !s.lake && !(soft && soft.same.includes(s.surf));
           if (on) {
             const wall = Math.min(side > 0 ? s.wallR : s.wallL, s.hw + 0.4);
-            const amp = 0.22 + 0.78 * Math.max(0, Math.sin(s.s * 0.011 + side * 2.1) * 0.55 + Math.sin(s.s * 0.031) * 0.2 + h2(i >> 3, side + 5) * 0.5);
-            const width = 2.0 + amp * 3.5;
+            // strength of the drift: slow swell along the track (soft drifts: no jump from one block of samples to the next)
+            const amp = soft
+              ? Math.max(0, Math.min(1, 0.36 + Math.sin(s.s * 0.011 + side * 2.1) * 0.5 + Math.sin(s.s * 0.031 + side) * 0.28 + Math.sin(s.s * 0.083 + side * 4.4) * 0.14))
+              : 0.22 + 0.78 * Math.max(0, Math.sin(s.s * 0.011 + side * 2.1) * 0.55 + Math.sin(s.s * 0.031) * 0.2 + h2(i >> 3, side + 5) * 0.5);
+            const width = soft ? 3.2 + amp * 5.2 : 2.0 + amp * 3.5, flat = s.surf > 0; // (natural ground has no kerb lip – `surf()` adds one)
             for (let k = 0; k < PR; k++) {
               const f = k / (PR - 1); const lat = side * (wall - f * width);
               const crest = Math.pow(1 - f, 1.55) * (1 + 0.14 * Math.sin(f * Math.PI));
-              sp.push(s.x + s.rx * lat, surf(s, lat) + dOff + amp * 0.92 * crest + (k === PR - 1 ? -0.02 : 0.02), s.z + s.rz * lat);
-              su.push(f * (width / 12), s.s / 12);
+              const e = Math.min(1, Math.abs(lat) / s.hw), y0 = flat ? s.y + s.ramp - lat * s.bank + (1 - e * e) * 0.2 + 0.06 : surf(s, lat);
+              const x = s.x + s.rx * lat, z = s.z + s.rz * lat;
+              sp.push(x, y0 + dOff + amp * 0.92 * crest + (soft ? 0.06 : k === PR - 1 ? -0.02 : 0.02), z);
+              if (soft) { su.push(x / soft.tile, z / soft.tile); sf.push(FADE[k] * amp * (0.3 + 0.7 * amp)); } else su.push(f * (width / 12), s.s / 12); // (a weak drift is a few faint patches, not a narrow stripe)
             }
             if (prev) { const a = sv - PR, b = sv; for (let k = 0; k < PR - 1; k++) { if (side > 0) si.push(a + k, b + k, a + k + 1, a + k + 1, b + k, b + k + 1); else si.push(a + k, a + k + 1, b + k, a + k + 1, b + k + 1, b + k); } }
             sv += PR;
@@ -279,7 +298,11 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
         }
       }
     }
-    addStrip(sp, su, si, snowMat, false, 3000);
+    if (soft && si.length) {
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(su, 2));
+      g.setAttribute('aFade', new THREE.Float32BufferAttribute(sf, 1)); g.setIndex(si); g.computeVertexNormals();
+      o.batcher.addStrip(g, soft.mat, 3000, false, GROUND_ORDER.OVER);
+    } else if (snowMat) addStrip(sp, su, si, snowMat, false, 3000);
   }
 
   // ---------------- sculpted chamfered kerbs on the inside of tight corners ----------------

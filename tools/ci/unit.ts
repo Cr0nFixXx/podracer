@@ -6,6 +6,7 @@ import { makeTerrainField } from '../../src/game/terrain';
 import { resolveEnvironment, type TimeOfDay, type WeatherKind } from '../../src/game/environment';
 import { clipOutside } from '../../src/game/meshClip';
 import { SnowField } from '../../src/game/snowField';
+import { borderRocks, ROCK_PROTRUDE, type BorderRock } from '../../src/game/borderRocks';
 import { SURF, SURFACES } from '../../src/game/surfaces';
 import { podLayout } from '../../src/game/podLayouts';
 import { cockpitGeo } from '../../src/game/podCockpits';
@@ -1140,6 +1141,58 @@ test('open sections: a rock border is solid – a pod that flies above its top i
   const [wallLow, fieldLow] = intoBorder(0), [wallHigh, fieldHigh] = intoBorder(9);
   ok(wallLow >= 1 && fieldLow === 0, `at hover height: ${wallLow} wall hits, ${fieldLow} field contacts – expected a wall hit`);
   ok(wallHigh === 0 && fieldHigh >= 1, `9 m higher, above the rock: ${wallHigh} wall hits, ${fieldHigh} field contacts – expected a soft contact`);
+});
+
+// ---- rock rows along natural roads (2026-11-23): what the player sees where the physics has its solid line ----
+/** Front rocks of the rows of a track (the closed line; the smaller rocks behind it are left out). */
+const rowRocks = (id: string) => borderRocks(trackOf(id)).filter(r => !r.back);
+/** How deep the disc of rock `r` stands inside the collision line of its own path, metres (≤ 0: not at all). Checked in the frame
+ *  of every sample the disc reaches – a row laid out along the border line can still cut the corner of a tight bend. */
+function rockIntrusion(td: TrackData, r: BorderRock): number {
+  const S = td.paths[r.path].samples, n = S.length, closed = td.paths[r.path].closed, i0 = Math.round(r.at), W = Math.ceil(r.r / DS) + 3; let worst = -1e9;
+  for (let k = -W; k <= W; k++) {
+    const j = closed ? ((i0 + k) % n + n) % n : i0 + k; if (j < 0 || j >= n) continue;
+    const q = S[j], along = (r.x - q.x) * q.tx + (r.z - q.z) * q.tz; if (Math.abs(along) >= r.r || (r.side > 0 ? q.openR : q.openL)) continue; // (a fork mouth has no line)
+    const lat = r.side * ((r.x - q.x) * q.rx + (r.z - q.z) * q.rz), wall = r.side > 0 ? q.wallR : q.wallL;
+    worst = Math.max(worst, wall - (lat - Math.sqrt(r.r * r.r - along * along)));
+  }
+  return worst;
+}
+test('rock rows: no rock stands in the road – not even on the inside of a tight bend', () => {
+  for (const id of ['boonta', 'frost', 'jungle', 'mosespa', 'aquilaris', 'oovo']) {
+    const td = trackOf(id), rocks = borderRocks(td); let bad = 0, worst = 0, where = '';
+    ok(rocks.length > 300, `${id}: only ${rocks.length} rocks – the check would prove nothing`);
+    for (const r of rocks) { const d = rockIntrusion(td, r); if (d > ROCK_PROTRUDE + 0.05) { bad++; if (d > worst) { worst = d; where = `sample ${Math.round(r.at)}, side ${r.side}`; } } }
+    eq(bad, 0, `${id}: rocks that reach into the road (worst ${worst.toFixed(1)} m at ${where}):`);
+  }
+});
+test('rock rows: the row is closed – every stretch of a rock border has a rock in front of it', () => {
+  for (const id of ['boonta', 'frost', 'jungle', 'oovo']) {
+    const td = trackOf(id), S = td.main.samples, rocks = rowRocks(id).filter(r => r.path === 0); let all = 0, open = 0, first = -1;
+    const byIdx = new Map<number, BorderRock[]>(); for (const r of rocks) { const k = Math.floor(r.at / 8); let a = byIdx.get(k); if (!a) { a = []; byIdx.set(k, a); } a.push(r); }
+    for (let i = 0; i < S.length; i++) for (const side of [-1, 1] as const) {
+      const q = S[i]; if (!(side > 0 ? q.rockR : q.rockL)) continue; all++;
+      const w = side > 0 ? q.wallR : q.wallL, bx = q.x + q.rx * side * w, bz = q.z + q.rz * side * w; let hit = false;
+      for (let k = Math.floor(i / 8) - 2; k <= Math.floor(i / 8) + 2 && !hit; k++) for (const r of byIdx.get(k) ?? []) {
+        if (r.side !== side) continue;
+        const dx = bx - r.x, dz = bz - r.z; if (Math.abs(dx * -r.oz + dz * r.ox) <= r.r * 0.8 && Math.hypot(dx, dz) <= r.r * 1.7) { hit = true; break; }
+      }
+      if (!hit) { open++; if (first < 0) first = i; }
+    }
+    ok(all > 1000, `${id}: only ${all} border samples`);
+    ok(open <= all * 0.01, `${id}: ${open} of ${all} border samples have no rock in front of them (first: sample ${first})`);
+  }
+});
+test('rock rows: a rock is about as tall as the border the physics knows, and neighbours overlap', () => {
+  const td = trackOf('boonta'), S = td.main.samples, rocks = rowRocks('boonta').filter(r => r.path === 0); let gaps = 0, pairs = 0;
+  for (let k = 0; k < rocks.length; k++) {
+    const r = rocks[k], q = S[Math.min(S.length - 1, Math.round(r.at))], h = r.side > 0 ? q.hR : q.hL;
+    ok(r.top >= Math.max(1, h * 0.7) - 0.6 && r.top <= h * 1.25 + 0.6, `rock at sample ${Math.round(r.at)}: top ${r.top.toFixed(1)} m beside a border of ${h.toFixed(1)} m`);
+    const nx = rocks[k + 1]; if (!nx || nx.run !== r.run) continue; pairs++;
+    if (Math.hypot(nx.x - r.x, nx.z - r.z) > (r.r + nx.r) * 0.98) gaps++;
+  }
+  ok(pairs > 500, `only ${pairs} neighbour pairs`);
+  ok(gaps <= pairs * 0.01, `${gaps} of ${pairs} neighbours in a row do not touch`);
 });
 
 console.log(failed ? `\n${failed} unit check(s) FAILED, ${passed} passed.` : `All ${passed} unit checks passed.`);

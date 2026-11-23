@@ -4,17 +4,18 @@ import type { ThemeDef } from './data';
 import type { GfxSettings } from './settings';
 import { detailKindForTheme, generateTexture, generateTextures, type TexSpec } from './textures';
 import { surfaceMaterial, type SurfaceOpts } from './materials';
-import { SURFACES, surfacePalette } from './surfaces';
-import { TUNNEL_SHOULDER, mulberry32, tunnelArc, tunnelProfile, type Path, type Sample, type TrackData, type Obstacle, CANYON_OUTSET, RAIL_INSET } from './trackBuilder';
+import { SURF, SURFACES, surfacePalette } from './surfaces';
+import { TUNNEL_SHOULDER, mulberry32, tunnelArc, tunnelProfile, type Path, type Sample, type TrackData, type Obstacle } from './trackBuilder';
+import { borderRocks, ROCK_VARIANTS } from './borderRocks';
 import { addProps, type Emitter } from './props';
 import { addMechProps } from './mechProps';
 import { addSciFi, oceanWindowMaterial } from './scifi';
 import { cactusMaterial, pineMaterial, treeMaterial } from './foliage';
 import { TUNNEL_DECK } from './physics';
 import { addTrackDetail } from './trackDetail';
-import { StaticBatcher } from './trackMesh';
+import { GROUND_ORDER, StaticBatcher } from './trackMesh';
 import { airshipGeometry, boulderGeometry, pylonGeometry, cactusGeometry, crystalClusterGeometry, jungleTreeGeometry, mesaGeometry, pineGeometry, rockGeometry, snowPineGeometry, spireGeometry } from './decorGeo';
-import { addSkyline, buildTerrain, makeTerrainField, terrainCell } from './terrain';
+import { addSkyline, buildTerrain, makeTerrainField, terrainCell, terrainMeshHeight } from './terrain';
 import { clipOutside } from './meshClip';
 import { buildSnowDeck } from './snowDeck';
 import { buildSetPieces, type SetPieceFx } from './setPieces';
@@ -115,19 +116,24 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   };
   const roadMat = surfaceMaterial(roadTex, roadOpts);
   let roadFade: THREE.Material | null = null; // the built deck with a noise dissolve: 26 m aprons where it meets a lake / plateau
-  const roadFadeMat = () => { if (!roadFade) { roadFade = surfaceMaterial(roadTex, { ...roadOpts, displace: 0, fade: true }); if (theme.road === 'ice') (roadFade as THREE.MeshStandardMaterial).roughness = 0.6; disposables.push(roadFade); } return roadFade; };
+  const roadFadeMat = () => { if (!roadFade) { roadFade = surfaceMaterial(roadTex, { ...roadOpts, displace: 0, fade: 'soft' }); if (theme.road === 'ice') (roadFade as THREE.MeshStandardMaterial).roughness = 0.6; disposables.push(roadFade); } return roadFade; };
   // ---- Session 20: one material per ground surface used on this track (photo sets graded to the world palette, world-space UVs) ----
   const usedSurf = [...new Set(td.paths.flatMap(pa => pa.samples.map(q => q.surf)))].filter(i => i > 0 && !!SURFACES[i].tex);
   const surfSets = await generateTextures(usedSurf.map(i => { const t = SURFACES[i].tex!; return { kind: t.kind, palette: surfacePalette(theme.id, SURFACES[i]), size: Math.min(gfx.texRes, 1024), seed: 200 + i, emissive: t.emissive, photo: t.set || undefined }; }), aniso);
-  const surfMat = new Map<number, THREE.Material>();
+  // 2026-11-23: two materials per surface. `surfMat` = the solid ground (opaque). `surfBlend` = the same picture alpha-blended by the
+  // vertex attribute `aFade` (materials.ts, `fade: 'soft'`): where one surface runs into the next, and on the shoulders of a natural
+  // road. (Before: one material with a hard noise dissolve – the transitions were cut-out blotches.)
+  const surfMat = new Map<number, THREE.Material>(), surfBlend = new Map<number, THREE.Material>();
   usedSurf.forEach((i, k) => {
     const t = SURFACES[i].tex!;
-    const m = surfaceMaterial(surfSets[k], {
-      worldUV: true, fade: true, cloud: theme.clouds * 0.4, parallax: plx * 0.02, layers, macro: 0.2, detail: 0.3, detailScale: 3.7, bump,
+    const so: SurfaceOpts = {
+      worldUV: true, cloud: theme.clouds * 0.4, parallax: plx * 0.02, layers, macro: 0.2, detail: 0.3, detailScale: 3.7, bump,
       normalScale: t.normal ?? 1, roughness: t.rough ?? 1, metalness: t.metal ?? 0, micro: 0.5, microScale: [5, 5], detailKind: detailKindForTheme(theme.id),
       envMapIntensity: t.env ?? 0.7, wet: t.wet ?? 0, puddles: 0.34, emissive: t.emissive, emissiveIntensity: 1.5,
-    });
-    surfMat.set(i, m); disposables.push(m);
+    };
+    const m = surfaceMaterial(surfSets[k], so), mb = surfaceMaterial(surfSets[k], { ...so, fade: 'soft' });
+    m.name = 'ground'; mb.name = 'groundBlend';
+    surfMat.set(i, m); surfBlend.set(i, mb); disposables.push(m, mb);
   });
   // Note: displace=0 on wallMat keeps road-to-skirt joints, cliffs, tunnels, arches & pillars 100% seam-free!
   const wallMat = surfaceMaterial(wallTex, {
@@ -160,6 +166,50 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   ];
   const abutmentMetal = new THREE.MeshStandardMaterial({ color: '#4d525c', metalness: 0.82, roughness: 0.38 });
   disposables.push(abutmentMetal);
+
+  // ---- 2026-11-23: what lies beside a natural road (user decision: no visible road edge on natural ground) ----
+  // Per sample and side an edge strip in the picture of the road's own ground:
+  //   kind 1, shoulder (beside a rock border): the ground of the road runs on beyond the road edge, comes down to the terrain over
+  //           `SHOULDER` metres and thins out into it (alpha). Full width along a rock border, eased to 0 over 6 samples towards
+  //           its ends, shortened where another stretch of road is near.
+  //   kind 2, apron (beside a canyon wall): 1.7 m of ground banked up against the foot of the wall – it covers the rock ditch
+  //           between road edge and wall that used to end the sand in a straight line.
+  // `edgeY` = the surface of the strip `d` metres outside the road edge. A shoulder follows the plane of the road first and then the
+  // DRAWN terrain (`groundY`: the terrain mesh, not the field – between its vertices the mesh cuts the field's corners).
+  const tb = td.bounds, tMargin = 2600 * gfx.drawDistance;
+  const terrExt = { cx: (tb.minX + tb.maxX) / 2, cz: (tb.minZ + tb.maxZ) / 2, W: tb.maxX - tb.minX + tMargin * 2, D: tb.maxZ - tb.minZ + tMargin * 2 };
+  const groundY = terrainMeshHeight(field, terrExt, geoQ);
+  const SHOULDER = 9 + terrainCell(geoQ) * 0.35, APRON = 1.7;
+  interface EdgeStrip { w: [number, number]; k: [number, number] } // per side (0 = left, 1 = right): width in metres, kind
+  const edgeStrips = new Map<Sample, EdgeStrip>();
+  const stripOf = (q: Sample) => { let e = edgeStrips.get(q); if (!e) { e = { w: [0, 0], k: [0, 0] }; edgeStrips.set(q, e); } return e; };
+  for (const pa of td.paths) {
+    const P = pa.samples, n = P.length;
+    for (const sd of [-1, 1]) {
+      const si = sd > 0 ? 1 : 0, natural = (q: Sample) => q.surf > 0 && !q.lake && !q.gap && !(q.roof > 0);
+      const on = P.map(q => natural(q) && !!(sd > 0 ? q.rockR : q.rockL));
+      const dist = new Float32Array(n).fill(1e6); // samples to the nearest sample without rock border, along the path
+      for (const dir of [1, -1]) { let d = 0; for (let k = 0, m = pa.closed ? 2 * n : n; k < m; k++) { const i = dir > 0 ? k % n : n - 1 - (k % n); d = on[i] ? d + 1 : 0; if ((k >= n || !pa.closed) && d < dist[i]) dist[i] = d; } }
+      for (let i = 0; i < n; i++) {
+        const q = P[i];
+        if (on[i]) {
+          const t = Math.max(0, Math.min(1, (dist[i] - 1) / 6)); let w = SHOULDER * t * t * (3 - 2 * t);
+          if (w > 0.5) { let ok = 0; for (const c of [1, 0.6, 0.3]) { const lat = sd * (q.hw + w * c); if (field.edgeDist(q.x + q.rx * lat, q.z + q.rz * lat) > w * c * 0.55) { ok = c; break; } } w *= ok; }
+          if (w > 0.5) { const e = stripOf(q); e.w[si] = w; e.k[si] = 1; }
+        } else if (natural(q) && (sd > 0 ? q.hR : q.hL) > 0 && !(sd > 0 ? q.openR : q.openL) && q.tun !== 3 && (pa.id === 0 || (i >= 70 && i <= n - 71))) { // (not where a branch road is tucked under the main road)
+          const e = stripOf(q); e.w[si] = APRON; e.k[si] = 2;
+        }
+      }
+    }
+  }
+  const edgeY = (q: Sample, sd: number, d: number) => {
+    const e = edgeStrips.get(q), si = sd > 0 ? 1 : 0, w = e ? e.w[si] : 0;
+    const yP = q.y + q.ramp - sd * q.hw * q.bank - d * (sd * q.bank + 0.4 / q.hw); // the road's own cross slope continued (camber + crown)
+    if (d <= 0 || w <= 0) return yP;
+    if (e!.k[si] === 2) return yP + 0.34 * d / w;
+    const lat = sd * (q.hw + d), u = Math.min(1, d / w), t = Math.max(0, Math.min(1, (u - 0.1) / 0.56)), k = t * t * (3 - 2 * t);
+    return yP + (Math.min(groundY(q.x + q.rx * lat, q.z + q.rz * lat) + 0.16, yP) - yP) * k;
+  };
 
   for (const path of td.paths) {
     const S = path.samples, n = S.length;
@@ -203,7 +253,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
           if (tile) uv.push(x / tile, z / tile); else uv.push(f, vAccs[k]);
         }
       };
-      const emit = (k0: number, k1: number, pos: number[], uv: number[], mat: THREE.Material, fade?: number[]) => {
+      const emit = (k0: number, k1: number, pos: number[], uv: number[], mat: THREE.Material, fade?: number[], order?: number) => {
         const ind: number[] = [];
         for (let k = k0 + 1; k <= k1; k++) {
           if (S[idxs[k]].gap || S[idxs[k - 1]].gap) continue;
@@ -216,7 +266,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
         g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
         if (fade) g.setAttribute('aFade', new THREE.Float32BufferAttribute(fade, 1));
         g.setIndex(ind); g.computeVertexNormals();
-        batcher.addStrip(g, mat, 5400, false);
+        batcher.addStrip(g, mat, 5400, false, order);
       };
       /** walks from row k0 in direction dir until `dist` metres are covered or `lim` is reached */
       const span = (k0: number, dir: number, lim: number, dist: number) => { let k = k0; while (k !== lim && Math.abs(dAcc[k] - dAcc[k0]) < dist) k += dir; return k; };
@@ -233,7 +283,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
             const k0 = dir > 0 ? last : r.a, k1 = span(k0, dir, dir > 0 ? Math.min(K - 1, nb.b) : nb.a, 26); if (k1 === k0) continue;
             const ap: number[] = [], au: number[] = [], af: number[] = [], lo = Math.min(k0, k1), hi = Math.max(k0, k1), len = Math.max(1, Math.abs(dAcc[k1] - dAcc[k0]));
             for (let k = lo; k <= hi; k++) { row(k, 0.05, 0, ap, au); const f = 1 - Math.abs(dAcc[k] - dAcc[k0]) / len; for (let a = 0; a <= across; a++) af.push(f); }
-            emit(lo, hi, ap, au, roadFadeMat(), af);
+            emit(lo, hi, ap, au, roadFadeMat(), af, GROUND_ORDER.OVER);
           }
           return;
         }
@@ -241,12 +291,60 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
         const kA = prev ? span(r.a, -1, prev.a, 30) : r.a, kB = next && cls(next.sf) !== 1 ? span(last, 1, Math.min(K - 1, next.b), 30) : last;
         const tile = SURFACES[r.sf].tex!.tile, lift0 = 0.05 + roadDispOff, pos: number[] = [], uv: number[] = [], fade: number[] = [];
         const lenIn = Math.max(1, dAcc[r.a] - dAcc[kA]), lenOut = Math.max(1, dAcc[kB] - dAcc[last]);
+        // 2026-11-23: ONE grid per passage – left shoulder · road · right shoulder – so the normals run smoothly over the road edge;
+        // it is then cut into the solid road (opaque), the stretches that fade in / out along the track and the shoulders (blended).
+        const NA = geoQ >= 2 ? 4 : 3, SU = NA === 4 ? [0.14, 0.38, 0.68, 1] : [0.2, 0.6, 1], SF = NA === 4 ? [1, 0.8, 0.38, 0] : [1, 0.5, 0];
+        const cols = across + 1 + 2 * NA, kinds: number[] = []; // (kinds: per row the kind of the left and of the right edge strip)
+        const shoulder = (q: Sample, sd: number, w: number, kind: number, j: number, f: number, lift: number) => {
+          const d = w * SU[j], lat = sd * (q.hw + d), x = q.x + q.rx * lat, z = q.z + q.rz * lat;
+          pos.push(x, edgeY(q, sd, d) + lift, z); uv.push(x / tile, z / tile); fade.push(w > 0 ? f * (kind === 2 ? 1 : SF[j]) : 0);
+        };
         for (let k = kA; k <= kB; k++) {
           const f = Math.min(k < r.a ? (dAcc[k] - dAcc[kA]) / lenIn : 1, k > last ? 1 - (dAcc[k] - dAcc[last]) / lenOut : 1);
-          row(k, f < 1 || k === r.a || k === last ? lift0 + 0.05 : lift0, tile, pos, uv);
+          const lift = f < 1 || k === r.a || k === last ? lift0 + 0.05 : lift0, q = S[idxs[k]], es = edgeStrips.get(q);
+          const wL = es ? es.w[0] : 0, wR = es ? es.w[1] : 0;
+          kinds.push(wL > 0 ? es!.k[0] : 0, wR > 0 ? es!.k[1] : 0);
+          for (let j = NA - 1; j >= 0; j--) shoulder(q, -1, wL, es ? es.k[0] : 0, j, f, lift);
+          row(k, lift, tile, pos, uv);
           for (let a = 0; a <= across; a++) fade.push(f);
+          for (let j = 0; j < NA; j++) shoulder(q, 1, wR, es ? es.k[1] : 0, j, f, lift);
         }
-        emit(kA, kB, pos, uv, surfMat.get(r.sf) ?? roadMat, fade);
+        const nrm = (() => { // smooth normals of the whole grid
+          const ind: number[] = [];
+          for (let k = kA + 1; k <= kB; k++) {
+            if (S[idxs[k]].gap || S[idxs[k - 1]].gap) continue;
+            const r0 = (k - 1 - kA) * cols, r1 = r0 + cols;
+            for (let c = 0; c < cols - 1; c++) ind.push(r0 + c, r0 + c + 1, r1 + c, r0 + c + 1, r1 + c + 1, r1 + c);
+          }
+          const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(ind); g.computeVertexNormals();
+          const a = (g.attributes.normal as THREE.BufferAttribute).array as Float32Array; g.dispose(); return a;
+        })();
+        /** rows k0 … k1, columns c0 … c1 of the grid as a mesh. `sd` ≠ 0: an edge strip – only the cells of kind `want` (1 = shoulder:
+         *  one of its two rows is a shoulder · 2 = apron: no shoulder, one row is an apron · 0 = both kinds) */
+        const cut = (k0: number, k1: number, c0: number, c1: number, mat: THREE.Material, order: number | undefined, sd: number, want = 0) => {
+          const nc = c1 - c0 + 1, P: number[] = [], U: number[] = [], Nn: number[] = [], F: number[] = [], ind: number[] = [];
+          for (let k = k0; k <= k1; k++) for (let c = c0; c <= c1; c++) {
+            const v = (k - kA) * cols + c;
+            P.push(pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]); U.push(uv[v * 2], uv[v * 2 + 1]); Nn.push(nrm[v * 3], nrm[v * 3 + 1], nrm[v * 3 + 2]); F.push(fade[v]);
+          }
+          for (let k = k0 + 1; k <= k1; k++) {
+            if (S[idxs[k]].gap || S[idxs[k - 1]].gap) continue;
+            if (sd) { const ka = kinds[(k - kA) * 2 + (sd > 0 ? 1 : 0)], kb = kinds[(k - 1 - kA) * 2 + (sd > 0 ? 1 : 0)], kind = ka === 1 || kb === 1 ? 1 : ka === 2 || kb === 2 ? 2 : 0; if (!kind || (want && kind !== want)) continue; }
+            const r0 = (k - 1 - k0) * nc, r1 = r0 + nc;
+            for (let c = 0; c < nc - 1; c++) ind.push(r0 + c, r0 + c + 1, r1 + c, r0 + c + 1, r1 + c + 1, r1 + c);
+          }
+          if (!ind.length) return;
+          const g = new THREE.BufferGeometry();
+          g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+          g.setAttribute('normal', new THREE.Float32BufferAttribute(Nn, 3)); g.setAttribute('aFade', new THREE.Float32BufferAttribute(F, 1));
+          g.setIndex(ind);
+          batcher.addStrip(g, mat, 5400, false, order);
+        };
+        const solid = surfMat.get(r.sf) ?? roadMat, blend = surfBlend.get(r.sf) ?? roadFadeMat(), cL = NA, cR = NA + across;
+        cut(r.a, last, cL, cR, solid, undefined, 0);
+        for (const [k0, k1] of [[kA, r.a], [last, kB]]) if (k1 > k0) { cut(k0, k1, cL, cR, blend, GROUND_ORDER.OVER, 0); cut(k0, k1, 0, cL, blend, GROUND_ORDER.OVER, -1); cut(k0, k1, cR, cols - 1, blend, GROUND_ORDER.OVER, 1); }
+        cut(r.a, last, 0, cL, blend, GROUND_ORDER.BODY, -1, 1); cut(r.a, last, cR, cols - 1, blend, GROUND_ORDER.BODY, 1, 1);
+        cut(r.a, last, 0, cL, solid, undefined, -1, 2); cut(r.a, last, cR, cols - 1, solid, undefined, 1, 2);
       });
     }
 
@@ -266,7 +364,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
         const bx = ex + s.rx * side * 3.8, bz = ez + s.rz * side * 3.8;
         const depth = okS ? Math.max(6.2, ey - heightAt(bx, bz) + 4.2) : 16;
         const mx = ex + s.rx * side * 0.75, mz = ez + s.rz * side * 0.75;
-        sp.push(ex, ey, ez, mx, ey - 0.85, mz, bx, ey - depth, bz);
+        sp.push(ex, s.surf > 0 && !s.lake ? ey - 0.16 : ey, ez, mx, ey - 0.85, mz, bx, ey - depth, bz); // (natural ground: the fascia starts below the road surface – its top used to show as a line of rock along the sand)
         su.push(sAcc / 18, 0, sAcc / 18, 0.06, sAcc / 18, depth / 18);
         if (okS && prevS) {
           for (let q = 0; q < SK - 1; q++) {
@@ -278,8 +376,10 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
 
         // Multi-ledge canyon cliff with vertical rock-buttress ribs & fracture fissures
         const H = side > 0 ? s.hR : s.hL;
-        const okW = H > 0 && !open && !s.gap && s.tun !== 3; // caves: the cave shell is the wall (hL/hR only flag the rock barrier)
-        const buttress = Math.pow(ridged(sAcc * 0.022 + side * 3.7, 1.3, 3), 2.0) * 2.2, lowK = Math.min(1, H / 12), rockIn = (side > 0 ? s.rockR : s.rockL) ? CANYON_OUTSET + RAIL_INSET + 0.1 : 0;
+        // caves: the cave shell is the wall (hL/hR only flag the rock barrier). A rock border (2026-11-23) is a row of single rocks
+        // (`borderRocks`, placed with the landscape) – no sheet.
+        const okW = H > 0 && !open && !s.gap && s.tun !== 3 && !(side > 0 ? s.rockR : s.rockL);
+        const buttress = Math.pow(ridged(sAcc * 0.022 + side * 3.7, 1.3, 3), 2.0) * 2.2, lowK = Math.min(1, H / 12);
         let latTop = 0.6;
         for (let j = 0; j < K; j++) {
           const f = j / (K - 1); const pf = f * (cliffProf.length - 1);
@@ -290,7 +390,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
           //  a 3 m wall a row of teeth)
           const crag = (fbm(sAcc * 0.052, f * 4.5 + side * 7, 4) - 0.5) * 5.2 * Math.min(1, f * 3.2) * lowK;
           const ribPush = -buttress * Math.sin(f * Math.PI) * Math.min(1, f * 4) * lowK; // protrudes slightly above driver height (keeps wall collision intact!)
-          const lat = Math.max(0.55, 0.6 + off * (H / 25) + crag + ribPush) - rockIn; // (a rock border stands 0.9 m further in: where the guard rail stood)
+          const lat = Math.max(0.55, 0.6 + off * (H / 25) + crag + ribPush);
           wp.push(ex + s.rx * side * lat, ey - 1.15 + hh * H, ez + s.rz * side * lat);
           wu.push(sAcc / 18, hh * H / 18);
           latTop = lat;
@@ -396,9 +496,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
 
   progress(0.55, 'Generiere Terrain (LOD) …'); await yield_();
   const tTer0 = performance.now();
-  const b = td.bounds; const margin = 2600 * gfx.drawDistance;
-  const W = b.maxX - b.minX + margin * 2, D = b.maxZ - b.minZ + margin * 2;
-  const cxm = (b.minX + b.maxX) / 2, czm = (b.minZ + b.maxZ) / 2;
+  const { cx: cxm, cz: czm, W, D } = terrExt; // (the same extent `groundY` was built for)
   await buildTerrain(field, theme, gfx, groundMat, batcher, { cx: cxm, cz: czm, W, D }, (p, m) => progress(0.55 + 0.25 * p, m));
   addSkyline(theme, group, disposables, avgY, { cx: cxm, cz: czm, W, D });
   const terrainMs = Math.round(performance.now() - tTer0);
@@ -430,6 +528,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   // obstacle rocks on the track are the closest rocks of all → HQ boulder (wallMat has no uv repeat: 2.4 rock units per tile)
   const obstRockH = gfx.geometry >= 2 ? heightSampler(wallTex) : undefined;
   const obstFx = addObstacles(td, group, theme, wallMat, disposables, gfx.geometry >= 2 ? boulderGeometry(gfx.geometry >= 3 ? 6 : 5, 9, 1.05, obstRockH, 2.4) : undefined);
+  decorCells.push(...addBorderRocks(td, group, wallMat, gfx, field.edgeDist, groundY, obstRockH, disposables));
   progress(0.9, 'Platziere Streckendetails …'); await yield_();
   // Session 15: objects are seated on the LOWEST ground point under their footprint (sampling only the centre left them floating on slopes)
   const groundMin = (x: number, z: number, r: number) => Math.min(heightAt(x, z), heightAt(x + r, z), heightAt(x - r, z), heightAt(x, z + r), heightAt(x, z - r));
@@ -475,7 +574,10 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   const S = td.main.samples;
   for (let i = 0; i < S.length; i += 110) { const s = S[i]; const side = (i / 110) % 2 ? 1 : -1; tvCams.push(new THREE.Vector3(s.x + s.rx * side * (s.hw + 6), s.y + 7 + (s.canyon ? 6 : 0), s.z + s.rz * side * (s.hw + 6))); }
 
-  const detail = addTrackDetail(td, theme, group, disposables, rng, wallMat, { across, disp: roadDispOff, detail: gfx.detail, tvCams, batcher, groundTex, heightAt: (x, z) => groundMin(x, z, 1.8) });
+  // (drifts: the loose ground of the world – sand, snow – blown against the borders; none on passages that are that ground themselves)
+  const driftSurf = theme.id === 'ice' ? SURF.snow : theme.id === 'desert' || theme.id === 'mesa' ? SURF.sand : -1;
+  const drift = surfBlend.has(driftSurf) ? { mat: surfBlend.get(driftSurf)!, tile: SURFACES[driftSurf].tex!.tile, same: [driftSurf, theme.id === 'ice' ? SURF.powder : SURF.dunes] } : undefined;
+  const detail = addTrackDetail(td, theme, group, disposables, rng, wallMat, { across, disp: roadDispOff, detail: gfx.detail, tvCams, batcher, groundTex, heightAt: (x, z) => groundMin(x, z, 1.8), drift });
   batcher.build(group, disposables);
 
   const timings: WorldTimings = {
@@ -1236,6 +1338,70 @@ function heightSampler(set: { map: THREE.Texture }, res = 16): ((u: number, v: n
   };
 }
 
+/** A sector of instanced scenery: hidden beyond `view2`, far twin beyond `lod2`, shadows only within `sh2` (squared distances from the sector centre). */
+interface DecorCell { mesh: THREE.InstancedMesh; x: number; z: number; view2: number; sh2: number; lod?: THREE.InstancedMesh; lod2?: number }
+
+/** 2026-11-23: the rock rows along natural roads. `borderRocks.ts` says where a rock stands and how big it is; here it gets its shape
+ *  and its seat: the base below the lowest drawn ground under it, the top as high above the road edge as the border the physics
+ *  knows. A rock that would reach into another stretch of road (forks, hairpins) is made smaller or left out. One InstancedMesh per
+ *  shape and 340 m sector with a far twin; the cells are switched with the decor cells (view distance, LOD, shadows near the camera). */
+function addBorderRocks(
+  td: TrackData, group: THREE.Group, mat: THREE.Material, gfx: GfxSettings, edgeDist: (x: number, z: number) => number,
+  groundY: (x: number, z: number) => number, rockH: ((u: number, v: number) => number) | undefined, disp: { dispose: () => void }[],
+): DecorCell[] {
+  const gq = gfx.geometry, DIRS = 48, SEEDS: [number, number][] = [[3, 1.0], [12, 1.18]]; // (seed, vertical stretch) per shape
+  const shapes = Array.from({ length: ROCK_VARIANTS }, (_, v) => {
+    const [sd, st] = SEEDS[v % SEEDS.length];
+    const near = gq >= 2 ? boulderGeometry(gq >= 3 ? 4 : 3, sd, st, rockH, 2.4) : rockGeometry(1, sd, st);
+    const far = gq >= 2 ? boulderGeometry(gq >= 3 ? 2 : 1, sd, st, rockH, 2.4) : undefined;
+    // measured on the near shape: lowest and highest point, reach in 48 horizontal directions (the row is laid out with these)
+    const p = near.attributes.position, reach = new Float32Array(DIRS); let y0 = 1e9, y1 = -1e9;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i); if (y < y0) y0 = y; if (y > y1) y1 = y;
+      for (let a = 0; a < DIRS; a++) { const ang = a / DIRS * Math.PI * 2, r = x * Math.cos(ang) + z * Math.sin(ang); if (r > reach[a]) reach[a] = r; }
+    }
+    disp.push(near); if (far) disp.push(far);
+    return { near, far, y0, y1, reach };
+  });
+  const rocks = borderRocks(td, (v, ang) => shapes[v].reach[((Math.round(ang / (Math.PI * 2) * DIRS) % DIRS) + DIRS) % DIRS]);
+  const SEC = 340, pad = SEC * 0.72, keepBack = Math.min(1, gfx.detail);
+  const sectors = new Map<string, { v: number; cx: number; cz: number; m: THREE.Matrix4[] }>();
+  const q = new THREE.Quaternion(), UPY = new THREE.Vector3(0, 1, 0), pv = new THREE.Vector3(), sv = new THREE.Vector3();
+  let n = 0;
+  for (const R of rocks) {
+    n++;
+    if (R.back && ((n * 0.61803398875) % 1) > keepBack) continue; // (the detail setting thins out the rocks behind the row – never the row)
+    const sh = shapes[R.variant], S = td.paths[R.path].samples, s = S[Math.min(S.length - 1, Math.round(R.at))];
+    const tx = -R.oz, tz = R.ox; // along the border
+    // another road behind the rock? (tested on its far half – its near half stands at its own road)
+    let k = 0;
+    for (const c of [1, 0.6]) {
+      const r = R.r * c, x = R.x - R.ox * R.off * (1 - c), z = R.z - R.oz * R.off * (1 - c);
+      if (edgeDist(x + R.ox * r * 0.9, z + R.oz * r * 0.9) > 0.6 && edgeDist(x + (R.ox * 0.5 + tx * 0.8) * r, z + (R.oz * 0.5 + tz * 0.8) * r) > 0.6 && edgeDist(x + (R.ox * 0.5 - tx * 0.8) * r, z + (R.oz * 0.5 - tz * 0.8) * r) > 0.6) { k = c; break; }
+    }
+    if (!k) continue;
+    const r = R.r * k, x = R.x - R.ox * R.off * (1 - k), z = R.z - R.oz * R.off * (1 - k);
+    const edgeY = s.y + s.ramp - R.side * s.hw * s.bank, topY = edgeY + R.top * (k < 1 ? 0.8 : 1);
+    let g = groundY(x, z); for (const [a, b] of [[0.6, 0], [0.3, 0.6], [0.3, -0.6]]) g = Math.min(g, groundY(x + (R.ox * a + tx * b) * r, z + (R.oz * a + tz * b) * r));
+    const base = Math.min(g - 0.3, edgeY - 0.5), sy = Math.max(0.6 * r, Math.min(2.2 * r, (topY - base) / (sh.y1 - sh.y0)));
+    const sx = Math.floor(x / SEC), sz = Math.floor(z / SEC), key = `${R.variant}|${sx},${sz}`;
+    let sec = sectors.get(key); if (!sec) { sec = { v: R.variant, cx: (sx + 0.5) * SEC, cz: (sz + 0.5) * SEC, m: [] }; sectors.set(key, sec); }
+    sec.m.push(new THREE.Matrix4().compose(pv.set(x, topY - sh.y1 * sy, z), q.setFromAxisAngle(UPY, R.yaw), sv.set(r, sy, r)));
+  }
+  const cells: DecorCell[] = [];
+  for (const sec of sectors.values()) {
+    const sh = shapes[sec.v], mk = (geo: THREE.BufferGeometry) => {
+      const im = new THREE.InstancedMesh(geo, mat, sec.m.length);
+      for (let i = 0; i < sec.m.length; i++) im.setMatrixAt(i, sec.m[i]);
+      im.receiveShadow = true; im.castShadow = false; im.computeBoundingSphere(); im.name = 'borderRocks'; group.add(im); return im;
+    };
+    const cell: DecorCell = { mesh: mk(sh.near), x: sec.cx, z: sec.cz, view2: (1000 + pad) ** 2, sh2: (150 + pad) ** 2 };
+    if (sh.far) { cell.lod = mk(sh.far); cell.lod.visible = false; cell.lod2 = (140 + pad) ** 2; }
+    cells.push(cell);
+  }
+  return cells;
+}
+
 function scatterDecor(
   theme: ThemeDef, group: THREE.Group, td: TrackData, heightAt: (x: number, z: number) => number,
   near: (x: number, z: number) => { d: number; s: Sample }, gfx: GfxSettings, disp: { dispose: () => void }[], rng: () => number,
@@ -1248,7 +1414,7 @@ function scatterDecor(
     emissiveIntensity: theme.id === 'lava' ? 1.35 : theme.id === 'crystal' ? 0.6 : 0,
   });
   disp.push(rockMat);
-  const decorCells: { mesh: THREE.InstancedMesh; x: number; z: number; view2: number; sh2: number; lod?: THREE.InstancedMesh; lod2?: number }[] = [];
+  const decorCells: DecorCell[] = [];
   // Sector-chunked + distance/shadow-culled InstancedMesh placement: skips distant sectors & shadows beyond the shadow box!
   const place = (geo: THREE.BufferGeometry, mat: THREE.Material, count: number, dMin: number, dMax: number, sMin: number, sMax: number, opts: { foot?: number; yOff?: number; tilt?: number; air?: number; shadow?: boolean; scaleY?: [number, number]; colors?: string[]; keepDry?: boolean; view?: number; lod?: { geo: THREE.BufferGeometry; dist: number } } = {}) => {
     count = Math.floor(count * det * dens); // Session 18: density follows the (longer) track + 20 % more decoration
@@ -1287,7 +1453,7 @@ function scatterDecor(
       for (let i = 0; i < sec.m.length; i++) { im.setMatrixAt(i, sec.m[i]); if (sec.c.length) im.setColorAt(i, sec.c[i]); }
       im.castShadow = cast && k === 'all'; im.receiveShadow = true; im.computeBoundingSphere(); group.add(im);
       if (k !== 'all') {
-        const cell: (typeof decorCells)[number] = { mesh: im, x: sec.cx, z: sec.cz, view2: (viewD + pad) ** 2, sh2: cast ? (150 + pad) ** 2 : 0 };
+        const cell: DecorCell = { mesh: im, x: sec.cx, z: sec.cz, view2: (viewD + pad) ** 2, sh2: cast ? (150 + pad) ** 2 : 0 };
         if (opts.lod) { // far-sector LOD twin: identical transforms/colours, ~1/4 of the triangles, never casts shadows
           const lm = new THREE.InstancedMesh(opts.lod.geo, mat, sec.m.length);
           for (let i = 0; i < sec.m.length; i++) { lm.setMatrixAt(i, sec.m[i]); if (sec.c.length) lm.setColorAt(i, sec.c[i]); }

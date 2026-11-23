@@ -142,7 +142,7 @@ let g: Game | null = null; let cur = -1;
   }
   (G.particles.alpha as unknown as { fullUpload: () => void }).fullUpload(); (G.particles.add as unknown as { fullUpload: () => void }).fullUpload(); // the harness runs many updates without rendering
   for (let k = 0; k < 3; k++) { G.render(0.016); await new Promise(r => setTimeout(r, 900)); }
-  return `${(window as unknown as Record<string, unknown>).loadInfo ?? ''} ${(window as unknown as Record<string, unknown>).coverInfo ?? ''} ${G.backend} ${TRACKS[i].id}/${view} calls=${G.renderer.info.render.calls} tris=${G.renderer.info.render.triangles}`;
+  return `${(window as unknown as Record<string, unknown>).loadInfo ?? ''} ${(window as unknown as Record<string, unknown>).coverInfo ?? ''} ${G.backend} ${TRACKS[i].id}/${view} calls=${(G.renderer.info.render as unknown as { drawCalls?: number }).drawCalls ?? G.renderer.info.render.calls} tris=${G.renderer.info.render.triangles}`; // (calls = draw calls of the last frame; `render.calls` only counts render passes since the start)
 };
 /** Session 20 – frame-time benchmark of one view: positions the camera like `track(i, view)`, then times `n` full frames (synchronised with readPixels).
  *  Software rendering (SwiftShader) → only useful to COMPARE views / builds, not as an absolute FPS figure. */

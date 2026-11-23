@@ -39,7 +39,13 @@ export function chunkGeometries(g: THREE.BufferGeometry, trisPerChunk = 3200): T
 }
 
 interface Item { g: THREE.BufferGeometry; m?: THREE.Matrix4 }
-interface Group { mat: THREE.Material; cast: boolean; items: Item[] }
+interface Group { mat: THREE.Material; cast: boolean; items: Item[]; order?: number }
+
+/** Draw order of alpha-blended GROUND (surface materials with `fade: 'soft'`): after everything opaque, before every other transparent
+ *  object (dust, flames, glass – they have order ≥ 0 and do not write depth, so ground drawn after them would paint over them).
+ *  BODY = the shoulder beside a natural road, OVER = a surface that fades in on top of another one (it must come after BODY: both
+ *  write depth, and a body drawn second would be rejected under the faint rim of the overlay). */
+export const GROUND_ORDER = { BODY: -3, OVER: -2 } as const;
 
 const CELL = 580;
 const MAX_VERTS = 60000;
@@ -48,13 +54,14 @@ export class StaticBatcher {
   batched: boolean; meshes = 0; batches = 0;
   private groups = new Map<string, Group>();
   constructor(batched: boolean) { this.batched = batched; }
-  add(g: THREE.BufferGeometry, mat: THREE.Material, cast = false, m?: THREE.Matrix4) {
-    const key = mat.uuid + (cast ? '|c' : '|n'); let grp = this.groups.get(key);
-    if (!grp) { grp = { mat, cast, items: [] }; this.groups.set(key, grp); }
+  /** `order` (optional): render order of the meshes of this group – the same material can be drawn in several orders (`GROUND_ORDER`). */
+  add(g: THREE.BufferGeometry, mat: THREE.Material, cast = false, m?: THREE.Matrix4, order?: number) {
+    const key = mat.uuid + (cast ? '|c' : '|n') + (order === undefined ? '' : '|o' + order); let grp = this.groups.get(key);
+    if (!grp) { grp = { mat, cast, items: [], order }; this.groups.set(key, grp); }
     grp.items.push({ g, m });
   }
-  addStrip(g: THREE.BufferGeometry, mat: THREE.Material, trisPerChunk: number, cast = false) {
-    for (const c of chunkGeometries(g, trisPerChunk)) this.add(c, mat, cast);
+  addStrip(g: THREE.BufferGeometry, mat: THREE.Material, trisPerChunk: number, cast = false, order?: number) {
+    for (const c of chunkGeometries(g, trisPerChunk)) this.add(c, mat, cast, undefined, order);
   }
   build(parent: THREE.Object3D, disp: Disp) {
     const sig = (g: THREE.BufferGeometry) => Object.keys(g.attributes).sort().join(',') + (g.index ? '|i' : '|n');
@@ -65,8 +72,8 @@ export class StaticBatcher {
         geo.computeBoundingBox(); geo.computeBoundingSphere();
         const mesh = new THREE.Mesh(geo, grp.mat);
         mesh.castShadow = grp.cast && !isTrans;
-        mesh.receiveShadow = !isTrans;
-        if (isTrans) mesh.renderOrder = 4;
+        mesh.receiveShadow = !isTrans || grp.order !== undefined; // (blended ground receives shadows like the ground below it)
+        if (grp.order !== undefined) mesh.renderOrder = grp.order; else if (isTrans) mesh.renderOrder = 4;
         mesh.matrixAutoUpdate = false;
         mesh.updateMatrix();
         parent.add(mesh); disp.push(geo);

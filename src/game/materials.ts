@@ -50,8 +50,11 @@ export interface SurfaceOpts {
   snow?: number;
   strata?: StrataDef | null;
   cloud?: number;
-  /** Session 20: noise dissolve driven by the vertex attribute `aFade` (0 = gone … 1 = solid) – ragged transitions between ground surfaces */
-  fade?: boolean;
+  /** The vertex attribute `aFade` (0 = gone … 1 = solid) thins the surface out – transitions between ground surfaces, the shoulder
+   *  of a natural road. `true` (Session 20) = hard noise dissolve (alpha test, opaque pass). `'soft'` (2026-11-23) = the surface is
+   *  alpha-blended over what lies below: drifts with soft rims that fill the hollows of the picture first. A soft material is
+   *  transparent, writes depth and must be drawn right after the opaque pass (`GROUND_ORDER`, see `StaticBatcher.addStrip`). */
+  fade?: boolean | 'soft';
   /** UVs are world-space (x / tile, z / tile): no edge-based effects (edge snow, edge-locked displacement) */
   worldUV?: boolean;
 }
@@ -227,7 +230,16 @@ export function surfaceMaterial(set: TexSet, o: SurfaceOpts = {}) {
   if (set.emissiveMap) mat.emissiveNode = texture(set.emissiveMap, pUV).rgb.mul(color(o.emissive ?? '#ffffff')).mul(o.emissiveIntensity ?? 1.6);
 
   // ---- edge-tapered road micro-relief (0 at uv.x=0/1 so road-to-skirt & kerb seams never crack open) ----
-  if (o.fade) {
+  if (o.fade === 'soft') {
+    // Alpha = how far `aFade` lies above a noise threshold. The threshold is low in the hollows of the surface's own relief (sand
+    // gathers between the stones first) and wanders in patches of about 9 m and 2.5 m; the rim of every patch is `SOFT` wide, so
+    // no edge is cut out. aFade = 1 → alpha 1 everywhere (joins the solid strip without a seam), aFade = 0 → alpha 0.
+    const SOFT = 0.38;
+    const fz = clamp(texture(macro, wpos.mul(1 / 9.1)).r.mul(0.62).add(texture(macro, wpos.mul(1 / 2.6).add(0.21)).g.mul(0.3)).add(baseSample.a.sub(0.5).mul(0.34)).sub(0.06).mul(1.25), 0.0, 1.0);
+    mat.opacityNode = smoothstep(0.0, SOFT, attribute('aFade', 'float').mul(1 + SOFT).sub(fz));
+    mat.transparent = true; mat.alphaTest = 0.012; mat.depthWrite = true;
+    mat.userData.ground = true; // (post.ts: counts as opaque in the SSR buffers – it IS the ground where it is visible)
+  } else if (o.fade) {
     // visible where the noise lies below the fade value: grains / hollows of the surface appear first, a ragged front follows
     const fz = texture(macro, wpos.mul(1 / 7.3)).r.mul(0.5).add(texture(macro, wpos.mul(1 / 2.1).add(0.21)).g.mul(0.32)).add(baseSample.a.mul(0.18));
     mat.opacityNode = smoothstep(-0.04, 0.04, attribute('aFade', 'float').mul(1.24).sub(0.12).sub(fz));

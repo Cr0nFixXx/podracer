@@ -257,7 +257,8 @@ export function makeTerrainField(td: TrackData, theme: ThemeDef, meshCell = 7): 
     let h = open;
     // Stratified massif behind cliff walls (per side, tapered at gorge entrances)
     const lat = (x - s.x) * s.rx + (z - s.z) * s.rz;
-    const H = lat >= 0 ? s.hR : s.hL;
+    // (2026-11-23: a rock border – `rockL` / `rockR` – is a row of free-standing rocks on open ground: no massif behind it)
+    const H = (lat >= 0 ? s.rockR : s.rockL) ? 0 : lat >= 0 ? s.hR : s.hL;
     let talus = 0;
     if (H > 0 && !s.gap && s.tun !== 3) { // (caves flag their rock barrier with hL/hR = 2 – no massif there)
       // `dm`: the massif stands 1.5 mesh cells behind the wall sheet (a terrain triangle spans up to 1.42 cells: none reaches across the
@@ -328,6 +329,23 @@ export function makeTerrainField(td: TrackData, theme: ThemeDef, meshCell = 7): 
     out.gz = (evalWithSample(x, z + eps, s, dZ, false) - y0) / eps;
   };
   return { heightAt, sampleCover, nearest, roadClear, edgeDist, distToTrack, avgY, splat };
+}
+
+/** The terrain MESH near the track as a height function (2026-11-23): `buildTerrain` lays its finest leaves on a fixed grid (root
+ *  square halved until a leaf is no larger than `terrainLeaf`, 16 cells per leaf, every cell split along the same diagonal). Within
+ *  about 100 m of the road every leaf is of the finest kind, so this is exactly the surface that gets drawn there – unlike
+ *  `field.heightAt`, which the mesh only meets at its vertices (between them it cuts every corner of the field by up to a metre).
+ *  Whatever has to lie ON the drawn ground (the shoulder of a natural road, rocks) asks this function. Corner heights are memoised. */
+export function terrainMeshHeight(field: TerrainField, ext: Extent, geoQ: number): (x: number, z: number) => number {
+  const S0 = Math.max(ext.W, ext.D), x0 = ext.cx - S0 / 2, z0 = ext.cz - S0 / 2;
+  let leaf = S0; while (leaf > terrainLeaf(geoQ)) leaf /= 2;
+  const c = leaf / 16, memo = new Map<number, number>();
+  const H = (i: number, j: number) => { const k = i * 200003 + j; let v = memo.get(k); if (v === undefined) { v = field.heightAt(x0 + i * c, z0 + j * c); memo.set(k, v); } return v; };
+  return (x, z) => {
+    const fi = (x - x0) / c, fj = (z - z0) / c, i = Math.floor(fi), j = Math.floor(fj), u = fi - i, v = fj - j;
+    const a = H(i, j), b = H(i, j + 1), cc = H(i + 1, j + 1), d = H(i + 1, j); // (triangles a-b-d and b-c-d, as `baseIdx` in buildTerrain)
+    return u + v <= 1 ? a + u * (d - a) + v * (b - a) : cc + (1 - u) * (b - cc) + (1 - v) * (d - cc);
+  };
 }
 
 /** Quadtree LOD terrain: leaves of 16×16 cells, fine near track, coarse far away; skirts hide T-junction cracks. */

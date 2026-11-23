@@ -58,7 +58,7 @@ export class PostFX {
 
     // Allocate MRT only when SSR is explicitly enabled (AO uses pure depth-buffer textureLoad)
     if (gfx.ssr) {
-      const opaqueAlpha = Fn((_p: N, builder: N) => float(builder?.material?.transparent ? 0.0 : 1.0))();
+      const opaqueAlpha = Fn((_p: N, builder: N) => float(builder?.material?.transparent && !builder?.material?.userData?.ground ? 0.0 : 1.0))(); // (blended ground, `fade: 'soft'`, IS the surface where it is drawn)
       const mrtNode = mrt({
         output,
         normal: vec4(packNormalToRGB(normalView), opaqueAlpha),
