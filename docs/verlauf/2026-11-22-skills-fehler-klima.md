@@ -46,7 +46,7 @@ Der Rest sind die Falten der Fahrbahn (`TODO.md` Abschnitt 5) und zwei Becken-R�
 - Faktor = Klima der Welt × Tageszeit × Wetter, begrenzt auf 0,75 … 1,25. Aufheizen beim Boosten × Faktor, Abkühlen ÷ Faktor. Die Boost-Kraft bleibt gleich. Gilt für Gegner.
 - Kühl: Regen −10 %, Gewitter und Schneeböen −16 %, Nebel −4 %, Nacht −8 %, Eiswelt −6 %. Heiß: Sandsturm +18 %, Aschesturm +20 %, Tag auf heißen Welten +5 %, Wüste und Vulkan +6 %. Der Untergrund zählt wie bisher dazu (Lavasee × 1,6).
 - Beispiele Tag / Nacht: Wüste klar 1,11 / 1,02 · Sandsturm 1,25 / 1,23 · Eiswelt klar 0,94 / 0,89 · Schneeböen 0,79 / 0,75 · Dschungel Gewitter 0,91 / 0,82 · Aquilaris Gewitter 0,81 / 0,76 · Oovo IV immer 1,00.
-- Anzeige: im Renn-Menü neben dem Wort „Wetter" („Boost-Hitze −16 %", Erklärung beim Überfahren mit der Maus). Zuerst stand dort ein eigener Satz – der machte den Bildschirm bei 1280 × 720 um 21 px zu hoch (`pui.mjs` schlug an), deshalb die kurze Form; im Rennen am Hitzebalken „KÜHLE LUFT −18 %" oder „HEISSE LUFT +11 %" (ab 3 %).
+- Anzeige: im Renn-Menü neben dem Wort „Wetter" („Boost-Hitze −16 %", Erklärung beim Überfahren mit der Maus). Zuerst stand dort ein eigener Satz – der machte den Bildschirm bei 1280 × 720 um 21 px zu hoch (`pui.mjs` schlug an), deshalb die kurze Form; im Rennen am Hitzebalken „KÜHLE LUFT −18 %" oder „HEISSE LUFT +11 %" (ab 3 %; seit dem 2026-11-23 unter dem Balken – in der Zeile darüber passte es nicht).
 
 ### 5. Pulverschnee: eine Schneedecke, die sich die Spuren merkt
 - **Daten** (`snowField.ts`): über jedem Pulverschnee-Feld liegt ein Raster aus 1-m-Zellen. Jede Zelle hält, wie fest der Schnee ist (0 frisch … 255 fest). Frostspalt-Ring: ein Feld, 474 Streckenpunkte (0,95 km), 116 × 948 Zellen.
@@ -69,6 +69,7 @@ Der Rest sind die Falten der Fahrbahn (`TODO.md` Abschnitt 5) und zwei Becken-R�
 
 - Schneedecke: Bilder in WebGL2 (frisches Feld, gestempelte Spuren aus Pilotenhöhe und von oben, vier Sekunden echtes Rennen mit acht Pods – Doppelspuren und Schneefahnen sind da). WebGPU-Check des Frostspalt-Rings (`check:gpu`): 0 Fehler, 0 Warnungen.
 - Felsgrenzen: Bilder vom Boonta-Kessel (Sandpiste, offene Dünenfläche, Felspiste).
+- Im Browser, die fertige App (`dist/index.html`): Rauchtest `papp.mjs` auf dem Frostspalt-Ring bei Schnee bestanden. Menüs in fünf Fenstergrößen (`pui.mjs`): zuerst rot – die eigene Zeile „Boost-Hitze" machte das Renn-Menü bei 1280 × 720 um 21 px zu hoch (741 px); sie steht seitdem neben „Wetter" (`e675bfb`), danach alle fünf Größen grün.
 
 ## Nicht geprüft
 - Auf echter GPU nichts. In der Sandbox rendert nur Software.
@@ -81,8 +82,13 @@ Der Rest sind die Falten der Fahrbahn (`TODO.md` Abschnitt 5) und zwei Becken-R�
 - In der Frostspalt-Höhle bleibt an der Gabelung eine schmale Felsrippe (0,5 m) stehen, wo die Abschlusswand in die Haupthöhle ragt.
 - Rückwärtslenken ist nicht von Hand gefahren.
 
+**Nachtrag 2026-11-23 – was davon inzwischen erledigt ist** ([Protokoll](2026-11-23-uebergaenge-felsreihen-buchten.md)):
+- Die gestreckte Textur der Kappen und der Felsgrenzen ist behoben (`a97f7c8`); aus dem Felsband sind Reihen einzelner Felsen geworden (`fec860b`), angesehen auch auf Frostspalt, Magma, Dschungel, Aquilaris, Oovo IV und Malastare.
+- Die Höhlen von Magma-Inferno, Dschungel und Kristall sind angesehen und haben neues Material und Lampenlicht (`765c551`); Howler weiter nicht.
+- Die Anzeigen zum Klima sind im Browser angesehen: das Renn-Menü passte nicht (siehe „Geprüft"), die Anzeige am Hitzebalken brach in zwei Zeilen um – beides behoben.
+
 ## Git
-- Commits auf `dev`, nicht gepusht (der Nutzer hat diesmal keinen Push verlangt): `5a21dc9` Skills · `0c03a22` Rückwärtslenkung · `7690d96` Gabelungen · `e3f739c` Klima und Boost · `f97e425` Doku · `3a809b5` Schneedecke · der Commit mit den Felsgrenzen.
+- Commits auf `dev`, nicht gepusht (der Nutzer hat diesmal keinen Push verlangt): `5a21dc9` Skills · `0c03a22` Rückwärtslenkung · `7690d96` Gabelungen · `e3f739c` Klima und Boost · `f97e425` Doku · `3a809b5` Schneedecke · `e675bfb` Renn-Menü (Boost-Hitze neben „Wetter") · `cadfc78` Felsgrenzen.
 
 ## Erledigt (aus dem Auftrag)
 - [x] Skill-Set installieren → ohne Ticket-Skills eingerichtet
