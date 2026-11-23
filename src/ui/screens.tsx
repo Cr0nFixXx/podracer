@@ -162,19 +162,22 @@ export function RaceSetup({ profile, update, go, start }: { profile: Profile; up
                 </select>
               </div>
               <div>
-                <div className="text-[11px] uppercase tracking-widest text-stone-300 mb-2">Wetter</div>
+                {/* 2026-11-22: climate, time of day and weather change how fast the engines heat up while boosting – shown beside the label
+                    (no line of its own: the setup screen has no height to spare at 1280 × 720) */}
+                {(() => {
+                  const [tod, wx] = sanitizeEnv(track.theme, r.timeOfDay, r.weather), hf = resolveEnvironment(THEMES[track.theme], tod, wx).fx.heat, pct = Math.round(Math.abs(hf - 1) * 100);
+                  return <div className="flex justify-between items-baseline text-[11px] uppercase tracking-widest text-stone-300 mb-2">
+                    <span>Wetter</span>
+                    <span data-heat-env={hf.toFixed(2)} className={`normal-case tracking-normal ${pct < 3 ? 'text-stone-500' : hf < 1 ? 'text-cyan-300' : 'text-orange-300'}`}
+                      title={pct < 3 ? 'Klima, Tageszeit und Wetter ändern die Boost-Hitze hier nicht.' : hf < 1 ? `Kühle Luft: die Triebwerke heizen beim Boosten ${pct} % langsamer auf und kühlen schneller ab.` : `Heiße Luft: die Triebwerke heizen beim Boosten ${pct} % schneller auf und kühlen langsamer ab.`}>
+                      Boost-Hitze {pct < 3 ? '±0' : `${hf < 1 ? '−' : '+'}${pct}`} %</span>
+                  </div>;
+                })()}
                 <select value={sanitizeEnv(track.theme, r.timeOfDay, r.weather)[1]} onChange={e => set('weather', e.target.value as WeatherKind)} className="w-full bg-black/60 border border-stone-600 text-amber-100 p-2 text-sm">
                   {weatherOptionsFor(track.theme).map(([v, n]) => <option key={v} value={v}>{n}</option>)}
                 </select>
               </div>
             </div>
-            {/* 2026-11-22: climate and weather change how fast the engines heat up while boosting */}
-            {(() => {
-              const [tod, wx] = sanitizeEnv(track.theme, r.timeOfDay, r.weather), hf = resolveEnvironment(THEMES[track.theme], tod, wx).fx.heat, pct = Math.round(Math.abs(hf - 1) * 100);
-              return <div className="text-[11px] text-stone-400 -mt-2 mb-4" data-heat-env={hf.toFixed(2)}>Triebwerke: {pct < 3 ? 'Klima und Wetter ändern die Boost-Hitze hier nicht.' : hf < 1
-                ? <>kühle Luft – der Boost heizt <span className="text-cyan-300">{pct} % langsamer</span> auf und kühlt schneller ab.</>
-                : <>heiße Luft – der Boost heizt <span className="text-orange-300">{pct} % schneller</span> auf und kühlt langsamer ab.</>}</div>;
-            })()}
             <div className="text-[11px] uppercase tracking-widest text-stone-300 mb-2">Startkamera</div>
             <select value={r.camera} onChange={e => set('camera', parseInt(e.target.value))} className="w-full bg-black/60 border border-stone-600 text-amber-100 p-2 mb-5 text-sm">
               {CAMERA_NAMES.map((c, i) => <option key={c} value={i}>{c}</option>)}
