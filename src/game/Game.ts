@@ -767,7 +767,9 @@ export class Game {
    *  The player's lamp is a real spot light: it follows steering and pitch, brightens with boost and flickers on a damaged engine. */
   updateLights() {
     const im = this.navLights; if (!im) return;
-    const lv = this.lightLevel, bm = this.beams, sl = this.headLamp;
+    // (2026-11-23: also inside a tunnel – `cover` is 1 while the player is under a roof. Only in races that have lights at all,
+    //  i.e. whose weather or time of day can get dark: `EnvBuild.lights`.)
+    const lv = Math.max(this.lightLevel, this.cover), bm = this.beams, sl = this.headLamp;
     im.visible = lv > 0.01; if (bm) { bm.mesh.visible = lv > 0.01 && !bm.mesh.userData.off; bm.strength.value = lv; }
     if (lv <= 0.01) { if (sl) sl.intensity = 0; return; }
     const m = this.tmpM, q0 = this.tmpQ.identity(), pos = this.tmpV, sc = this.tmpV2, qb = this.tmpQ2; let n = 0, nb = 0;

@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { ThemeDef } from './data';
 import type { GfxSettings } from './settings';
 import { detailKindForTheme, generateTexture, generateTextures, type TexSpec } from './textures';
-import { surfaceMaterial, type SurfaceOpts } from './materials';
+import { caveMaterial, surfaceMaterial, type CaveOpts, type SurfaceOpts } from './materials';
 import { SURF, SURFACES, surfacePalette } from './surfaces';
 import { TUNNEL_SHOULDER, mulberry32, tunnelArc, tunnelProfile, type Path, type Sample, type TrackData, type Obstacle } from './trackBuilder';
 import { borderRocks, ROCK_VARIANTS } from './borderRocks';
@@ -146,6 +146,18 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   const wallMat = surfaceMaterial(wallTex, wallOpts);
   let wallBlend: THREE.Material | null = null; // the rock of the walls, alpha-blended by `aFade`: the outer half of a wall cap that runs out onto the land behind it
   const wallBlendMat = () => { if (!wallBlend) { wallBlend = surfaceMaterial(wallTex, { ...wallOpts, parallax: 0, fade: 'soft' }); wallBlend.name = 'cliffBlend'; disposables.push(wallBlend); } return wallBlend; };
+  // Rock inside tunnels and caves: the walls' photo set projected in world space, lit by the tunnel's own lamps (`caveMaterial`).
+  // `lit` reads the baked light per vertex (vault, shelves, end walls), `flat` has a fixed amount (instanced stalactites).
+  const caveOpts: CaveOpts = { tile: 15, strata: STRATA[theme.id], normalScale: 1.5, emissive: wallOpts.emissive, emissiveIntensity: wallOpts.emissiveIntensity };
+  // How much of it depends on the world. In a dark one (lava, moon, crystal) the lamps are all the light a tunnel has: CAVE_LIGHT[0].
+  // In a bright one the fill light of the sky already lights the rock, the lamps only add a little: CAVE_LIGHT[1] – with the dark
+  // amount the jungle cave glowed lime green, three to five times brighter than the land outside. Measure = the luminance of the
+  // hemisphere light's ground colour (linear), that is what a roof receives: lava 0.012, moon 0.007, crystal 0.03 | jungle 0.083 and above.
+  const gLum = (() => { const c = new THREE.Color(theme.hemiGround); return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; })();
+  const gT = Math.min(1, gLum / 0.08), caveGain = CAVE_LIGHT[0] + (CAVE_LIGHT[1] - CAVE_LIGHT[0]) * gT * gT * (3 - 2 * gT);
+  const lampLight = new THREE.Color(theme.barrierColor).lerp(new THREE.Color('#ffffff'), 0.5).multiplyScalar(caveGain);
+  const caveRock: CaveRock = { lit: caveMaterial(wallTex, { ...caveOpts, light: { color: lampLight } }), flatMat: null, flat() { if (!this.flatMat) { this.flatMat = caveMaterial(wallTex, { ...caveOpts, light: { color: lampLight, level: 0.6 } }); this.flatMat.name = 'caveRockFlat'; disposables.push(this.flatMat); } return this.flatMat; } };
+  caveRock.lit.name = 'caveRock'; disposables.push(caveRock.lit);
   const groundMat = terrainMaterial({
     themeId: theme.id, ground: groundTex, gravel: gravelTex, basin: basinTex, rock: cliffTex,
     groundScale: !theme.emissiveGround && hasPbr(PHOTO_GROUND[theme.id]) ? 2.7 : 1, // photo ground: ~11 m tiles instead of 30 m
@@ -480,7 +492,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     }
 
     // ---- high-clearance tunnels, underwater tubes, underpasses & widened/branching caverns ----
-    buildTunnel(td, path, group, wallMat, roadMat, abutmentMetal, disposables, theme, waterY, heightAt);
+    buildTunnel(td, path, group, wallMat, caveRock, roadMat, abutmentMetal, disposables, theme, waterY, heightAt);
     if (td.def.theme === 'oovo') buildZeroGTubes(path, group, wallMat, abutmentMetal, disposables, theme);
   }
   // ---- sculpted rock bifurcation wedges with glowing direction chevrons at every branching cave split & reunion ----
@@ -965,8 +977,13 @@ function insideCave(L: Sample[], x: number, y: number, z: number, m: number) {
   return y > base - 7 && y < base + 1.5 + (bq.roof - 1.5) * tunnelProfile(Math.max(0, al) / Wd) - m;
 }
 
+/** Brightness of the baked lamp light inside tunnels: rock colour × lamp colour × CAVE_LIGHT × aLit (aLit ≈ 1 beside a lamp or a
+ *  glow vein, up to 3 at the roof right above a lamp). [dark world, bright world] – see `caveGain` in `buildWorld`. */
+const CAVE_LIGHT = [1.5, 0.12];
+interface CaveRock { lit: THREE.Material; flatMat: THREE.Material | null; flat(): THREE.Material }
+
 function buildTunnel(
-  td: TrackData, path: Path, group: THREE.Group, mat: THREE.Material, roadMat: THREE.Material, ribMat: THREE.Material,
+  td: TrackData, path: Path, group: THREE.Group, mat: THREE.Material, rock: CaveRock, roadMat: THREE.Material, ribMat: THREE.Material,
   disp: { dispose: () => void }[], theme: ThemeDef, seaY: number, heightAt: (x: number, z: number) => number,
 ) {
   // Four tunnel kinds (Sample.tun). Cross-section = superellipse (`tunnelArc`, nearly vertical walls), half width Wd = hw + 3.4 m:
@@ -979,13 +996,14 @@ function buildTunnel(
   const runs: [number, number][] = []; let a0 = -1;
   for (let i = 0; i < n; i++) { const on = S[i].roof > 0; if (on && a0 < 0) a0 = i; if ((!on || i === n - 1) && a0 >= 0) { const b0 = on ? i : i - 1; if (b0 - a0 >= 5) runs.push([a0, b0]); a0 = -1; } }
   if (!runs.length) return;
-  type Buf = { pos: number[]; uv: number[]; ind: number[] };
-  const mk = (): Buf => ({ pos: [], uv: [], ind: [] });
-  const shell = mk(), caveShell = mk(), caveEnd = mk(), deck = mk(), berm = mk(), caveBerm = mk(), steel = mk(), glowB = mk(), caveFloor = mk(), veinB = mk(); const winInd: number[] = [];
+  type Buf = { pos: number[]; uv: number[]; ind: number[]; lit?: number[] };
+  const mk = (lit = false): Buf => (lit ? { pos: [], uv: [], ind: [], lit: [] } : { pos: [], uv: [], ind: [] });
+  // (the buffers of the rock INSIDE the tube carry the baked lamp light `lit` – one value per vertex, see `litAt`)
+  const shell = mk(true), caveShell = mk(true), caveEnd = mk(true), deck = mk(), berm = mk(), caveBerm = mk(), steel = mk(), glowB = mk(), caveFloor = mk(true), veinB = mk(); const winInd: number[] = [];
   const segA = TUN_SEG, DECK = TUNNEL_DECK; const lamps: THREE.Matrix4[] = [], ribs: THREE.BufferGeometry[] = [], tites: THREE.Matrix4[] = [];
   const winSeg: boolean[] = []; for (let a = 0; a < segA; a++) { const my = (TUN_ARC[a][1] + TUN_ARC[a + 1][1]) / 2, mx = Math.abs(TUN_ARC[a][0] + TUN_ARC[a + 1][0]) / 2; winSeg.push(my > 0.2 && my < 0.95 && mx > 0.36); }
   const upV = new THREE.Vector3(0, 1, 0), flipQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
-  const put = (b: Buf, s: Sample, lat: number, up: number, u: number, v: number) => { b.pos.push(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + up, s.z + s.rz * lat); b.uv.push(u, v); };
+  const put = (b: Buf, s: Sample, lat: number, up: number, u: number, v: number, lit = 0) => { b.pos.push(s.x + s.rx * lat, s.y + s.ramp - lat * s.bank + up, s.z + s.rz * lat); b.uv.push(u, v); if (b.lit) b.lit.push(lit); };
   const strip = (b: Buf, r0: number, r1: number, cols: number) => { for (let a = 0; a < cols; a++) b.ind.push(r0 + a, r0 + a + 1, r1 + a, r0 + a + 1, r1 + a + 1, r1 + a); };
   // ribs / portal frames are tubes swept along the superellipse vault profile, with legs reaching below the road edge
   const arch = (s: Sample, R: number, tube: number, H: number) => {
@@ -1016,6 +1034,23 @@ function buildTunnel(
     const hasDeck = !sea && !underP && !path.isCave;
     const amp = cave ? 2.6 : (sea || underP) ? 0 : 1.3;
     const sh = cave ? caveShell : shell, bm = cave ? caveBerm : berm, step = cave ? 1 : 2;
+    // Light that the tube's own lamps and glow veins throw on a point of its cross-section (`lat` m beside the centre line, `up` m
+    // above the road of sample i) – baked per vertex, `caveMaterial` turns it into rock colour × lamp colour.
+    //  halo: the bright patch of rock around each roof lamp (6 m),
+    //  wash: the broad light of the lamps on walls and floor (38 m; the lamps hang every 12 samples, so it pools only gently),
+    //  vein: the glow veins along both feet of a cave's walls (line sources: they fall off with the distance, not its square).
+    // A cave reads by its bright roof patches and wall feet with darker rock between; a built tunnel has no veins and more wash.
+    const LAMP_DROP = cave ? 0.9 : 0.45;
+    const litAt = (i: number, lat: number, up: number) => {
+      const s = S[i], k0 = ra + Math.floor((i - ra) / 12) * 12; let halo = 0, wash = 0, vein = 0;
+      for (let li = k0 - 12; li <= k0 + 24; li += 12) {
+        if (li < ra || li > rb) continue;
+        const q = S[li], dz = q.s - s.s, dy = q.roof - LAMP_DROP - up, d2 = lat * lat + dy * dy + dz * dz;
+        halo += 1 / (1 + d2 / 36); wash += 1 / (1 + d2 / 1444);
+      }
+      if (cave) for (const sd of [-1, 1]) { if (sd < 0 ? s.openL : s.openR) continue; vein += 1 / (1 + Math.hypot(lat - sd * (s.hw + 0.75), up - 0.5) / 6); }
+      return Math.min(3, 1.5 * halo + (cave ? 0.34 : 0.5) * wash + 0.9 * vein);
+    };
     let pRing = -1, pDeck = -1, pBerm = -1, pSteel = -1, pGlow = -1, pUnder = false;
     let pFloorL = -1, pFloorR = -1, pVeinL = -1, pVeinR = -1, vAcc = 0, last = ra;
     for (let i = ra; i <= rb; i = i === rb ? rb + 1 : Math.min(rb, i + step)) {
@@ -1034,7 +1069,7 @@ function buildTunnel(
       for (let a = 0; a <= segA; a++) {
         const [ax, ay] = TUN_ARC[a], nz = noise(a);
         const yBase = a === 0 || a === segA ? -2.2 : 1.5; // tuck shell base 2.2 m below road edge so walls never gap on hills!
-        put(sh, s, ax * (Wd + nz), ay * (H + nz) + yBase, s.s / 15, a / segA * vPer);
+        put(sh, s, ax * (Wd + nz), ay * (H + nz) + yBase, s.s / 15, a / segA * vPer, litAt(i, ax * (Wd + nz), ay * (H + nz) + yBase));
       }
       if (pRing >= 0) for (let a = 0; a < segA; a++) {
         const p0 = pRing + a, p1 = ring + a;
@@ -1044,10 +1079,10 @@ function buildTunnel(
         // End wall of a branch tube: a disc divided into RINGS rings (planar texture coordinates: lateral, height). The union below cuts
         // it exactly along the vault of the main cavern, what stays is the part in the rock. Until 2026-11-22 it was ONE fan of large
         // triangles, kept whole as soon as one corner lay in the rock – it stood in the fork as a flat slab.
-        const RINGS = 6, c = caveEnd.pos.length / 3, hc = H * 0.45, nA = segA + 1; put(caveEnd, s, 0, hc, 0, hc / 15);
+        const RINGS = 6, c = caveEnd.pos.length / 3, hc = H * 0.45, nA = segA + 1; put(caveEnd, s, 0, hc, 0, hc / 15, litAt(i, 0, hc));
         for (let r = 1; r <= RINGS; r++) for (let a = 0; a <= segA; a++) {
           const [ax, ay] = TUN_ARC[a], nz = noise(a), f = r / RINGS, lat = ax * (Wd + nz) * f, hh = hc + (ay * (H + nz) + (a === 0 || a === segA ? -2.2 : 1.5) - hc) * f;
-          put(caveEnd, s, lat, hh, lat / 15, hh / 15);
+          put(caveEnd, s, lat, hh, lat / 15, hh / 15, litAt(i, lat, hh));
         }
         const v = (r: number, a: number) => c + 1 + (r - 1) * nA + a % nA;
         for (let a = 0; a <= segA; a++) { // (a = segA closes the disc along the floor: last point of a ring → its first)
@@ -1066,7 +1101,7 @@ function buildTunnel(
           for (let c = 0; c < COLS; c++) {
             const f = c / (COLS - 1), lat = lIn + (lOut - lIn) * f;
             const shelf = f === 0 ? 0.1 : f === COLS - 1 ? 1.4 : 0.35 * f + (vnoise(i * 0.22 + sd * 5, c * 1.3) - 0.42) * 1.1 * Math.sin(f * Math.PI);
-            put(caveFloor, s, lat, shelf, f * 0.5, s.s / 14);
+            put(caveFloor, s, lat, shelf, f * 0.5, s.s / 14, litAt(i, lat, shelf));
           }
           if (prev >= 0) for (let c = 0; c < COLS - 1; c++) {
             const a = prev + c, b = r0 + c;
@@ -1183,20 +1218,20 @@ function buildTunnel(
         if (gapW > 12) break;
         const mx = bq.x + bq.rx * sd * (bq.hw - 0.4), mz = bq.z + bq.rz * sd * (bq.hw - 0.4), my = bq.y + bq.ramp - sd * (bq.hw - 0.4) * bq.bank;
         const bx = ex + s.rx * sd * 0.4, bz = ez + s.rz * sd * 0.4, r0 = caveFloor.pos.length / 3;
-        for (let c = 0; c < 4; c++) { const f = c / 3; caveFloor.pos.push(mx + (bx - mx) * f, my + (ey - my) * f - 0.12 - Math.sin(f * Math.PI) * 0.35, mz + (bz - mz) * f); caveFloor.uv.push(f * 0.5, s.s / 14); }
+        for (let c = 0; c < 4; c++) { const f = c / 3; caveFloor.pos.push(mx + (bx - mx) * f, my + (ey - my) * f - 0.12 - Math.sin(f * Math.PI) * 0.35, mz + (bz - mz) * f); caveFloor.uv.push(f * 0.5, s.s / 14); caveFloor.lit!.push(0.75); }
         if (prev >= 0) for (let c = 0; c < 3; c++) { const a = prev + c, b = r0 + c; caveFloor.ind.push(a, a + 1, b, a + 1, b + 1, b, a, b, a + 1, a + 1, b, b + 1); }
         prev = r0;
       }
     }
   }
 
-  const geo = (b: Buf, ind = b.ind) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2)); g.setIndex(ind); g.computeVertexNormals(); disp.push(g); return g; };
+  const geo = (b: Buf, ind = b.ind) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2)); if (b.lit) g.setAttribute('aLit', new THREE.Float32BufferAttribute(b.lit, 1)); g.setIndex(ind); g.computeVertexNormals(); disp.push(g); return g; };
   const add = (g: THREE.BufferGeometry, m: THREE.Material, cast = false) => { const o = new THREE.Mesh(g, m); o.castShadow = cast; o.receiveShadow = true; group.add(o); return o; };
-  const m2 = (mat as THREE.MeshStandardMaterial).clone(); m2.side = THREE.DoubleSide; disp.push(m2);
-  const sg = geo(shell); if (shell.ind.length || winInd.length) add(sg, m2, true);
-  if (caveShell.ind.length) add(geo(caveShell), m2, true);
-  if (caveEnd.ind.length) add(geo(caveEnd), m2, true);
-  if (caveFloor.ind.length) add(geo(caveFloor), m2, false);
+  const m2 = (mat as THREE.MeshStandardMaterial).clone(); m2.side = THREE.DoubleSide; disp.push(m2); // rock seen from OUTSIDE (berms, headwalls)
+  const sg = geo(shell); if (shell.ind.length || winInd.length) add(sg, rock.lit, true);
+  if (caveShell.ind.length) add(geo(caveShell), rock.lit, true);
+  if (caveEnd.ind.length) add(geo(caveEnd), rock.lit, true);
+  if (caveFloor.ind.length) add(geo(caveFloor), rock.lit, false);
   if (winInd.length) { const wg = new THREE.BufferGeometry(); wg.setAttribute('position', sg.attributes.position); wg.setAttribute('uv', sg.attributes.uv); wg.setIndex(winInd); const wm = oceanWindowMaterial(seaY); add(wg, wm as unknown as THREE.Material); disp.push(wg, wm as unknown as { dispose: () => void }); }
   if (deck.ind.length) add(geo(deck), roadMat);
   if (berm.ind.length) add(geo(berm), m2, true);
@@ -1208,7 +1243,7 @@ function buildTunnel(
   if (ribs.length) { const rg = mergeGeometries(ribs)!; ribs.forEach(x => x.dispose()); const rm = new THREE.Mesh(rg, ribMat); rm.receiveShadow = true; group.add(rm); disp.push(rg); }
   const lg = new THREE.BoxGeometry(1.3, 0.28, 3.4); disp.push(lg);
   if (lamps.length) { const im = new THREE.InstancedMesh(lg, lm, lamps.length); lamps.forEach((mm, i) => im.setMatrixAt(i, mm)); group.add(im); }
-  if (tites.length) { const tg = new THREE.ConeGeometry(1, 1, 6); disp.push(tg); const im = new THREE.InstancedMesh(tg, mat, tites.length); tites.forEach((mm, i) => im.setMatrixAt(i, mm)); im.receiveShadow = true; group.add(im); }
+  if (tites.length) { const tg = new THREE.ConeGeometry(1, 1, 6); disp.push(tg); const im = new THREE.InstancedMesh(tg, rock.flat(), tites.length); tites.forEach((mm, i) => im.setMatrixAt(i, mm)); im.receiveShadow = true; group.add(im); }
 }
 
 function addStartArea(td: TrackData, group: THREE.Group, theme: ThemeDef, disp: { dispose: () => void }[], rng: () => number, dOff = 0, heightAt: (x: number, z: number) => number = () => -20) {

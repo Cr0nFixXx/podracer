@@ -6,7 +6,7 @@ const TSL = TSLmod as any;
  *  compiled with `wet > 0` (dynamic rain → the road gets wet and dries again). Keep it at 1 on worlds without dynamic rain. */
 export const WEATHER: { wet: { value: number } } = { wet: TSL.uniform(1) };
 const {
-  Break, Fn, If, Loop, abs, attribute, clamp, color, cross, dFdx, dFdy, dot, float, inverseSqrt, length, materialColor, materialRoughness, max, mix,
+  Break, Fn, If, Loop, abs, attribute, cameraViewMatrix, clamp, color, cross, dFdx, dFdy, dot, float, inverseSqrt, length, materialColor, materialRoughness, max, mix, vec4,
   normalLocal, normalView, normalViewGeometry, normalWorldGeometry, normalize, positionLocal, positionView, positionWorld, pow,
   oneMinus, smoothstep, texture, uniform, uv, vec2, vec3, vertexColor, floor, fract, min, sin, time,
 } = TSL;
@@ -250,5 +250,65 @@ export function surfaceMaterial(set: TexSet, o: SurfaceOpts = {}) {
     const edgeLock = smoothstep(0.0, 0.14, min(uv().x, oneMinus(uv().x)));
     mat.positionNode = positionLocal.add(normalLocal.mul(texture(set.map, baseUV).level(2).a.mul(amp).mul(edgeLock)));
   }
+  return mat;
+}
+
+export interface CaveOpts {
+  /** metres per repeat of the photo set */
+  tile: number;
+  strata?: StrataDef | null; normalScale?: number; detail?: number; detailScale?: number; macro?: number; envMapIntensity?: number;
+  emissive?: string; emissiveIntensity?: number;
+  /** Light of the tunnel's own lamps and glow veins. Without `level` it is read per vertex from the attribute `aLit` (baked by
+   *  `buildTunnel`); with `level` it is that fixed amount (instanced stalactites have no such attribute). */
+  light?: { color: THREE.Color; level?: number };
+}
+
+/** Rock INSIDE tunnels and caves (2026-11-23, `TODO.md` section 5 „Höhlen-Optik").
+ *
+ *  Why not `surfaceMaterial`: that one maps the photo set by the mesh's UVs, and the vault's UVs run along the tunnel and around the
+ *  arch. The layering of the rock therefore followed the arch like the courses of a brick vault, and wherever a cave widens the rings
+ *  have different lengths – the texture sheared into swirls. Here the set is projected in WORLD space from the three axes and blended
+ *  by the surface normal: layers stay level on the walls, the roof shows the rock from below, nothing stretches, branch tubes and
+ *  shelves continue the same rock without a seam. Three colour and three normal reads, no parallax loop – cheaper than the UV version.
+ *
+ *  Light: nothing but the hemisphere light reaches into a tunnel, and that is the theme's GROUND colour on a roof (lava world: almost
+ *  black). The lamps and glow veins were drawn but lit nothing. Their light is baked per vertex (`aLit`) and added here as
+ *  rock colour × lamp colour × aLit, shaded by the relief as if it came from above. It costs no light source. */
+export function caveMaterial(set: TexSet, o: CaveOpts) {
+  const mat = new THREE.MeshStandardNodeMaterial();
+  mat.roughness = 1; mat.metalness = 0; mat.side = THREE.DoubleSide; mat.envMapIntensity = Math.min(1.15, o.envMapIntensity ?? 0.85);
+  const pw = positionWorld, k = 1 / o.tile, dist = length(positionView), macro = macroTexture();
+  const bw = pow(abs(normalWorldGeometry), vec3(4.0)), w = bw.div(bw.x.add(bw.y).add(bw.z).add(1e-5));
+  const ux = pw.zy.mul(k), uy = pw.xz.mul(k), uz = pw.xy.mul(k);
+  const tri = (t: THREE.Texture): N => texture(t, ux).mul(w.x).add(texture(t, uy).mul(w.y)).add(texture(t, uz).mul(w.z));
+
+  const macroAmt = o.macro ?? 0.3;
+  const macroV = texture(macro, uy.mul(0.0931).add(pw.y.mul(0.004))).r.mul(0.6).add(texture(macro, uz.mul(0.0217).add(0.37)).g.mul(0.4));
+  let col: N = tri(set.map).rgb.mul(mix(float(1 - macroAmt), float(1 + macroAmt * 0.8), macroV));
+  if (o.strata) col = col.mul(strataTint(o.strata));
+  mat.colorNode = col;
+
+  // Relief: per projection the slope along (u, v) of the normal map, plus a finer copy of it close to the camera; z carries the roughness.
+  const ns = o.normalScale ?? 1, detStr = o.detail ?? 0.5, dFade = ssInv(64.0, 6.0, dist).mul(detStr);
+  const slope = (uvp: N): N => {
+    const a = texture(set.normalMap, uvp); let xy: N = a.xy.mul(2).sub(1).mul(ns);
+    if (detStr > 0.01) xy = xy.add(texture(set.normalMap, uvp.mul(o.detailScale ?? 5.3).add(0.13)).xy.mul(2).sub(1).mul(dFade));
+    return vec3(xy, a.a);
+  };
+  const sX = slope(ux), sY = slope(uy), sZ = slope(uz);
+  // u, v of each projection are world axes (x-projection: u = z, v = y …) – the slopes add up to one world-space tilt of the normal
+  const tilt = vec3(0, sX.y, sX.x).mul(w.x).add(vec3(sY.x, 0, sY.y).mul(w.y)).add(vec3(sZ.x, sZ.y, 0).mul(w.z)).mul(ssInv(440.0, 110.0, dist));
+  mat.normalNode = normalize(normalize(normalView).add(cameraViewMatrix.mul(vec4(tilt, 0.0)).xyz));
+  const rough = sX.z.mul(w.x).add(sY.z.mul(w.y)).add(sZ.z.mul(w.z)).mul(materialRoughness);
+  mat.roughnessNode = clamp(mix(rough, max(rough, float(0.36)), smoothstep(48.0, 220.0, dist)), 0.11, 1.0);
+
+  let em: N | null = set.emissiveMap ? tri(set.emissiveMap).rgb.mul(color(o.emissive ?? '#ffffff')).mul(o.emissiveIntensity ?? 1.6) : null;
+  if (o.light) {
+    const amount = o.light.level === undefined ? attribute('aLit', 'float') : float(o.light.level);
+    // (tilt.y > 0: the relief faces upwards, towards the lamps)
+    const lit = col.mul(vec3(o.light.color.r, o.light.color.g, o.light.color.b)).mul(amount).mul(clamp(tilt.y.mul(0.7).add(1), 0.35, 1.6));
+    em = em ? em.add(lit) : lit;
+  }
+  if (em) mat.emissiveNode = em;
   return mat;
 }
