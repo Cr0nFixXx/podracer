@@ -53,7 +53,6 @@ Nur offene Punkte, nach Thema. Erledigtes steht im Verlauf: `docs/verlauf/`, je 
 Auftrag und Entscheidungen: [Protokoll](docs/verlauf/2026-11-23-nach-der-probefahrt.md). Reihenfolge: Fehler → Verbesserungen → Streckenanpassungen → TODO 2, 5, 8. Nach jedem fertigen Block wird gepusht.
 
 **Fehler**
-- [ ] Methan-Derby: Felswände ragen halb auf die Strecke
 - [ ] Extrem schlechte Sicht bei Nacht + Gewitter
 - [ ] Bodentexturen haben Streifen wie Reifenspuren (besonders auf Schnee)
 

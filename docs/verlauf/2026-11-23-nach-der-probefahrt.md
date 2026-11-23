@@ -66,9 +66,15 @@ Der Nutzer ist den Stand vom 2026-11-23 (`ee20aa5`) auf echter GPU gefahren und 
 Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?" – zu schwach, siehe „Untergründe".
 
 ## Was gemacht wurde
-*(wird Punkt für Punkt ergänzt)*
+### Fehler 1 – Methan-Derby: Felswände auf der Strecke
+- **Ursache:** Auf dem Methan-Derby läuft eine Schlucht direkt in zwei Brücken. Brücken-Samples formen das Gelände nicht mit (es gehört der Straße darunter). Das Gelände auf den ersten 40 m der Brücke wurde deshalb allein vom letzten Schlucht-Sample beurteilt – und „hinter dessen 28 m hoher Wand" lag die halbe Brücke. Ein Felsmassiv stand quer über der rechten Hälfte der Fahrbahn, bis 18 m hoch, an drei Brückenenden (Samples 1202–1216, 1308–1320, 1702–1712).
+- **Behoben:** (1) Unter einer Brücke und 2 m + 1,5 Gitterzellen daneben bleibt das Gelände 1,5 m unter der Fahrbahn (`underBridges` in `terrain.ts`). (2) Eine Schluchtwand läuft vor einer Brücke auf einen niedrigen Felsbord aus und steigt dahinter wieder an, wie neben einer Gabelung (`trackBuilder.ts`).
+- **Warum es nie auffiel:** das Werkzeug `tools/ci/poke.ts` („Gelände über der Fahrbahn") übersprang Brücken. Es prüft sie jetzt; alle anderen Strecken sind sauber.
+- **Neues Werkzeug:** `pdbg.mjs`-Variante `scan` – Strahlen quer über jedes vierte Sample; nennt jedes Mesh, das in der Fahrbahn steht. Hat die Stelle in einem Lauf gefunden.
+- **Kein Fehler:** die Felstürme mit grünen Leuchtringen auf der Fahrbahn sind die Geysir-Schlote (`hazards`), sie stehen dort mit Absicht.
 
 ## Geprüft
+- Fehler 1: neue Prüfungen `bridges: …` (11, zuerst rot: Gelände 22,7 m über der Brücke, 309 Punkte; Wand 28 m hoch direkt neben der Brücke). Nur mit Regel (2) stand das Gelände noch 5,2 m über der Fahrbahn – Regel (1) ist nötig. `poke.ts` auf allen Strecken, Gitter 4,5 / 7 / 13,75 m, Brücken eingeschlossen: 0 Punkte (vorher 242 auf dem Methan-Derby). Bilder vorher/nachher an allen drei Stellen (WebGL2, Software).
 
 ## Nicht geprüft
 

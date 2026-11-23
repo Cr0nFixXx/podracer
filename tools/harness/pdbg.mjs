@@ -13,6 +13,10 @@
 //   wire                terrain as wireframe
 //   trails              presses test trails into the first powder snow field (three passes in the middle, one 9 m left, one weaving)
 //   race                all pods fly four seconds over the first powder snow field (real trails, real plumes)
+//   scan[:<step>[_<margin>[_<materials>]]]  no picture: "what stands in the road?" – rays across every <step>-th sample of every
+//                       path (default 4), parallel to the road at 1.5 and 4 m, from <margin> m (default 2.5) inside one edge to the
+//                       other. Tests the meshes of the materials named (a+b+c; default: cliff, rock, terrain, tunnel and cave
+//                       rock) and lists what was hit, by stretch. scan:0 lists the material names of the scene with their sizes.
 //   pick:<x>_<y>+<x>_<y>  no picture: names the mesh under each point of the view (x, y from 0 to 1, origin top left) –
 //                       object, material, geometry, vertex attributes, distance, instance. For "what is that white thing?".
 // query     default "?webgl" (screenshots need WebGL2: headless WebGPU frames come out white)
@@ -33,6 +37,11 @@ for (const v of views) {
   console.log(String(await p.evaluate(([i, d]) => window.track(+i, d), [ti, v])).replace(/^.*?(probe|WebGL2|WebGPU)/, '$1').slice(0, 170));
   let fresh = true; // (first variant of this view: remember which meshes `track()` left visible – it switches the decor and rock sectors for the new camera)
   for (const variant of variants.split(',')) {
+    if (variant.startsWith('scan')) { // scan[:<step>[_<margin>[_<materials>]]] – no picture: what stands in the road
+      const [st, mg, names] = (variant.split(':')[1] ?? '4_2.5').split('_');
+      console.log(`${v} ${variant}:\n` + await p.evaluate((st, mg, names) => names === undefined ? window.scanRoad(st, mg) : window.scanRoad(st, mg, names), +st, +(mg ?? 2.5), names));
+      continue;
+    }
     if (variant.startsWith('pick:')) {
       for (const pt of variant.slice(5).split('+')) { const [x, y] = pt.split('_').map(Number); console.log(`${v} pick ${x},${y}: ` + await p.evaluate((x, y) => window.pick(x, y), x, y)); }
       continue;

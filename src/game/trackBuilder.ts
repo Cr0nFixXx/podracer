@@ -958,7 +958,9 @@ export function buildTrack(def: TrackDef): TrackData {
   {
     const n = samples.length, W = (i: number) => samples[closed ? ((i % n) + n) % n : Math.max(0, Math.min(n - 1, i))];
     for (const right of [false, true]) {
-      const isOpen = (q: Sample) => right ? q.openR : q.openL, fac = new Float32Array(n).fill(1);
+      // 2026-11-23: the same before and behind a BRIDGE. A canyon that runs into a crossing lost its walls on the bridge samples only –
+      // on the Methan-Derby a 28 m wall ended where the bridge began, and the terrain's massif behind it stood across half the deck.
+      const isOpen = (q: Sample) => (right ? q.openR : q.openL) || !!q.bridge, fac = new Float32Array(n).fill(1);
       for (let i = 0; i < n; i++) {
         if (isOpen(samples[i])) continue;
         let d = 19; for (let k = 1; k <= 18 && d > 18; k++) if (isOpen(W(i - k)) || isOpen(W(i + k))) d = k;

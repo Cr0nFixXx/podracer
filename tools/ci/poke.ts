@@ -19,7 +19,9 @@ for (const def of TRACKS) {
     const S = p.samples; let run: { a: number; b: number; mx: number; lat: number; n: number } | null = null;
     const flush = () => { if (run) { lines.push(`  path ${p.id}${p.isCave ? ' CAVE' : ''} ${run.a}-${run.b} max +${run.mx.toFixed(1)} m @lat ${run.lat.toFixed(0)} (${run.n} pts)`); run = null; } };
     for (let i = 0; i < S.length; i += 2) {
-      const s = S[i]; if (s.gap || s.bridge || s.zeroG || s.lake) { flush(); continue; }
+      // (2026-11-23: bridges are tested too – the terrain passes BELOW a bridge, but on the Methan-Derby the massif of the canyon
+      //  before the bridge stood across half of its deck; until then this line skipped `s.bridge`)
+      const s = S[i]; if (s.gap || s.zeroG || s.lake) { flush(); continue; }
       let mx = 0, ml = 0, n = 0;
       for (let lat = -s.hw + 0.5; lat <= s.hw - 0.5; lat += 1.5) {
         const x = s.x + s.rx * lat, z = s.z + s.rz * lat, road = s.y + s.ramp - lat * s.bank, h = mesh(x, z);

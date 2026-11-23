@@ -303,7 +303,7 @@ export function makeTerrainField(td: TrackData, theme: ThemeDef, meshCell = 7): 
   // is handicapped by SLOPE metres per metre beyond R_IN, so far from a road its vote fades out without a step. (2026-11-22)
   const R_IN = 6, SLOPE = 1.6;
   let wS: Sample, wEdge = 0, wK = 0; // the winning stretch of the last `evalMulti`: its sample and handicap – and the nearest road edge
-  const evalMulti = (x: number, z: number, writeSplat: boolean) => {
+  const evalVote = (x: number, z: number, writeSplat: boolean) => {
     near2(x, z);
     wK = 0;
     if (!c0) { const n = nearest(x, z); wS = n.s; wEdge = n.d - n.s.hw; return evalWithSample(x, z, n.s, n.d, writeSplat); }
@@ -317,6 +317,30 @@ export function makeTerrainField(td: TrackData, theme: ThemeDef, meshCell = 7): 
     if (h1 < h0) { wS = s1; wK = k1; if (writeSplat) { splat.g = g; splat.b = b; splat.c = c; } return h1; }
     wK = k0; return h0;
   };
+  // 2026-11-23 – a bridge deck is a ceiling for the ground. Bridge samples take no part in shaping it (the ground belongs to the road
+  // that passes below), so near a bridge it is judged from the samples before and behind the bridge alone – and whatever stands beside
+  // THEIR road (the massif behind a canyon wall, the hill behind a rock kerb) wrapped around the end of that stretch onto the deck: on the
+  // Methan-Derby a rock massif stood across the right half of both bridges, up to 18 m high. Under the deck and for 2 m + 1.5 mesh cells
+  // beside it (a terrain triangle spans up to 1.42 cells) the ground now stays 1.5 m below the low edge of the deck; further out the
+  // ceiling rises by 1.2 m per metre.
+  const bridgeBins = new Map<number, Sample[]>();
+  for (const p of td.paths) for (const q of p.samples) {
+    if (!q.bridge || q.gap) continue;
+    const cx = Math.floor(q.x / cell), cz = Math.floor(q.z / cell);
+    for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) { const k = key(cx + i, cz + j); let a = bridgeBins.get(k); if (!a) { a = []; bridgeBins.set(k, a); } a.push(q); }
+  }
+  const BRIDGE_CLEAR = 1.5, bridgeSide = 2 + meshCell * 1.5;
+  const underBridges = (x: number, z: number, h: number) => {
+    const arr = bridgeBins.get(key(Math.floor(x / cell), Math.floor(z / cell))); if (!arr) return h;
+    let ceil = Infinity;
+    for (const q of arr) {
+      const e = Math.hypot(q.x - x, q.z - z) - q.hw; if (e > 80) continue;
+      const c = q.y + q.ramp - Math.abs(q.bank) * q.hw - BRIDGE_CLEAR + Math.max(0, e - bridgeSide) * 1.2;
+      if (c < ceil) ceil = c;
+    }
+    return Math.min(h, ceil);
+  };
+  const evalMulti = (x: number, z: number, writeSplat: boolean) => underBridges(x, z, evalVote(x, z, writeSplat));
   const heightAt = (x: number, z: number) => evalMulti(x, z, true);
   const edgeDist = (x: number, z: number) => { near2(x, z); if (!c0) { const n = nearest(x, z); return n.d - n.s.hw; } const e0 = cd0 - c0.hw; return c1 ? Math.min(e0, cd1 - (c1 as Sample).hw) : e0; };
   const sampleCover = (x: number, z: number, out: { y: number; edge: number; gx: number; gz: number }) => {

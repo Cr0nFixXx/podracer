@@ -27,6 +27,57 @@ let g: Game | null = null; let cur = -1;
     + ` at=${[h.point.x, h.point.y, h.point.z].map(v => v.toFixed(1)).join('_')}`
     + (h.face ? ` faceNy=${h.face.normal.y.toFixed(2)}` + (g.attributes.normal ? ` vertexNy=${[h.face.a, h.face.b, h.face.c].map(k => (g.attributes.normal as THREE.BufferAttribute).getY(k).toFixed(2)).join('/')}` : '') : '');
 };
+// "What stands in the road?" – rays across every `step`-th sample of every path, parallel to the (banked) road surface at two
+// heights, from `margin` metres inside the left edge to `margin` metres inside the right edge. Reports the meshes they hit, clustered
+// by mesh and stretch. Used by `pdbg.mjs scan` (2026-11-23: rock walls stood half on the road of the Methan-Derby).
+// `only` = material names to test, '+'-separated ('' = everything except the road, liquids, sky and effects – slow: three's raycast
+// walks every triangle of every mesh whose bounding sphere the ray touches). `scanRoad(0)` lists the material names of the scene.
+(window as unknown as Record<string, unknown>).scanRoad = (step = 4, margin = 2.5, only = 'cliff+cliffBlend+rock+terrain+tunnelWall+caveRock+caveRockFlat', heights = [1.5, 4]) => {
+  const G = g!; const rc = new THREE.Raycaster();
+  const shown = (o: THREE.Object3D | null) => { for (let a = o; a; a = a.parent) if (!a.visible) return false; return true; };
+  const matOf = (m: THREE.Mesh) => (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.Material & { alphaTestNode?: unknown };
+  const tris = (m: THREE.Mesh) => ((m.geometry.index?.count ?? m.geometry.attributes.position?.count ?? 0) / 3) * ((m as unknown as THREE.InstancedMesh).count ?? 1);
+  if (!step) { // the names to choose from
+    const seen = new Map<string, [number, number]>();
+    G.scene.traverse(o => { const m = o as THREE.Mesh; if (!m.isMesh) return; const k = `${matOf(m)?.name || '(' + matOf(m)?.type + ')'} / mesh "${m.name}"`, e = seen.get(k) ?? [0, 0]; e[0]++; e[1] += tris(m); seen.set(k, e); });
+    return [...seen].sort((a, b) => b[1][1] - a[1][1]).map(([k, [n, t]]) => `${k}: ${n} meshes, ${Math.round(t)} triangles`).join('\n');
+  }
+  const names = only ? only.split('+') : null, all: THREE.Mesh[] = [];
+  G.scene.traverse(o => {
+    const m = o as THREE.Mesh; if (!m.isMesh) return; const mat = matOf(m), n = mat?.name ?? '';
+    if (names ? !(names.includes(n) || names.includes(m.name)) : ((m as unknown as THREE.InstancedMesh).isInstancedMesh && !!mat.alphaTestNode) || mat.transparent || /road|ground|water|sky|lava|liquid|snow/i.test(n + m.name)) return;
+    all.push(m);
+  });
+  let cands: THREE.Object3D[] = [], sinceUpdate = 1e9;
+  type Hit = { p: number; i: number; lat: number; h: number; key: string; at: string };
+  const hits: Hit[] = []; let rays = 0;
+  G.td.paths.forEach((path, p) => {
+    const S = path.samples;
+    for (let i = 0; i < S.length; i += step) {
+      const s = S[i]; if (s.gap) continue;
+      const L = s.hw - margin; if (L < 2) continue;
+      // decor, rock rows and the near / far twins are switched by sector around the camera: look from where the pod would be
+      if (++sinceUpdate > 12) { sinceUpdate = 0; G.world.update(G.clock + 5, new THREE.Vector3(s.x, s.y + 3, s.z)); cands = all.filter(shown); }
+      for (const h of heights) {
+        const y0 = s.y + s.ramp, a = new THREE.Vector3(s.x - s.rx * L, y0 + L * s.bank + h, s.z - s.rz * L), b = new THREE.Vector3(s.x + s.rx * L, y0 - L * s.bank + h, s.z + s.rz * L);
+        const d = b.clone().sub(a), len = d.length(); d.normalize(); rc.set(a, d); rc.near = 0; rc.far = len; rays++;
+        const hit = rc.intersectObjects(cands, false)[0]; if (!hit) continue;
+        const o = hit.object as THREE.Mesh, m = matOf(o);
+        hits.push({ p, i, lat: -L + hit.distance, h, key: `${m?.name || m?.type} / mesh "${o.name}" / geometry "${o.geometry.name}"`, at: [hit.point.x, hit.point.y, hit.point.z].map(v => v.toFixed(1)).join('_') });
+      }
+    }
+  });
+  // cluster: same mesh key, same path, sample indices closer than 40
+  hits.sort((x, y) => x.key < y.key ? -1 : x.key > y.key ? 1 : x.p - y.p || x.i - y.i);
+  const out: string[] = [`rays=${rays} hits=${hits.length} meshes tested=${all.length} (${Math.round(all.reduce((t, m) => t + tris(m), 0))} triangles)`]; let k = 0;
+  while (k < hits.length) {
+    let e = k; while (e + 1 < hits.length && hits[e + 1].key === hits[k].key && hits[e + 1].p === hits[k].p && hits[e + 1].i - hits[e].i <= 40) e++;
+    const c = hits.slice(k, e + 1), lats = c.map(q => q.lat), hw = G.td.paths[c[0].p].samples[c[0].i].hw, mid = c[Math.floor(c.length / 2)];
+    out.push(`${c[0].key}  path ${c[0].p} ${c[0].i}-${c[c.length - 1].i}  n=${c.length}  lat ${Math.min(...lats).toFixed(0)}..${Math.max(...lats).toFixed(0)} (hw ${hw.toFixed(0)})  heights ${[...new Set(c.map(q => q.h))].join('/')}  e.g. sample ${mid.i} at=${mid.at}`);
+    k = e + 1;
+  }
+  return out.join('\n');
+};
 (window as unknown as Record<string, unknown>).track = async (i: number, view: string) => {
   if (cur !== i) {
     g?.dispose(); cur = i;

@@ -1304,5 +1304,40 @@ for (const id of ['boonta', 'frost', 'magma', 'oovo']) test(`open sections: the 
   }
 });
 
+// ---- bridges: the terrain passes below the deck (2026-11-23, reported by the user after the first drive on a real GPU) ----
+// On the Methan-Derby a canyon runs straight into a bridge. Bridge samples take no part in shaping the ground, so the ground on the first
+// 40 m of the deck was judged from the last canyon sample alone – and "behind its 28 m wall" lay half of the bridge: a rock massif stood
+// across the right half of the road, 18 m high, at both ends of both bridges. `tools/ci/poke.ts` skipped bridge samples until that day.
+for (const id of TRACKS.filter(t => trackOf(t.id).main.samples.some(q => q.bridge)).map(t => t.id)) test(`bridges: the terrain stays below the deck of every bridge of ${id} (terrain mesh of 4.5, 7 and 13.75 m)`, () => {
+  const td = trackOf(id), S = td.main.samples;
+  for (const cell of [4.5, 7, 13.75]) {
+    const mesh = terrainMeshOf(id, cell); let worst = 0, where = '', n = 0, bad = 0;
+    for (let i = 0; i < S.length; i += 2) {
+      const s = S[i]; if (!s.bridge || s.gap) continue; n++;
+      for (let lat = -s.hw + 0.5; lat <= s.hw - 0.5; lat += 1.5) {
+        const over = mesh(s.x + s.rx * lat, s.z + s.rz * lat) - (s.y + s.ramp - lat * s.bank);
+        if (over > 0.3) bad++;
+        if (over > worst) { worst = over; where = `sample ${i} lat ${lat.toFixed(0)}`; }
+      }
+    }
+    ok(n > 20, `${id}: only ${n} bridge samples`);
+    ok(worst < 0.3, `${cell} m cells: terrain ${worst.toFixed(1)} m above the bridge deck at ${where} (${bad} points)`);
+  }
+});
+
+// A canyon wall must not end at its full height where a bridge begins: it comes down to a rock kerb first, as it does beside a fork mouth.
+test('bridges: a canyon wall comes down before a bridge begins and rises again behind it – on every track', () => {
+  const bad: string[] = [];
+  for (const def of TRACKS) {
+    const S = trackOf(def.id).main.samples, n = S.length, closed = def.type === 'circuit';
+    for (let i = 0; i < n; i++) {
+      if (S[i].bridge) continue;
+      const nb = [i - 1, i + 1].some(k => closed ? S[((k % n) + n) % n].bridge : k >= 0 && k < n && S[k].bridge);
+      if (nb && Math.max(S[i].hL, S[i].hR) > 2) bad.push(`${def.id} ${i}: wall ${Math.max(S[i].hL, S[i].hR).toFixed(0)} m high right beside a bridge`);
+    }
+  }
+  eq(bad.length, 0, `${bad.slice(0, 6).join(' · ')} –`);
+});
+
 console.log(failed ? `\n${failed} unit check(s) FAILED, ${passed} passed.` : `All ${passed} unit checks passed.`);
 process.exit(failed ? 1 : 0);
