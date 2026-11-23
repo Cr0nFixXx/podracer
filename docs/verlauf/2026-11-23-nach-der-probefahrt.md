@@ -102,6 +102,16 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - HUD-Hinweis über dem See: „Boost nur ganz kurz". README-Tabelle angepasst.
 - Geprüft: zwei neue Unit-Prüfungen `lava:` (vorher rot: 2,1–2,3 s bis zum Limit, 3,8–4,0 s bis zur Abschaltung; jetzt ≤ 1,1 s und ≤ 2,3 s).
 
+### Verbesserung – größere Schatten-Sichtweite („Schattenwand" auf Ultra)
+- **Ursache der Schattenwand:** auf „Ultra" gibt es zwei Schattenstufen (nah, weit). Die weite Stufe hat gar nicht gearbeitet: ihr Tiefenbereich endete über dem Boden. Alle Schatten hörten deshalb 104 m vor dem Pod auf, und diese Kante fuhr mit.
+- **Behoben:** die weite Stufe schattiert jetzt wirklich – bis 700 m (bis 112 m scharf, dahinter weicher, die letzten 175 m laufen aus).
+- **Auch ohne Kaskaden weiter:** eine Schattenkarte reicht jetzt 195 / 245 / 295 m vor den Pod (bisher 148 m) und läuft am Rand weich aus statt mit einer harten Linie.
+- **Tiefe Sonne (Dämmerung):** das Schattenlicht steht jetzt 2000 m statt 360 m hinter der Szene – vorher lag bei tiefer Sonne der größte Teil der Karte hinter dem Licht.
+- **Felsen** (Felsreihen, Felsnadeln nahe der Strecke) werfen Schatten so weit, wie die Schatten reichen (bisher 150 m).
+- Alles dazu steht in `src/game/sunShadow.ts`; Regeln in `docs/regeln/grafik.md` → „Sun shadows". Anzeige der Schattenqualität im Menü berichtigt (1024 / 1536 / 2048 statt 1024 / 2048 / 4096).
+- Geprüft: drei neue Unit-Prüfungen `shadow:` (mit den alten Werten lagen 2801 von 4640 sichtbaren Bodenpunkten außerhalb ihrer Schattenstufe – jetzt 0), Bildvergleich vorher/nachher auf Boonta (Ultra: Wandschatten und Bogenschatten jetzt auch in der Ferne), WebGPU-Konsolenprüfung mit einer Karte und mit Kaskaden (0 Fehler).
+- **Nicht gemessen:** die Kosten auf einer echten Grafikkarte. Die weite Stufe zeichnet jetzt wirklich (in jedem zweiten Bild). Fällt „Ultra" unter 60 FPS: `CSM_FAR` in `sunShadow.ts` kleiner stellen.
+
 ## Geprüft
 - Fehler 1: neue Prüfungen `bridges: …` (11, zuerst rot: Gelände 22,7 m über der Brücke, 309 Punkte; Wand 28 m hoch direkt neben der Brücke). Nur mit Regel (2) stand das Gelände noch 5,2 m über der Fahrbahn – Regel (1) ist nötig. `poke.ts` auf allen Strecken, Gitter 4,5 / 7 / 13,75 m, Brücken eingeschlossen: 0 Punkte (vorher 242 auf dem Methan-Derby). Bilder vorher/nachher an allen drei Stellen (WebGL2, Software).
 

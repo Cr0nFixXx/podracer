@@ -21,6 +21,8 @@ import { applyDamage, bodyToWorld, collidePods, hullWorld, podParams, respawn, s
 import { DAMAGE_RULES, damageModel, lostMessage, partLamps, partsFx, zoneFactor, type DamageZone } from '../../src/game/podDamage';
 import { buildTrack, frameAt, tunnelCeiling, baySameStretch, DS, TUNNEL_SHOULDER, type Path, type Sample, type TrackData } from '../../src/game/trackBuilder';
 import { defaultProfile, effectiveStats, loadProfile, saveProfile, CAMERA_NAMES, MAX_LAPS, PRESETS, type GfxSettings } from '../../src/game/settings';
+import * as GPU3 from 'three/webgpu';
+import { setupSunShadow, CSM_FAR, CSM_SPLIT, SH_BACK, SH_BOX } from '../../src/game/sunShadow';
 
 let failed = 0, passed = 0;
 const ONLY = process.env.ONLY;
@@ -1302,6 +1304,74 @@ for (const id of ['boonta', 'frost', 'magma', 'oovo']) test(`open sections: the 
     ok(n > 100, `${id}: only ${n} samples with a bay`);
     ok(worst < 0.3, `${cell} m cells: terrain ${worst.toFixed(2)} m above the road at ${where}`);
   }
+});
+
+// ---- sun shadows (2026-11-23, user: „größere Schatten-Sichtweite – auf Ultra schiebt sich eine Schattenwand vor dem Pod her") ----
+// The far cascade's depth range ended in mid-air above the ground: it shaded nothing, every shadow stopped at the split 104 m ahead.
+// These checks project points of the ground through the shadow cameras the game sets up: what the player sees must lie inside.
+const SUNS: [string, number][] = [['dusk', 4.5], ['dawn', 7], ['moon', 34], ['day', 50], ['noon', 78]];
+const sunVec = (elev: number, az: number) => { const e = elev * Math.PI / 180; return new GPU3.Vector3(Math.cos(e) * Math.sin(az), Math.sin(e), Math.cos(e) * Math.cos(az)); };
+/** Is the point inside the box of this shadow (light with `.shadow` and `.target`)? Returns '' or what is wrong. */
+function inShadowBox(light: { shadow: GPU3.LightShadow; matrixWorld: GPU3.Matrix4 }, pt: GPU3.Vector3): string {
+  const sh = light.shadow, c = sh.camera as GPU3.OrthographicCamera;
+  sh.updateMatrices(light as unknown as GPU3.Light);
+  const v = pt.clone().applyMatrix4(c.matrixWorldInverse), half = (c.right - c.left) / 2, depth = -v.z;
+  if (Math.abs(v.x) > half || Math.abs(v.y) > half) return `beside the map (${v.x.toFixed(0)}, ${v.y.toFixed(0)} of ±${half.toFixed(0)})`;
+  if (depth < c.near || depth > c.far) return `depth ${depth.toFixed(0)} outside ${c.near} … ${c.far.toFixed(0)}`;
+  return '';
+}
+test('shadow: cascades – every piece of ground the player sees up to 690 m lies inside its cascade, under any sun, at any field of view', () => {
+  const bad: string[] = []; let n = 0;
+  for (const fov of [70, 94]) {
+    const scene = new GPU3.Scene(), sun = new GPU3.DirectionalLight(0xffffff, 1); scene.add(sun, sun.target);
+    const cam = new GPU3.PerspectiveCamera(fov, 16 / 9, 0.5, 6000); cam.position.set(40, 12, -30); cam.lookAt(40, 9.5, 70); cam.updateMatrixWorld(true);
+    const rig = setupSunShadow(sun, 3, true), csm = rig.csm as unknown as { _init(o: unknown): void; updateBefore(): void; lights: { shadow: GPU3.LightShadow; matrixWorld: GPU3.Matrix4; position: GPU3.Vector3 }[] };
+    ok(!!rig.csm, 'no cascades were set up');
+    csm._init({ camera: cam, renderer: { coordinateSystem: GPU3.WebGPUCoordinateSystem, reversedDepthBuffer: false } }); // (what the first material does in the browser)
+    const fr = new GPU3.Frustum().setFromProjectionMatrix(new GPU3.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+    const fwd = cam.getWorldDirection(new GPU3.Vector3()), flat = new GPU3.Vector3(fwd.x, 0, fwd.z).normalize(), side = new GPU3.Vector3(flat.z, 0, -flat.x);
+    for (const [name, elev] of SUNS) for (let k = 0; k < 8; k++) {
+      const d = sunVec(elev, k * Math.PI / 4 + 0.2), right = new GPU3.Vector3().crossVectors(new GPU3.Vector3(0, 1, 0), d).normalize(), up = new GPU3.Vector3().crossVectors(d, right).normalize();
+      sun.target.position.copy(cam.position); sun.position.copy(cam.position).addScaledVector(d, SH_BACK); sun.updateMatrixWorld(true); sun.target.updateMatrixWorld(true);
+      rig.update(sun.target.position, right, up); csm.updateBefore();
+      for (const dist of [30, 100, 125, 200, 350, 520, 690]) for (const b of [-0.85, -0.4, 0, 0.4, 0.85]) for (const drop of [6, 40]) {
+        const ang = b * Math.atan(Math.tan(fov * Math.PI / 360) * 16 / 9), g = cam.position.clone().addScaledVector(flat, dist * Math.cos(ang)).addScaledVector(side, dist * Math.sin(ang)); g.y = cam.position.y - drop;
+        if (!fr.containsPoint(g)) continue;
+        const depth = g.clone().sub(cam.position).dot(fwd), cascade = depth / CSM_FAR < CSM_SPLIT ? 0 : 1; if (depth > CSM_FAR) continue;
+        n++; const why = inShadowBox(csm.lights[cascade], g);
+        if (why) bad.push(`${name} az ${k * 45}° fov ${fov}: ground ${dist} m ahead (cascade ${cascade}) – ${why}`);
+      }
+    }
+    rig.dispose();
+  }
+  ok(n > 1500, `only ${n} points were tested`);
+  eq(bad.length, 0, `${bad.length} of ${n} · ${bad.slice(0, 3).join(' · ')} –`);
+});
+test('shadow: one map – the ground inside the map lies inside its depth range under any sun, in every shadow quality', () => {
+  const bad: string[] = []; let n = 0;
+  for (const q of [1, 2, 3]) {
+    const scene = new GPU3.Scene(), sun = new GPU3.DirectionalLight(0xffffff, 1); scene.add(sun, sun.target);
+    const rig = setupSunShadow(sun, q, false), ext = SH_BOX[q].ext; ok(!rig.csm && rig.texel > 0, `quality ${q}: no single map`);
+    for (const [name, elev] of SUNS) for (let k = 0; k < 4; k++) {
+      const d = sunVec(elev, k * Math.PI / 2 + 0.3), right = new GPU3.Vector3().crossVectors(new GPU3.Vector3(0, 1, 0), d).normalize(), up = new GPU3.Vector3().crossVectors(d, right).normalize();
+      sun.target.position.set(500, 20, -300); sun.position.copy(sun.target.position).addScaledVector(d, SH_BACK); sun.updateMatrixWorld(true); sun.target.updateMatrixWorld(true);
+      for (const u of [-0.75, 0, 0.75]) for (const v of [-0.75, -0.3, 0.3, 0.75]) for (const dy of [0, -25]) {
+        // the point of the ground (dy below the target) that the map's texel (u, v) looks at
+        const w = (dy - v * ext * up.y) / d.y, g = sun.target.position.clone().addScaledVector(right, u * ext).addScaledVector(up, v * ext).addScaledVector(d, w);
+        n++; const why = inShadowBox(sun as unknown as { shadow: GPU3.LightShadow; matrixWorld: GPU3.Matrix4 }, g);
+        if (why) bad.push(`quality ${q} ${name}: map (${u}, ${v}), ${dy} m – ${why}`);
+      }
+    }
+    rig.dispose();
+  }
+  eq(bad.length, 0, `${bad.length} of ${n} · ${bad.slice(0, 3).join(' · ')} –`);
+});
+test('shadow: reach – one map shades at least 190 m ahead of the pod, the cascades 600 m; scenery throws shadows that far', () => {
+  for (const q of [1, 2, 3]) { const b = SH_BOX[q]; ok(b.ext + b.ahead >= 190, `quality ${q}: the map ends ${b.ext + b.ahead} m ahead`); ok(b.ext - b.ahead >= 40, `quality ${q}: only ${b.ext - b.ahead} m behind the pod`); ok(b.ext * 2 / b.map <= 0.25, `quality ${q}: ${(b.ext * 2 / b.map).toFixed(2)} m per texel`); }
+  ok(CSM_FAR >= 600 && CSM_FAR * CSM_SPLIT >= 100, `cascades: far ${CSM_FAR} m, near cascade ${(CSM_FAR * CSM_SPLIT).toFixed(0)} m`);
+  const sun = new GPU3.DirectionalLight(0xffffff, 1), one = setupSunShadow(sun, 2, false), two = setupSunShadow(new GPU3.DirectionalLight(0xffffff, 1), 3, true);
+  ok(one.reach >= SH_BOX[2].ext + SH_BOX[2].ahead, `scenery reach ${one.reach} m with one map`); ok(two.reach >= 400, `scenery reach ${two.reach} m with cascades`);
+  one.dispose(); two.dispose();
 });
 
 // ---- lava (2026-11-23, user: "bei Fahrten über Lava extrem kurze Boost-Möglichkeit") ----

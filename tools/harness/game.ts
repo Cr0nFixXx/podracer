@@ -199,8 +199,10 @@ let g: Game | null = null; let cur = -1;
     G.state = 'race'; (G as unknown as { keys: Set<string> }).keys.add('KeyW'); for (let k = 0; k < 170; k++) { G.update(1 / 60); if (k % 3 === 0) G.updateVisuals(); } G.updateCamera(0.5);
   } else { G.updateCamera(0.5); }
   if (!chase) G.camera.fov = 70; G.camera.updateProjectionMatrix(); G.sky.mesh.position.copy(G.camera.position);
-  const fwd = G.camera.getWorldDirection(new THREE.Vector3()); const t = G.camera.position.clone().addScaledVector(fwd, 50);
-  G.sun.target.position.copy(t); G.sun.position.copy(t).addScaledVector(G.sunDir, 400);
+  const fwd = G.camera.getWorldDirection(new THREE.Vector3());
+  // (2026-11-23: the game's own placement of the shadows – box, depth and cascades as in a race. The single map is centred `ahead`
+  //  metres in front of the given point; a probe camera has no pod, so the box goes where the camera looks.)
+  if (!chase) { const h = Math.hypot(fwd.x, fwd.z) || 1; G.placeShadow(G.camera.position.x, G.camera.position.y, G.camera.position.z, fwd.x / h, fwd.z / h); }
   { const rt = new URLSearchParams(location.search).get('rt'); if (rt) { G.raceTime = +rt; G.applyEnv(0, true); } }
   G.updateVisuals(); G.updateLights(); G.updateShields(0.5); G.world.update(G.clock + 5, G.camera.position);
   if (location.search.includes('bright') && !G.scene.getObjectByName('dbgAmb')) { const al = new THREE.AmbientLight(0xffffff, 2.5); al.name = 'dbgAmb'; G.scene.add(al); } // diagnostic fill light (caves)

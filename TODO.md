@@ -54,8 +54,7 @@ Auftrag und Entscheidungen: [Protokoll](docs/verlauf/2026-11-23-nach-der-probefa
 
 **Fehler** – alle drei behoben (Protokoll), warten auf die Probefahrt des Nutzers
 
-**Verbesserungen** – erledigt (Protokoll): kein Fallschaden bei normaler Landung · Plasma-Hitzeschild über Lava · über Lava nur extrem kurzer Boost
-- [ ] Größere Schatten-Sichtweite (auf „Ultra" schiebt sich eine Schattenwand vor dem Pod her)
+**Verbesserungen** – erledigt (Protokoll): kein Fallschaden bei normaler Landung · Plasma-Hitzeschild über Lava · über Lava nur extrem kurzer Boost · größere Schatten-Sichtweite (Schattenwand auf „Ultra" behoben – **bitte FPS auf „Ultra" prüfen**, die weite Schattenstufe arbeitet jetzt erst wirklich)
 - [ ] Wasserspritzer auf der Linse auch über Wasser/Pfützen ohne Regen
 - [ ] Boost-Alarm: langsam stärker werdender Ton kurz vor dem Maximum
 - [ ] Controller-Bedienung auch im Menü

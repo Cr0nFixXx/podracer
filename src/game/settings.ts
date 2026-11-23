@@ -6,7 +6,7 @@ import { defaultKeys, defaultPad, normalizeKeys, normalizePad, type KeyMap, type
 export interface GfxSettings {
   preset: 'low' | 'medium' | 'high' | 'ultra' | 'custom';
   renderScale: number;
-  shadows: number; // 0 off, 1 1024, 2 2048, 3 4096
+  shadows: number; // 0 off, 1 1024, 2 1536, 3 2048 (map size; box and reach: SH_BOX in sunShadow.ts)
   texRes: number;
   parallax: boolean;
   ao: boolean;
@@ -20,7 +20,7 @@ export interface GfxSettings {
   weatherFx?: number;   // 0 off · 1 reduced · 2 full: rain/snow particles, gusts, spray, splashes, lens drops (live)
   volumetrics?: number; // 0 off · 1 height fog + light cones · 2 + drifting fog banks
   lensFx?: boolean; // sun glare / lens flare + rain droplets on the lens (default on)
-  csm?: boolean; // opt-in 2-cascade sun shadows (near 0–105 m + far 105–520 m) – costs one extra shadow pass
+  csm?: boolean; // opt-in 2-cascade sun shadows (near 0–112 m + far 112–700 m, sunShadow.ts) – costs one extra shadow pass every second frame
   motionBlur: boolean;
   cinematic: boolean;
   particles: number;

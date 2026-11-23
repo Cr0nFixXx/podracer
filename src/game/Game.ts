@@ -11,7 +11,7 @@ import { SnowField } from './snowField';
 import { normalizeKeys, normalizePad, padValue, type Action, type KeyMap, type PadMap } from './keymap';
 import { podEnvelope } from './podDesigns';
 import { WeatherFx } from './weather';
-import { CSMShadowNode } from 'three/examples/jsm/csm/CSMShadowNode.js';
+import { SH_BACK, setupSunShadow, type SunShadow } from './sunShadow';
 import { DIFFICULTIES, PILOTS, PODS, THEMES, TRACKS } from './data';
 import { CAMERA_NAMES, effectiveStats, MAX_OPPONENTS, type Profile, type GfxSettings } from './settings';
 import { pickRivals, rivalKit } from './roster';
@@ -67,7 +67,7 @@ export class Game {
   renderer!: THREE.WebGPURenderer; backend = 'WebGL2'; scene = new THREE.Scene(); camera!: THREE.PerspectiveCamera;
   post!: PostFX; world!: World; td!: TrackData; particles!: Particles; audio!: AudioFX;
   sky!: ReturnType<typeof makeSky>; sun!: THREE.DirectionalLight; sunDir = new THREE.Vector3();
-  csm: CSMShadowNode | null = null; csmFov = 0;
+  sunShadow!: SunShadow; csmFov = 0;
   env!: EnvFx; weather!: WeatherFx; hemi!: THREE.HemisphereLight; prevRoll = 0;
   keymap: KeyMap = normalizeKeys(null); padmap: PadMap = normalizePad(null); envLabel = '';
   fog!: ReturnType<typeof applyAtmosphere>;
@@ -83,7 +83,6 @@ export class Game {
   debris = new DebrisPool(); /** sheet metal: Bruchteile and pieces of exploding pods */ scrap = new DebrisPool('plate'); dustAmt = 1;
   /** Session 14: 0..1 how far the player is under a roof (rain, splashes and lens drops fade out); weather-effects quality 0 / 0.5 / 1 */
   cover = 0; wxQ = 1; envDirty = false;
-  private shadowTexel = 0;
   private sunRight = new THREE.Vector3(); private sunUp = new THREE.Vector3();
   pods: PodState[] = []; player!: PodState;
   keys = new Set<string>();
@@ -164,17 +163,9 @@ export class Game {
     const hemi = new THREE.HemisphereLight(theme.hemiSky, theme.hemiGround, 0.58); this.scene.add(hemi); this.hemi = hemi;
     const sun = new THREE.DirectionalLight(theme.sunColor, theme.sunIntensity);
     sun.castShadow = gfx.shadows > 0;
-    const ms = [0, 1024, 1536, 2048][gfx.shadows] ?? 1536;
-    const sExt = 96;
-    if (ms) { sun.shadow.mapSize.set(ms, ms); this.shadowTexel = (sExt * 2) / ms; }
-    const sc = sun.shadow.camera; sc.left = -sExt; sc.right = sExt; sc.top = sExt; sc.bottom = -sExt; sc.near = 20; sc.far = 620;
-    sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.65;
     this.scene.add(sun); this.scene.add(sun.target); this.sun = sun;
-    if (gfx.csm && gfx.shadows > 0) {
-      // Cascaded shadow maps (TODO §3): cascade 0 keeps the crisp near map, cascade 1 reaches distant canyon walls (blended split)
-      const csm = new CSMShadowNode(sun, { cascades: 2, maxFar: 520, mode: 'custom', lightMargin: 340, customSplitsCallback: (_n: number, _near: number, _far: number, out: number[]) => { out.push(0.2, 1); } });
-      csm.fade = true; sun.shadow.shadowNode = csm; this.csm = csm;
-    }
+    // range, depth and soft ends of the sun shadows – one map or two cascades (`gfx.csm`): sunShadow.ts
+    this.sunShadow = setupSunShadow(sun, gfx.shadows, !!gfx.csm);
 
     // track & world
     this.loadMs.init = Math.round(performance.now() - tL0);
@@ -184,6 +175,7 @@ export class Game {
     { const sf = new SnowField(this.td); if (sf.runs.length) this.td.snow = sf; } // 2026-11-22: powder snow keeps the trails of the pods
     { const avgY = this.td.main.samples.reduce((a, s) => a + s.y, 0) / this.td.N; const fogFloor = Math.min(avgY - 14, this.td.bounds.minY - 6); this.fog = applyAtmosphere(this.scene, theme, theme.fogDensity / gfx.drawDistance, fogFloor, this.sunDir, fx.volFog, gfx.volumetrics ?? 2); }
     this.world = await buildWorld(this.td, theme, gfx, (p, m) => this.cb.onLoading(0.05 + p * 0.85, m));
+    this.world.setShadowReach(this.sunShadow.reach);
     if (this.disposed) return;
     this.scene.add(this.world.group);
 
@@ -710,10 +702,10 @@ export class Game {
       if (vq > 0 && !this.beams && this.navLights) { this.beams = makeBeams(this.pods.length * 2); this.scene.add(this.beams.mesh); }
       if (this.beams) this.beams.mesh.userData.off = vq === 0; }
     if ((g.anisotropy ?? 8) !== (prev.anisotropy ?? 8)) setTextureAnisotropy(g.anisotropy ?? 8);
-    if (g.shadows !== prev.shadows && !this.csm) { // sun shadows on/off + resolution (cascaded shadows stay as built)
-      const on = g.shadows > 0, ms = [0, 1024, 1536, 2048][g.shadows] ?? 1536;
+    if (g.shadows !== prev.shadows && !this.sunShadow.csm) { // sun shadows on/off + resolution and range (cascaded shadows stay as built)
+      const on = g.shadows > 0;
       this.renderer.shadowMap.enabled = on; this.sun.castShadow = on;
-      if (ms) { this.sun.shadow.mapSize.set(ms, ms); this.shadowTexel = 192 / ms; this.sun.shadow.map?.dispose(); (this.sun.shadow as unknown as { map: unknown }).map = null; }
+      if (on) { this.sunShadow.setQuality(g.shadows); this.sun.shadow.map?.dispose(); (this.sun.shadow as unknown as { map: unknown }).map = null; this.world.setShadowReach(this.sunShadow.reach); }
     }
     if (Game.POST_KEYS.some(k => g[k] !== prev[k])) { // rebuild the post-processing chain with the new options
       const old = this.post;
@@ -905,20 +897,25 @@ export class Game {
     }
     cam.fov += (fov - cam.fov) * Math.min(1, dt * 4); cam.updateProjectionMatrix();
     this.sky.mesh.position.copy(cam.position);
-    if (this.csm && this.csm.camera && Math.abs(cam.fov - this.csmFov) > 1) { this.csmFov = cam.fov; this.csm.updateFrustums(); } // cascades follow the speed-FOV
+    this.placeShadow(p.pos.x, p.pos.y, p.pos.z, fx, fz);
+  }
 
-    // Shadow frustum follows player, snapped to exact light-space texel increments (eliminates shadow-edge shimmering!)
-    if (this.sun.castShadow) {
-      this.tmpV.set(p.pos.x + fx * 52, p.pos.y, p.pos.z + fz * 52);
-      if (this.shadowTexel > 0) {
-        const tx = this.shadowTexel;
-        const u = this.tmpV.dot(this.sunRight), v = this.tmpV.dot(this.sunUp), w = this.tmpV.dot(this.sunDir);
-        const su = Math.round(u / tx) * tx, sv = Math.round(v / tx) * tx;
-        this.tmpV.set(0, 0, 0).addScaledVector(this.sunRight, su).addScaledVector(this.sunUp, sv).addScaledVector(this.sunDir, w);
-      }
-      this.sun.target.position.copy(this.tmpV);
-      this.sun.position.copy(this.tmpV).addScaledVector(this.sunDir, 360);
+  /** The shadow box follows the point (the player), its centre `ahead` metres along (fx, fz); snapped to whole texels of the map in
+   *  the light's plane (no shimmering shadow edges). The cascades follow the camera by themselves – and its speed-FOV here. */
+  placeShadow(x: number, y: number, z: number, fx: number, fz: number) {
+    const rig = this.sunShadow, cam = this.camera;
+    if (rig.csm && rig.csm.camera && Math.abs(cam.fov - this.csmFov) > 1) { this.csmFov = cam.fov; rig.onFov(); }
+    if (!this.sun.castShadow) return;
+    const ahead = rig.ahead, tx = rig.texel;
+    this.tmpV.set(x + fx * ahead, y, z + fz * ahead);
+    if (tx > 0) {
+      const u = this.tmpV.dot(this.sunRight), v = this.tmpV.dot(this.sunUp), w = this.tmpV.dot(this.sunDir);
+      const su = Math.round(u / tx) * tx, sv = Math.round(v / tx) * tx;
+      this.tmpV.set(0, 0, 0).addScaledVector(this.sunRight, su).addScaledVector(this.sunUp, sv).addScaledVector(this.sunDir, w);
     }
+    this.sun.target.position.copy(this.tmpV);
+    this.sun.position.copy(this.tmpV).addScaledVector(this.sunDir, SH_BACK);
+    rig.update(this.tmpV, this.sunRight, this.sunUp);
   }
 
   render(dt: number) {
@@ -1065,7 +1062,7 @@ export class Game {
     this.ro?.disconnect();
     this.audio?.dispose();
     this.pods.forEach(p => p.visual?.dispose());
-    this.weather?.dispose(); this.world?.dispose(); this.particles?.dispose(); this.debris?.dispose(); this.scrap?.dispose(); this.post?.dispose(); this.csm?.dispose(); this.shields?.dispose();
+    this.weather?.dispose(); this.world?.dispose(); this.particles?.dispose(); this.debris?.dispose(); this.scrap?.dispose(); this.post?.dispose(); this.sunShadow?.dispose(); this.shields?.dispose();
     this.sky?.mesh.geometry.dispose(); (this.sky?.mesh.material as THREE.Material | undefined)?.dispose();
     (this.scene.environment as THREE.Texture | null)?.dispose();
     this.renderer?.dispose();

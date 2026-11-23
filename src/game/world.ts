@@ -44,6 +44,7 @@ export interface WorldTimings { texMs: number; trackMs: number; terrainMs: numbe
 
 export interface World {
   breakObstacle: (o: Obstacle) => void; setLodBias: (v: number) => void;
+  /** how far away scenery still throws shadows, metres (the reach of the sun shadows: sunShadow.ts) */ setShadowReach: (m: number) => void;
   group: THREE.Group;
   heightAt: (x: number, z: number) => number;
   update: (t: number, cam?: THREE.Vector3, pods?: PodPos[]) => void;
@@ -647,6 +648,8 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   progress(0.95, 'Kompiliere Shader …'); await yield_();
   let lodB2 = (gfx.lodBias ?? 1) ** 2; // graphics setting "LOD-Distanz" (live)
   const setLodBias = (v: number) => { lodB2 = v * v; };
+  let shReach = 150; // scenery throws shadows up to here (+ the sector's own radius); set by the game from the reach of the sun shadows
+  const setShadowReach = (m: number) => { shReach = Math.max(60, m); };
   // 2026-11-22: the powder snow fields as a layer of snow that keeps the trails of the pods (snowDeck.ts) – only when a race runs on the track
   const snowDeck = td.snow ? buildSnowDeck(td.snow, geoQ, group, disposables) : null;
   const update = (t: number, cam?: THREE.Vector3, pods?: PodPos[]) => {
@@ -658,13 +661,15 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
         const dc = decorCells[i]; const dx = dc.x - cam.x, dz = dc.z - cam.z, d2 = dx * dx + dz * dz;
         const vis = d2 < dc.view2;
         if (dc.lod) { const near = d2 < dc.lod2! * lodB2; dc.mesh.visible = vis && near; dc.lod.visible = vis && !near; } else dc.mesh.visible = vis;
-        if (dc.sh2 > 0) dc.mesh.castShadow = vis && d2 < dc.sh2;
+        // (2026-11-23: the reach follows the sun shadows, and the far twin throws the shadow where it stands in for the near mesh –
+        //  before, every rock's shadow ended at 150 m, or at the twin's switch distance)
+        if (dc.pad > 0) { const r = shReach + dc.pad, cast = vis && d2 < r * r; dc.mesh.castShadow = cast; if (dc.lod) dc.lod.castShadow = cast; }
       }
     }
     props.update(t); detail.update(t); mech.update(t); snowDeck?.update();
   };
   return {
-    breakObstacle: obstFx.breakObstacle, setLodBias,
+    breakObstacle: obstFx.breakObstacle, setLodBias, setShadowReach,
     group, heightAt, update, flashField: detail.flashField, nearAudio: life.nearAudio, cascades, timings,
     tvCams, glossy, emitters: props.emitters, setPieces,
     dispose: () => disposables.forEach(d => d.dispose()),
@@ -1419,8 +1424,9 @@ function heightSampler(set: { map: THREE.Texture }, res = 16): ((u: number, v: n
   };
 }
 
-/** A sector of instanced scenery: hidden beyond `view2`, far twin beyond `lod2`, shadows only within `sh2` (squared distances from the sector centre). */
-interface DecorCell { mesh: THREE.InstancedMesh; x: number; z: number; view2: number; sh2: number; lod?: THREE.InstancedMesh; lod2?: number }
+/** A sector of instanced scenery: hidden beyond `view2`, far twin beyond `lod2` (squared distances from the sector centre); shadows
+ *  only within the reach of the sun shadows + `pad` (`setShadowReach`). */
+interface DecorCell { mesh: THREE.InstancedMesh; x: number; z: number; view2: number; /** radius of the sector if it throws shadows, else 0 */ pad: number; lod?: THREE.InstancedMesh; lod2?: number }
 
 /** 2026-11-23: the rock rows along natural roads. `borderRocks.ts` says where a rock stands and how big it is; here it gets its shape
  *  and its seat: the base below the lowest drawn ground under it, the top as high above the road edge as the border the physics
@@ -1476,7 +1482,7 @@ function addBorderRocks(
       for (let i = 0; i < sec.m.length; i++) im.setMatrixAt(i, sec.m[i]);
       im.receiveShadow = true; im.castShadow = false; im.computeBoundingSphere(); im.name = 'borderRocks'; group.add(im); return im;
     };
-    const cell: DecorCell = { mesh: mk(sh.near), x: sec.cx, z: sec.cz, view2: (1000 + pad) ** 2, sh2: (150 + pad) ** 2 };
+    const cell: DecorCell = { mesh: mk(sh.near), x: sec.cx, z: sec.cz, view2: (1000 + pad) ** 2, pad };
     if (sh.far) { cell.lod = mk(sh.far); cell.lod.visible = false; cell.lod2 = (140 + pad) ** 2; }
     cells.push(cell);
   }
@@ -1534,8 +1540,8 @@ function scatterDecor(
       for (let i = 0; i < sec.m.length; i++) { im.setMatrixAt(i, sec.m[i]); if (sec.c.length) im.setColorAt(i, sec.c[i]); }
       im.castShadow = cast && k === 'all'; im.receiveShadow = true; im.computeBoundingSphere(); group.add(im);
       if (k !== 'all') {
-        const cell: DecorCell = { mesh: im, x: sec.cx, z: sec.cz, view2: (viewD + pad) ** 2, sh2: cast ? (150 + pad) ** 2 : 0 };
-        if (opts.lod) { // far-sector LOD twin: identical transforms/colours, ~1/4 of the triangles, never casts shadows
+        const cell: DecorCell = { mesh: im, x: sec.cx, z: sec.cz, view2: (viewD + pad) ** 2, pad: cast ? pad : 0 };
+        if (opts.lod) { // far-sector LOD twin: identical transforms/colours, ~1/4 of the triangles (it throws the sector's shadow while it stands in)
           const lm = new THREE.InstancedMesh(opts.lod.geo, mat, sec.m.length);
           for (let i = 0; i < sec.m.length; i++) { lm.setMatrixAt(i, sec.m[i]); if (sec.c.length) lm.setColorAt(i, sec.c[i]); }
           lm.receiveShadow = true; lm.visible = false; lm.computeBoundingSphere(); group.add(lm);

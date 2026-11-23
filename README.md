@@ -172,7 +172,7 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 - **Voreinstellung „Ultra":** stellt jede Option auf ihr Maximum (nur Sichtfeld und Bloom-Stärke bleiben). Sehr leistungshungrig.
 - **Neu:** LOD-Distanz (ab wann ferne Bäume/Felsen vereinfacht werden), Gegner-Pod-Detail (bis zu welcher Entfernung Gegner voll detailliert sind), Wetter-Effekte (Aus/Reduziert/Voll), Volumetrie (Nebelbänke und Lichtkegel).
 
-- **Kaskaden-Schatten (neu, optional):** zweite, weite Schattenstufe bis 520 m für ferne Schluchtwände. Kostet einen zusätzlichen Schattenpass – nur bei Leistungsreserve einschalten.
+- **Schatten-Sichtweite:** Schatten reichen je nach Schattenqualität 195 m, 245 m oder 295 m vor den Pod und laufen am Ende weich aus. Mit **Kaskaden-Schatten** (in „Ultra" eingeschaltet, sonst optional) reichen sie 700 m weit: bis 112 m scharf, dahinter weicher. Die weite Stufe kostet einen zusätzlichen Schattenpass in jedem zweiten Bild – nur bei Leistungsreserve einschalten.
 
 | Schalter | Wirkung |
 |---|---|
