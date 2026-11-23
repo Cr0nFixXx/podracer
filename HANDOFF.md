@@ -1,6 +1,13 @@
 # HANDOFF
 
 ## Nächster Schritt (zuerst lesen)
+**Laufender Auftrag: „nach der Probefahrt" (2026-11-23)** – [Protokoll](docs/verlauf/2026-11-23-nach-der-probefahrt.md) (Auftrag wörtlich, alle Entscheidungen des Nutzers, was je Punkt gemacht und geprüft wurde), offene Punkte in `TODO.md` Abschnitt 9.
+- **Fertig und gepusht:** Block 1 (drei Fehler) und Block 2 (acht Verbesserungen: Landung, Hitzeschild, Lava-Boost, Schatten-Sichtweite, Linsentropfen, Boost-Alarm, Reset-Taste, Controller im Menü).
+- **Als Nächstes:** Block 3 „Streckenanpassungen" (Intro-Flug zuerst), danach Block 4 (TODO 2, 5, 8). Jeder Punkt ein eigener Commit, nach jedem Block pushen (für diesen Auftrag ausdrücklich erlaubt).
+- **Der Nutzer soll nach Block 2 prüfen** (alles lief nur in Software-Grafik, ohne Ton, ohne echtes Gamepad): Bildrate auf „Ultra" (weite Schattenstufe), Lautstärke des Boost-Alarms, Menüs mit dem echten Gamepad – Liste im Protokoll unter „Nicht geprüft".
+
+Davor, weiter gültig:
+
 Session 20 lief in zwei Zweigen und ist zusammengeführt ([Merge](docs/verlauf/2026-11-22-merge-session-20.md)): **Session 20 (Strecken)** aus `B` und **Session 20 (Pods)** aus `new_pods`. Offen:
 0. **`dev` nach `main` bringen** (Pull Request auf GitHub – Schritt des Nutzers). `main` (`3625c99`) enthält beide Sitzungen und die Tunneldecke je Pod (Pull Request #2, gemergt am 2026-11-22). Auf `dev` liegen danach: die **Hülle je Pod** (Tunneldecke fertig, Überkopf-Bauten, Test-Werkzeuge repariert – [Protokoll](docs/verlauf/2026-11-22-huelle-je-pod.md); die [Vorstufe](docs/verlauf/2026-11-22-tunneldecke-je-pod.md) ist überholt), das **Aufräumen des Speichers** und der **Umbau der Doku** ([Protokoll](docs/verlauf/2026-11-22-speicher-und-doku.md)) und die **TODO-Runde** (Wandtreffer frontal = „Front", zehn Kleinigkeiten an den Pods, Aufwärmen, zweiter Build `npm run build:web`, GitHub-Action, Harness-Bundles aus Git – [Protokoll](docs/verlauf/2026-11-22-todo-runde.md)). Dazu die **Folgerunde**: die GitHub-Action ist auf GitHub und läuft, die Controller-Meldung ist untersucht ([Protokoll](docs/verlauf/2026-11-22-controller-und-action.md)). Und die **bestellte Runde vom 2026-11-22/23** (Punkt 5): Fehlerkorrekturen, Klima und Boost, Schneedecke, Felsreihen, Buchten, Übergänge. Alles davon liegt auf GitHub (`dev`, „Git-Stand"). **Vor dem ersten Commit lesen:** `docs/regeln/git-sandbox.md` (Speicher-Limit 128 MB).
 1. **Strecken – Probefahrt auf echter GPU** (`npm run dev`, ≈ 10 Min.; in der Sandbox ließ sich nur in Software rendern):
@@ -39,6 +46,7 @@ Session 20 lief in zwei Zweigen und ist zusammengeführt ([Merge](docs/verlauf/2
 | `CONTEXT.md`, `docs/adr/` | Begriffe, grundlegende Entscheidungen |
 
 ## Verlauf (neueste zuerst)
+- 2026-11-23 – [Nach der Probefahrt: drei Fehler, acht Verbesserungen (Schatten-Sichtweite, Hitzeschild, Lava-Boost, Linsentropfen, Boost-Alarm, Reset-Taste, Controller im Menü) – Streckenanpassungen und TODO 2 / 5 / 8 noch offen](docs/verlauf/2026-11-23-nach-der-probefahrt.md)
 - 2026-11-23 – [Übergänge am Pistenrand und zwischen Untergründen, Felsreihen und Buchten, keine Falten der Fahrbahn mehr, Höhlen-Optik, Farne, Schnee-Fotosets, echter Fels auf Aquilaris und Oovo IV](docs/verlauf/2026-11-23-uebergaenge-felsreihen-buchten.md)
 - 2026-11-22 – [Skill-Set eingerichtet, Rückwärtslenkung, freie Eingänge an Höhlen und Abkürzungen, Klima wirkt auf den Boost, Schneedecke mit Spuren, Felsgrenzen statt Leitplanken](docs/verlauf/2026-11-22-skills-fehler-klima.md)
 - 2026-11-22 – [Controller geht beim Rennstart aus (Diagnose), GitHub-Action auf GitHub](docs/verlauf/2026-11-22-controller-und-action.md)

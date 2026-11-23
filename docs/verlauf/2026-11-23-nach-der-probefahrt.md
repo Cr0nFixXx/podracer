@@ -158,9 +158,35 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Fehler 2: neue Prüfung `night: bad weather keeps the light of a clear night …` (zuerst rot: 39 Verstöße). Bilder aus der Sicht des Spielers (neue Harness-Ansicht `chase_<idx>`: echter Pod, echte Kamera, echte Lampe), vorher/nachher: Dschungel bei Nacht + Gewitter (offene Piste, Tunnel), dazu Nacht klar und Nacht + Regen zum Vergleich; Aquilaris Nacht + Gewitter; Frostspalt Nacht + Schnee.
 - Fehler 3: Bilder vorher/nachher, Frostspalt Schnee-Passage (Streifen weg) und Start-Piste (weiche Brandspuren). Welches Mesh die Streifen waren, hat `pick:` gezeigt.
 - Landung: neue Prüfung `landing: a normal landing costs nothing …` (zuerst rot: 5,9 Punkte bei 30 m/s). 30 und 36 m/s kosten nichts, 55 m/s kostet deutlich.
+- Verbesserungen (Block 2): was je Punkt geprüft wurde, steht in seinem Abschnitt oben. Am Ende des Blocks zusammen: `npm run check` (152 Unit-Prüfungen, Simulation aller Strecken), `npm run build`, `npm run build:web`, Layout-Prüfung `pui.mjs` in fünf Fenstergrößen, Gamepad-Durchlauf `ppad.mjs`, App-Rauchtest `papp.mjs` auf Aquilaris.
 
 ## Nicht geprüft
 - Fehler 2: nur Standbilder in Software-WebGL2. Wie es sich bei Tempo 400 mit Regen, Gischt der Vorausfahrenden und Tropfen auf der Linse anfühlt, kann nur die Probefahrt zeigen – die Linsentropfen und der Regen selbst sind unverändert. Malastare, Kristall und Sandsturm bei Nacht nicht angesehen (die Prüfung deckt alle Welten rechnerisch ab).
 - Fehler 3: die neuen Brandspuren nur auf der Eis-Piste gesehen.
+- **Alles in Block 2 lief nur in Software-Grafik ohne Ton und ohne echtes Gamepad.** Offen für die Probefahrt:
+  - Schatten: Bildrate auf „Ultra" (die weite Schattenstufe arbeitet jetzt erst wirklich) und ob die Schattenwand weg ist. Fällt die Bildrate: `CSM_FAR` in `src/game/sunShadow.ts`.
+  - Boost-Alarm: Lautstärke und Klang neben den Triebwerken (`boostAlarmVoice` in `src/game/audio.ts`).
+  - Controller im Menü: mit dem echten Gamepad. Meldet der Browser es nicht als „Standard"-Layout, zählt das Steuerkreuz nicht (der linke Stick geht immer).
+  - Hitzeschild und Linsentropfen: nur als Standbild gesehen, nicht in Bewegung.
+  - Reset-Taste: an echten Problemstellen (Schlucht, Röhre, Gabelung) nicht von Hand ausprobiert; die Prüfung setzt auf fünf Strecken von einer geraden Stelle aus zurück.
 
 ## Git
+Zweig `dev`. Jeder Punkt ein eigener Commit; nach jedem Block gepusht.
+
+| Block | Commit | Inhalt |
+|---|---|---|
+| Vorbereitung | `523f43c` | Doku: Auftrag, Entscheidungen der Fragerunde, TODO 1 |
+| 1 Fehler | `3beb534` | Methan-Derby: kein Felsmassiv mehr auf den Brücken |
+| 1 Fehler | `fe39eae` | Keine Reifenspuren mehr (Brandspuren nur auf gebauter Piste) |
+| 1 Fehler | `b4f1266` | Nacht + Unwetter: das Wetter nimmt nachts kein Licht mehr weg |
+| 2 Verbesserungen | `36d7873` | Kein Fallschaden bei normaler Landung |
+| 2 Verbesserungen | `8c4ed3a`, `61b18bb` | Plasma-Hitzeschild über Lava, Nachbesserung des Rands |
+| 2 Verbesserungen | `00f664e` | Über dem Lavasee nur noch ein extrem kurzer Boost |
+| 2 Verbesserungen | `e94c162` | Größere Schatten-Sichtweite, „Schattenwand" auf Ultra behoben |
+| 2 Verbesserungen | `3e12b57` | Wasserspritzer auf der Linse auch ohne Regen |
+| 2 Verbesserungen | `2ee31e8` | Boost-Alarm |
+| 2 Verbesserungen | `c5e0b07` | Reset-Taste |
+| 2 Verbesserungen | `d950095` | Controller-Bedienung in allen Menüs |
+| nebenbei | `c3234a3` | Hauptmenü: Titel „PODRACER" vollständig |
+
+Block 1 wurde am 2026-11-23 gepusht (`ee20aa5..b4f1266`), Block 2 mit dem Commit, der diese Tabelle enthält. Block 3 und 4 sind offen (`TODO.md` Abschnitt 9).
