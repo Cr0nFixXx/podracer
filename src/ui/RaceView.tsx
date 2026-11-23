@@ -147,6 +147,8 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
             <div className="absolute left-3 right-3 bottom-0">
               <div className="flex justify-between text-[9px] tracking-[0.25em] mb-0.5">
                 <span className={h.overheat ? 'text-red-400 animate-pulse' : h.boosting ? 'text-cyan-200' : 'text-white/70'}>{h.overheat ? 'ÜBERHITZT' : h.overdrive > 0 && h.heat >= 0.99 ? `ÜBERZOGEN · NOCH ${(3 - h.overdrive * 3).toFixed(1)} s` : h.boosting ? 'BOOST' : 'BOOST-HITZE'}</span>
+                {/* 2026-11-22: climate and weather change how fast the engines heat up – shown when it is off by 3 % or more */}
+                {Math.abs(h.heatEnv - 1) >= 0.03 && <span className={h.heatEnv < 1 ? 'text-cyan-300' : 'text-orange-300'} title="Klima und Wetter">{h.heatEnv < 1 ? 'KÜHLE LUFT' : 'HEISSE LUFT'} {h.heatEnv < 1 ? '−' : '+'}{Math.round(Math.abs(h.heatEnv - 1) * 100)} %</span>}
                 <span className="text-white/70 tabular-nums">{Math.round(Math.min(1, h.heat) * 100)}%</span>
               </div>
               <div className="relative h-3 bg-black/55 border border-sky-300/50 rounded-sm overflow-hidden">

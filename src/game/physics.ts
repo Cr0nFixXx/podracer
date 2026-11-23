@@ -195,7 +195,8 @@ export function podParams(p: PodState) {
 
 function wrapAngle(a: number) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
 
-export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gripMul: number, frozen: boolean) {
+/** `heatMul` = engine-heat factor of climate and weather (`EnvFx.heat`): while boosting the engines heat up × heatMul, they cool down ÷ heatMul. */
+export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gripMul: number, frozen: boolean, heatMul = 1) {
   const P = podParams(p);
   const inp = p.input;
   if (p.dead > 0) return;
@@ -242,7 +243,8 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   // heat / boost
   const wantBoost = inp.boost && inp.throttle > 0.5 && vf > 35 && !p.overheat && !frozen && !p.repairing;
   p.boosting = wantBoost;
-  if (p.boosting) p.heat += P.heatRate * SF.heat * dt; else p.heat -= P.cool / SF.heat * dt * (p.repairing ? 1.5 : 1);
+  const hf = SF.heat * heatMul; // the ground under the pod × climate and weather
+  if (p.boosting) p.heat += P.heatRate * hf * dt; else p.heat -= P.cool / hf * dt * (p.repairing ? 1.5 : 1);
   // Session 17 – overdrive: at the heat limit the boost can be held for up to 3 more seconds at the cost of slow engine damage.
   // After 3 s the engines cut out (lock-out until they have cooled to 55 %). Releasing early cools down normally; the used time recovers below 90 %.
   if (p.heat >= 1) {

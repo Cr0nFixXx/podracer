@@ -66,6 +66,7 @@ export interface EnvFx {
   volFog: number;      // 0..1 strength of the drifting volumetric fog banks
   flare: number;       // 0..1 sun glare / lens flare strength
   grip: number;        // multiplier on lateral grip
+  heat: number;        // engine-heat factor (boost): heating × heat, cooling ÷ heat – climate × time of day × weather, 0.75 … 1.25
   night: number;       // 0..1
   dark: number;        // 0..1 how dark the sky is (pods switch their lights on above ~0.45)
   amb: number;         // 0..1 density of the ambient weather particles
@@ -86,6 +87,19 @@ function overcast(a: string, t: number, tint: RGB, mul: number) {
 const lumS = (c: RGB) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 const lin = (v: number) => v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
 const lumL = (c: RGB) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+
+// 2026-11-22 – climate and weather change the boost (user decision: only the engine heat, ±10–25 %, for the Gegner too).
+// factor = climate of the world × time of day × weather, clamped to 0.75 … 1.25. Heating is multiplied by it, cooling divided (physics.ts).
+// The ground adds its own factor on top (surfaces.ts: lava lake 1.6, snow 0.9 …) – the climate values here are kept moderate for that reason.
+const HEAT_CLIMATE: Record<string, number> = { ice: 0.94, desert: 1.06, mesa: 1.06, lava: 1.06, jungle: 1.03, malastare: 1.03, aquilaris: 0.97 };
+const HEAT_HOT_DAY = new Set(['desert', 'mesa', 'lava', 'jungle', 'malastare']); // the sun adds 5 % there; every night takes 8 % off
+const HEAT_WX: Record<Wx, number> = { clear: 1, rain: 0.9, storm: 0.84, snow: 0.84, fog: 0.96, dust: 1.18 };
+/** `k` = strength of the weather 0..1, `dark` = how dark the sky is 0..1 (night, and partly a storm sky). */
+export function engineHeat(themeId: string, wx: Wx, k: number, dark: number) {
+  const day = HEAT_HOT_DAY.has(themeId) ? 1.05 : 1, tod = day + (0.92 - day) * dark;
+  const w = 1 + ((wx === 'dust' && themeId === 'lava' ? 1.2 : HEAT_WX[wx]) - 1) * Math.max(0, Math.min(1, k)); // (lava: ash storm)
+  return Math.max(0.75, Math.min(1.25, (HEAT_CLIMATE[themeId] ?? 1) * tod * w));
+}
 
 function resolveOne(base: ThemeDef, tod: Tod, key: WxKey): EnvState {
   const th: ThemeDef = { ...base };
@@ -115,7 +129,7 @@ function resolveOne(base: ThemeDef, tod: Tod, key: WxKey): EnvState {
   }
 
   const [wx, k]: [Wx, number] = !clim ? ['clear', 1] : key === 'auto' ? clim.auto : key;
-  const fx: EnvFx = { weather: wx, tod, rain: 0, lightning: 0, gust: 'none', gustColor: '#ffffff', gustAmt: 0, wind: 0.15, volFog: clim ? 0.25 : 0, flare: 0.85, grip: 1, night, dark: 0, amb: 0.45 };
+  const fx: EnvFx = { weather: wx, tod, rain: 0, lightning: 0, gust: 'none', gustColor: '#ffffff', gustAmt: 0, wind: 0.15, volFog: clim ? 0.25 : 0, flare: 0.85, grip: 1, heat: 1, night, dark: 0, amb: 0.45 };
   const wetAmbient = th.ambient === 'rain' || th.ambient === 'snow';
   if (clim) switch (wx) {
     case 'clear':
@@ -151,6 +165,7 @@ function resolveOne(base: ThemeDef, tod: Tod, key: WxKey): EnvState {
   }
   if (night) fx.flare *= 0.4;
   fx.dark = Math.max(0, Math.min(1, 1 - (lumS(rgb(th.skyTop)) + lumS(rgb(th.skyHorizon))) * 0.5 / 0.4));
+  fx.heat = clim ? engineHeat(base.id, wx, k, fx.dark) : 1;
   return { theme: th, fx };
 }
 
@@ -158,9 +173,9 @@ function resolveOne(base: ThemeDef, tod: Tod, key: WxKey): EnvState {
 export interface EnvSnap {
   top: RGB; hor: RGB; sun: RGB; fog: RGB; hemiS: RGB; hemiG: RGB; dir: RGB; moon: number; // colours = sRGB triples
   clouds: number; dens: number; sunI: number; exp: number; stars: number; lit: number; lum: number;
-  rain: number; lightning: number; wind: number; grip: number; volFog: number; flare: number; dark: number; gustAmt: number; amb: number; wet: number; sev: number;
+  rain: number; lightning: number; wind: number; grip: number; heat: number; volFog: number; flare: number; dark: number; gustAmt: number; amb: number; wet: number; sev: number;
 }
-const NUM: (keyof EnvSnap)[] = ['moon', 'clouds', 'dens', 'sunI', 'exp', 'stars', 'lit', 'lum', 'rain', 'lightning', 'wind', 'grip', 'volFog', 'flare', 'dark', 'gustAmt', 'amb', 'wet', 'sev'];
+const NUM: (keyof EnvSnap)[] = ['moon', 'clouds', 'dens', 'sunI', 'exp', 'stars', 'lit', 'lum', 'rain', 'lightning', 'wind', 'grip', 'heat', 'volFog', 'flare', 'dark', 'gustAmt', 'amb', 'wet', 'sev'];
 const COL: (keyof EnvSnap)[] = ['top', 'hor', 'sun', 'fog', 'hemiS', 'hemiG', 'dir'];
 function snapOf(s: EnvState, ambient: string): EnvSnap {
   const t = s.theme, f = s.fx, el = t.sunElev * Math.PI / 180, az = t.sunAz * Math.PI / 180;
@@ -170,11 +185,11 @@ function snapOf(s: EnvState, ambient: string): EnvSnap {
     dir: [Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az)], moon: f.night,
     clouds: t.clouds, dens: t.fogDensity, sunI: t.sunIntensity, exp: t.exposure, stars: t.stars ?? 0,
     lit: Math.min(1, lumL(hor) * 2.4 + lumL(top) * 0.8), lum: lumL(hor) * 0.6 + lumL(top) * 0.4,
-    rain: f.rain, lightning: f.lightning, wind: f.wind, grip: f.grip, volFog: f.volFog, flare: f.flare, dark: f.dark, gustAmt: f.gustAmt,
+    rain: f.rain, lightning: f.lightning, wind: f.wind, grip: f.grip, heat: f.heat, volFog: f.volFog, flare: f.flare, dark: f.dark, gustAmt: f.gustAmt,
     amb: t.ambient === ambient ? f.amb : 0, wet: f.rain > 0.05 ? Math.min(1, 0.35 + f.rain) : 0, sev: Math.max(f.rain * 0.9, f.lightning, f.gustAmt * 0.8),
   };
 }
-const emptySnap = (): EnvSnap => ({ top: [0, 0, 0], hor: [0, 0, 0], sun: [0, 0, 0], fog: [0, 0, 0], hemiS: [0, 0, 0], hemiG: [0, 0, 0], dir: [0, 1, 0], moon: 0, clouds: 0, dens: 0, sunI: 0, exp: 1, stars: 0, lit: 1, lum: 1, rain: 0, lightning: 0, wind: 0, grip: 1, volFog: 0, flare: 0, dark: 0, gustAmt: 0, amb: 0, wet: 0, sev: 0 });
+const emptySnap = (): EnvSnap => ({ top: [0, 0, 0], hor: [0, 0, 0], sun: [0, 0, 0], fog: [0, 0, 0], hemiS: [0, 0, 0], hemiG: [0, 0, 0], dir: [0, 1, 0], moon: 0, clouds: 0, dens: 0, sunI: 0, exp: 1, stars: 0, lit: 1, lum: 1, rain: 0, lightning: 0, wind: 0, grip: 1, heat: 1, volFog: 0, flare: 0, dark: 0, gustAmt: 0, amb: 0, wet: 0, sev: 0 });
 function blend(o: EnvSnap, a: EnvSnap, b: EnvSnap, s: number) {
   const O = o as unknown as Record<string, number | RGB>, A = a as unknown as Record<string, number | RGB>, B = b as unknown as Record<string, number | RGB>;
   for (const k of NUM) O[k] = (A[k] as number) + ((B[k] as number) - (A[k] as number)) * s;

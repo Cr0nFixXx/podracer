@@ -40,6 +40,8 @@ export interface HudState {
   roll: number; pitch: number; sliding: boolean; slideCharge: number; airborne: boolean; env: string;
   /** Session 20: ground under the player (label + effect hint, e.g. "Eis · wenig Haftung") */
   surface: string; surfaceFx: string;
+  /** engine-heat factor of climate and weather, 1 = neutral (the HUD shows it beside the heat bar when it is off by 3 % or more) */
+  heatEnv: number;
   /** 0..1 share of the 3 s boost overdrive that is used up */
   overdrive: number;
   /** Bruchteil lamps of the two damage boxes (screen-left / screen-right), rows 50 / 35 / 20 %: 0 no part · 1 attached · 2 lost */
@@ -86,7 +88,7 @@ export class Game {
   minimap: HTMLCanvasElement | null = null;
   private mapBg: HTMLCanvasElement | null = null; private mapW = 0; private mapH = 0;
   message = ''; messageT = 0; finishShown = false; postTimer = 0;
-  gripMul = 1; lastBeep = 99;
+  gripMul = 1; /** engine-heat factor of climate and weather (EnvFx.heat) */ heatMul = 1; lastBeep = 99;
   raf = 0; ro: ResizeObserver | null = null;
   // Pre-allocated scratch math objects (zero per-frame GC allocations!)
   tmpV = new THREE.Vector3(); tmpV2 = new THREE.Vector3(); tmpV3 = new THREE.Vector3();
@@ -108,7 +110,7 @@ export class Game {
     const { theme, fx, build } = res;
     this.env = fx; this.envBuild = build; this.tl = res.timeline; this.envLabel = res.label; this.keymap = normalizeKeys(this.profile.keys); this.padmap = normalizePad(this.profile.pad);
     this.baseGrip = theme.id === 'ice' ? 0.8 : theme.id === 'jungle' ? 0.9 : 1; // Session 20: the surfaces carry the rest (ice ×0.75, snow ×0.92, mud ×0.9 …)
-    this.gripMul = this.baseGrip * fx.grip;
+    this.gripMul = this.baseGrip * fx.grip; this.heatMul = fx.heat;
     this.dustBase.set(theme.palette.ground[1]); this.dustCol.copy(this.dustBase);
     this.dustAmt = theme.terrain === 'prison' || theme.road === 'cityRoad' ? 0.35 : theme.id === 'ice' ? 0.8 : 1; // little loose dust on metal decks
     this.barrierGlow.set(theme.barrierColor).multiplyScalar(1.25);
@@ -381,7 +383,7 @@ export class Game {
     // physics substeps
     this.acc += dt; const h = 1 / 120; let steps = 0;
     while (this.acc >= h && steps < 6) {
-      for (const p of this.pods) stepPod(p, this.td, h, this.raceTime, this.gripMul, frozen);
+      for (const p of this.pods) stepPod(p, this.td, h, this.raceTime, this.gripMul, frozen, this.heatMul);
       this.podCollisions();
       this.acc -= h; steps++;
     }
@@ -731,7 +733,7 @@ export class Game {
       this.renderer.toneMappingExposure = s.exp; this.envI = 0.85 * Math.max(0.05, Math.min(1.3, s.lum / this.envLum));
       this.setSunDir(s.dir[0], s.dir[1], s.dir[2]);
       e.rain = s.rain; e.lightning = s.lightning; e.wind = s.wind; e.flare = s.flare; e.dark = s.dark; e.gustAmt = s.gustAmt; e.volFog = s.volFog; e.grip = s.grip;
-      this.gripMul = this.baseGrip * s.grip;
+      this.gripMul = this.baseGrip * s.grip; e.heat = s.heat; this.heatMul = s.heat;
       if (this.post) { this.post.lens.rain.value = s.rain; this.post.lens.sunColor?.value.setRGB(s.sun[0], s.sun[1], s.sun[2], S); }
       this.particles?.setAmbientAmount(s.amb / b.ambMax * this.wxQ);
       this.wetTarget = b.rainRoad ? s.wet : 1;
@@ -953,7 +955,7 @@ export class Game {
       wrongWay: p.wrongWay > 1.2, zeroG: p.zeroG, countdown: this.state === 'countdown' ? this.countdown : -1,
       message: this.messageT > 0 ? this.message : '', camName: CAMERA_NAMES[this.camMode], fps: this.fps, backend: this.backend,
       standings: [], dead: p.dead > 0, finished: p.finished,
-      roll: p.rollCtl ?? 0, pitch: p.pitchCtl ?? 0, sliding: !!p.sliding, slideCharge: Math.min(1, (p.slideT ?? 0) / 1.6), airborne: !p.grounded && !p.zeroG, env: this.envLabel, ...this.surfaceHud(), overdrive: Math.min(1, (p.overT ?? 0) / 3),
+      roll: p.rollCtl ?? 0, pitch: p.pitchCtl ?? 0, sliding: !!p.sliding, slideCharge: Math.min(1, (p.slideT ?? 0) / 1.6), airborne: !p.grounded && !p.zeroG, env: this.envLabel, ...this.surfaceHud(), heatEnv: this.heatMul, overdrive: Math.min(1, (p.overT ?? 0) / 3),
     };
   }
 

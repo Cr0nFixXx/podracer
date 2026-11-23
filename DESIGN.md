@@ -248,6 +248,7 @@ Leitidee: **Wetter verändert die Lesbarkeit, nie die Fairness.** Sicht wird wei
 | Thema | Regel | Stand |
 |---|---|---|
 | Klima | Wüste: Sand statt Wasser. Eis: Schnee und Eisnebel. Vulkan: Smog und Asche mit trockenen Blitzen. Nur feuchte Welten kennen Regen und Gewitter. | S13 |
+| Klima und Boost | Klima, Tageszeit und Wetter ändern nur die Triebwerkshitze beim Boosten (0,75 … 1,25), nie die Boost-Kraft. Kühl: Regen −10 %, Gewitter und Schneeböen −16 %, Nebel −4 %, Nacht −8 %, Eiswelt −6 %. Heiß: Sand-/Aschesturm +18 / +20 %, Tag auf heißen Welten +5 %, Wüste / Vulkan +6 %. Gilt für Gegner; Anzeige im Renn-Menü und am Hitzebalken ab 3 %. | 2026-11-22 |
 | Sonnenbahn | Aufgang 40° vor, Untergang 70° nach dem Mittags-Azimut der Welt; der Mond steht gegenüber. Beim Wechsel wird das Licht kurz dunkel statt über den Himmel zu wandern. | S13 |
 | Regenstreifen | Länge und Richtung folgen der Relativgeschwindigkeit: im Stand fast senkrecht, in Fahrt vom Fluchtpunkt nach außen. Breite ~3 cm, Deckkraft ≤ 0,6. | S13 |
 | Linsentropfen | langsam: laufen herab; schnell: werden nach außen gedrückt, Spuren werden länger, Perlen werden weniger. Nie größer als 2,5 % der Bildhöhe. | S13 |

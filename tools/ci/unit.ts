@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, THEMES, TRACKS, type PodDef, type StatKey } from '../../src/game/data';
 import { makeTerrainField } from '../../src/game/terrain';
+import { resolveEnvironment, type TimeOfDay, type WeatherKind } from '../../src/game/environment';
 import { clipOutside } from '../../src/game/meshClip';
 import { podLayout } from '../../src/game/podLayouts';
 import { cockpitGeo } from '../../src/game/podCockpits';
@@ -999,6 +1000,47 @@ test('clipOutside: a square cut by a plane keeps exactly the half outside, witho
   }
   ok(Math.abs(area - 1) < 0.01, `kept area ${area.toFixed(4)}, expected 1 (the strip 0.5 × 2)`);
   for (let v = 4; v < b.pos.length / 3; v++) ok(Math.abs(b.uv[v * 2] - b.pos[v * 3] / 2) < 0.01, 'a cut vertex has the wrong texture coordinate');
+});
+
+// ---- climate and weather change the boost (2026-11-22, user decision: only the engine heat, ±10–25 %, Gegner too) ----
+/** The engine-heat factor of a world at a time of day and a weather (1 = neutral, below 1 = the engines stay cooler). */
+const envHeat = (theme: string, tod: TimeOfDay, wx: WeatherKind) => resolveEnvironment(THEMES[theme], tod, wx).fx.heat;
+test('boost climate: rain, storm, snow and the night cool the engines; a dust or ash storm heats them', () => {
+  const dayClear = envHeat('jungle', 'day', 'clear');
+  ok(envHeat('jungle', 'day', 'rain') < dayClear - 0.05, `jungle rain ${envHeat('jungle', 'day', 'rain')} against clear ${dayClear}`);
+  ok(envHeat('jungle', 'day', 'storm') < envHeat('jungle', 'day', 'rain'), 'a storm should cool more than rain');
+  ok(envHeat('ice', 'day', 'snow') < envHeat('ice', 'day', 'clear') - 0.05, 'snow squalls should cool');
+  ok(envHeat('desert', 'night', 'clear') < envHeat('desert', 'day', 'clear') - 0.05, 'the desert night should be cooler than its day');
+  ok(envHeat('desert', 'day', 'dust') > envHeat('desert', 'day', 'clear') + 0.05, 'a dust storm should heat');
+  ok(envHeat('lava', 'day', 'dust') > envHeat('lava', 'day', 'clear') + 0.05, 'an ash storm should heat');
+});
+test('boost climate: the ice world is cooler than the desert, and every factor stays within 0.75 … 1.25', () => {
+  ok(envHeat('ice', 'day', 'clear') < 1 && envHeat('desert', 'day', 'clear') > 1, `ice ${envHeat('ice', 'day', 'clear')}, desert ${envHeat('desert', 'day', 'clear')}`);
+  for (const theme of Object.keys(THEMES)) for (const tod of ['day', 'night', 'dawn', 'dusk'] as TimeOfDay[]) for (const wx of ['clear', 'rain', 'storm', 'snow', 'dust', 'fog'] as WeatherKind[]) {
+    const h = envHeat(theme, tod, wx); // (weather a world does not have falls back to its own – the factor must still be sane)
+    ok(h >= 0.75 && h <= 1.25, `${theme} ${tod} ${wx}: factor ${h}`);
+  }
+});
+/** Engine heat of an Aurora after `secs` of boosting on a straight piece of Boonta with the environment's heat factor `env`, then after `cool` seconds without boost. */
+function heatAfterBoost(env: number, secs: number, cool = 0): [number, number] {
+  const td = trackOf('boonta'), S = td.main.samples;
+  let idx = -1;
+  for (let k = 80; k < S.length - 200 && idx < 0; k++) { let fine = true; for (let j = k - 10; j <= k + 190 && fine; j++) { const q = S[j]; fine = !q.gap && !q.zeroG && !q.lake && !q.roof && !q.ramp && Math.abs(q.curv) < 0.004 && q.surf === S[k].surf; } if (fine) idx = k; }
+  ok(idx > 0, 'no long straight piece of road found on boonta');
+  const s = S[idx], p = racer(byId('aurora'), td, idx, 0, s.y + HOVER);
+  p.vel.set(s.tx * 80, 0, s.tz * 80); p.input.throttle = 1; p.input.boost = true;
+  for (let f = 0; f < secs * 60; f++) stepPod(p, td, 1 / 60, f / 60, 1, false, env);
+  const hot = p.heat; p.input.boost = false;
+  for (let f = 0; f < cool * 60; f++) stepPod(p, td, 1 / 60, f / 60, 1, false, env);
+  return [hot, p.heat];
+}
+test('boost climate: in the cold the same boost heats the engines less and they cool down faster; in the heat the opposite', () => {
+  const [n, nc] = heatAfterBoost(1, 1.5, 0.4), [c, cc] = heatAfterBoost(0.8, 1.5, 0.4), [h, hc] = heatAfterBoost(1.2, 1.5, 0.4); // (0.4 s of cooling: no gauge reaches 0)
+  ok(n > 0.2 && n < 0.95, `neutral: heat ${n.toFixed(3)} after 1.5 s of boost – the test needs a value in the middle of the scale`);
+  ok(Math.abs(c / n - 0.8) < 0.02, `cold (0.8): heat ${c.toFixed(3)} against ${n.toFixed(3)} neutral – expected 80 %`);
+  ok(Math.abs(h / n - 1.2) < 0.02, `hot (1.2): heat ${h.toFixed(3)} against ${n.toFixed(3)} neutral – expected 120 %`);
+  ok(Math.abs((c - cc) / (n - nc) - 1.25) < 0.03, `cold: cooled by ${(c - cc).toFixed(3)} in 0.4 s against ${(n - nc).toFixed(3)} neutral – expected 125 %`);
+  ok(Math.abs((h - hc) / (n - nc) - 1 / 1.2) < 0.03, `hot: cooled by ${(h - hc).toFixed(3)} in 0.4 s against ${(n - nc).toFixed(3)} neutral – expected 83 %`);
 });
 
 console.log(failed ? `\n${failed} unit check(s) FAILED, ${passed} passed.` : `All ${passed} unit checks passed.`);

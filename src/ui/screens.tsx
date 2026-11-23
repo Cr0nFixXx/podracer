@@ -1,7 +1,7 @@
 import { Fit } from './Fit';
 import { GfxPanels } from './GfxPanels';
 import { KeyBindings, PadBindings } from './KeyBindings';
-import { sanitizeEnv, timeOptionsFor, weatherOptionsFor, type TimeOfDay, type WeatherKind } from '../game/environment';
+import { resolveEnvironment, sanitizeEnv, timeOptionsFor, weatherOptionsFor, type TimeOfDay, type WeatherKind } from '../game/environment';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, STAT_LABELS, THEMES, TRACKS, type StatKey } from '../game/data';
 import { effectiveStats, KIT_SLOTS, LIVERY_PATTERNS, MAX_LAPS, MAX_OPPONENTS, PAINT_FINISHES, type PaintFinish, type PodKit, type Profile } from '../game/settings';
@@ -168,6 +168,13 @@ export function RaceSetup({ profile, update, go, start }: { profile: Profile; up
                 </select>
               </div>
             </div>
+            {/* 2026-11-22: climate and weather change how fast the engines heat up while boosting */}
+            {(() => {
+              const [tod, wx] = sanitizeEnv(track.theme, r.timeOfDay, r.weather), hf = resolveEnvironment(THEMES[track.theme], tod, wx).fx.heat, pct = Math.round(Math.abs(hf - 1) * 100);
+              return <div className="text-[11px] text-stone-400 -mt-2 mb-4" data-heat-env={hf.toFixed(2)}>Triebwerke: {pct < 3 ? 'Klima und Wetter ändern die Boost-Hitze hier nicht.' : hf < 1
+                ? <>kühle Luft – der Boost heizt <span className="text-cyan-300">{pct} % langsamer</span> auf und kühlt schneller ab.</>
+                : <>heiße Luft – der Boost heizt <span className="text-orange-300">{pct} % schneller</span> auf und kühlt langsamer ab.</>}</div>;
+            })()}
             <div className="text-[11px] uppercase tracking-widest text-stone-300 mb-2">Startkamera</div>
             <select value={r.camera} onChange={e => set('camera', parseInt(e.target.value))} className="w-full bg-black/60 border border-stone-600 text-amber-100 p-2 mb-5 text-sm">
               {CAMERA_NAMES.map((c, i) => <option key={c} value={i}>{c}</option>)}

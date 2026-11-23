@@ -18,6 +18,9 @@ Part of the agent manual (`CLAUDE.md`). Read this before you change `environment
 - **Sky (`sky.ts`):** cloud albedo scales with the sky light level (`lit`) – no constant white. `uniforms.flash` = lightning. Stars only when `theme.stars` is set. *(S11)*
 - **Fog node (`atmosphere.ts`):** analytic height fog + 2 noise taps with `.level(0)` (valid in any control flow). It binds `macroTexture` in every fogged material: +1 sampler → keep material texture counts ≤ 14. *(S11)*
 
+## Climate and the boost
+- **Climate, time of day and weather change only the engine heat of the boost** (user decision 2026-11-22; never the boost's power): `EnvFx.heat` = `engineHeat(theme, weather, strength, dark)` in `environment.ts`, clamped to 0.75 … 1.25, blended like `grip` (`EnvSnap.heat`), applied in `Game.applyEnv` as `heatMul` and handed to `stepPod` (heating × factor, cooling ÷ factor – for the Gegner too). Tables `HEAT_CLIMATE`, `HEAT_HOT_DAY`, `HEAT_WX`. The ground multiplies on top (`SurfaceDef.heat`), so keep the climate values moderate. Shown in the race menu (`screens.tsx`, `data-heat-env`) and beside the heat bar (`HudState.heatEnv`, from 3 %). Unit checks `boost climate: …`. *(2026-11-22)*
+
 ## Rain, wetness, storm
 - **Weather intensity** numbers live in `environment.ts` (fog/sun/wind per weather), `particles.initAmbient` (count, streak width/opacity), `weather.ts` (gusts, lightning rate), `Game.applyEnv` (flash). *(S16)*
 - **Roof cover:** `Game.cover` (player under `sample.roof > 0`) fades rain particles, lens drops, splashes, spray, rain audio. *(S14)*
