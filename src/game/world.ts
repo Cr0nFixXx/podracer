@@ -16,6 +16,7 @@ import { StaticBatcher } from './trackMesh';
 import { airshipGeometry, boulderGeometry, pylonGeometry, cactusGeometry, crystalClusterGeometry, jungleTreeGeometry, mesaGeometry, pineGeometry, rockGeometry, snowPineGeometry, spireGeometry } from './decorGeo';
 import { addSkyline, buildTerrain, makeTerrainField, terrainCell } from './terrain';
 import { clipOutside } from './meshClip';
+import { buildSnowDeck } from './snowDeck';
 import { buildSetPieces, type SetPieceFx } from './setPieces';
 import { addLandmarks } from './landmarks';
 import { lavaSeaMaterial, layersFor, LIQUIDS, STRATA, terrainMaterial, waterMaterial } from './terrainMaterial';
@@ -486,6 +487,8 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   progress(0.95, 'Kompiliere Shader …'); await yield_();
   let lodB2 = (gfx.lodBias ?? 1) ** 2; // graphics setting "LOD-Distanz" (live)
   const setLodBias = (v: number) => { lodB2 = v * v; };
+  // 2026-11-22: the powder snow fields as a layer of snow that keeps the trails of the pods (snowDeck.ts) – only when a race runs on the track
+  const snowDeck = td.snow ? buildSnowDeck(td.snow, geoQ, group, disposables) : null;
   const update = (t: number, cam?: THREE.Vector3, pods?: PodPos[]) => {
     smoke.update(t); life.update(t, pods);
     if (cam) {
@@ -498,7 +501,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
         if (dc.sh2 > 0) dc.mesh.castShadow = vis && d2 < dc.sh2;
       }
     }
-    props.update(t); detail.update(t); mech.update(t);
+    props.update(t); detail.update(t); mech.update(t); snowDeck?.update();
   };
   return {
     breakObstacle: obstFx.breakObstacle, setLodBias,

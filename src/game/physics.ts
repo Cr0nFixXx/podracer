@@ -3,6 +3,7 @@ import type { PilotDef, PodDef, StatKey } from './data';
 import { DS, TUNNEL_SHOULDER, boulderState, tunnelCeiling, bridgeSwing, frameAt, gateDrop, nearestGlobal, nearestOnPath, roadSurfaceAt, rotorAngle, tunnelProfile, type Obstacle, type Path, type Sample, type SetPiece, type TrackData } from './trackBuilder';
 import type { PodVisual } from './podModel';
 import { COCKPIT_SWAY, podCollision, podEnvelope, type PodEnvelope } from './podDesigns';
+import { PACKED_GRIP, PACKED_VMAX, STAMP_AMOUNT, STAMP_EVERY, STAMP_RADIUS } from './snowField';
 import { surfaceOf } from './surfaces';
 import { DAMAGE_RULES, FX_NONE, damageModel, partsDue, partsFx, zoneFactor, type DamageZone, type PodFx } from './podDamage';
 export { FX_NONE, type DamageZone, type PodFx };
@@ -11,6 +12,8 @@ export { FX_NONE, type DamageZone, type PodFx };
 export interface Inputs { throttle: number; brake: number; steer: number; boost: boolean; airbrake: boolean; repair: boolean; pitch?: number; roll?: number; }
 
 export interface PodState {
+  /** powder snow: how firmly packed the snow under the pod is (0 fresh … 1 firm trail), and the metres flown since its last stamp */
+  snowPack?: number; snowS?: number;
   id: number; isPlayer: boolean; def: PodDef; pilot: PilotDef; stats: Record<StatKey, number>;
   name: string; color: string;
   pos: THREE.Vector3; vel: THREE.Vector3; yaw: number; yawRate: number; steer: number;
@@ -203,7 +206,18 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   // Session 20: the ground under the pod changes the handling – for the player and the rivals alike (surfaces.ts). Airborne and
   // in zero-G only the heat factor applies (the hot air over a lava lake, the cold over ice).
   const SF = surfaceOf(td.paths[p.path]?.samples[p.idx]?.surf), onSurf = p.grounded && !p.zeroG;
-  const sfGrip = onSurf ? SF.grip : 1, sfVmax = onSurf ? SF.vmax : 1;
+  let sfGrip = onSurf ? SF.grip : 1, sfVmax = onSurf ? SF.vmax : 1;
+  // 2026-11-22 – powder snow keeps trails (snowField.ts). A pod presses the snow down under its two engine banks, and packed snow
+  // carries it faster than fresh powder: the more often a line is flown, the faster it gets.
+  p.snowPack = 0;
+  if (td.snow && onSurf && SF.id === 'powder' && !frozen) {
+    const snow = td.snow, off = P.width * 0.6, rx = -Math.cos(p.yaw), rz = Math.sin(p.yaw);
+    const lx = p.pos.x - rx * off, lz = p.pos.z - rz * off, qx = p.pos.x + rx * off, qz = p.pos.z + rz * off;
+    const pk = (snow.packAt(p.path, p.idx, lx, lz) + snow.packAt(p.path, p.idx, qx, qz)) / 2;
+    p.snowPack = pk; sfGrip += (PACKED_GRIP - sfGrip) * pk; sfVmax += (PACKED_VMAX - sfVmax) * pk;
+    p.snowS = (p.snowS ?? 0) + Math.hypot(p.vel.x, p.vel.z) * dt;
+    if (p.snowS >= STAMP_EVERY) { p.snowS = Math.min(STAMP_EVERY, p.snowS - STAMP_EVERY); snow.stamp(p.path, p.idx, lx, lz, STAMP_RADIUS, STAMP_AMOUNT); snow.stamp(p.path, p.idx, qx, qz, STAMP_RADIUS, STAMP_AMOUNT); }
+  }
   if (p.invuln > 0) p.invuln -= dt;
   { const pc = p as unknown as { obCd?: number; wCd?: number }; if (pc.obCd) pc.obCd = Math.max(0, pc.obCd - dt); if (pc.wCd) pc.wCd = Math.max(0, pc.wCd - dt); }
   // steering smoothing

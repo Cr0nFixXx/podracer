@@ -34,6 +34,7 @@ Nur offene Punkte, nach Thema. Erledigtes steht im Verlauf: `docs/verlauf/`, je 
 - [ ] **Höhlen-Optik prüfen:** Felsschichtung läuft am Gewölbe stark gebogen (Textur folgt dem Bogen); Vulkan-Höhle ist ohne Zusatzlicht fast schwarz – ggf. mehr Glutadern/Lampen
 - [ ] **Schnee-Fotoset:** zeigt auf Ando Prime fußspurartige Flecken – ggf. anderes CC0-Set (`tools/photos/pbr.py`)
 - [ ] **Fahrbahn faltet sich in sehr engen Knicken weiter offener Flächen** (halbe Breite > Kurvenradius; besteht seit Session 18): Boonta 3462–3487 (Breite/Radius 2,8) und 2159–2178, Mos Espa 4671–4692, Aquilaris 4521–4534. Anzeige: `tools/ci/info.ts`, Zeile `fold`. Lösung in `trackBuilder.ts → controlPoints` (Breite an den Radius koppeln oder Knick entschärfen)
+- [ ] **Schneedecke – Feinschliff nach der Probefahrt** (seit 2026-11-22 gebaut): Tiefe und Rand der Spuren, Körnung und Wellen des frischen Schnees, Stärke der Schneefahne, die Zahlen (frisch 93 % / fest 98,5 % Höchsttempo) – alles nur in Software-Bildern gesehen. Offen: sollen die Gegner feste Spuren suchen? Sollen auch normale Schnee-Abschnitte Spuren bekommen (der Nutzer wählte vorerst nur die Pulverschnee-Felder)?
 
 ## 6. Spieltiefe
 - [ ] **Meisterschafts- / Cup-Modus:** 4-Rennen-Serien mit Gesamtpunkten und Siegerehrung
@@ -49,7 +50,6 @@ Nur offene Punkte, nach Thema. Erledigtes steht im Verlauf: `docs/verlauf/`, je 
 - [ ] `tools/harness/shot.mjs` und `tools/harness/app.mjs` (Playwright) ruft nichts mehr auf, seit `run.sh` gelöscht ist – `pshot.mjs` / `papp.mjs` (Puppeteer) ersetzen sie. Löschen?
 
 ## 8. Vom Nutzer am 2026-11-22 bestellt und entschieden – noch nicht gebaut
-- [ ] **Pulverschnee als 3D-Schneedecke mit Spuren** (Entscheidung: die Spuren ändern auch das Fahren). Die Pulverschnee-Felder der zwei Eiswelt-Strecken (je ≈ 1 km) bekommen eine echte Schneedecke mit feinem Relief. Jeder Pod pflügt eine Spur mit aufgeworfenen Rändern; sie bleibt das ganze Rennen und schneit bei Schneeböen langsam zu. Gespurter Schnee ist schneller als frischer – es entsteht eine Ideallinie. Dazu feine Schneefahnen
 - [ ] **Textur- und Terrainübergänge überarbeiten** (Entscheidung: alle drei Arten): (1) Pistenrand ↔ Gelände, (2) Wechsel der Untergründe entlang der Strecke, (3) im Gelände selbst (Fels ↔ Sand ↔ Schnee an Hängen und Felswänden). Dazu gehört die gestreckte Textur auf den neuen Kappen der Felswände
 - [ ] **Offenere Abschnitte** (Entscheidung: auf allen Natur-Untergründen): Leitplanken, Randsteine und die sichtbare Pistenkante weg; der Boden geht ins Gelände über; die Grenze bilden unregelmäßige Felsreihen und Felswände (fest, man prallt ab), die Breite schwankt. Gebaute Decks (Start/Ziel, Brücken, Tunnel) behalten ihre Geländer. Heute stehen an 44–71 % jeder Strecke Leitplanken. Vorher die Falten aus Abschnitt 5 beheben
 

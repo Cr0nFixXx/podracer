@@ -80,6 +80,8 @@ export interface Path {
 }
 
 export interface TrackData {
+  /** 2026-11-22: the trails in the powder snow (snowField.ts) – set by whoever runs a race on the track (Game, a unit check); absent: powder is plain powder */
+  snow?: import('./snowField').SnowField;
   def: TrackDef;
   seaY?: number; // fixed sea level of ocean worlds (set before the underwater tunnels dip the road)
   overheads?: Overhead[]; // filled by the world builder (trackDetail / start portal), read by stepPod

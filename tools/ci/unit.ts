@@ -5,6 +5,8 @@ import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, THEMES, TRACKS, type PodDef, typ
 import { makeTerrainField } from '../../src/game/terrain';
 import { resolveEnvironment, type TimeOfDay, type WeatherKind } from '../../src/game/environment';
 import { clipOutside } from '../../src/game/meshClip';
+import { SnowField } from '../../src/game/snowField';
+import { SURF } from '../../src/game/surfaces';
 import { podLayout } from '../../src/game/podLayouts';
 import { cockpitGeo } from '../../src/game/podCockpits';
 import { engineExtent, engineGeo } from '../../src/game/podParts';
@@ -1041,6 +1043,61 @@ test('boost climate: in the cold the same boost heats the engines less and they 
   ok(Math.abs(h / n - 1.2) < 0.02, `hot (1.2): heat ${h.toFixed(3)} against ${n.toFixed(3)} neutral – expected 120 %`);
   ok(Math.abs((c - cc) / (n - nc) - 1.25) < 0.03, `cold: cooled by ${(c - cc).toFixed(3)} in 0.4 s against ${(n - nc).toFixed(3)} neutral – expected 125 %`);
   ok(Math.abs((h - hc) / (n - nc) - 1 / 1.2) < 0.03, `hot: cooled by ${(h - hc).toFixed(3)} in 0.4 s against ${(n - nc).toFixed(3)} neutral – expected 83 %`);
+});
+
+// ---- powder snow keeps the trails of the pods (2026-11-22, user decision: the trails change the driving too) ----
+/** A fresh copy of the Frostspalt track with its snow field, and the middle of its powder run: [track, field, sample index]. */
+function snowTrack(): [TrackData, SnowField, number] {
+  const td = buildTrack(TRACKS.find(t => t.id === 'frost')!), snow = new SnowField(td); (td as unknown as { snow: SnowField }).snow = snow;
+  ok(snow.runs.length > 0, 'the snow field found no powder run on frost');
+  const r = snow.runs[0], mid = r.a + (r.n >> 1);
+  eq(td.paths[r.path].samples[mid].surf, SURF.powder, 'surface in the middle of the run:');
+  return [td, snow, mid];
+}
+/** An Aurora flying `secs` seconds along the powder run from sample `idx`, full throttle from `v0` m/s. It is kept on the centre line
+ *  of the road (position and heading are put back after every step – the run bends), its speed is the physics' own. Returns it. */
+function snowPass(td: TrackData, idx: number, secs: number, v0 = 60): PodState {
+  const s = td.main.samples[idx], p = racer(byId('aurora'), td, idx, 0, s.y + HOVER);
+  p.grounded = true; p.vel.set(s.tx * v0, 0, s.tz * v0); p.input.throttle = 1;
+  for (let f = 0; f < secs * 60; f++) {
+    stepPod(p, td, 1 / 60, f / 60, 1, false);
+    const q = td.main.samples[p.idx], v = Math.hypot(p.vel.x, p.vel.z), al = (p.pos.x - q.x) * q.tx + (p.pos.z - q.z) * q.tz;
+    p.pos.x = q.x + q.tx * al; p.pos.z = q.z + q.tz * al; p.yaw = Math.atan2(q.tx, q.tz); p.yawRate = 0; p.vel.x = q.tx * v; p.vel.z = q.tz * v;
+  }
+  return p;
+}
+test('snow: a pod presses a trail into the powder – packed under its engines, fresh a few metres beside it', () => {
+  const [td, snow, mid] = snowTrack(), S = td.main.samples;
+  snowPass(td, mid - 40, 1.2); // (60 m/s and faster for 1.2 s: from 40 samples before the middle to about 5 samples behind it)
+  const at = (i: number, lat: number) => { const q = S[i]; return snow.packAt(0, i, q.x + q.rx * lat, q.z + q.rz * lat); };
+  let best = 0; for (let lat = -6; lat <= 6; lat += 0.5) best = Math.max(best, at(mid - 20, lat));
+  ok(best > 0.3 && best < 0.75, `packing in the trail after ONE pass: ${best.toFixed(2)}, expected 0.3 … 0.75`);
+  ok(at(mid - 20, 14) === 0 && at(mid - 20, -14) === 0, `14 m beside the trail the snow should be fresh: ${at(mid - 20, 14)} / ${at(mid - 20, -14)}`);
+  ok(at(mid + 60, 0) === 0, 'far ahead of the pod the snow should be fresh');
+});
+test('snow: every further pass packs the trail harder', () => {
+  const [td, snow, mid] = snowTrack(), S = td.main.samples;
+  const best = () => { let b = 0; const q = S[mid - 20]; for (let lat = -6; lat <= 6; lat += 0.5) b = Math.max(b, snow.packAt(0, mid - 20, q.x + q.rx * lat, q.z + q.rz * lat)); return b; };
+  snowPass(td, mid - 40, 1.2); const one = best();
+  snowPass(td, mid - 40, 1.2); const two = best();
+  snowPass(td, mid - 40, 1.2); snowPass(td, mid - 40, 1.2); const four = best();
+  ok(two > one + 0.1 && four > two + 0.05 && four <= 1, `packing after 1 / 2 / 4 passes: ${one.toFixed(2)} / ${two.toFixed(2)} / ${four.toFixed(2)}`);
+});
+test('snow: on a packed trail a pod is faster than in fresh powder', () => {
+  const run = (packed: boolean) => {
+    const [td, snow, mid] = snowTrack();
+    if (packed) for (const r of snow.runs) { r.data.fill(255); }
+    return Math.hypot(...snowPass(td, mid - 150, 2, 125).vel.toArray().filter((_, k) => k !== 1)); // (starts just below the top speed of fresh powder)
+  };
+  const fresh = run(false), firm = run(true);
+  ok(firm > fresh * 1.02, `speed after 2 s: ${firm.toFixed(1)} m/s on a firm trail, ${fresh.toFixed(1)} m/s in fresh powder – expected at least 2 % more`);
+});
+test('snow: snowfall loosens a trail again', () => {
+  const [td, snow, mid] = snowTrack(), q = td.main.samples[mid];
+  for (const r of snow.runs) r.data.fill(200);
+  const before = snow.packAt(0, mid, q.x, q.z); snow.snowIn(0.25); const after = snow.packAt(0, mid, q.x, q.z);
+  ok(Math.abs(before - 200 / 255) < 0.01 && Math.abs(after - (200 / 255 - 0.25)) < 0.02, `packing ${before.toFixed(2)} → ${after.toFixed(2)} after snowIn(0.25), expected ${(200 / 255 - 0.25).toFixed(2)}`);
+  snow.snowIn(5); eq(snow.packAt(0, mid, q.x, q.z), 0, 'after a lot of snow:');
 });
 
 console.log(failed ? `\n${failed} unit check(s) FAILED, ${passed} passed.` : `All ${passed} unit checks passed.`);

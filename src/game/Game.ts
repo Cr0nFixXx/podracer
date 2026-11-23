@@ -5,7 +5,8 @@ import { beginTextureEpoch, generateTextures, hasTextureWorkers, setTextureAniso
 import { makeBeams } from './lights';
 import { DebrisPool } from './debris';
 import { DS, TUNNEL_SHOULDER, roadSurfaceAt, tunnelCeiling } from './trackBuilder';
-import { surfaceOf, surfacePalette, type SurfaceDef } from './surfaces';
+import { SURF, surfaceOf, surfacePalette, type SurfaceDef } from './surfaces';
+import { SnowField } from './snowField';
 import { normalizeKeys, normalizePad, padValue, type Action, type KeyMap, type PadMap } from './keymap';
 import { podEnvelope } from './podDesigns';
 import { WeatherFx } from './weather';
@@ -88,7 +89,7 @@ export class Game {
   minimap: HTMLCanvasElement | null = null;
   private mapBg: HTMLCanvasElement | null = null; private mapW = 0; private mapH = 0;
   message = ''; messageT = 0; finishShown = false; postTimer = 0;
-  gripMul = 1; /** engine-heat factor of climate and weather (EnvFx.heat) */ heatMul = 1; lastBeep = 99;
+  gripMul = 1; /** engine-heat factor of climate and weather (EnvFx.heat) */ heatMul = 1; private snowAcc = 0; lastBeep = 99;
   raf = 0; ro: ResizeObserver | null = null;
   // Pre-allocated scratch math objects (zero per-frame GC allocations!)
   tmpV = new THREE.Vector3(); tmpV2 = new THREE.Vector3(); tmpV3 = new THREE.Vector3();
@@ -174,6 +175,7 @@ export class Game {
     this.cb.onLoading(0.03, 'Berechne Streckenverlauf …');
     await new Promise(res => setTimeout(res, 0));
     this.td = buildTrack(trackDef);
+    { const sf = new SnowField(this.td); if (sf.runs.length) this.td.snow = sf; } // 2026-11-22: powder snow keeps the trails of the pods
     { const avgY = this.td.main.samples.reduce((a, s) => a + s.y, 0) / this.td.N; const fogFloor = Math.min(avgY - 14, this.td.bounds.minY - 6); this.fog = applyAtmosphere(this.scene, theme, theme.fogDensity / gfx.drawDistance, fogFloor, this.sunDir, fx.volFog, gfx.volumetrics ?? 2); }
     this.world = await buildWorld(this.td, theme, gfx, (p, m) => this.cb.onLoading(0.05 + p * 0.85, m));
     if (this.disposed) return;
@@ -366,6 +368,11 @@ export class Game {
 
   update(dt: number) {
     this.clock += dt;
+    // 2026-11-22: snow squalls loosen the trails in the powder again – a firm trail is fresh powder after about 2.5 minutes of full squalls
+    if (this.td.snow && this.td.def.theme === 'ice' && this.env.gustAmt > 0.05 && this.state === 'race') {
+      this.snowAcc += dt * this.env.gustAmt / 150;
+      if (this.snowAcc >= 1 / 255) { const n = Math.floor(this.snowAcc * 255); this.td.snow.snowIn(n / 255); this.snowAcc -= n / 255; }
+    }
     const frozen = this.state === 'countdown';
     if (this.state === 'countdown') {
       this.countdown -= dt;
@@ -642,6 +649,7 @@ export class Game {
         const envP = podEnvelope(p.def), cyD = Math.cos(p.yaw), syD = Math.sin(p.yaw);
         const near = !p.isPlayer && dist < 24 ? 0.3 : 1, aD = (p.isPlayer ? 0.42 : 0.36) * near * this.dustAmt;
         this.tmpC.copy(this.dustCol).lerp(WHITE_C, 0.3); // a little lighter than the ground, otherwise the wake is invisible on its own surface
+        const powder = (smp?.surf ?? 0) === SURF.powder && !!this.td.snow ? 1 + 1.5 * (1 - (p.snowPack ?? 0)) : 1; // fresh powder flies up in a plume, a firm trail hardly at all
         const sfw = surfaceOf(smp?.surf), wk = sfw.liquid && sfw.liquid !== 'lava' && sfw.liquid !== 'methane' ? 'spray' : sfw.wake === 'spray' ? 'dust' : sfw.wake, wkCol = this.wakeColor(sfw);
         for (const e of [envP.engL, envP.engR]) {
           const lz = p.isPlayer ? (e.frontZ + e.backZ) * 0.5 : e.backZ - 1.2, lx = e.outerX * 1.1, sg = e.x < 0 ? -1 : 1;
@@ -651,7 +659,7 @@ export class Game {
           // glowing embers over lava, next to nothing on bare ice and metal decks
           if (wet || wk === 'spray') this.particles.spray(this.tmpV, this.tmpV2, sp, (wet ? this.wet : 0.9) * (p.isPlayer ? 1 : 0.85) * near);
           else if (wk !== 'none') {
-            this.particles.trail(this.tmpV, this.tmpV2, wkCol ?? this.tmpC, sp, wkCol ? aD / Math.max(0.35, this.dustAmt) : aD);
+            this.particles.trail(this.tmpV, this.tmpV2, wkCol ?? this.tmpC, sp, (wkCol ? aD / Math.max(0.35, this.dustAmt) : aD) * powder);
             if (wk === 'embers' && this.particles.chance(0.22)) this.particles.sparks(this.tmpV, UP, p.vel, 2);
           }
         }
@@ -801,6 +809,7 @@ export class Game {
   private surfaceHud(): { surface: string; surfaceFx: string } {
     const p = this.player, sf = surfaceOf(this.td.paths[p.path]?.samples[p.idx]?.surf);
     const fx = sf.grip <= 0.8 ? 'wenig Haftung' : sf.heat >= 1.25 ? 'Triebwerke heizen auf' : sf.vmax <= 0.95 ? 'bremst' : sf.grip < 0.95 ? 'rutschig' : '';
+    if (sf.id === 'powder' && (p.snowPack ?? 0) > 0.45 && !p.zeroG) return { surface: 'Pulverschnee · gespurt', surfaceFx: 'trägt besser' };
     return { surface: p.zeroG ? 'Schwerelos' : sf.name, surfaceFx: p.zeroG ? '' : fx };
   }
 

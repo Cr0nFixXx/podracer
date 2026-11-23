@@ -77,6 +77,8 @@ Jede Strecke wechselt zwischen mehreren Untergründen. Unter der Wetterzeile im 
 
 Kalte Untergründe (Schnee, Eis, Wasser) kühlen: die Triebwerke heizen dort 10 % langsamer auf. Haftung und Höchsttempo ändern sich nur am Boden – nicht in der Luft und nicht in den Zero-G-Röhren. Die HUD-Zeile nennt den Untergrund und einen Hinweis („wenig Haftung", „bremst", „rutschig", „Triebwerke heizen auf").
 
+**Pulverschnee merkt sich die Spuren:** Auf den Pulverschnee-Feldern von Ando Prime liegt eine echte Schneedecke. Jeder Pod pflügt mit seinen beiden Triebwerksbänken eine Doppelspur hinein, mit aufgeworfenen Rändern. Gespurter Schnee trägt besser: in frischem Pulver verliert man 7 % Höchsttempo, auf einer fest gefahrenen Spur nur noch 1,5 % (Haftung 95 % statt 90 %). Eine Überfahrt festigt die Spur etwa zur Hälfte, nach drei bis vier ist sie fest – über die Runden entsteht eine Ideallinie, die allen nützt. Bei Schneeböen schneit sie langsam wieder zu (eine feste Spur in rund zweieinhalb Minuten). In frischem Pulver fliegt hinter dem Pod eine dichte Schneefahne auf, auf der Spur kaum noch. Die HUD-Zeile zeigt „Pulverschnee · gespurt".
+
 **Seen:** In den weiten offenen Passagen fährt man direkt über die Oberfläche von Eissee, Lavasee, Methansee, Sumpf, Spiegelsee oder dem Meer von Aquilaris. Die Fläche ist eben und bis über 100 m breit; Baken und ein Energiefeld markieren den Rand. Hineinfallen kann man nicht.
 
 ## Tageszeit & Wetter

@@ -38,6 +38,9 @@ Part of the agent manual (`CLAUDE.md`). Read this before you change `physics.ts`
 - **AI start discipline:** `ai.gridLat` (grid lane) is held for ~4.5 s, blended out until 7.5 s; no lateral dodging and lift-off when tailgating during that phase. CI column `startTouch`. *(S16)*
 - **AI dive rule** lives in `aiInputs` (`ai.dive`, `ai.diveT`, `ai.diveRoll`); CI fails above 1.5 % dive frames. Do not loosen it without re-measuring. *(S13)*
 
+## Ground under the pod
+- **Powder snow with trails:** `stepPod` raises `sfVmax` / `sfGrip` by how firmly the snow under the two engine banks is packed (`p.snowPack`, mean of left and right) and stamps the field as it flies (`p.snowS` = metres since the last stamp). Numbers in `snowField.ts`: fresh 0.93 / 0.90 (`SURFACES.powder`), firm 0.985 / 0.95; one pass packs about half, four passes about 90 %. Details: `strecken.md` → „Surfaces and flat basins". *(2026-11-22)*
+
 ## Boost and engine heat
 - **`stepPod(…, heatMul)`**: the seventh argument is the engine-heat factor of climate and weather (default 1: node sim and unit checks). Heat while boosting = `heatRate × SurfaceDef.heat × heatMul`, cooling = `cool ÷ (SurfaceDef.heat × heatMul)`. Where the numbers come from: `umwelt.md` → „Climate and the boost". *(2026-11-22)*
 
