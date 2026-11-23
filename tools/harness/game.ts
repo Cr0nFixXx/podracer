@@ -202,7 +202,7 @@ let g: Game | null = null; let cur = -1;
   const fwd = G.camera.getWorldDirection(new THREE.Vector3()); const t = G.camera.position.clone().addScaledVector(fwd, 50);
   G.sun.target.position.copy(t); G.sun.position.copy(t).addScaledVector(G.sunDir, 400);
   { const rt = new URLSearchParams(location.search).get('rt'); if (rt) { G.raceTime = +rt; G.applyEnv(0, true); } }
-  G.updateVisuals(); G.updateLights(); G.world.update(G.clock + 5, G.camera.position);
+  G.updateVisuals(); G.updateLights(); G.updateShields(0.5); G.world.update(G.clock + 5, G.camera.position);
   if (location.search.includes('bright') && !G.scene.getObjectByName('dbgAmb')) { const al = new THREE.AmbientLight(0xffffff, 2.5); al.name = 'dbgAmb'; G.scene.add(al); } // diagnostic fill light (caves)
   if (location.search.includes('flash')) { G.sky.uniforms.flash.value = 0.9; G.hemi.intensity = 1.75; }
   if (location.search.includes('live')) { // live graphics switching: toggle everything that is switchable at runtime, render, toggle back

@@ -8,6 +8,8 @@ Part of the agent manual (`CLAUDE.md`). Read this before you change the renderer
 ## Renderer and TSL
 - Renderer/node classes from `three/webgpu`, TSL from `three/tsl`. **No `ShaderMaterial` / `onBeforeCompile` / `EffectComposer`.** *(≤ S9)*
 - WGSL strictness: no constant `smoothstep(a,b,x)` with `a >= b` → `ssInv`. Keep all `.sample()` calls in uniform control flow; inside `If`/`Loop` use `textureLoad(...)` (for depth) or `.level(0)` / `.grad(dx, dy)`. In `Fn((_params, builder) => ...)`, `builder` is the **2nd** argument. *(≤ S9)*
+- **Pattern on an instanced mesh: `positionGeometry`, not `positionLocal`.** On an `InstancedMesh`, `positionLocal` is already multiplied by the instance matrix (metres in the mesh's space, for a world-space instance: world metres). A pattern built on it scales with the instance and wanders with its position – the heat shield came out as a black disc. `positionGeometry` is the untouched vertex. *(2026-11-23)*
+- **Additive light reads far stronger than its number.** 0.14 linear blue on dark basalt is already a medium blue on screen (≈ 105 / 255). Fill terms of additive effects stay near 0.01 … 0.1; lines and rims carry the look. *(2026-11-23)*
 - **`screenUV` origin is top-left on WebGPU *and* WebGL2.** Any NDC → screen conversion must flip y (`0.5 - ndc.y * 0.5`). The old god-ray code did not. *(S11)*
 
 ## Normals, materials, batching

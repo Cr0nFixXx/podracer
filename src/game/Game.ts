@@ -3,6 +3,7 @@ import { resolveEnvironment, type EnvBuild, type EnvFx, type EnvTimeline } from 
 import { WEATHER } from './materials';
 import { beginTextureEpoch, generateTextures, hasTextureWorkers, setTextureAnisotropy, textureStats } from './textures';
 import { makeBeams } from './lights';
+import { makeHeatShields } from './heatShield';
 import { DebrisPool } from './debris';
 import { DS, TUNNEL_SHOULDER, roadSurfaceAt, tunnelCeiling } from './trackBuilder';
 import { SURF, surfaceOf, surfacePalette, type SurfaceDef } from './surfaces';
@@ -75,6 +76,8 @@ export class Game {
   tl!: EnvTimeline; envBuild!: EnvBuild; envInit = false; baseGrip = 1; wet = 0; wetTarget = 0; private sunBaseI = 1; private envI = 0.85; private envLum = 1;
   private sevPrev = 0; private darkPrev = 0; private dustBase = new THREE.Color(); lightLevel = 0;
   beams: ReturnType<typeof makeBeams> | null = null; private tmpE = new THREE.Euler();
+  /** 2026-11-23: plasma heat shields under the pods over lava (look only); `shieldAmt` = how far each pod's shield is up, 0 … 1 */
+  shields: ReturnType<typeof makeHeatShields> | null = null; private shieldAmt: Float32Array = new Float32Array(0);
   private prevNd = 1e9; private closing = 0; private flybyT = 0;
   loadMs: Record<string, number> = {};
   debris = new DebrisPool(); /** sheet metal: Bruchteile and pieces of exploding pods */ scrap = new DebrisPool('plate'); dustAmt = 1;
@@ -208,6 +211,8 @@ export class Game {
       // (2026-11-23: wider and with a flatter falloff – decay 1.7 instead of 2 – so that walls and rock borders 150 m ahead still catch light)
       const sl = new THREE.SpotLight('#dfeaff', HEAD_LAMP, 0, 0.62, 0.7, 1.7); this.scene.add(sl); this.scene.add(sl.target); this.headLamp = sl;
     }
+
+    if (this.td.paths.some(pa => pa.samples.some(q => surfaceOf(q.surf).liquid === 'lava'))) { this.shields = makeHeatShields(this.pods.length); this.shieldAmt = new Float32Array(this.pods.length); this.scene.add(this.shields.mesh); }
 
     this.post = new PostFX(r, this.scene, this.camera, gfx, { rain: (gfx.weatherFx ?? 2) > 0 ? build.maxRain : 0, flare: build.flare });
     this.applyEnv(0);
@@ -466,7 +471,7 @@ export class Game {
 
     this.updateCamera(dt);
     this.updateVisuals(dt);
-    this.updateLights();
+    this.updateLights(); this.updateShields(dt);
     this.particles.update(dt, this.camera.position, this.clock); this.debris.update(dt); this.scrap.update(dt);
     this.world.update(this.clock, this.camera.position, this.pods);
     this.sky.uniforms.time.value = this.clock;
@@ -767,6 +772,28 @@ export class Game {
     this.sun.intensity = this.sunBaseI; this.hemi.intensity = 0.58 + f * 3.0; this.scene.environmentIntensity = this.envI + f * 1.1; this.sky.uniforms.flash.value = f;
   }
 
+  /** Plasma heat shields (2026-11-23, look only): a pod over a lava lake raises its shield within a quarter of a second and drops
+   *  it half a second after the lava ends. The bowl hangs below the lowest part of the pod and reaches round engines and cockpit. */
+  updateShields(dt: number) {
+    const sh = this.shields; if (!sh) return;
+    const m = this.tmpM, q = this.tmpQ, pos = this.tmpV, sc = this.tmpV2, A = sh.strength.array as Float32Array; let any = false;
+    sh.time.value = this.clock;
+    this.pods.forEach((p, i) => {
+      const over = p.dead <= 0 && surfaceOf(this.td.paths[p.path]?.samples[p.idx]?.surf).liquid === 'lava' && p.pos.y - p.groundY < HOVER + 7;
+      const a = this.shieldAmt[i] = Math.max(0, Math.min(1, this.shieldAmt[i] + (over ? dt * 4.5 : -dt * 2.2)));
+      A[i] = a * a * (3 - 2 * a) * (p.boosting ? 1.35 : 1);
+      if (a <= 0) { m.makeScale(0, 0, 0); sh.mesh.setMatrixAt(i, m); return; }
+      any = true;
+      const env = podEnvelope(p.def), front = Math.max(env.engL.frontZ, env.engR.frontZ) + 1.0, back = front - env.length - 1.4;
+      const halfW = Math.max(-env.engL.outerX, env.engR.outerX) + 1.0, low = Math.min(env.engL.minY, env.engR.minY, env.cockpit.minY) - 0.45, zc = (front + back) * 0.5;
+      const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
+      pos.set(p.pos.x + zc * sy, p.pos.y + low - zc * p.pitch, p.pos.z + zc * cy);
+      q.setFromEuler(this.tmpE.set(p.pitch, p.yaw, 0, 'YXZ')); // (level across: the bowl does not bank with the pod)
+      m.compose(pos, q, sc.set(halfW, 2.6 + 0.5 * a, (front - back) * 0.5)); sh.mesh.setMatrixAt(i, m);
+    });
+    sh.mesh.visible = any; sh.mesh.instanceMatrix.needsUpdate = true; sh.strength.needsUpdate = true;
+  }
+
   /** Running lights (fade in with darkness): headlights with soft volumetric beams at both engine noses, wingtip markers, cockpit strobe.
    *  The player's lamp is a real spot light: it follows steering and pitch, brightens with boost and flickers on a damaged engine. */
   updateLights() {
@@ -1038,7 +1065,7 @@ export class Game {
     this.ro?.disconnect();
     this.audio?.dispose();
     this.pods.forEach(p => p.visual?.dispose());
-    this.weather?.dispose(); this.world?.dispose(); this.particles?.dispose(); this.debris?.dispose(); this.scrap?.dispose(); this.post?.dispose(); this.csm?.dispose();
+    this.weather?.dispose(); this.world?.dispose(); this.particles?.dispose(); this.debris?.dispose(); this.scrap?.dispose(); this.post?.dispose(); this.csm?.dispose(); this.shields?.dispose();
     this.sky?.mesh.geometry.dispose(); (this.sky?.mesh.material as THREE.Material | undefined)?.dispose();
     (this.scene.environment as THREE.Texture | null)?.dispose();
     this.renderer?.dispose();

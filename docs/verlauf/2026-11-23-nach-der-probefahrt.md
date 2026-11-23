@@ -87,6 +87,13 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Bisher kostete jede Landung über 14 m/s Sinkrate Hülle – ein gewöhnlicher Rampensprung landet mit etwa 30 m/s und kostete jedes Mal rund 6 Punkte.
 - Jetzt sind 38 m/s frei (freier Fall aus 21 m). Nur was darüber liegt, trifft den Rumpf. Gemessen wird gegen den Boden: eine abfallende Piste macht die Landung weicher. Staub, Geräusch und Kamerastoß bleiben.
 
+### Verbesserung – Plasma-Hitzeschild über Lava (nur Optik)
+- Unter jedem Pod, der über dem Lavasee fliegt, liegt jetzt eine flache Schale aus blau-weißem Plasma: Wabenmuster, heller Rand, Ringe laufen nach außen, leichtes Flackern. Sie blendet über der Lava ein (0,2 s) und dahinter wieder aus (0,5 s); beim Boost leuchtet sie stärker. Auch die Gegner haben eine.
+- Reine Optik: an Hitze, Schaden und Fahrverhalten ändert sie nichts. Ein Zeichenaufruf für alle Pods (`src/game/heatShield.ts`, `Game.updateShields`).
+- Größe aus der Hülle des jeweiligen Pods: Triebwerksnasen bis Cockpit-Heck plus 1 m, Triebwerks-Außenkanten plus 1 m.
+- Erster Versuch war eine schwarze Scheibe: Muster auf `positionLocal` gebaut – bei instanzierten Netzen sind das schon Weltmeter. Regel dazu in `docs/regeln/grafik.md`.
+- Geprüft: Bilder auf Magma über dem Lavasee (Verfolgerkamera, Seite, von oben), `tsc`, WebGPU-Konsolenprüfung mit der neuen Option `VIEW=chase_3600 TRACKS=2` (0 Fehler).
+
 ## Geprüft
 - Fehler 1: neue Prüfungen `bridges: …` (11, zuerst rot: Gelände 22,7 m über der Brücke, 309 Punkte; Wand 28 m hoch direkt neben der Brücke). Nur mit Regel (2) stand das Gelände noch 5,2 m über der Fahrbahn – Regel (1) ist nötig. `poke.ts` auf allen Strecken, Gitter 4,5 / 7 / 13,75 m, Brücken eingeschlossen: 0 Punkte (vorher 242 auf dem Methan-Derby). Bilder vorher/nachher an allen drei Stellen (WebGL2, Software).
 
