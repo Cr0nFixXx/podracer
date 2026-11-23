@@ -25,11 +25,34 @@ await has(p, 'Rennen starten'); await click(p, 'Rennen starten');
 await has(p, 'Wetter'); await p.screenshot({ path: out + '_setup.png' });
 await click(p, '▶ Start');
 await has(p, 'FLUGLAGE'); console.log('HUD up');
+// The boost gauge is 230 px wide and its labels are absolutely placed: every label must stay on ONE line, inside the gauge, and clear of
+// its neighbours in the row. (2026-11-23: the climate label "KÜHLE LUFT −21 %" stood in the line of the heat label – both broke in two.)
+const gaugeFit = async () => {
+  const r = await p.evaluate(() => {
+    const max = [...document.querySelectorAll('span')].find(el => el.textContent === 'MAX'); if (!max) return null;
+    const box = max.parentElement.parentElement, bb = box.getBoundingClientRect(), bad = [], seen = [];
+    const rows = new Map();
+    for (const el of box.querySelectorAll('span')) {
+      const rg = document.createRange(); rg.selectNodeContents(el);
+      const rects = [...rg.getClientRects()].filter(q => q.width > 0); if (!rects.length) continue;
+      const lines = new Set(rects.map(q => Math.round(q.top))).size, l = Math.min(...rects.map(q => q.left)), rt = Math.max(...rects.map(q => q.right)), t = el.textContent;
+      seen.push(t);
+      if (lines > 1) bad.push(`"${t}" breaks into ${lines} lines`);
+      if (l < bb.left - 1 || rt > bb.right + 1) bad.push(`"${t}" leaves the gauge (${Math.round(l - bb.left)} … ${Math.round(rt - bb.left)} of ${Math.round(bb.width)} px)`);
+      const key = Math.round(el.parentElement.getBoundingClientRect().top); if (!rows.has(key)) rows.set(key, []); rows.get(key).push({ t, l, r: rt });
+    }
+    for (const row of rows.values()) for (let i = 0; i < row.length; i++) for (let j = i + 1; j < row.length; j++) if (row[i].l < row[j].r - 1 && row[j].l < row[i].r - 1) bad.push(`"${row[i].t}" overlaps "${row[j].t}"`);
+    return { seen, bad };
+  });
+  if (!r) { console.log('HUD boost gauge: not found FAIL'); errs++; return; }
+  console.log('HUD boost gauge labels:', JSON.stringify(r.seen), r.bad.length ? 'FAIL – ' + r.bad.join('; ') : 'ok (one line each, inside the gauge, no overlap)'); if (r.bad.length) errs++;
+};
+await sleep(1500); await gaugeFit();
 if (process.env.TWICE) { // persistent texture cache: wait for the deferred write, then load the same race again in a fresh page
   await sleep(9000); await p.close(); p = await open();
   await has(p, 'Rennen starten'); await click(p, 'Rennen starten'); await has(p, 'Wetter'); await click(p, '▶ Start'); await has(p, 'FLUGLAGE'); console.log('second load done');
 }
-if (process.env.LOAD_ONLY) { await b.close(); process.exit(0); } // only the [load] timing line(s) wanted
+if (process.env.LOAD_ONLY) { await b.close(); process.exit(errs ? 1 : 0); } // only the [load] timing line(s) and the checks up to here wanted
 await has(p, 'LOS!', 600000); console.log('race started'); // software rendering runs the countdown in slow motion
 await p.keyboard.down('KeyW'); await sleep(Number(process.env.DRIVE_MS ?? 15000));
 await p.keyboard.down('ArrowRight'); await sleep(4000);

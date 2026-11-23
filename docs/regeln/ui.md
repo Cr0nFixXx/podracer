@@ -10,6 +10,7 @@ Part of the agent manual (`CLAUDE.md`). Read this before you change a menu, the 
 
 ## HUD
 - **HUD** is a scaled layer (reference 1280 × 720, `hs` in `RaceView`). Position with absolute px inside it. *(S14)*
+- **The boost gauge is 230 px wide – a HUD label has no room to grow.** At 9 px with 0.25 em tracking a character is ≈ 8 px: the line above the heat bar holds the state label and the percentage, nothing more (longest state: „ÜBERZOGEN · NOCH 2.4 s"). A third text there wraps BOTH labels into two lines (2026-11-23, the climate label). New information goes into the row under the bar (left of „MAX", not while BEREIT is shown) or elsewhere. The smoke test `tools/harness/papp.mjs` checks every label of the gauge: one line, inside the gauge, no overlap (`HUD boost gauge labels: … ok`) – it looks at the state the test race is in, so try a new label with the track and weather that make it longest. *(2026-11-23)*
 - **HUD left/right:** internal `hpL` / `engL` = local x < 0 = screen-RIGHT in the chase view. Only `Game.hud()` swaps; do not "fix" it anywhere else. *(S14)*
 - **HUD:** new fields go into `HudState` + `Game.hud()` + `RaceView.tsx`. HUD refreshes at ~12 Hz – no per-frame animation there. *(S12)*
 
