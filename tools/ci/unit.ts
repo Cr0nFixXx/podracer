@@ -1,7 +1,9 @@
 // Headless unit checks for pure game logic (part of `npm run check`). No framework: tiny test / expect helpers.
 // Env: ONLY=<substring> runs only the tests whose name contains it.
 import * as THREE from 'three';
-import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, TRACKS, type PodDef, type StatKey } from '../../src/game/data';
+import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, THEMES, TRACKS, type PodDef, type StatKey } from '../../src/game/data';
+import { makeTerrainField } from '../../src/game/terrain';
+import { clipOutside } from '../../src/game/meshClip';
 import { podLayout } from '../../src/game/podLayouts';
 import { cockpitGeo } from '../../src/game/podCockpits';
 import { engineExtent, engineGeo } from '../../src/game/podParts';
@@ -939,6 +941,64 @@ test('steering: flying forwards, stick right turns the nose to the right', () =>
 test('steering: reversing, stick right swings the TAIL to the right – the nose turns left, as a car does in reverse', () => {
   const a = noseRightAfter(-12, true);
   ok(a < -0.1, `nose turned ${a.toFixed(3)} rad to the right, expected clearly to the left (below -0.1)`);
+});
+
+// ---- forks: the mouth and the reunion of a shortcut or a cave branch (2026-11-22: user report "Höhlen/Abkürzungen haben am Anfang
+// Geometriefehler und sind teilweise versperrt") ----
+/** How far the terrain – as the mesh draws it: the field sampled every `cell` metres, each quad split as `buildTerrain` splits it –
+ *  stands above the road at the fork mouths and reunions of a track. Returns [highest excess in metres, where]. */
+function terrainOverRoadAtForks(id: string, cell: number): [number, string] {
+  const td = trackOf(id), tf = makeTerrainField(td, THEMES[TRACKS.find(t => t.id === id)!.theme], cell), memo = new Map<number, number>();
+  const H = (i: number, j: number) => { const k = i * 200003 + j; let v = memo.get(k); if (v === undefined) { v = tf.heightAt(i * cell, j * cell); memo.set(k, v); } return v; };
+  const mesh = (x: number, z: number) => {
+    const fi = x / cell, fj = z / cell, i = Math.floor(fi), j = Math.floor(fj), u = fi - i, v = fj - j, a = H(i, j), b = H(i, j + 1), c = H(i + 1, j + 1), d = H(i + 1, j);
+    return u + v <= 1 ? a + u * (d - a) + v * (b - a) : c + (1 - u) * (b - c) + (1 - v) * (d - c);
+  };
+  let worst = 0, where = '';
+  const scan = (p: Path, i: number) => {
+    const s = p.samples[i]; if (!s || s.gap || s.bridge || s.zeroG || s.lake) return;
+    for (let lat = -s.hw + 0.5; lat <= s.hw - 0.5; lat += 1.5) {
+      const over = mesh(s.x + s.rx * lat, s.z + s.rz * lat) - (s.y + s.ramp - lat * s.bank);
+      if (over > worst) { worst = over; where = `${id} path ${p.id} sample ${i} lat ${lat.toFixed(0)}`; }
+    }
+  };
+  const N = td.main.samples.length;
+  for (const br of td.paths.slice(1)) {
+    for (const m of [br.mainFrom, br.mainTo]) for (let k = -50; k <= 50; k += 2) scan(td.main, ((m + k) % N + N) % N);
+    for (let k = 0; k < Math.min(60, br.samples.length); k += 2) { scan(br, k); scan(br, br.samples.length - 1 - k); }
+  }
+  return [worst, where];
+}
+for (const id of ['boonta', 'frost', 'magma', 'oovo']) test(`forks: the terrain stays below the road at every mouth and reunion of ${id} (terrain mesh of 7 m and of 13.75 m)`, () => {
+  for (const cell of [7, 13.75]) { const [over, where] = terrainOverRoadAtForks(id, cell); ok(over < 0.5, `${cell} m cells: terrain ${over.toFixed(2)} m above the road at ${where}`); }
+});
+test('forks: the canyon wall of the main road comes down to a kerb beside a fork mouth and rises with the distance', () => {
+  let walls = 0;
+  for (const id of ['boonta', 'dunepass', 'mosespa', 'frost']) {
+    const td = trackOf(id), S = td.main.samples, N = S.length, W = (i: number) => S[((i % N) + N) % N];
+    for (let i = 0; i < N; i++) for (const right of [false, true]) for (const dir of [-1, 1]) {
+      const open = (q: Sample) => right ? q.openR : q.openL, h = (q: Sample) => right ? q.hR : q.hL;
+      if (!open(S[i]) || open(W(i + dir)) || S[i].roof > 0) continue; // i = the last open sample of a mouth in direction `dir` (a cave fork has no canyon walls): look at the wall beyond it
+      if (!(h(W(i + dir)) > 0 && h(W(i + dir * 19)) > 6)) continue; // (no canyon wall reaches this end of the mouth)
+      walls++;
+      ok(h(W(i + dir)) <= 1.21, `${id} ${i}: the wall beside the mouth is ${h(W(i + dir)).toFixed(1)} m high, expected a kerb of 1.2 m`);
+      for (let k = 1; k < 18; k++) { const a = h(W(i + dir * k)), b = h(W(i + dir * (k + 1))); if (!(b > 0)) break; ok(b >= a - 2.5, `${id} ${i}: the wall drops from ${a.toFixed(1)} to ${b.toFixed(1)} m going away from the mouth (${k} → ${k + 1} samples)`); }
+      ok(h(W(i + dir * 10)) > 3, `${id} ${i}: ten samples from the mouth the wall is only ${h(W(i + dir * 10)).toFixed(1)} m high`);
+    }
+  }
+  ok(walls >= 3, `only ${walls} canyon walls found that reach a fork mouth – the check would prove nothing`);
+});
+test('clipOutside: a square cut by a plane keeps exactly the half outside, without a vertex beyond the cut', () => {
+  const b = { pos: [0, 0, 0, 2, 0, 0, 2, 2, 0, 0, 2, 0], uv: [0, 0, 1, 0, 1, 1, 0, 1], ind: [0, 1, 2, 0, 2, 3] };
+  clipOutside(b, x => x > 0.5); // everything right of x = 0.5 is "inside" and must go
+  let area = 0;
+  for (let t = 0; t < b.ind.length; t += 3) {
+    const [i, j, k] = [b.ind[t], b.ind[t + 1], b.ind[t + 2]], ax = b.pos[i * 3], ay = b.pos[i * 3 + 1], cr = (b.pos[j * 3] - ax) * (b.pos[k * 3 + 1] - ay) - (b.pos[j * 3 + 1] - ay) * (b.pos[k * 3] - ax);
+    ok(cr > 0, 'a kept triangle changed its winding'); area += cr / 2;
+    for (const v of [i, j, k]) ok(b.pos[v * 3] <= 0.5 + 1e-9, `vertex at x = ${b.pos[v * 3]} lies beyond the cut`);
+  }
+  ok(Math.abs(area - 1) < 0.01, `kept area ${area.toFixed(4)}, expected 1 (the strip 0.5 × 2)`);
+  for (let v = 4; v < b.pos.length / 3; v++) ok(Math.abs(b.uv[v * 2] - b.pos[v * 3] / 2) < 0.01, 'a cut vertex has the wrong texture coordinate');
 });
 
 console.log(failed ? `\n${failed} unit check(s) FAILED, ${passed} passed.` : `All ${passed} unit checks passed.`);

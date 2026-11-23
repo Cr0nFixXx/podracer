@@ -801,6 +801,21 @@ export function buildTrack(def: TrackDef): TrackData {
     for (const pa of paths) for (const q of pa.samples) { const g = SURFACES[q.surf].grip; if (g < 1) q.vmax *= 0.45 + 0.55 * g; }
   }
 
+  // 2026-11-22: the canyon wall of the main road used to stop at its full height right beside a fork mouth (a rock slab of up to 50 m
+  // stood beside the entrance). Now it comes down to a 1.2 m rock kerb over the 16 samples before the opening and rises again behind it –
+  // as the walls of the branch roads always did (`applyShortcutWalls`).
+  {
+    const n = samples.length, W = (i: number) => samples[closed ? ((i % n) + n) % n : Math.max(0, Math.min(n - 1, i))];
+    for (const right of [false, true]) {
+      const isOpen = (q: Sample) => right ? q.openR : q.openL, fac = new Float32Array(n).fill(1);
+      for (let i = 0; i < n; i++) {
+        if (isOpen(samples[i])) continue;
+        let d = 19; for (let k = 1; k <= 18 && d > 18; k++) if (isOpen(W(i - k)) || isOpen(W(i + k))) d = k;
+        if (d <= 18) { const t = Math.max(0, Math.min(1, (d - 2) / 16)); fac[i] = t * t * (3 - 2 * t); }
+      }
+      for (let i = 0; i < n; i++) { const q = samples[i], h = right ? q.hR : q.hL; if (h > 1.2 && fac[i] < 1) { const v = 1.2 + (h - 1.2) * fac[i]; if (right) q.hR = v; else q.hL = v; } }
+    }
+  }
   // Recompute final collision wall offsets after all shortcuts, bridges, underwater tubes & branching caves are placed
   for (const p of paths) for (const s of p.samples) {
     if (s.openL) s.hL = 0;

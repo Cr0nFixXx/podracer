@@ -45,6 +45,8 @@ export interface TerrainField {
   splat: { g: number; b: number; c: number }; // splat weights of last heightAt(): gravel, basin, crest/talus
   nearest: (x: number, z: number) => { d: number; s: Sample };
   roadClear: (x: number, z: number, r: number, margin?: number) => boolean;
+  /** metres to the nearest road edge of any stretch (negative: on a road) – unlike `distToTrack` it does not favour the narrower road */
+  edgeDist: (x: number, z: number) => number;
   distToTrack: (x: number, z: number) => number;
   avgY: number;
 }
@@ -68,14 +70,28 @@ function craters(x: number, z: number) {
   return h;
 }
 
-export function makeTerrainField(td: TrackData, theme: ThemeDef): TerrainField {
+/** Edge length of the finest terrain cells (the ones along the track) for a geometry quality 1..3 – `buildTerrain` and the field share it. */
+export const terrainLeaf = (geoQ: number) => geoQ >= 3 ? 72 : geoQ === 2 ? 112 : 220;
+export const terrainCell = (geoQ: number) => terrainLeaf(geoQ) / 16;
+
+/** `meshCell` = edge length of the terrain mesh along the track (`terrainCell`): the rock massif behind a canyon wall starts that far
+ *  behind the wall, so that no terrain triangle can reach across the wall sheet or the road edge (2026-11-22). */
+export function makeTerrainField(td: TrackData, theme: ThemeDef, meshCell = 7): TerrainField {
   // Ground-shaping samples skip elevated overpass bridges (`!s.bridge`) so terrain hugs the lower road cleanly beneath every viaduct!
   // `allGrid` still holds bridges too so `roadClear()` keeps trees, rocks & bridge piers completely off both upper & lower roadways.
   const coarse: Sample[] = [], allCoarse: Sample[] = [];
   for (const p of td.paths) for (let i = 0; i < p.samples.length; i += 4) { const s = p.samples[i]; allCoarse.push(s); if (!s.bridge) coarse.push(s); }
   const cell = 40; const grid = new Map<number, Sample[]>(), allGrid = new Map<number, Sample[]>();
   const key = (cx: number, cz: number) => cx * 100003 + cz;
-  for (const s of coarse) { const k = key(Math.floor(s.x / cell), Math.floor(s.z / cell)); let a = grid.get(k); if (!a) { a = []; grid.set(k, a); } a.push(s); }
+  // Which stretch a coarse sample belongs to: path id · 1e6 + sample index (parallel to `grid`). Two samples are different stretches when
+  // they lie on different paths or more than 200 m apart along the same path (a fork, a hairpin, a parallel run).
+  const gridM = new Map<number, number[]>(), pathN = td.paths.map(p => p.samples.length), pathClosed = td.paths.map(p => p.closed);
+  for (const p of td.paths) for (let i = 0; i < p.samples.length; i += 4) {
+    const s = p.samples[i]; if (s.bridge) continue;
+    const k = key(Math.floor(s.x / cell), Math.floor(s.z / cell)); let a = grid.get(k), m = gridM.get(k); if (!a || !m) { a = []; m = []; grid.set(k, a); gridM.set(k, m); }
+    a.push(s); m.push(p.id * 1e6 + i);
+  }
+  const otherStretch = (m: number, n: number) => { const pm = Math.floor(m / 1e6); if (pm !== Math.floor(n / 1e6)) return true; let di = Math.abs(m - n); if (pathClosed[pm]) di = Math.min(di, pathN[pm] - di); return di > 100; };
   for (const s of allCoarse) { const k = key(Math.floor(s.x / cell), Math.floor(s.z / cell)); let a = allGrid.get(k); if (!a) { a = []; allGrid.set(k, a); } a.push(s); }
   const sparse: Sample[] = []; for (let i = 0; i < td.main.samples.length; i += 20) if (!td.main.samples[i].bridge) sparse.push(td.main.samples[i]);
   const avgY = td.main.samples.reduce((a, s) => a + s.y, 0) / td.N;
@@ -85,6 +101,20 @@ export function makeTerrainField(td: TrackData, theme: ThemeDef): TerrainField {
     for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) { const arr = grid.get(key(cx + i, cz + j)); if (!arr) continue; for (const s of arr) { const d = (s.x - x) ** 2 + (s.z - z) ** 2; if (d < bd) { bd = d; bs = s; } } }
     if (!bs) { for (const s of sparse) { const d = (s.x - x) ** 2 + (s.z - z) ** 2; if (d < bd) { bd = d; bs = s; } } }
     return { d: Math.sqrt(bd), s: bs! };
+  };
+  // The nearest sample AND the nearest sample of another stretch (results in c0 / c1, centre distances cd0 / cd1; c1 = null: none within reach).
+  let c0: Sample | null = null, c1: Sample | null = null, cd0 = 0, cd1 = 0;
+  const near2 = (x: number, z: number) => {
+    const cx = Math.floor(x / cell), cz = Math.floor(z / cell); let b0 = 1e12, b1 = 1e12, m0 = 0; c0 = null; c1 = null;
+    for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) {
+      const k = key(cx + i, cz + j), arr = grid.get(k); if (!arr) continue; const mt = gridM.get(k)!;
+      for (let q = 0; q < arr.length; q++) {
+        const s = arr[q], d = (s.x - x) ** 2 + (s.z - z) ** 2;
+        if (d < b0) { if (c0 && otherStretch(mt[q], m0)) { c1 = c0; b1 = b0; } c0 = s; b0 = d; m0 = mt[q]; }
+        else if (d < b1 && otherStretch(mt[q], m0)) { c1 = s; b1 = d; }
+      }
+    }
+    cd0 = Math.sqrt(b0); cd1 = Math.sqrt(b1);
   };
   const roadClear = (x: number, z: number, r: number, margin = 3) => {
     const cx = Math.floor(x / cell), cz = Math.floor(z / cell); const reach = Math.ceil((r + margin + 40) / cell) + 1;
@@ -122,7 +152,10 @@ export function makeTerrainField(td: TrackData, theme: ThemeDef): TerrainField {
   const emb = new Map<Sample, number>();
   for (const p of td.paths) {
     const n = p.samples.length, W = T === 'prison' ? 30 : 12;
-    const raw = p.samples.map(q => q.lake ? 1.6 : q.surf > 0 && !(T === 'prison' && SURFACES[q.surf].id === 'deck') ? 1.25 : T === 'prison' ? (q.zeroG ? 46 : 28) : 3.1);
+    // 2026-11-22: on a grade the ground beside the road is as high as the road was one mesh cell uphill – the depth grows with the grade
+    // and the cell size (a 19 % descent on 13.75 m cells put the ground 1.5 m above the low road edge)
+    const grade = (i: number) => { const a = p.samples[p.closed ? (i - 4 + n) % n : Math.max(0, i - 4)], b = p.samples[p.closed ? (i + 4) % n : Math.min(n - 1, i + 4)]; return Math.abs(b.y + b.ramp - a.y - a.ramp) / Math.max(1, Math.hypot(b.x - a.x, b.z - a.z)); };
+    const raw = p.samples.map((q, i) => q.lake ? 1.6 : Math.max(q.surf > 0 && !(T === 'prison' && SURFACES[q.surf].id === 'deck') ? 1.25 : T === 'prison' ? (q.zeroG ? 46 : 28) : 3.1, 1.25 + meshCell * 1.1 * grade(i)));
     const pre = new Float64Array(n + 1); for (let i = 0; i < n; i++) pre[i + 1] = pre[i] + raw[i];
     for (let i = 0; i < n; i += 4) {
       let sum = 0, cnt = 0;
@@ -227,14 +260,16 @@ export function makeTerrainField(td: TrackData, theme: ThemeDef): TerrainField {
     const H = lat >= 0 ? s.hR : s.hL;
     let talus = 0;
     if (H > 0 && !s.gap && s.tun !== 3) { // (caves flag their rock barrier with hL/hR = 2 – no massif there)
-      const rim = s.y + H, foot = s.hw + 0.6 + H * 0.6;
+      // `dm`: the massif stands 1.5 mesh cells behind the wall sheet (a terrain triangle spans up to 1.42 cells: none reaches across the
+      // sheet or over the road edge any more – before, slanted terrain faces stood in front of the wall and on the edge of the road)
+      const rim = s.y + H, foot = s.hw + 0.6 + H * 0.6, dm = Math.max(s.hw, d - meshCell * 1.5);
       const rimTerrace = id === 'mesa' || id === 'desert' ? (terrace(n2, 3) - 0.5) * 12 : (n2 - 0.5) * 11;
-      const ch = d < foot
-        ? roadLow + (rim - 3 - roadLow) * Math.pow(wallFrac(Math.max(0, d - s.hw) / Math.max(0.5, H / 25)), 1.48)
-        : rim + rimTerrace - sstep(foot, foot + 175 + H * 3.1, d) * Math.max(0, rim - open);
+      const ch = dm < foot
+        ? roadLow + (rim - 3 - roadLow) * Math.pow(wallFrac(Math.max(0, dm - s.hw) / Math.max(0.5, H / 25)), 1.48)
+        : rim + rimTerrace - sstep(foot, foot + 175 + H * 3.1, dm) * Math.max(0, rim - open);
       if (ch > h + 0.5) {
         if (writeSplat) splat.b = 0;
-        talus = 1 - sstep(foot, foot + 45, d);
+        talus = 1 - sstep(foot, foot + 45, dm);
       }
       h = Math.max(h, ch);
     }
@@ -261,27 +296,44 @@ export function makeTerrainField(td: TrackData, theme: ThemeDef): TerrainField {
     return h;
   };
 
-  const heightAt = (x: number, z: number) => {
-    const { d, s } = nearest(x, z);
-    return evalWithSample(x, z, s, d, true);
+  // Two stretches of road near one point (a fork, a reunion, a hairpin): each stretch only knows its own road and its own canyon wall.
+  // Judged from the nearest sample alone, the massif of one road stood on the edge of the other and the ground jumped where the nearest
+  // sample changed sides. Now both stretches vote and the LOWER ground wins; a stretch whose road edge is further away than the other's
+  // is handicapped by SLOPE metres per metre beyond R_IN, so far from a road its vote fades out without a step. (2026-11-22)
+  const R_IN = 6, SLOPE = 1.6;
+  let wS: Sample, wEdge = 0, wK = 0; // the winning stretch of the last `evalMulti`: its sample and handicap – and the nearest road edge
+  const evalMulti = (x: number, z: number, writeSplat: boolean) => {
+    near2(x, z);
+    wK = 0;
+    if (!c0) { const n = nearest(x, z); wS = n.s; wEdge = n.d - n.s.hw; return evalWithSample(x, z, n.s, n.d, writeSplat); }
+    const s0 = c0, d0 = cd0, e0 = d0 - s0.hw; wS = s0; wEdge = e0;
+    if (!c1) return evalWithSample(x, z, s0, d0, writeSplat);
+    const s1: Sample = c1, d1 = cd1, e1 = d1 - s1.hw, em = Math.min(e0, e1); wEdge = em;
+    const k0 = SLOPE * (Math.max(0, e0 - R_IN) - Math.max(0, em - R_IN)), k1 = SLOPE * (Math.max(0, e1 - R_IN) - Math.max(0, em - R_IN));
+    if (k1 > 90) return evalWithSample(x, z, s0, d0, writeSplat); // the other road is too far away to matter
+    const h1 = evalWithSample(x, z, s1, d1, writeSplat) + k1, g = splat.g, b = splat.b, c = splat.c;
+    const h0 = k0 > 90 ? 1e9 : evalWithSample(x, z, s0, d0, writeSplat) + k0;
+    if (h1 < h0) { wS = s1; wK = k1; if (writeSplat) { splat.g = g; splat.b = b; splat.c = c; } return h1; }
+    wK = k0; return h0;
   };
+  const heightAt = (x: number, z: number) => evalMulti(x, z, true);
+  const edgeDist = (x: number, z: number) => { near2(x, z); if (!c0) { const n = nearest(x, z); return n.d - n.s.hw; } const e0 = cd0 - c0.hw; return c1 ? Math.min(e0, cd1 - (c1 as Sample).hw) : e0; };
   const sampleCover = (x: number, z: number, out: { y: number; edge: number; gx: number; gz: number }) => {
-    const { d, s } = nearest(x, z);
-    out.edge = d - s.hw;
-    const y0 = evalWithSample(x, z, s, d, false);
-    out.y = y0;
+    const yM = evalMulti(x, z, false), s = wS, y0 = yM - wK; // (slope: taken on the winning stretch alone, without its handicap)
+    out.edge = wEdge;
+    out.y = yM;
     const eps = 1.25;
     const dX = Math.hypot(s.x - (x + eps), s.z - z), dZ = Math.hypot(s.x - x, s.z - (z + eps));
     out.gx = (evalWithSample(x + eps, z, s, dX, false) - y0) / eps;
     out.gz = (evalWithSample(x, z + eps, s, dZ, false) - y0) / eps;
   };
-  return { heightAt, sampleCover, nearest, roadClear, distToTrack, avgY, splat };
+  return { heightAt, sampleCover, nearest, roadClear, edgeDist, distToTrack, avgY, splat };
 }
 
 /** Quadtree LOD terrain: leaves of 16×16 cells, fine near track, coarse far away; skirts hide T-junction cracks. */
 export async function buildTerrain(field: TerrainField, theme: ThemeDef, gfx: GfxSettings, mat: THREE.Material, batcher: StaticBatcher, ext: Extent, progress: (p: number, m: string) => void) {
   const R = 16, geoQ = gfx.geometry;
-  const minLeaf = geoQ >= 3 ? 72 : geoQ === 2 ? 112 : 220, maxLeaf = 1700;
+  const minLeaf = terrainLeaf(geoQ), maxLeaf = 1700;
   const S0 = Math.max(ext.W, ext.D);
   const rx0 = ext.cx - ext.W / 2, rx1 = ext.cx + ext.W / 2, rz0 = ext.cz - ext.D / 2, rz1 = ext.cz + ext.D / 2;
   const leaves: [number, number, number][] = [];

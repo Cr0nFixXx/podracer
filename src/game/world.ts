@@ -14,7 +14,8 @@ import { TUNNEL_DECK } from './physics';
 import { addTrackDetail } from './trackDetail';
 import { StaticBatcher } from './trackMesh';
 import { airshipGeometry, boulderGeometry, pylonGeometry, cactusGeometry, crystalClusterGeometry, jungleTreeGeometry, mesaGeometry, pineGeometry, rockGeometry, snowPineGeometry, spireGeometry } from './decorGeo';
-import { addSkyline, buildTerrain, makeTerrainField } from './terrain';
+import { addSkyline, buildTerrain, makeTerrainField, terrainCell } from './terrain';
+import { clipOutside } from './meshClip';
 import { buildSetPieces, type SetPieceFx } from './setPieces';
 import { addLandmarks } from './landmarks';
 import { lavaSeaMaterial, layersFor, LIQUIDS, STRATA, terrainMaterial, waterMaterial } from './terrainMaterial';
@@ -90,7 +91,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   const TL = layersFor(theme.id);
   const specs = worldTextureSpecs(theme, gfx);
   const texJob = generateTextures(specs, aniso);
-  const field = makeTerrainField(td, theme); const { heightAt, nearest, roadClear, avgY } = field;
+  const field = makeTerrainField(td, theme, terrainCell(gfx.geometry)); const { heightAt, nearest, roadClear, avgY } = field;
   const [roadTex, wallTex, groundTex, gravelTex, basinTex, cliffT] = await texJob; const cliffTex = cliffT ?? wallTex;
   const texMs = Math.round(performance.now() - tTex0);
   await yield_();
@@ -142,6 +143,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     emissive: theme.emissiveGround ?? '#ff4a10', emissiveIntensity: 1.1,
   });
   disposables.push(roadMat, wallMat, groundMat);
+  roadMat.name = 'road'; wallMat.name = 'cliff'; groundMat.name = 'terrain'; // (the harness finds meshes by the name of their material)
   if (theme.road === 'ice') roadMat.roughness = 0.6;
   const batcher = new StaticBatcher(gfx.batching ?? true);
 
@@ -251,7 +253,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
     for (const side of [-1, 1]) {
       const sp: number[] = [], su: number[] = [], si: number[] = [];
       const wp: number[] = [], wu: number[] = [], wi: number[] = [];
-      const K = geoQ >= 3 ? 16 : geoQ === 2 ? 11 : 6;
+      const K = geoQ >= 3 ? 16 : geoQ === 2 ? 11 : 6, KK = K + 2, capW = terrainCell(geoQ) * 1.5 + 3; // (KK: wall profile + the two points of its cap)
       const SK = 3; // curb fascia -> upper talus shelf -> deep battered embankment slope
       let sv = 0, wv = 0; let prevS = false, prevW = false; let sAcc = 0;
       for (let k = 0; k < idxs.length; k++) {
@@ -276,23 +278,40 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
         // Multi-ledge canyon cliff with vertical rock-buttress ribs & fracture fissures
         const H = side > 0 ? s.hR : s.hL;
         const okW = H > 0 && !open && !s.gap && s.tun !== 3; // caves: the cave shell is the wall (hL/hR only flag the rock barrier)
-        const buttress = Math.pow(ridged(sAcc * 0.022 + side * 3.7, 1.3, 3), 2.0) * 2.2;
+        const buttress = Math.pow(ridged(sAcc * 0.022 + side * 3.7, 1.3, 3), 2.0) * 2.2, lowK = Math.min(1, H / 12);
+        let latTop = 0.6;
         for (let j = 0; j < K; j++) {
           const f = j / (K - 1); const pf = f * (cliffProf.length - 1);
           const pi = Math.min(cliffProf.length - 2, Math.floor(pf)); const pt = pf - pi;
           const off = cliffProf[pi][0] + (cliffProf[pi + 1][0] - cliffProf[pi][0]) * pt;
           const hh = cliffProf[pi][1] + (cliffProf[pi + 1][1] - cliffProf[pi][1]) * pt;
-          const crag = (fbm(sAcc * 0.052, f * 4.5 + side * 7, 4) - 0.5) * 5.2 * Math.min(1, f * 3.2);
-          const ribPush = -buttress * Math.sin(f * Math.PI) * Math.min(1, f * 4); // protrudes slightly above driver height (keeps wall collision intact!)
+          // (a low wall – the kerb beside a fork mouth, a tapering end – keeps its crags and ribs in proportion: at full size they made
+          //  a 3 m wall a row of teeth)
+          const crag = (fbm(sAcc * 0.052, f * 4.5 + side * 7, 4) - 0.5) * 5.2 * Math.min(1, f * 3.2) * lowK;
+          const ribPush = -buttress * Math.sin(f * Math.PI) * Math.min(1, f * 4) * lowK; // protrudes slightly above driver height (keeps wall collision intact!)
           const lat = Math.max(0.55, 0.6 + off * (H / 25) + crag + ribPush);
           wp.push(ex + s.rx * side * lat, ey - 1.15 + hh * H, ez + s.rz * side * lat);
           wu.push(sAcc / 18, hh * H / 18);
+          latTop = lat;
         }
-        if (okW && prevW) for (let j = 0; j < K - 1; j++) {
-          const a = wv - K + j, b = wv + j;
+        // 2026-11-22 – back of the wall: the terrain's massif starts 1.5 mesh cells behind the sheet (terrain.ts), so the sheet gets a
+        // cap from its rim back to the ground behind it (two more points). Without it a wall seen from the side or from the other road of
+        // a fork is a paper-thin sail. The cap is shortened where it would reach over another road.
+        {
+          let back = 0, yB = ey - 1.15 + H; const yTop = yB;
+          if (okW) {
+            for (const c of [capW, capW * 0.6, capW * 0.3, 2.5]) if (field.edgeDist(ex + s.rx * side * (latTop + c), ez + s.rz * side * (latTop + c)) > 1.2) { back = c; break; }
+            if (back > 0) yB = Math.min(yTop - 0.3, heightAt(ex + s.rx * side * (latTop + back), ez + s.rz * side * (latTop + back)) - 1.2);
+          }
+          wp.push(ex + s.rx * side * (latTop + back * 0.45), yTop + (yB - yTop) * 0.22, ez + s.rz * side * (latTop + back * 0.45));
+          wp.push(ex + s.rx * side * (latTop + back), yB, ez + s.rz * side * (latTop + back));
+          wu.push(sAcc / 18, (H + back * 0.45) / 18, sAcc / 18, (H + back + Math.abs(yB - yTop)) / 18);
+        }
+        if (okW && prevW) for (let j = 0; j < KK - 1; j++) {
+          const a = wv - KK + j, b = wv + j;
           if (side > 0) wi.push(a, a + 1, b, b, a + 1, b + 1); else wi.push(a, b, a + 1, a + 1, b, b + 1);
         }
-        wv += K; prevW = okW;
+        wv += KK; prevW = okW;
       }
       const mk = (p: number[], u: number[], i: number[], mat: THREE.Material, shadow: boolean) => {
         if (!i.length) return;
@@ -799,12 +818,14 @@ const TUN_ARC: [number, number][] = (() => {
 })();
 /** Is the world point inside the cave tube described by the roofed samples `L`? `m` shrinks (> 0) or grows (< 0) the tested volume. */
 function insideCave(L: Sample[], x: number, y: number, z: number, m: number) {
-  let bd = 1e12, bq: Sample | null = null;
-  for (const q of L) { const d = (q.x - x) ** 2 + (q.z - z) ** 2; if (d < bd) { bd = d; bq = q; } }
+  let bd = 1e12, bq: Sample | null = null, bi = -1;
+  for (let i = 0; i < L.length; i++) { const q = L[i], d = (q.x - x) ** 2 + (q.z - z) ** 2; if (d < bd) { bd = d; bq = q; bi = i; } }
   if (!bq) return false;
   const Wd = bq.hw + TUNNEL_SHOULDER; if (bd > (Wd + 4) ** 2) return false;
-  const dx = x - bq.x, dz = z - bq.z, lat = dx * bq.rx + dz * bq.rz;
-  if (Math.abs(dx * bq.tx + dz * bq.tz) > 3.2) return false; // beyond the end of the tube
+  const dx = x - bq.x, dz = z - bq.z, lat = dx * bq.rx + dz * bq.rz, along = dx * bq.tx + dz * bq.tz;
+  // Beyond the end of the tube. 2026-11-22: the tube used to reach 3.2 m past its end wall – the main cavern's shell was cut open
+  // behind the wall of a branch tube, so the wall stood in the opening as a slab.
+  if (Math.abs(along) > 3.2 || (bi === 0 && along < -0.2) || (bi === L.length - 1 && along > 0.2)) return false;
   const al = Math.abs(lat) + m; if (al >= Wd) return false;
   const base = bq.y + bq.ramp - lat * bq.bank;
   return y > base - 7 && y < base + 1.5 + (bq.roof - 1.5) * tunnelProfile(Math.max(0, al) / Wd) - m;
@@ -826,7 +847,7 @@ function buildTunnel(
   if (!runs.length) return;
   type Buf = { pos: number[]; uv: number[]; ind: number[] };
   const mk = (): Buf => ({ pos: [], uv: [], ind: [] });
-  const shell = mk(), caveShell = mk(), deck = mk(), berm = mk(), caveBerm = mk(), steel = mk(), glowB = mk(), caveFloor = mk(), veinB = mk(); const winInd: number[] = [];
+  const shell = mk(), caveShell = mk(), caveEnd = mk(), deck = mk(), berm = mk(), caveBerm = mk(), steel = mk(), glowB = mk(), caveFloor = mk(), veinB = mk(); const winInd: number[] = [];
   const segA = TUN_SEG, DECK = TUNNEL_DECK; const lamps: THREE.Matrix4[] = [], ribs: THREE.BufferGeometry[] = [], tites: THREE.Matrix4[] = [];
   const winSeg: boolean[] = []; for (let a = 0; a < segA; a++) { const my = (TUN_ARC[a][1] + TUN_ARC[a + 1][1]) / 2, mx = Math.abs(TUN_ARC[a][0] + TUN_ARC[a + 1][0]) / 2; winSeg.push(my > 0.2 && my < 0.95 && mx > 0.36); }
   const upV = new THREE.Vector3(0, 1, 0), flipQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
@@ -885,16 +906,20 @@ function buildTunnel(
         const p0 = pRing + a, p1 = ring + a;
         (pUnder && under && winSeg[a] ? winInd : sh.ind).push(p0, p0 + 1, p1, p1, p0 + 1, p1 + 1);
       }
-      if (path.isCave && cave && (i === ra || i === rb)) { // end wall of a branch tube – the part inside the main cavern is removed by the union
-        // Own vertices with planar texture coordinates (lateral, height). The fan used to reuse the ring's (distance, arc) coordinates:
-        // `u` was the same on every vertex, so the rock texture collapsed into thin parallel stripes on the wall stub at the fork.
-        const c = sh.pos.length / 3; put(sh, s, 0, H * 0.45, 0, H * 0.45 / 15);
-        for (let a = 0; a <= segA; a++) {
-          const [ax, ay] = TUN_ARC[a], nz = noise(a), lat = ax * (Wd + nz), hh = ay * (H + nz) + (a === 0 || a === segA ? -2.2 : 1.5);
-          put(sh, s, lat, hh, lat / 15, hh / 15);
+      if (path.isCave && cave && (i === ra || i === rb)) {
+        // End wall of a branch tube: a disc divided into RINGS rings (planar texture coordinates: lateral, height). The union below cuts
+        // it exactly along the vault of the main cavern, what stays is the part in the rock. Until 2026-11-22 it was ONE fan of large
+        // triangles, kept whole as soon as one corner lay in the rock – it stood in the fork as a flat slab.
+        const RINGS = 6, c = caveEnd.pos.length / 3, hc = H * 0.45, nA = segA + 1; put(caveEnd, s, 0, hc, 0, hc / 15);
+        for (let r = 1; r <= RINGS; r++) for (let a = 0; a <= segA; a++) {
+          const [ax, ay] = TUN_ARC[a], nz = noise(a), f = r / RINGS, lat = ax * (Wd + nz) * f, hh = hc + (ay * (H + nz) + (a === 0 || a === segA ? -2.2 : 1.5) - hc) * f;
+          put(caveEnd, s, lat, hh, lat / 15, hh / 15);
         }
-        for (let a = 0; a < segA; a++) sh.ind.push(c, c + 1 + a, c + 2 + a);
-        sh.ind.push(c, c + 1 + segA, c + 1);
+        const v = (r: number, a: number) => c + 1 + (r - 1) * nA + a % nA;
+        for (let a = 0; a <= segA; a++) { // (a = segA closes the disc along the floor: last point of a ring → its first)
+          caveEnd.ind.push(c, v(1, a), v(1, a + 1));
+          for (let r = 1; r < RINGS; r++) caveEnd.ind.push(v(r, a), v(r + 1, a), v(r + 1, a + 1), v(r, a), v(r + 1, a + 1), v(r, a + 1));
+        }
       }
       pRing = ring; pUnder = under;
 
@@ -1007,6 +1032,7 @@ function buildTunnel(
     b.ind = keep;
   };
   cull(caveShell, 1.5, true); cull(caveBerm, -2.5, false); cull(caveFloor, 0.4, true);
+  if (others.length && caveEnd.ind.length) clipOutside(caveEnd, (x, y, z) => others.some(L => insideCave(L, x, y, z, 0.5))); // (0.5 m: the wall keeps a small lip inside the cavern – the shell there is noisy)
 
   // ---- wedge floor between the main road edge and the inner edge of a branch road (the area both paths leave open at a fork / reunion) ----
   if (path.isCave) {
@@ -1035,6 +1061,7 @@ function buildTunnel(
   const m2 = (mat as THREE.MeshStandardMaterial).clone(); m2.side = THREE.DoubleSide; disp.push(m2);
   const sg = geo(shell); if (shell.ind.length || winInd.length) add(sg, m2, true);
   if (caveShell.ind.length) add(geo(caveShell), m2, true);
+  if (caveEnd.ind.length) add(geo(caveEnd), m2, true);
   if (caveFloor.ind.length) add(geo(caveFloor), m2, false);
   if (winInd.length) { const wg = new THREE.BufferGeometry(); wg.setAttribute('position', sg.attributes.position); wg.setAttribute('uv', sg.attributes.uv); wg.setIndex(winInd); const wm = oceanWindowMaterial(seaY); add(wg, wm as unknown as THREE.Material); disp.push(wg, wm as unknown as { dispose: () => void }); }
   if (deck.ind.length) add(geo(deck), roadMat);
