@@ -234,6 +234,10 @@ export function addTrackDetail(td: TrackData, theme: ThemeDef, group: THREE.Grou
       if (s.gap || s.ramp > 0 || s.hL < 18 || s.hR < 18 || rng() > 0.55 * o.detail) continue;
       const hCab = 15 + rng() * Math.min(10, Math.min(s.hL, s.hR) - 16);
       const sag = 1.8 + rng() * 1.4;
+      // 2026-11-23: no gorge cable under a roof. A tunnel has walls of 18 m and more as well, so cables were strung across the tube –
+      // wider than the vault at that height, the ends in the rock: a thin dark line across the vault (Boonta tunnel, found with
+      // `pick:`). The random numbers above are drawn all the same, so everything placed after this stays where it was.
+      if (s.roof > 0) continue;
       const spanL = s.hw + 2.5 + hCab * 0.18;
       const pL = new THREE.Vector3(s.x - s.rx * spanL, s.y + hCab, s.z - s.rz * spanL);
       const pM = new THREE.Vector3(s.x, s.y + hCab - sag, s.z);
