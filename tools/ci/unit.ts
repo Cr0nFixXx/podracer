@@ -25,6 +25,7 @@ import { defaultProfile, effectiveStats, loadProfile, saveProfile, CAMERA_NAMES,
 import { ALARM_FROM, boostAlarmLevel, boostAlarmVoice } from '../../src/game/audio';
 import { PadRepeater, nextFocus, readPadNav, stepRange, type NavRect, type PadSnapshot } from '../../src/ui/padNav';
 import { FLIGHT_BAND, FLIGHT_LOOK, FLIGHT_SPEED, buildIntroFlight, type FlightPose } from '../../src/game/introFlight';
+import { TrackLayer, TRACK_SEG, trackLife } from '../../src/game/groundTracks';
 import * as GPU3 from 'three/webgpu';
 import { setupSunShadow, CSM_FAR, CSM_SPLIT, SH_BACK, SH_BOX } from '../../src/game/sunShadow';
 
@@ -1669,6 +1670,84 @@ test('lava: the flowing-lava photo belongs to the liquid (lake, lava sea) – th
   ok(lake.liquid === 'lava' && !lake.tex, 'the lake is a liquid: no ground texture, drawn by lavaSeaMaterial');
   for (const id of ['basalt', 'ash'] as const) ok(SURFACES[SURF[id]].tex!.set !== LAVA_TEX.set, `${id} is solid ground too`);
 });
+
+/* ---- 2026-11-23, user: "dezente Fahrspuren auch im Sand / Mondstaub" (look only) ----
+ * Decision: two flat stripes per pod; in sand the wind erases them after about 40 s, in moon dust they stay for the whole race;
+ * on sand, dunes, beach, ash and moon dust. `TrackLayer` (groundTracks.ts) lays the stripes; it is pure data – the mesh only shows it. */
+/** first sample of a stretch of `len` samples of one surface on the main path without ramp, gap, roof or zero-G (-1: none) */
+function surfStretch(td: TrackData, surf: number, len = 70): number {
+  const S = td.main.samples; let run = 0;
+  for (let i = 0; i < S.length; i++) { const q = S[i]; run = q.surf === surf && !q.gap && !q.ramp && !(q.roof > 0) && !q.zeroG ? run + 1 : 0; if (run >= len) return i - len + 1; }
+  return -1;
+}
+/** flies a pod `metres` along the main road from sample `i0` (`lat` m beside the centre line, no physics: the layer only reads where
+ *  the pod is) and lets the layer lay its stripes; returns the quads laid */
+function layTracks(layer: TrackLayer, td: TrackData, def: string, i0: number, metres: number, t0: number, lat = 0, grounded = true): number {
+  const S = td.main.samples, p = racer(byId(def), td, i0, lat, S[i0].y + HOVER); p.grounded = grounded;
+  let laid = 0; const v = 100, dt = 1 / 60;
+  for (let d = 0, f = 0; d <= metres; d += v * dt, f++) {
+    const k = Math.min(S.length - 2, i0 + Math.floor(d / DS)), q = S[k], al = d - (k - i0) * DS;
+    p.pos.x = q.x + q.tx * al + q.rx * lat; p.pos.z = q.z + q.tz * al + q.rz * lat; p.idx = k; p.lat = lat; p.vel.set(q.tx * v, 0, q.tz * v); p.yaw = Math.atan2(q.tx, q.tz); p.groundY = q.y; p.pos.y = q.y + HOVER + (grounded ? 0 : 9);
+    laid += layer.step([p], td, t0 + f * dt);
+  }
+  return laid;
+}
+test('tracks: sand, dunes, beach and ash keep a track for 40 s, moon dust for the whole race – solid, frozen and liquid ground keeps none', () => {
+  for (const id of ['sand', 'dunes', 'beach', 'ash'] as const) eq(trackLife(SURF[id]), 40, `${id}:`);
+  eq(trackLife(SURF.regolith), Infinity, 'moon dust:');
+  for (const sf of SURFACES) if (!['sand', 'dunes', 'beach', 'ash', 'regolith'].includes(sf.id)) eq(trackLife(SURFACES.indexOf(sf)), 0, `${sf.id} (${sf.name}):`);
+  eq(trackLife(undefined), 0, 'no surface:');
+});
+test('tracks: a pod lays two flat stripes behind it on sand, under its engine banks – none on rock, none while it is in the air', () => {
+  const td = trackOf('boonta'), S = td.main.samples, i0 = surfStretch(td, SURF.sand); ok(i0 >= 0, 'boonta has no plain stretch of sand');
+  const layer = new TrackLayer(4000), n = layTracks(layer, td, 'aurora', i0 + 5, 80, 10);
+  // (a cross-section is laid in the first frame in which the pod is TRACK_SEG metres on: at 100 m/s and 60 frames/s every 5 m)
+  ok(n >= 2 * Math.floor(80 / (TRACK_SEG + 100 / 60)) - 2 && n <= 2 * Math.ceil(80 / TRACK_SEG) + 2, `${n} quads on 80 m of sand – expected two stripes of one quad per ${TRACK_SEG} … ${(TRACK_SEG + 100 / 60).toFixed(1)} m`);
+  eq(layer.alive(10.5), n, 'quads visible right after the pass:');
+  // where they lie: every corner of every quad under one of the two engine banks, close above the road
+  const env = podEnvelope(byId('aurora')); let off = 0, high = 0, sides = [0, 0];
+  for (let k = 0; k < n * 4; k++) {
+    const x = layer.pos[k * 3], y = layer.pos[k * 3 + 1], z = layer.pos[k * 3 + 2];
+    let bi = i0, bd = 1e9; for (let i = i0; i < i0 + 60; i++) { const d = (S[i].x - x) ** 2 + (S[i].z - z) ** 2; if (d < bd) { bd = d; bi = i; } }
+    const q = S[bi], lat = (x - q.x) * q.rx + (z - q.z) * q.rz, e = lat < 0 ? env.engL : env.engR;
+    if (Math.abs(lat) < Math.abs(e.x) - 2.2 || Math.abs(lat) > Math.abs(e.outerX) + 0.4) off++;
+    const gy = frameAt(td.main, bi, x, z).groundY; if (y < gy || y > gy + 0.3) high++;
+    sides[lat < 0 ? 0 : 1]++;
+  }
+  eq(off, 0, 'corners that do not lie under an engine bank:'); eq(high, 0, 'corners below the road or more than 0.3 m above it:');
+  ok(sides[0] > 0 && sides[0] === sides[1], `corners left / right of the pod: ${sides[0]} / ${sides[1]} – expected two equal stripes`);
+  const rock = surfStretch(td, SURF.rock); ok(rock >= 0, 'boonta has no plain stretch of rock');
+  eq(layTracks(new TrackLayer(4000), td, 'aurora', rock + 5, 80, 10), 0, 'quads on rock:');
+  eq(layTracks(new TrackLayer(4000), td, 'aurora', i0 + 5, 80, 10, 0, false), 0, 'quads while the pod is in the air:');
+});
+test('tracks: a second pod on the same line does not darken the track again, one beside it lays its own – and the wind erases them after 40 s', () => {
+  const td = trackOf('boonta'), i0 = surfStretch(td, SURF.sand) + 5, layer = new TrackLayer(4000);
+  const first = layTracks(layer, td, 'aurora', i0, 80, 10);
+  const again = layTracks(layer, td, 'aurora', i0, 80, 14);
+  ok(again <= first * 0.15, `${again} new quads on a line that already has ${first} – a track must not be laid twice (it would get darker with every pod)`);
+  const beside = layTracks(layer, td, 'aurora', i0, 80, 16, 14);
+  ok(beside >= first * 0.85, `${beside} quads 14 m beside the first line, expected about ${first}`);
+  const all = first + again + beside;
+  eq(layer.alive(17), all, 'visible at 17 s:');
+  ok(layer.alive(10 + 39) > 0, 'after 39 s the first track should still be there');
+  eq(layer.alive(16 + 41.5), 0, 'visible 41.5 s after the last pass:');
+  const late = layTracks(layer, td, 'aurora', i0, 80, 80);
+  ok(late >= first * 0.85, `${late} quads on the first line after the wind has erased it – expected a fresh track (${first})`);
+});
+test('tracks: in moon dust a track stays for the whole race and is never laid twice', () => {
+  const td = trackOf('oovo'), i0 = surfStretch(td, SURF.regolith); ok(i0 >= 0, 'oovo has no plain stretch of moon dust');
+  const layer = new TrackLayer(4000), first = layTracks(layer, td, 'mavik', i0 + 5, 80, 10);
+  ok(first > 20, `${first} quads on 80 m of moon dust`);
+  eq(layer.alive(10 + 1800), first, 'visible half an hour later:');
+  eq(layTracks(layer, td, 'mavik', i0 + 5, 80, 1000), 0, 'new quads on the same line 16 minutes later:');
+});
+test('tracks: a full layer overwrites its oldest quads – it never grows, never throws', () => {
+  const td = trackOf('oovo'), i0 = surfStretch(td, SURF.regolith) + 5, layer = new TrackLayer(24);
+  let n = 0; for (let k = 0; k < 6; k++) n += layTracks(layer, td, 'mavik', i0, 60, 10 + k, -15 + k * 6);
+  ok(n > 24, `${n} quads laid into a layer of 24`); eq(layer.count, 24, 'quads held:'); ok(layer.alive(20) <= 24, 'more visible than the layer holds');
+  eq(layer.pos.length, 24 * 4 * 3, 'the buffer grew:');
+});
+
 
 
 // ---- sun shadows (2026-11-23, user: „größere Schatten-Sichtweite – auf Ultra schiebt sich eine Schattenwand vor dem Pod her") ----

@@ -169,6 +169,15 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Geprüft: fünf Unit-Prüfungen `snow:` (zuerst rot): Höhe 1–3 m und die flachen Stellen auf beiden Strecken, eine Überfahrt = fertiger Graben, 86 % / 99 % und „der eigene Graben hilft nicht", ein Gegner wechselt in einen Graben 13 m neben seiner Linie, Schneefall füllt wieder auf. Simulation beider Strecken über 100 s mit Schneefeld (kein Ausfall). Bilder aus Sicht des Spielers bei klarem und trübem Wetter, flacher und tiefer Schnee, mit drei Gegnern voraus, von der Seite, am Tor, am Hindernis, am Feldanfang. WebGPU-Konsolenprüfung auf dem Feld.
 - Nicht geprüft: in Bewegung und auf echter GPU. Vor allem: die Stärke der Schneefahne (Stellschrauben in `Particles.plough`, `src/game/particles.ts`), die Bildrate auf dem Feld (das Schneegitter hat rund 275 000 Dreiecke je Feld, wie die Schneedecke davor), die Cockpit-Kamera im Graben, Nacht und Schneesturm. Die Bilder entstanden in Software-Grafik.
 
+### Strecken – dezente Fahrspuren in Sand und Mondstaub
+- Hinter jedem Pod (Spieler und Gegner) bleiben zwei flache Streifen unter den Triebwerksbänken: etwas dunkler als der Boden, mit einer feinen dunkleren Linie an jedem Rand.
+- Auf Sand, Dünen, Strand und Asche verweht sie der Wind nach etwa 40 s (ab 20 s verblassen sie). Im Mondstaub bleiben sie das ganze Rennen.
+- Dezent bleibt es, weil eine Stelle nie zwei Spuren übereinander bekommt: fliegt ein Pod über eine frische Spur, legt er dort keine neue. Die Ideallinie wird also nicht mit jedem Pod dunkler.
+- Reine Optik. Keine Wirkung auf Tempo oder Haftung. Auf Fels, gebauter Piste, Schnee, Eis und über Seen gibt es keine Spuren.
+- **Eigene Festlegung:** auf den dunklen Böden (Asche, Mondstaub) sind die Streifen rund doppelt so kräftig wie auf Sand – 10 % dunkler war dort nicht zu sehen.
+- Geprüft: fünf Unit-Prüfungen `tracks:` (zuerst rot): welche Böden Spuren halten und wie lange, zwei Streifen unter den Triebwerksbänken dicht über dem Boden, keine auf Fels und in der Luft, keine zweite Spur auf derselben Linie, nach 40 s weg, Mondstaub dauerhaft, voller Speicher überschreibt die ältesten. Bilder: Sand und Dünen auf dem Boonta-Kessel (vier Pods, Blick zurück über die Spuren), Mondstaub auf Oovo IV. WebGPU-Konsolenprüfung.
+- Nicht geprüft: Strand und Asche im Bild; das Verblassen in Bewegung; Spuren bei Nacht und Sandsturm.
+
 ### Nachmeldung des Nutzers – „Introfahrt geht noch nicht"
 - Wörtlich (2026-11-23, nach dem Bericht zu Block 2): „intro fahrt geht noch nicht. lavakruste und lavasee texturen sehen vertauscht aus. pushe danach und mach dann weiter mit den restlichen teil".
 - Ursache: der Intro-Flug war fertig, lag aber nur lokal (`ba3da24`). Geplant war der Push erst am Ende von Block 3. Auf GitHub fehlte er also.
@@ -232,6 +241,7 @@ Zweig `dev`. Jeder Punkt ein eigener Commit; nach jedem Block gepusht.
 | 3 Strecken | `ba3da24` | Intro-Flug über die Strecke bis „Rennen starten" – gepusht am 2026-11-23 auf Wunsch des Nutzers, nicht erst am Ende des Blocks |
 | Nachmeldung | `93b342e` | Lava: See und Kruste getauscht |
 | Nachmeldung | `6d1ccc9` | Test: Intro-Flug auch auf WebGPU und mit echtem Mausklick |
-| 3 Strecken | (dieser Commit) | 3D-Schnee auf den Pulverschnee-Feldern – lokal, wird mit Block 3 gepusht |
+| 3 Strecken | `c1ebd90` | 3D-Schnee auf den Pulverschnee-Feldern – lokal, wird mit Block 3 gepusht |
+| 3 Strecken | (folgender Commit) | Dezente Fahrspuren in Sand und Mondstaub – lokal, wird mit Block 3 gepusht |
 
 Block 1 wurde am 2026-11-23 gepusht (`ee20aa5..b4f1266`); der Lauf der GitHub-Action dafür war grün. Block 2 wurde am 2026-11-23 gepusht (`b4f1266..55713c7`); der Lauf der GitHub-Action für `55713c7` war grün (`npm ci`, `npm run check`, beide Builds). Der erste Versuch scheiterte: der Zugangstoken des Nutzers lag in der Sitzung nicht mehr vor (er wird nirgends gespeichert – Regel in `docs/regeln/git-sandbox.md`); der Nutzer hat ihn auf Nachfrage neu gegeben. Block 3 und 4 sind offen (`TODO.md` Abschnitt 9).

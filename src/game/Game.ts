@@ -4,6 +4,7 @@ import { WEATHER } from './materials';
 import { beginTextureEpoch, generateTextures, hasTextureWorkers, setTextureAnisotropy, textureStats } from './textures';
 import { makeBeams } from './lights';
 import { makeHeatShields } from './heatShield';
+import { buildGroundTracks, trackLife, TrackLayer, type GroundTracks } from './groundTracks';
 import { DebrisPool } from './debris';
 import { DS, TUNNEL_SHOULDER, roadSurfaceAt, tunnelCeiling } from './trackBuilder';
 import { SURF, lensSpray, splashes, surfaceOf, surfacePalette, trackSplashes, type SurfaceDef } from './surfaces';
@@ -86,6 +87,8 @@ export class Game {
   beams: ReturnType<typeof makeBeams> | null = null; private tmpE = new THREE.Euler();
   /** 2026-11-23: plasma heat shields under the pods over lava (look only); `shieldAmt` = how far each pod's shield is up, 0 … 1 */
   shields: ReturnType<typeof makeHeatShields> | null = null; private shieldAmt: Float32Array = new Float32Array(0);
+  /** tracks the pods leave in loose ground (groundTracks.ts); null on a track without such ground */
+  tracks: GroundTracks | null = null; private tracksDisp: { dispose: () => void }[] = [];
   private prevNd = 1e9; private closing = 0; private flybyT = 0;
   loadMs: Record<string, number> = {};
   debris = new DebrisPool(); /** sheet metal: Bruchteile and pieces of exploding pods */ scrap = new DebrisPool('plate'); dustAmt = 1;
@@ -217,6 +220,12 @@ export class Game {
     }
 
     if (this.td.paths.some(pa => pa.samples.some(q => surfaceOf(q.surf).liquid === 'lava'))) { this.shields = makeHeatShields(this.pods.length); this.shieldAmt = new Float32Array(this.pods.length); this.scene.add(this.shields.mesh); }
+    // 2026-11-23 (user): subtle tracks in sand, dunes, beach, ash and moon dust – look only (groundTracks.ts). In moon dust they stay
+    // for the whole race: Oovo gets a larger ring.
+    if (this.td.paths.some(pa => pa.samples.some(q => trackLife(q.surf) > 0))) {
+      const forever = this.td.paths.some(pa => pa.samples.some(q => trackLife(q.surf) === Infinity));
+      this.tracks = buildGroundTracks(new TrackLayer(forever ? 72000 : 36000), this.scene, this.tracksDisp);
+    }
 
     this.post = new PostFX(r, this.scene, this.camera, gfx, { rain: this.lensRainMax(gfx), flare: build.flare }); this.updateLens(0);
     this.applyEnv(0);
@@ -515,6 +524,7 @@ export class Game {
     this.updateVisuals(dt);
     this.updateLights(); this.updateShields(dt);
     this.particles.update(dt, this.camera.position, this.clock); this.debris.update(dt); this.scrap.update(dt);
+    if (this.tracks) { if (this.state === 'race' || this.state === 'post') this.tracks.layer.step(this.pods, this.td, this.clock); this.tracks.update(this.clock); }
     this.world.update(this.clock, this.camera.position, this.pods);
     this.sky.uniforms.time.value = this.clock;
     this.weather.update(dt, this.clock, this.camera, frozen, v => this.audio.thunder(v), near => { if (near > 0.5) this.player.shake = Math.min(1, this.player.shake + (near - 0.5) * 0.9); });
@@ -1158,7 +1168,7 @@ export class Game {
     this.ro?.disconnect();
     this.audio?.dispose();
     this.pods.forEach(p => p.visual?.dispose());
-    this.weather?.dispose(); this.world?.dispose(); this.particles?.dispose(); this.debris?.dispose(); this.scrap?.dispose(); this.post?.dispose(); this.sunShadow?.dispose(); this.shields?.dispose();
+    this.weather?.dispose(); this.world?.dispose(); this.particles?.dispose(); this.debris?.dispose(); this.scrap?.dispose(); this.post?.dispose(); this.sunShadow?.dispose(); this.shields?.dispose(); this.tracksDisp.forEach(d => d.dispose());
     this.sky?.mesh.geometry.dispose(); (this.sky?.mesh.material as THREE.Material | undefined)?.dispose();
     (this.scene.environment as THREE.Texture | null)?.dispose();
     this.renderer?.dispose();
