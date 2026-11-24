@@ -56,7 +56,9 @@ export class WeatherFx {
   private carry = 0;
 
   /** `fx` is the live (per-frame updated) effect state; `withBolt` = lightning can occur at some point of the race. */
-  constructor(private fx: EnvFx, private particles: Particles, scene: THREE.Scene, private windAz: number, withBolt: boolean) {
+  /** `green`: methane storm (Malastare) – bolt and ground glow are green */
+  constructor(private fx: EnvFx, private particles: Particles, scene: THREE.Scene, private windAz: number, withBolt: boolean, green = false) {
+    if (green) this.glowCol.setRGB(0.62, 1.15, 0.5);
     this.nextStrike = 2.5 + Math.random() * 3;
     this.col.set(fx.gustColor);
     if (withBolt) {
@@ -79,7 +81,7 @@ export class WeatherFx {
       // Razor-fine transverse falloff: bright white-blue needle along centerline, soft electric-violet corona towards edge
       const across = oneMinus(abs(uv().x.mul(2.0).sub(1.0)));
       const profile = pow(across, 2.4);
-      const tint = mix(vec3(0.55, 0.74, 1.0), vec3(0.95, 0.98, 1.0), pow(across, 3.0));
+      const tint = green ? mix(vec3(0.4, 1.0, 0.3), vec3(0.9, 1.0, 0.8), pow(across, 3.0)) : mix(vec3(0.55, 0.74, 1.0), vec3(0.95, 0.98, 1.0), pow(across, 3.0));
       m.colorNode = tint.mul(this.boltI).mul(attribute('aI', 'float')).mul(profile);
       this.bolt = new THREE.Mesh(g, m); this.bolt.frustumCulled = false; this.bolt.visible = false; this.bolt.renderOrder = 3;
       scene.add(this.bolt);

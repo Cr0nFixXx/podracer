@@ -38,6 +38,7 @@ export function makeSky(theme: ThemeDef, forEnv = false) {
     time: uniform(0),
     sunDir2: uniform(sunDirection2(theme)),
     flash: uniform(0), // lightning: lights the cloud deck from inside (weather.ts)
+    flashCol: uniform(new THREE.Color(0.5, 0.6, 0.85)), // its colour (methane storm on Malastare: green – environment.ts METHANE)
     stars: uniform(theme.stars ?? 0), cloudLit: uniform(1), // runtime-blended by the environment timeline
   };
 
@@ -69,7 +70,7 @@ export function makeSky(theme: ThemeDef, forEnv = false) {
     col = mix(col, cc, cov.mul(smoothstep(0.0, 0.16, d.y)).mul(0.85));
     covN = cov;
   }
-  if (!forEnv) col = col.add(vec3(0.5, 0.6, 0.85).mul(uniforms.flash).mul(covN.mul(0.75).add(0.25)).mul(smoothstep(-0.05, 0.3, d.y)));
+  if (!forEnv) col = col.add(vec3(uniforms.flashCol).mul(uniforms.flash).mul(covN.mul(0.75).add(0.25)).mul(smoothstep(-0.05, 0.3, d.y)));
 
   if (!forEnv) {
     col = col.add(uniforms.sunColor.mul(smoothstep(0.9992, 0.9997, sd).mul(8.5)));

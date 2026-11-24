@@ -99,6 +99,7 @@ const C_EXH1 = new THREE.Color(0.55, 0.14, 0.05);
 const C_SPARK0 = new THREE.Color(2.2, 1.6, 0.7), C_SPARK1 = new THREE.Color(1.3, 0.35, 0.05);
 const C_SMK_DK = new THREE.Color(0.12, 0.11, 0.1), C_SMK_LT = new THREE.Color(0.42, 0.42, 0.42);
 const C_FIRE0 = new THREE.Color(2.0, 0.95, 0.28), C_FIRE1 = new THREE.Color(0.75, 0.15, 0.03);
+const C_FLAME_OUT = new THREE.Color(0.1, 0.42, 0.04);
 const C_VSMK0 = new THREE.Color(0.14, 0.12, 0.12), C_VSMK1 = new THREE.Color(0.26, 0.23, 0.23);
 const C_VSTM0 = new THREE.Color(0.88, 0.9, 0.94), C_VSTM1 = new THREE.Color(0.78, 0.84, 0.88);
 const C_VEMB0 = new THREE.Color(2.0, 0.82, 0.2), C_VEMB1 = new THREE.Color(0.75, 0.1, 0.02);
@@ -158,13 +159,24 @@ export class Particles {
   }
 
   /** Rooster tail of fine spray thrown up from a wet road – taller and denser with speed. */
-  spray(p: THREE.Vector3, vel: THREE.Vector3, speed: number, alphaScale = 1) {
+  spray(p: THREE.Vector3, vel: THREE.Vector3, speed: number, alphaScale = 1, col: THREE.Color = C_SPRAY) {
     const want = Math.min(4, 0.7 + speed * 0.018) * this.amount * this.rateScale;
     const n = Math.floor(want) + (Math.random() < (want % 1) ? 1 : 0);
     for (let i = 0; i < n; i++) {
       _v.set((Math.random() - 0.5) * 7, 2.2 + Math.random() * 3.4 + speed * 0.03, (Math.random() - 0.5) * 7).addScaledVector(vel, 0.78); // carried along in the slipstream
       _p.set(p.x + (Math.random() - 0.5) * 3.2, p.y, p.z + (Math.random() - 0.5) * 3.2);
-      this.alpha.spawn(_p, _v, 0.55 + Math.random() * 0.5, 0.9, 3.6 + speed * 0.028 + Math.random() * 2.5, C_SPRAY, C_SPRAY, 0.3 * alphaScale, 3.0, 7);
+      this.alpha.spawn(_p, _v, 0.55 + Math.random() * 0.5, 0.9, 3.6 + speed * 0.028 + Math.random() * 2.5, col, col, 0.3 * alphaScale, 3.0, 7);
+    }
+  }
+  /** Methane rain (2026-11-23): a boost sets the rain behind the engine alight – a flame trail several pod lengths long. `back` =
+   *  unit vector pointing backwards, `col` = colour of the flame (it burns out towards a dark green). */
+  flameTrail(p: THREE.Vector3, back: THREE.Vector3, baseVel: THREE.Vector3, col: THREE.Color, scale = 1) {
+    const want = 2.4 * this.amount * this.rateScale * scale;
+    for (let i = Math.floor(want) + (Math.random() < (want % 1) ? 1 : 0); i > 0; i--) {
+      const sp = 8 + Math.random() * 22;
+      _v.copy(baseVel).multiplyScalar(0.6).addScaledVector(back, sp); _v.x += (Math.random() - 0.5) * 5; _v.y += 0.5 + Math.random() * 3.5; _v.z += (Math.random() - 0.5) * 5;
+      _p.set(p.x + (Math.random() - 0.5) * 0.7, p.y + (Math.random() - 0.5) * 0.5, p.z + (Math.random() - 0.5) * 0.7);
+      this.add.spawn(_p, _v, 0.4 + Math.random() * 0.45, 1.5 + Math.random() * 0.7, 0.3, col, C_FLAME_OUT, 0.6, 1.5, -3);
     }
   }
   /** 3D snow (2026-11-23): an engine ploughs through a drift. `(ox, oz)` = unit vector pointing outwards from the pod, `amount` 0 … 1.3
@@ -197,7 +209,7 @@ export class Particles {
     }
   }
   /** Tiny short-lived splash crown where a rain drop hits the road. */
-  splash(p: THREE.Vector3) { _v.set(0, 1.3, 0); this.alpha.spawn(p, _v, 0.13 + Math.random() * 0.09, 0.06, 0.46, C_SPLASH, C_SPLASH, 0.36, 0.5, 6); }
+  splash(p: THREE.Vector3, col: THREE.Color = C_SPLASH) { _v.set(0, 1.3, 0); this.alpha.spawn(p, _v, 0.13 + Math.random() * 0.09, 0.06, 0.46, col, col, 0.36, 0.5, 6); }
 
   /** Clean plasma exhaust sparks (no blinding grey smoke behind healthy pods!). */
   exhaust(p: THREE.Vector3, back: THREE.Vector3, baseVel: THREE.Vector3, col: THREE.Color, power: number, boost: number, scale = 1) {
@@ -285,7 +297,8 @@ export class Particles {
   }
 
   /** `wind` (0..1) slants rain/snow/dust and speeds them up, `dense` scales the count (storms, gusts). */
-  initAmbient(type: string, wind = 0, dense = 1) {
+  /** `tint`: colour of the drops instead of the type's own (methane rain) */
+  initAmbient(type: string, wind = 0, dense = 1, tint?: string) {
     const n = Math.max(1, Math.min(4200, Math.floor(1500 * this.amount * dense))); // Session 16: far denser weather
     const colors: Record<string, string> = { dust: '#e8c8a0', snow: '#ffffff', embers: '#ff7020', spores: '#d8ff9a', rain: '#cfdcee', sparkle: '#e0b0ff' };
     const vel: Record<string, [number, number, number]> = { dust: [8 + wind * 26, 0.5, 3 + wind * 10], snow: [2 + wind * 18, -4 - wind * 2, 1 + wind * 8], embers: [1 + wind * 6, 3, 0.5], spores: [0.5 + wind * 3, 0.4, 0.3], rain: [1 + wind * 16, -40, 0.5 + wind * 7], sparkle: [0.3, 0.6, 0.2] };
@@ -308,7 +321,7 @@ export class Particles {
     mat.positionNode = wrapped;
     // Never expand into giant screen-filling quads when ambient particles cross camera.position!
     mat.sizeNode = tslMin(float(baseSz), tslMax(vz.sub(2.0), float(0.0)).mul(rain ? 0.1 : 0.05)).mul(step(float(2.2), vz));
-    mat.colorNode = color(new THREE.Color(colors[type]).multiplyScalar(add ? 1.3 : 1));
+    mat.colorNode = color(new THREE.Color(tint ?? colors[type]).multiplyScalar(add ? 1.3 : 1));
     if (rain) {
       // Session 13: each drop is motion-blurred along its SCREEN-SPACE velocity relative to the camera (rain velocity − pod velocity):
       // standing → near-vertical wind-slanted lines; fast → long streaks rushing past the edges, short dots straight ahead.

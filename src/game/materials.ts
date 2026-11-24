@@ -4,7 +4,8 @@ import * as TSLmod from 'three/tsl';
 const TSL = TSLmod as any;
 /** Session 13: global runtime weather level for all surface materials. `wet` 0..1 scales puddles, darkening and gloss of every material
  *  compiled with `wet > 0` (dynamic rain → the road gets wet and dries again). Keep it at 1 on worlds without dynamic rain. */
-export const WEATHER: { wet: { value: number } } = { wet: TSL.uniform(1) };
+/** `tint` (2026-11-23, methane rain on Malastare): colour of the wetness – a multiplier on wet ground and puddles. White = water. */
+export const WEATHER: { wet: { value: number }; tint: { value: THREE.Color } } = { wet: TSL.uniform(1), tint: TSL.uniform(new THREE.Color(1, 1, 1)) };
 const {
   Break, Fn, If, Loop, abs, attribute, cameraViewMatrix, clamp, color, cross, dFdx, dFdy, dot, float, inverseSqrt, length, materialColor, materialRoughness, max, mix, vec4,
   normalLocal, normalView, normalViewGeometry, normalWorldGeometry, normalize, positionLocal, positionView, positionWorld, pow,
@@ -189,6 +190,7 @@ export function surfaceMaterial(set: TexSet, o: SurfaceOpts = {}) {
     col = mix(col, color(o.ledge.color).mul(mix(float(0.82), float(1.12), macroV)), ledgeM);
   }
   if (wetAmt > 0) col = col.mul(oneMinus(wetU.mul(0.36 * wetAmt))).mul(mix(float(1), float(0.74), puddle));
+  if (wetAmt > 0) col = col.mul(mix(vec3(1.0, 1.0, 1.0), WEATHER.tint as unknown as N, clamp(wetU.mul(0.85 * wetAmt).add(puddle.mul(0.5)), 0.0, 1.0))); // (white while the rain is water)
   if (snowAmt > 0) col = mix(col, vec3(0.9, 0.94, 1.0), snowM);
   if (o.cloud) col = col.mul(cloudShade(o.cloud));
   mat.colorNode = col;

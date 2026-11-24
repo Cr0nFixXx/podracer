@@ -43,7 +43,7 @@ export class PostFX {
   cine: { uniforms: { time: { value: number }; speed: { value: number }; boost: { value: number }; damage: { value: number }; flash: { value: number }; flow: { value: number } } };
   godRays: { uniforms: { sunPos: { value: THREE.Vector2 }; intensity: { value: number } } } | null = null;
   /** Session 11 lens effects: sun glare/flare strength, viewport aspect, rain droplets on the lens (0..1), sun colour */
-  lens!: { flare: { value: number }; aspect: { value: number }; rain: { value: number }; sunColor: { value: THREE.Color } | null };
+  lens!: { flare: { value: number }; aspect: { value: number }; rain: { value: number }; sunColor: { value: THREE.Color } | null; /** colour of the drops (white = water; Malastare: methane green) */ rainTint: { value: THREE.Color } };
   /** Exhaust heat-haze plumes (6 slots: player L/R + 2 nearest rival pods L/R): vec4(screenU, screenV, 1/radius, weight 0..1) */
   heat: { plumes: { value: THREE.Vector4 }[]; strength: { value: number } } | null = null;
   private disposables: { dispose?: () => void }[] = [];
@@ -172,13 +172,14 @@ export class PostFX {
     // ---- Lightweight depth-occluded sun shafts (textureLoad inside If/Loop = 100% WGSL valid, 0 ms off-sun) ----
     let sunPosU: N = null, sunIntU: N = null, sunColU: N = null;
     const flareU = uniform(0), aspectU = uniform(camera.aspect), rainU = uniform(env.rain ?? 0);
+    const rainTintU = uniform(new THREE.Color(1, 1, 1));
     if ((gfx.godRays || flareOn) && depthTex) {
       sunPosU = uniform(new THREE.Vector2(0.5, 0.5));
       sunIntU = uniform(0);
       sunColU = uniform(new THREE.Color(1.0, 0.9, 0.72));
       this.godRays = { uniforms: { sunPos: sunPosU, intensity: sunIntU } };
     }
-    this.lens = { flare: flareU, aspect: aspectU, rain: rainU, sunColor: sunColU };
+    this.lens = { flare: flareU, aspect: aspectU, rain: rainU, sunColor: sunColU, rainTint: rainTintU };
     // 6 exhaust plume uniforms (slots 0–1 = player L/R, slots 2–5 = two nearest visible rival pods' L/R nozzles)
     const heatP = Array.from({ length: 6 }, () => uniform(new THREE.Vector4(-2, -2, 25, 0))), heatS = uniform(0);
     if (lensOn) this.heat = { plumes: heatP, strength: heatS };
@@ -311,7 +312,7 @@ export class PostFX {
         }
         g = g.add(fl.mul(I));
       }
-      if (dropM) g = g.mul(dropM.mul(0.1).add(1.0));
+      if (dropM) g = g.mul(mix(vec3(1.0, 1.0, 1.0), vec3(rainTintU).mul(1.1), dropM)); // a drop is 10 % brighter – and takes the colour of the rain
       g = g.mul(oneMinus(pow(r.mul(1.2), 2.6).mul(vignette * 0.7)));
       return vec4(max(min(g.add(vec3(1.0, 0.9, 0.8).mul(u.flash)), vec3(12.0)), vec3(0.0)), 1.0);
     })();

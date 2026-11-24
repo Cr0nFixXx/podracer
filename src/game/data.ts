@@ -220,8 +220,10 @@ export const THEMES: Record<string, ThemeDef> = {
     decor: ['crystals', 'spires', 'rocks'], ambient: 'sparkle', terrain: 'mountains', barrierColor: '#c87aff',
   },
   malastare: {
-    id: 'malastare', name: 'Malastare', skyTop: '#4f6b5a', skyHorizon: '#e2cf96', sunColor: '#fff0c8', sunElev: 22, sunAz: 150, clouds: 0.55,
-    fogColor: '#a8a880', fogDensity: 0.0008, sunIntensity: 3.4, hemiSky: '#d8e8c0', hemiGround: '#4a4a2a', exposure: 1.0,
+    // 2026-11-23 (user: "Setting etwas düsterer"): about 30 % less light than before – sun 3.4 → 2.4, sky, fill lights and haze 15 %
+    // lower in sRGB (= 30 % less light). The exposure stays: it must not make up for it. (Before: #4f6b5a, #e2cf96, #a8a880, #d8e8c0, #4a4a2a.)
+    id: 'malastare', name: 'Malastare', skyTop: '#435b4d', skyHorizon: '#c0b080', sunColor: '#fff0c8', sunElev: 22, sunAz: 150, clouds: 0.55,
+    fogColor: '#8f8f6d', fogDensity: 0.0008, sunIntensity: 2.4, hemiSky: '#b8c5a3', hemiGround: '#3f3f24', exposure: 1.0,
     road: 'cityRoad', wall: 'rock', ground: 'jungle', // Session 16: panelled metal race deck with light lines (methane refinery world)
     palette: { road: ['#4a4436', '#665e4a', '#8a8064'], wall: ['#3e3a2e', '#625a46', '#8e8466'], ground: ['#3a4422', '#566230', '#7a8240'] },
     decor: ['rocks', 'spires', 'wrecks', 'pylons'], ambient: 'spores', terrain: 'jungle', barrierColor: '#c8ff3a',

@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, THEMES, TRACKS, type PodDef, type StatKey } from '../../src/game/data';
 import { makeTerrainField, terrainLeafMaker } from '../../src/game/terrain';
-import { resolveEnvironment, type TimeOfDay, type WeatherKind } from '../../src/game/environment';
+import { engineHeat, envLabel, METHANE, resolveEnvironment, weatherOptionsFor, type TimeOfDay, type WeatherKind } from '../../src/game/environment';
 import { clipOutside } from '../../src/game/meshClip';
 import { SnowField, SNOW_CLEAR_PIECE, SNOW_CLEAR_ROCK, SNOW_FLOOR, SNOW_LEAD, SNOW_MAX, SNOW_MIN, TRENCH_VMAX } from '../../src/game/snowField';
 import { borderRocks, ROCK_PROTRUDE, type BorderRock } from '../../src/game/borderRocks';
@@ -1901,6 +1901,53 @@ test('night: bad weather keeps the light of a clear night – on every world, in
   ok(n >= 14, `only ${n} combinations of world and weather`);
   eq(bad.length, 0, `${bad.slice(0, 5).join(' · ')}${bad.length > 5 ? ` · … (${bad.length})` : ''} –`);
 });
+
+/* ---- 2026-11-23, user: "auf Malastare: giftig grüner Methanregen – kein normaler Regen – Setting etwas düsterer" ----
+ * Decisions: on both Malastare tracks methane replaces rain and storm entirely (green drops, green-yellow haze, green wetness, green
+ * lens drops, greenish lightning); "Klar" and "Methannebel" stay; the world is about 30 % darker; the rain is flammable: grip as in
+ * rain, boost heat +12 % (water rain −10 %), the boost draws green flame trails. */
+const hexRGB = (h: string): [number, number, number] => { const n = parseInt(h.slice(1), 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
+const isGreen = (c: [number, number, number]) => c[1] > c[0] * 1.02 && c[1] > c[2] * 1.25;
+test('methane: on Malastare rain and storm are methane – named so and flagged so; clear weather and the methane fog stay; other worlds keep water', () => {
+  const names = weatherOptionsFor('malastare').map(o => o[1]);
+  for (const n of ['Klar', 'Methanregen', 'Methangewitter', 'Methannebel']) ok(names.includes(n), `Malastare lacks the weather „${n}" (it has: ${names.join(', ')})`);
+  ok(!names.includes('Regen') && !names.includes('Gewitter'), `Malastare still offers water rain: ${names.join(', ')}`);
+  eq(envLabel('malastare', 'auto', 'rain'), 'Methanregen', 'HUD line for rain on Malastare:'); eq(envLabel('malastare', 'auto', 'storm'), 'Methangewitter', 'HUD line for a storm on Malastare:');
+  for (const wx of ['rain', 'storm'] as WeatherKind[]) { const r = resolveEnvironment(THEMES.malastare, 'day', wx); ok(r.fx.methane && r.build.methane, `Malastare ${wx}: the rain is not flagged as methane`); ok(r.fx.rain > 0.5, `Malastare ${wx}: it does not rain (${r.fx.rain})`); }
+  for (const wx of ['clear', 'fog'] as WeatherKind[]) { const r = resolveEnvironment(THEMES.malastare, 'day', wx); ok(!r.fx.methane && r.fx.rain === 0, `Malastare ${wx}: no rain expected`); }
+  ok(resolveEnvironment(THEMES.malastare, 'auto', 'auto').build.methane, 'the standard weather of Malastare should be methane rain');
+  for (const wx of ['front', 'clearing', 'changing'] as WeatherKind[]) ok(resolveEnvironment(THEMES.malastare, 'auto', wx).build.methane, `Malastare ${wx}: built without methane`);
+  for (const id of ['jungle', 'aquilaris', 'crystal']) { const r = resolveEnvironment(THEMES[id], 'day', 'storm'); ok(!r.fx.methane && !r.build.methane, `${id}: its rain is methane`); ok(weatherOptionsFor(id).some(o => o[1] === 'Regen'), `${id} lost its rain`); }
+});
+test('methane: the rain is flammable – the boost heats 12 % faster than in clear weather (water rain: 10 % slower); the grip is that of rain', () => {
+  for (const d of [0, 0.3, 1]) {
+    ok(Math.abs(engineHeat('malastare', 'rain', 1, d) / engineHeat('malastare', 'clear', 1, d) - 1.12) < 0.004, `Malastare, sky darkness ${d}: methane rain changes the heat by × ${(engineHeat('malastare', 'rain', 1, d) / engineHeat('malastare', 'clear', 1, d)).toFixed(3)}, expected × 1.12`);
+    ok(engineHeat('malastare', 'storm', 1, d) >= engineHeat('malastare', 'rain', 1, d) - 1e-9, 'a methane storm must not cool more than methane rain');
+    ok(Math.abs(engineHeat('jungle', 'rain', 1, d) / engineHeat('jungle', 'clear', 1, d) - 0.9) < 0.004, `jungle, sky darkness ${d}: water rain should cool by 10 %`);
+  }
+  ok(engineHeat('malastare', 'rain', 1, 0) <= 1.25, 'the heat factor leaves its range');
+  for (const wx of ['rain', 'storm'] as WeatherKind[]) near(resolveEnvironment(THEMES.malastare, 'day', wx).fx.grip, resolveEnvironment(THEMES.jungle, 'day', wx).fx.grip, `grip in a methane ${wx}:`);
+});
+test('methane: haze, drops, wetness, lens and lightning are green – on the jungle moon the same weather stays blue-grey', () => {
+  for (const wx of ['rain', 'storm'] as WeatherKind[]) for (const tod of ['day', 'night'] as TimeOfDay[]) {
+    const m = resolveEnvironment(THEMES.malastare, tod, wx), j = resolveEnvironment(THEMES.jungle, tod, wx);
+    ok(isGreen(hexRGB(m.theme.fogColor)), `Malastare ${tod} ${wx}: the haze ${m.theme.fogColor} is not green-yellow`);
+    ok(isGreen(hexRGB(m.fx.gustColor)), `Malastare ${tod} ${wx}: the squalls ${m.fx.gustColor} are not green-yellow`);
+    ok(!isGreen(hexRGB(j.theme.fogColor)), `jungle ${tod} ${wx}: the haze ${j.theme.fogColor} turned green`);
+  }
+  ok(isGreen(hexRGB(METHANE.rain)), `drops ${METHANE.rain}`); ok(isGreen(METHANE.lens), `lens drops ${METHANE.lens}`); ok(isGreen(METHANE.wet), `wet ground ${METHANE.wet}`);
+  ok(isGreen(METHANE.bolt) && isGreen(METHANE.flash) && isGreen(hexRGB(METHANE.flame)), 'lightning and boost flames should be green');
+  ok(METHANE.wet.every(v => v > 0.3 && v <= 1), `the tint of wet ground must only tint (${METHANE.wet})`);
+});
+test('methane: Malastare is about 30 % darker than it was', () => {
+  // before 2026-11-23: sun 3.4, sky fill #d8e8c0, ground fill #4a4a2a, horizon #e2cf96, zenith #4f6b5a
+  const t = THEMES.malastare, linL = (h: string) => { const c = hexRGB(h).map(v => v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const was = { sun: 3.4, sky: linL('#d8e8c0'), ground: linL('#4a4a2a'), hor: linL('#e2cf96'), top: linL('#4f6b5a') };
+  const r = { sun: t.sunIntensity / was.sun, sky: linL(t.hemiSky) / was.sky, ground: linL(t.hemiGround) / was.ground, hor: linL(t.skyHorizon) / was.hor, top: linL(t.skyTop) / was.top };
+  for (const [k, v] of Object.entries(r)) ok(v > 0.6 && v < 0.8, `${k}: ${(v * 100).toFixed(0)} % of the light it had – expected about 70 % (60 … 80)`);
+  ok(Math.abs(t.exposure - 1) < 1e-9, `the exposure must not make up for it (${t.exposure})`);
+});
+
 
 // ---- bridges: the terrain passes below the deck (2026-11-23, reported by the user after the first drive on a real GPU) ----
 // On the Methan-Derby a canyon runs straight into a bridge. Bridge samples take no part in shaping the ground, so the ground on the first

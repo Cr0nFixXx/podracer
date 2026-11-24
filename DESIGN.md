@@ -151,6 +151,7 @@ Leitidee: **Technik leuchtet schmal und bewegt sich.** Futuristisch wirkt nicht 
 | Lavakruste | fester Boden: dunkle Basaltplatten, in den Fugen glüht es orange – stellenweise, wo die Kruste dünn ist. Nichts fließt (seit 2026-11-23, vorher lag hier das Foto der fließenden Lava) | 2026-11-23 |
 | Oovo IV | Mond statt Leere: grauer Regolith, Krater, flache Kraterränder am Horizont; Stationsdecks aus hellen Metallplatten; Gasriese mit Ring tief am Himmel; flache Sonne (19°) für lange Schatten | S20 Strecken |
 | Malastare | Metall-Renndeck mit Lichtlinien statt Schotter – Industrie-/Raffineriewelt | S16 |
+| Malastare – Wetter | düster (rund 30 % weniger Licht als die anderen Welten hatten), der Himmel schmutzig gelbgrün. Es regnet Methan: giftgrüne Tropfen, grün-gelber Dunst, grüne Nässe und Pfützen, grüne Linsentropfen, grünliche Blitze. Ein Boost im Regen zündet ihn: grüne Flammenfahnen hinter den Triebwerken | 2026-11-23 |
 
 ### Tunnel & Höhlen
 

@@ -33,7 +33,8 @@ const CLIMATE: Record<string, Climate> = {
   jungle: { allowed: ['clear', 'rain', 'storm', 'fog'], calm: ['fog', 0.4], severe: ['storm', 1], auto: ['fog', 0.5] },
   aquilaris: { allowed: ['clear', 'rain', 'storm', 'fog'], calm: ['clear', 1], severe: ['storm', 1], auto: ['rain', 0.55], names: { fog: 'Seenebel' } },
   crystal: { allowed: ['clear', 'rain', 'storm', 'fog'], calm: ['fog', 0.4], severe: ['storm', 0.8], auto: ['fog', 0.4] },
-  malastare: { allowed: ['clear', 'rain', 'storm', 'fog'], calm: ['rain', 0.3], severe: ['storm', 1], auto: ['storm', 0.55], names: { fog: 'Methannebel' } },
+  // (2026-11-23, user: on Malastare it never rains water – rain and storm are methane: `METHANE` below)
+  malastare: { allowed: ['clear', 'rain', 'storm', 'fog'], calm: ['rain', 0.3], severe: ['storm', 1], auto: ['storm', 0.55], names: { rain: 'Methanregen', storm: 'Methangewitter', fog: 'Methannebel' } },
 };
 const DYNAMIC: WeatherKind[] = ['front', 'clearing', 'changing'];
 /** Weather choices that make sense on this world (airless Oovo IV: none). */
@@ -60,6 +61,7 @@ export function envLabel(themeId: string, tod: TimeOfDay, wx: WeatherKind) {
 export interface EnvFx {
   weather: Wx; tod: TimeOfDay;
   rain: number;        // 0..1 lens droplets, rain streak density, rain audio, road spray
+  methane: boolean;    // the rain is methane (Malastare): green drops / haze / wetness / lens / lightning, flammable – see METHANE
   lightning: number;   // 0..1 strike frequency (0 = none)
   gust: 'none' | 'snow' | 'dust' | 'mist'; gustColor: string; gustAmt: number;
   wind: number;        // 0..1 slant of rain/snow, gust speed, wind audio
@@ -76,7 +78,17 @@ export interface EnvFx {
 export const NIGHT_WX = { moon: 0.9, fill: 0.62, ground: 0.2, horizon: 0.16, fog: 0.13, dens: 1.8, exp: 1.22 };
 export interface EnvState { theme: ThemeDef; fx: EnvFx }
 /** What must exist at build time so the whole timeline can play without recompiling anything. */
-export interface EnvBuild { rainRoad: boolean; maxRain: number; bolt: boolean; flare: boolean; lights: boolean; stars: boolean; wind: number; ambMax: number; envTheme: ThemeDef; dynamic: boolean }
+export interface EnvBuild { rainRoad: boolean; maxRain: number; bolt: boolean; flare: boolean; lights: boolean; stars: boolean; wind: number; ambMax: number; envTheme: ThemeDef; dynamic: boolean; /** the rain of this race is methane */ methane: boolean }
+
+/** Methane rain (2026-11-23, user: "giftig grüner Methanregen – kein normaler Regen", both Malastare tracks). Colours of everything
+ *  the rain touches: the drops, the tint of the drops on the lens, of wet ground (a multiplier – it only tints), the lightning bolt,
+ *  the light of a flash in the clouds, the flame trails of a boost. The haze comes from `HAZE` (a tint of the sky's own brightness). */
+export const METHANE = {
+  rain: '#a8f03c', flame: '#7dff3a',
+  lens: [0.62, 1, 0.38] as RGB, wet: [0.72, 1, 0.5] as RGB, bolt: [0.6, 1, 0.45] as RGB, flash: [0.5, 0.85, 0.4] as RGB,
+  /** green-yellow haze: tint of zenith / horizon / fog in methane rain */ haze: [0.92, 1.1, 0.46] as RGB,
+  /** boost heat in methane rain against clear weather (water rain: 0.9) – the rain burns */ heat: 1.12,
+};
 
 // All colour blending happens in sRGB (perceptual) space: a linear-space lerp keeps 15 % of a bright day colour visibly grey at night.
 const rgb = (h: string): RGB => { const n = parseInt(h.slice(1), 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
@@ -100,7 +112,8 @@ const HEAT_WX: Record<Wx, number> = { clear: 1, rain: 0.9, storm: 0.84, snow: 0.
 /** `k` = strength of the weather 0..1, `dark` = how dark the sky is 0..1 (night, and partly a storm sky). */
 export function engineHeat(themeId: string, wx: Wx, k: number, dark: number) {
   const day = HEAT_HOT_DAY.has(themeId) ? 1.05 : 1, tod = day + (0.92 - day) * dark;
-  const w = 1 + ((wx === 'dust' && themeId === 'lava' ? 1.2 : HEAT_WX[wx]) - 1) * Math.max(0, Math.min(1, k)); // (lava: ash storm)
+  const special = wx === 'dust' && themeId === 'lava' ? 1.2 : themeId === 'malastare' && (wx === 'rain' || wx === 'storm') ? METHANE.heat : undefined; // (lava: ash storm · Malastare: methane rain burns)
+  const w = 1 + ((special ?? HEAT_WX[wx]) - 1) * Math.max(0, Math.min(1, k));
   return Math.max(0.75, Math.min(1.25, (HEAT_CLIMATE[themeId] ?? 1) * tod * w));
 }
 
@@ -132,21 +145,22 @@ function resolveOne(base: ThemeDef, tod: Tod, key: WxKey): EnvState {
   }
 
   const [wx, k]: [Wx, number] = !clim ? ['clear', 1] : key === 'auto' ? clim.auto : key;
-  const fx: EnvFx = { weather: wx, tod, rain: 0, lightning: 0, gust: 'none', gustColor: '#ffffff', gustAmt: 0, wind: 0.15, volFog: clim ? 0.25 : 0, flare: 0.85, grip: 1, heat: 1, night, dark: 0, amb: 0.45 };
+  const methane = base.id === 'malastare' && (wx === 'rain' || wx === 'storm'), H = METHANE.haze;
+  const fx: EnvFx = { weather: wx, tod, rain: 0, methane, lightning: 0, gust: 'none', gustColor: '#ffffff', gustAmt: 0, wind: 0.15, volFog: clim ? 0.25 : 0, flare: 0.85, grip: 1, heat: 1, night, dark: 0, amb: 0.45 };
   const wetAmbient = th.ambient === 'rain' || th.ambient === 'snow';
   if (clim) switch (wx) {
     case 'clear':
       th.clouds = Math.min(th.clouds, 0.2); th.fogDensity *= 0.8; if (wetAmbient) th.ambient = 'dust'; fx.flare = 1; fx.amb = 0.3; break;
     case 'rain':
       th.clouds = Math.max(th.clouds, 0.6 + 0.3 * k); th.fogDensity *= 1 + 0.75 * k; th.sunIntensity *= 1 - 0.5 * k;
-      th.skyTop = overcast(th.skyTop, 0.6 * k, [0.9, 1, 1.12], 0.85); th.skyHorizon = overcast(th.skyHorizon, 0.55 * k, [0.94, 1, 1.06], 0.9);
-      th.fogColor = overcast(th.fogColor, 0.5 * k, [0.92, 1, 1.08], 0.9); th.ambient = 'rain';
+      th.skyTop = overcast(th.skyTop, 0.6 * k, methane ? H : [0.9, 1, 1.12], 0.85); th.skyHorizon = overcast(th.skyHorizon, 0.55 * k, methane ? H : [0.94, 1, 1.06], 0.9);
+      th.fogColor = overcast(th.fogColor, methane ? 0.75 * k : 0.5 * k, methane ? H : [0.92, 1, 1.08], 0.9); th.ambient = 'rain';
       fx.rain = Math.min(1, 0.85 * k); fx.wind = 0.55 * k; fx.grip = 1 - 0.07 * k; fx.flare = 0.3 * (1.6 - k); fx.volFog = 0.5; fx.amb = fx.rain;
       fx.gust = 'mist'; fx.gustColor = th.fogColor; fx.gustAmt = 0.5 * k; break; // Session 16: rain squalls drift across the track
     case 'storm':
       th.clouds = 1; th.fogDensity *= 1 + 1.25 * k; th.sunIntensity *= 1 - 0.74 * k;
-      th.skyTop = overcast(th.skyTop, 0.85 * k, [0.85, 0.95, 1.15], 0.42); th.skyHorizon = overcast(th.skyHorizon, 0.75 * k, [0.9, 1, 1.1], 0.55);
-      th.fogColor = overcast(th.fogColor, 0.7 * k, [0.9, 1, 1.1], 0.6); th.hemiSky = overcast(th.hemiSky, 0.55 * k, [0.9, 1, 1.12], 0.75); th.ambient = 'rain';
+      th.skyTop = overcast(th.skyTop, 0.85 * k, methane ? H : [0.85, 0.95, 1.15], 0.42); th.skyHorizon = overcast(th.skyHorizon, 0.75 * k, methane ? H : [0.9, 1, 1.1], 0.55);
+      th.fogColor = overcast(th.fogColor, methane ? 0.85 * k : 0.7 * k, methane ? H : [0.9, 1, 1.1], 0.6); th.hemiSky = overcast(th.hemiSky, 0.55 * k, methane ? [0.95, 1.06, 0.7] : [0.9, 1, 1.12], 0.75); th.ambient = 'rain';
       fx.rain = 0.55 + 0.45 * k; fx.lightning = k; fx.gust = 'mist'; fx.gustColor = th.fogColor; fx.gustAmt = k; fx.wind = Math.min(1, 1.05 * k); fx.grip = 1 - 0.1 * k; fx.flare = 0; fx.volFog = 0.72; fx.amb = fx.rain; break;
     case 'snow':
       th.clouds = Math.max(th.clouds, 0.55 + 0.35 * k); th.fogDensity *= 1 + 1.35 * k; th.sunIntensity *= 1 - 0.45 * k;
@@ -179,7 +193,8 @@ function resolveOne(base: ThemeDef, tod: Tod, key: WxKey): EnvState {
     const up = (c: string, min: number, to: string) => { let out = c; for (let i = 0; i < 12 && lumS(rgb(out)) < min; i++) out = mixHex(out, to, 0.18); return out; };
     th.sunIntensity = Math.max(th.sunIntensity, NIGHT_WX.moon);
     th.hemiSky = up(th.hemiSky, NIGHT_WX.fill, '#b9cbff'); th.hemiGround = up(th.hemiGround, NIGHT_WX.ground, '#5b6680');
-    th.skyHorizon = up(th.skyHorizon, NIGHT_WX.horizon, '#5a6e9c'); th.fogColor = up(th.fogColor, NIGHT_WX.fog, '#5a6e9c');
+    const haze = methane ? '#5c8a34' : '#5a6e9c'; // (a methane night keeps its green haze)
+    th.skyHorizon = up(th.skyHorizon, NIGHT_WX.horizon, haze); th.fogColor = up(th.fogColor, NIGHT_WX.fog, haze);
     th.fogDensity = Math.min(th.fogDensity, base.fogDensity * NIGHT_WX.dens);
     th.exposure *= NIGHT_WX.exp;
     if (fx.gust === 'mist') { fx.gustColor = th.fogColor; fx.gustAmt *= 0.65; } // rain squalls: veils of that haze, and thinner – at night they were black curtains
@@ -280,6 +295,7 @@ export function resolveEnvironment(base: ThemeDef, todIn: TimeOfDay = 'auto', wx
     rainRoad: max(s => s.fx.rain) > 0.05, maxRain: max(s => s.fx.rain), bolt: max(s => s.fx.lightning) > 0, flare: max(s => s.fx.flare) > 0.02,
     lights: max(s => s.fx.dark) > 0.4, stars: max(s => s.theme.stars ?? 0) > 0, wind: max(s => s.fx.wind),
     ambMax: Math.max(0.05, max(s => s.theme.ambient === ambient ? s.fx.amb : 0)), envTheme: bright.theme, dynamic: timeline.dynamic,
+    methane: states.some(st => st.fx.methane),
   };
   const start = states[0], s0 = timeline.eval(0);
   const theme: ThemeDef = { ...start.theme, ambient, clouds: Math.max(start.theme.clouds, timeline.dynamic ? 0.02 : 0) };

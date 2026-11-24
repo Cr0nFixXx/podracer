@@ -216,10 +216,10 @@ let g: Game | null = null; let cur = -1;
     chase = true;
     // three seconds of weather around that camera (rain streaks, snow, gust banks need time to fill the air)
     { const W = (G as unknown as { weather?: { update: (dt: number, t: number, cam: THREE.Camera, frozen: boolean, thunder: (v: number) => void, near: (v: number) => void) => void } }).weather; if (W) for (let k = 0; k < 90; k++) { G.clock += 1 / 30; W.update(1 / 30, G.clock, G.camera, false, () => {}, () => {}); } }
-  } else if (view.startsWith('plough_')) { // 3D snow (2026-11-23): plough_<idx>[_<lat>[_<speed m/s>[_<seconds>[_<rivals>[_<side camera m>]]]]] – the player flies the last
+  } else if (view.startsWith('plough_')) { // 3D snow (2026-11-23): plough_<idx>[_<lat>[_<speed m/s>[_<seconds>[_<rivals>[_<side camera m>[_<boost 0|1>]]]]]] – the player flies the last
     // seconds up to that sample in the REAL game loop (physics, particles, camera), held on its line `lat` m beside the centre:
     // it cuts its trench and throws the snow up. `rivals` (0–3): that many rivals fly ahead of it, 45 m apart, 9 m further left each.
-    const [, i0, l0, v0, t0, r0, c0] = view.split('_'); const S = G.td.main.samples, N = S.length, lat = +(l0 ?? 0), speed = +(v0 ?? 110), secs = +(t0 ?? 1.6), nRiv = Math.min(3, +(r0 ?? 0)), side = +(c0 ?? 0), pl = G.player;
+    const [, i0, l0, v0, t0, r0, c0, b0] = view.split('_'); const S = G.td.main.samples, N = S.length, lat = +(l0 ?? 0), speed = +(v0 ?? 110), secs = +(t0 ?? 1.6), nRiv = Math.min(3, +(r0 ?? 0)), side = +(c0 ?? 0), pl = G.player;
     const W = (k: number) => S[((k % N) + N) % N];
     const put = (q: PodState, idx: number, la: number) => { const s = W(idx); q.pos.set(s.x + s.rx * la, s.y + s.ramp + 2.85, s.z + s.rz * la); q.yaw = Math.atan2(s.tx, s.tz); q.yawRate = 0; q.vel.set(s.tx * speed, 0, s.tz * speed); q.path = 0; q.idx = ((idx % N) + N) % N; q.dead = 0; q.invuln = 0; q.grounded = true; q.inRoof = s.roof > 0; q.upper = false; };
     const hold = (q: PodState, la: number) => { const s = S[q.idx], al = (q.pos.x - s.x) * s.tx + (q.pos.z - s.z) * s.tz, v = Math.hypot(q.vel.x, q.vel.z); q.pos.x = s.x + s.tx * al + s.rx * la; q.pos.z = s.z + s.tz * al + s.rz * la; q.yaw = Math.atan2(s.tx, s.tz); q.yawRate = 0; q.vel.x = s.tx * v; q.vel.z = s.tz * v; };
@@ -228,8 +228,11 @@ let g: Game | null = null; let cur = -1;
     { const g0 = S[G.td.startIdx]; for (const q of G.pods) if (q !== pl && !riv.includes(q)) { q.pos.set(g0.x, g0.y + 2.85, g0.z); q.vel.set(0, 0, 0); q.path = 0; q.idx = G.td.startIdx; } } // rivals of an earlier view: back to the start
     put(pl, start, lat); riv.forEach((q, k) => put(q, start + 22 * (k + 1), lat - 9 * (k + 1)));
     G.state = 'race'; (G as unknown as { keys: Set<string> }).keys.add('KeyW');
-    for (let k = 0; k < secs * 60; k++) { G.update(1 / 60); hold(pl, lat); riv.forEach((q, j) => hold(q, lat - 9 * (j + 1))); if (k % 2 === 0) G.updateVisuals(); }
-    G.lensWet = 0; G.updateVisuals(); G.updateLens(1); for (let k = 0; k < 10; k++) G.updateCamera(0.5);
+    // a 7th value of 1: the player (and the rivals of this view) boost for the last 0.7 s – flames, heat, alarm
+    const boostFrom = b0 === '1' ? secs * 60 - 42 : 1e9;
+    for (let k = 0; k < secs * 60; k++) { if (k >= boostFrom) { (G as unknown as { keys: Set<string> }).keys.add('ShiftLeft'); for (const q of riv) { q.heat = 0; if (q.ai) q.ai.boostUntil = G.raceTime + 2; } } G.update(1 / 60); hold(pl, lat); riv.forEach((q, j) => hold(q, lat - 9 * (j + 1))); if (k % 2 === 0) G.updateVisuals(); }
+    (G as unknown as { keys: Set<string> }).keys.delete('ShiftLeft');
+    G.updateVisuals(); G.updateLens(1); for (let k = 0; k < 10; k++) G.updateCamera(0.5); // (the lens keeps what the weather and the wake put on it)
     chase = true;
     // a 6th value: instead of the chase camera, a camera that many metres to the right of the pod (negative: left), 14 m ahead of it, looking back at it
     if (side) { const s = S[pl.idx]; G.camera.position.set(pl.pos.x + s.rx * side + s.tx * 14, pl.pos.y + 1.6, pl.pos.z + s.rz * side + s.tz * 14); G.camera.up.set(0, 1, 0); G.camera.lookAt(pl.pos.x - s.tx * 4, pl.pos.y - 0.6, pl.pos.z - s.tz * 4); G.camera.fov = 62; }

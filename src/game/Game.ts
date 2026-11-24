@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { resolveEnvironment, type EnvBuild, type EnvFx, type EnvTimeline } from './environment';
+import { METHANE, resolveEnvironment, type EnvBuild, type EnvFx, type EnvTimeline } from './environment';
 import { WEATHER } from './materials';
 import { beginTextureEpoch, generateTextures, hasTextureWorkers, setTextureAnisotropy, textureStats } from './textures';
 import { makeBeams } from './lights';
@@ -113,6 +113,8 @@ export class Game {
   tmpV = new THREE.Vector3(); tmpV2 = new THREE.Vector3(); tmpV3 = new THREE.Vector3();
   tmpQ = new THREE.Quaternion(); tmpQ2 = new THREE.Quaternion(); tmpC = new THREE.Color(); dustCol = new THREE.Color(); barrierGlow = new THREE.Color();
   private snowLight = 1;
+  /** methane rain (Malastare): colour of the spray off the wet road and of the flames a boost lights in the rain; null = water */
+  private methaneSpray: THREE.Color | null = null; private methaneFlame: THREE.Color | null = null;
   lifeAudio: LifeAudio = { bird: 0, herd: 0, crawler: 0 };
   worldAudio: WorldAudioState = { themeId: 'desert', geyser: 0, rotor: 0, rotorHz: 2, crawler: 0, bird: 0, herd: 0 };
   prevCamBtn = false; prevResetBtn = false; prevStartBtn = false;
@@ -196,9 +198,12 @@ export class Game {
 
     // particles
     this.particles = new Particles(gfx.particles, this.td.snow ? 1400 : 0); // (a powder field: room for the snow the pods plough up)
-    this.particles.initAmbient(theme.ambient, build.wind, Math.max(1, build.ambMax / 0.45));
+    this.particles.initAmbient(theme.ambient, build.wind, Math.max(1, build.ambMax / 0.45), build.methane ? METHANE.rain : undefined);
+    // 2026-11-23 (user): on Malastare it rains methane – green drops, wetness, spray, lightning and lens drops; the boost sets it alight
+    if (build.methane) { this.methaneSpray = new THREE.Color(0.5, 0.72, 0.3); this.methaneFlame = new THREE.Color(METHANE.flame).multiplyScalar(1.25); this.sky.uniforms.flashCol.value.setRGB(...METHANE.flash); }
+    WEATHER.tint.value.setRGB(...(build.methane ? METHANE.wet : [1, 1, 1] as [number, number, number])); // (a global of all ground materials: set for every race)
     this.wxQ = [0, 0.5, 1][gfx.weatherFx ?? 2] ?? 1; setPodLodScale(gfx.podDetail ?? 1);
-    this.weather = new WeatherFx(fx, this.particles, this.scene, theme.sunAz * Math.PI / 180 + 1.1, build.bolt); this.weather.quality = this.wxQ;
+    this.weather = new WeatherFx(fx, this.particles, this.scene, theme.sunAz * Math.PI / 180 + 1.1, build.bolt, build.methane); this.weather.quality = this.wxQ;
     this.scene.add(this.particles.group); this.scene.add(this.debris.mesh); this.scene.add(this.scrap.mesh);
 
     // pods (player = full hero detail; opponents = merged whole-pod + automatic 2-tier distance LOD!)
@@ -227,7 +232,7 @@ export class Game {
       this.tracks = buildGroundTracks(new TrackLayer(forever ? 72000 : 36000), this.scene, this.tracksDisp);
     }
 
-    this.post = new PostFX(r, this.scene, this.camera, gfx, { rain: this.lensRainMax(gfx), flare: build.flare }); this.updateLens(0);
+    this.post = new PostFX(r, this.scene, this.camera, gfx, { rain: this.lensRainMax(gfx), flare: build.flare }); this.tintLens(); this.updateLens(0);
     this.applyEnv(0);
     this.post.lens.sunColor?.value.set(theme.sunColor);
     this.particles.setScale(h0 * r.getPixelRatio());
@@ -606,7 +611,7 @@ export class Game {
       for (let i = 0; i < n; i++) {
         let k = pl.idx - 3 + Math.floor(Math.random() * 46); k = path.closed ? ((k % S.length) + S.length) % S.length : Math.max(0, Math.min(S.length - 1, k));
         const s = S[k]; if (s.gap || s.roof > 0) continue; const lat = (Math.random() * 2 - 1) * s.hw, x = s.x + s.rx * lat, z = s.z + s.rz * lat;
-        this.particles.splash(this.tmpV.set(x, roadSurfaceAt(path, k, x, z).y + 0.07, z));
+        this.particles.splash(this.tmpV.set(x, roadSurfaceAt(path, k, x, z).y + 0.07, z), this.methaneSpray ?? undefined);
       }
     }
     for (let i = 0; i < this.world.emitters.length; i++) {
@@ -691,12 +696,15 @@ export class Game {
       const glowHex = p.isPlayer ? this.profile.custom[p.def.id].colors[2] : p.def.colors[2];
       this.tmpC.set(glowHex).multiplyScalar(0.88);
       const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw), bz = v.body.position.z;
-      const rivalVis = p.isPlayer ? 1 : 0.32;
+      const rivalVis = p.isPlayer ? 1 : 0.32, roofed = (this.td.paths[p.path]?.samples[p.idx]?.roof ?? 0) > 0;
       for (let i = 0; i < v.exhaustLocal.length; i++) {
         const loc = v.exhaustLocal[i]; const lz = loc.z + bz;
         const eLift = loc.x < 0 ? eyL : eyR;
         this.tmpV3.set(p.pos.x + loc.x * cy + lz * sy, p.pos.y + (loc.y + eLift) * Math.cos(p.roll) + loc.x * Math.sin(p.roll) - lz * p.pitch, p.pos.z - loc.x * sy + lz * cy);
         if (v.engineOut[i]) { if (p.isPlayer || dist < 160) this.particles.smoke(this.tmpV3, p.vel, 0.85, rivalVis); continue; } // a flamed-out engine only trails smoke
+        // methane rain is flammable: a boost sets it alight – green flames in the exhaust and a flame trail behind every engine
+        const burn = !!this.methaneFlame && p.boosting && this.env.rain > 0.15 && !(roofed && !p.upper);
+        if (burn) { this.tmpC.lerp(this.methaneFlame!, 0.75); this.particles.flameTrail(this.tmpV3, back, p.vel, this.methaneFlame!, p.isPlayer ? 1 : 0.5); }
         this.particles.exhaust(this.tmpV3, back, p.vel, this.tmpC, p.input.throttle, p.boosting ? 1 : 0, emitScale);
         // close to the heat limit the engines spit sparks (more while overdriving)
         if (p.heat > 0.86 && (p.isPlayer || dist < 160) && this.particles.chance((p.heat - 0.86) * 4 + (p.overT ?? 0) * 0.5)) this.particles.sparks(this.tmpV3, back, p.vel, 3);
@@ -732,7 +740,7 @@ export class Game {
           this.tmpV2.set(p.vel.x + cyD * sg * 11, 0, p.vel.z - syD * sg * 11); // slight outward drift: the wakes pass left and right of the cockpit
           // Session 20: the wake shows what the pod is flying over – white spray on lakes, coloured dust on sand / snow / ash / mud,
           // glowing embers over lava, next to nothing on bare ice and metal decks
-          if (wet || wk === 'spray') this.particles.spray(this.tmpV, this.tmpV2, sp, (wet ? this.wet : 0.9) * (p.isPlayer ? 1 : 0.85) * near);
+          if (wet || wk === 'spray') this.particles.spray(this.tmpV, this.tmpV2, sp, (wet ? this.wet : 0.9) * (p.isPlayer ? 1 : 0.85) * near, wet && this.methaneSpray ? this.methaneSpray : undefined);
           else if (wk !== 'none') {
             this.particles.trail(this.tmpV, this.tmpV2, wkCol ?? this.tmpC, sp, (wkCol ? aD / Math.max(0.35, this.dustAmt) : aD) * powder);
             if (wk === 'embers' && this.particles.chance(0.22)) this.particles.sparks(this.tmpV, UP, p.vel, 2);
@@ -787,7 +795,7 @@ export class Game {
     }
     if (Game.POST_KEYS.some(k => g[k] !== prev[k])) { // rebuild the post-processing chain with the new options
       const old = this.post;
-      this.post = new PostFX(this.renderer, this.scene, this.camera, { ...g, ssr: prev.ssr && g.ssr }, { rain: this.lensRainMax(g), flare: this.envBuild.flare }); this.updateLens(0);
+      this.post = new PostFX(this.renderer, this.scene, this.camera, { ...g, ssr: prev.ssr && g.ssr }, { rain: this.lensRainMax(g), flare: this.envBuild.flare }); this.tintLens(); this.updateLens(0);
       old.dispose(); // no async warm-up here: it would interleave with running frames and compile pipelines for the wrong target layout
     }
   }
@@ -829,7 +837,7 @@ export class Game {
       this.snowLight = 1 - 0.6 * s.dark; // brightness of the (unlit) snow the pods plough up
       this.lightLevel = Math.max(0, Math.min(1, (s.dark - 0.35) / 0.2));
       if (this.envInit && this.state === 'race' && this.messageT <= 0) {
-        if (s.sev > 0.45 && this.sevPrev <= 0.45) this.showMsg(e.gust === 'dust' ? 'STURM ZIEHT AUF' : e.gust === 'snow' ? 'SCHNEESTURM ZIEHT AUF' : 'UNWETTER ZIEHT AUF', 2.4);
+        if (s.sev > 0.45 && this.sevPrev <= 0.45) this.showMsg(e.gust === 'dust' ? 'STURM ZIEHT AUF' : e.gust === 'snow' ? 'SCHNEESTURM ZIEHT AUF' : b.methane ? 'METHANGEWITTER ZIEHT AUF' : 'UNWETTER ZIEHT AUF', 2.4);
         else if (s.sev < 0.3 && this.sevPrev >= 0.3) this.showMsg('ES KLART AUF', 2.2);
         else if (s.dark > 0.5 && this.darkPrev <= 0.5) this.showMsg('NACHT – LICHTER AN', 2.2);
         else if (s.dark < 0.4 && this.darkPrev >= 0.4) this.showMsg('TAGESANBRUCH', 2.2);
@@ -902,6 +910,8 @@ export class Game {
   }
 
   /** Can drops land on the lens in this race? (PostFX compiles the drops only then.) Rain – or a track with a lake to fly over. */
+  /** Drops on the lens take the colour of what is in the air and on the ground: on Malastare methane (rain, the methane lakes), else water. */
+  private tintLens() { if (this.td.def.theme === 'malastare') this.post.lens.rainTint.value.setRGB(...METHANE.lens); }
   private lensRainMax(g: GfxSettings) {
     if (this.sprayTrack === null) this.sprayTrack = trackSplashes(this.td.paths);
     return Math.max((g.weatherFx ?? 2) > 0 ? this.envBuild.maxRain : 0, this.sprayTrack ? 0.6 : 0);

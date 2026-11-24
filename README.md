@@ -115,12 +115,14 @@ Im Menü **Renneinstellungen** gibt es die Auswahlfelder „Tageszeit" und „We
 | Tatooine, Rote Tafelberge | Klar, Sandsturm |
 | Ando Prime | Klar, Schneeböen, Eisnebel |
 | Vulkanwelt | Klar, Smog, Aschesturm mit Vulkanblitzen |
-| Dschungelmond, Aquilaris, Kristallschluchten, Malastare | Klar, Regen, Gewitter, Nebel |
+| Dschungelmond, Aquilaris, Kristallschluchten | Klar, Regen, Gewitter, Nebel |
+| Malastare | Klar, Methanregen, Methangewitter, Methannebel |
 
 Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → heftig in 75 s), „Aufklarend" (umgekehrt) und „Wechselhaft" (beides im Wechsel). Was „heftig" ist, hängt von der Welt ab: Gewitter, Sandsturm, Schneesturm oder Aschesturm.
 
 - **Intensität:** Regen, Schnee und Staub sind dicht (bis 4 200 Partikel), die Sicht geht bei Unwetter spürbar zurück, Böen ziehen Schwaden quer über die Piste und rütteln an der Kamera.
 - **Regen:** Tropfen ziehen mit steigendem Tempo immer längere Streifen, auf der Linse laufen sie erst herab und werden bei hohem Tempo nach außen getrieben. Pods ziehen Gischtfahnen, Tropfen spritzen auf der Fahrbahn. Die Straße wird nass und trocknet nach dem Regen langsam ab. Etwas weniger Haftung.
+- **Methanregen (Malastare):** auf Malastare regnet es kein Wasser. Die Tropfen sind giftgrün, der Dunst grün-gelb, die Piste glänzt grün, auch die Tropfen auf der Linse und die Blitze sind grün. Die Welt ist insgesamt düsterer. **Der Regen brennt:** die Haftung ist wie bei Regen, aber der Boost heizt die Triebwerke 12 % schneller auf (Wasserregen kühlt um 10 %) – und wer im Regen boostet, zieht grüne Flammenfahnen hinter sich her.
 - **Gischt auf der Linse:** auch ohne Regen landen Tropfen auf der Linse, wenn du über einen See, Sumpf oder Methansee fliegst, durch Pfützen nach einem Regen fährst oder dicht hinter einem Pod durch dessen Gischt. Nach etwa drei Sekunden über trockenem Boden ist die Linse wieder klar.
 - **Gewitter:** verzweigte Blitze mit Folgeblitzen, lauter Donner mit Verzögerung je nach Entfernung, Wind.
 - **Lichter:** Bei Dunkelheit schalten alle Pods Scheinwerfer mit Lichtkegeln, Positionslichter und Blitzlicht ein. Dein Scheinwerfer folgt der Lenkung.

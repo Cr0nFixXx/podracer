@@ -178,6 +178,15 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Geprüft: fünf Unit-Prüfungen `tracks:` (zuerst rot): welche Böden Spuren halten und wie lange, zwei Streifen unter den Triebwerksbänken dicht über dem Boden, keine auf Fels und in der Luft, keine zweite Spur auf derselben Linie, nach 40 s weg, Mondstaub dauerhaft, voller Speicher überschreibt die ältesten. Bilder: Sand und Dünen auf dem Boonta-Kessel (vier Pods, Blick zurück über die Spuren), Mondstaub auf Oovo IV. WebGPU-Konsolenprüfung.
 - Nicht geprüft: Strand und Asche im Bild; das Verblassen in Bewegung; Spuren bei Nacht und Sandsturm.
 
+### Strecken – Methanregen auf Malastare
+- Auf beiden Malastare-Strecken (Malastare-100-Sprint, Methan-Derby) regnet es kein Wasser mehr. „Regen" und „Gewitter" heißen dort „Methanregen" und „Methangewitter"; „Klar" und „Methannebel" bleiben. Das Standardwetter von Malastare ist ein Methangewitter.
+- Grün ist alles, was der Regen berührt: die Tropfen, der Dunst (grün-gelb, auch nachts), die nasse Piste und die Pfützen, die Gischt hinter den Pods, die Tropfen auf der Linse, der Blitz und sein Leuchten in den Wolken.
+- **Der Regen brennt:** Haftung wie bei Regen. Der Boost heizt 12 % schneller auf als bei klarem Wetter (Wasserregen: 10 % langsamer). Wer im Regen boostet, zieht grüne Flammenfahnen hinter den Triebwerken her – nicht unter einem Dach.
+- **Düsterer:** Malastare hat insgesamt rund 30 % weniger Licht (Sonne, Himmel, Aufhelllicht, Dunst). Das gilt bei jedem Wetter und zu jeder Tageszeit. Die Mindesthelligkeit für Nacht + Unwetter aus Block 1 gilt weiter.
+- **Eigene Festlegungen:** (1) Das Methangewitter heizt wie der Methanregen (+12 % bei voller Stärke), nicht stärker. (2) Linsentropfen sind auf Malastare immer grün – auch die Gischt der Methanseen bei klarem Wetter.
+- Geprüft: vier Unit-Prüfungen `methane:` (zuerst rot): Namen und Kennzeichnung, andere Welten behalten Wasser; +12 % / −10 % Hitze, Haftung wie Regen; Dunst und alle Regenfarben grün – auf dem Dschungelmond weiter blaugrau; rund 30 % weniger Licht. Die Prüfung „Nacht + Unwetter" läuft weiter durch. Bilder: Methangewitter am Tag (Piste, Methansee, von oben), Boost mit Flammenfahnen, klares Wetter (die düsterere Welt), Nacht + Methangewitter mit Blitz. WebGPU-Konsolenprüfung im Gewitter mit Boost.
+- Nicht geprüft: in Bewegung; ob „30 % düsterer" bei klarem Wetter gefällt (Stellschraube: die Werte von `malastare` in `src/game/data.ts`, die alten stehen im Kommentar); Methan-Derby im Bild (gleiche Welt, nur gerechnet).
+
 ### Nachmeldung des Nutzers – „Introfahrt geht noch nicht"
 - Wörtlich (2026-11-23, nach dem Bericht zu Block 2): „intro fahrt geht noch nicht. lavakruste und lavasee texturen sehen vertauscht aus. pushe danach und mach dann weiter mit den restlichen teil".
 - Ursache: der Intro-Flug war fertig, lag aber nur lokal (`ba3da24`). Geplant war der Push erst am Ende von Block 3. Auf GitHub fehlte er also.
@@ -242,6 +251,7 @@ Zweig `dev`. Jeder Punkt ein eigener Commit; nach jedem Block gepusht.
 | Nachmeldung | `93b342e` | Lava: See und Kruste getauscht |
 | Nachmeldung | `6d1ccc9` | Test: Intro-Flug auch auf WebGPU und mit echtem Mausklick |
 | 3 Strecken | `c1ebd90` | 3D-Schnee auf den Pulverschnee-Feldern – lokal, wird mit Block 3 gepusht |
-| 3 Strecken | (folgender Commit) | Dezente Fahrspuren in Sand und Mondstaub – lokal, wird mit Block 3 gepusht |
+| 3 Strecken | `4e2ca0d` | Dezente Fahrspuren in Sand und Mondstaub – lokal, wird mit Block 3 gepusht |
+| 3 Strecken | (folgender Commit) | Methanregen auf Malastare, die Welt düsterer – lokal, wird mit Block 3 gepusht |
 
 Block 1 wurde am 2026-11-23 gepusht (`ee20aa5..b4f1266`); der Lauf der GitHub-Action dafür war grün. Block 2 wurde am 2026-11-23 gepusht (`b4f1266..55713c7`); der Lauf der GitHub-Action für `55713c7` war grün (`npm ci`, `npm run check`, beide Builds). Der erste Versuch scheiterte: der Zugangstoken des Nutzers lag in der Sitzung nicht mehr vor (er wird nirgends gespeichert – Regel in `docs/regeln/git-sandbox.md`); der Nutzer hat ihn auf Nachfrage neu gegeben. Block 3 und 4 sind offen (`TODO.md` Abschnitt 9).
