@@ -279,10 +279,10 @@ Zweig `dev`. Jeder Punkt ein eigener Commit; nach jedem Block gepusht.
 | 3 Strecken | `ba3da24` | Intro-Flug über die Strecke bis „Rennen starten" – gepusht am 2026-11-23 auf Wunsch des Nutzers, nicht erst am Ende des Blocks |
 | Nachmeldung | `93b342e` | Lava: See und Kruste getauscht |
 | Nachmeldung | `6d1ccc9` | Test: Intro-Flug auch auf WebGPU und mit echtem Mausklick |
-| 3 Strecken | `c1ebd90` | 3D-Schnee auf den Pulverschnee-Feldern – lokal, wird mit Block 3 gepusht |
-| 3 Strecken | `4e2ca0d` | Dezente Fahrspuren in Sand und Mondstaub – lokal, wird mit Block 3 gepusht |
-| 3 Strecken | `0a1f99b` | Methanregen auf Malastare, die Welt düsterer – lokal, wird mit Block 3 gepusht |
-| 3 Strecken | `c327089` | Schwerelosigkeit wie am Gummiband, treibende Felsbrocken – lokal, wird mit Block 3 gepusht |
-| 3 Strecken | `2874271` | Untergründe deutlich spürbar, Eis rutscht nach – lokal, wird mit Block 3 gepusht |
+| 3 Strecken | `c1ebd90` | 3D-Schnee auf den Pulverschnee-Feldern – gepusht am 2026-11-24 |
+| 3 Strecken | `4e2ca0d` | Dezente Fahrspuren in Sand und Mondstaub – gepusht am 2026-11-24 |
+| 3 Strecken | `0a1f99b` | Methanregen auf Malastare, die Welt düsterer – gepusht am 2026-11-24 |
+| 3 Strecken | `c327089` | Schwerelosigkeit wie am Gummiband, treibende Felsbrocken – gepusht am 2026-11-24 |
+| 3 Strecken | `2874271` | Untergründe deutlich spürbar, Eis rutscht nach – gepusht am 2026-11-24 |
 
-Block 1 wurde am 2026-11-23 gepusht (`ee20aa5..b4f1266`); der Lauf der GitHub-Action dafür war grün. Block 2 wurde am 2026-11-23 gepusht (`b4f1266..55713c7`); der Lauf der GitHub-Action für `55713c7` war grün (`npm ci`, `npm run check`, beide Builds). Der erste Versuch scheiterte: der Zugangstoken des Nutzers lag in der Sitzung nicht mehr vor (er wird nirgends gespeichert – Regel in `docs/regeln/git-sandbox.md`); der Nutzer hat ihn auf Nachfrage neu gegeben. Block 3 und 4 sind offen (`TODO.md` Abschnitt 9).
+Block 1 wurde am 2026-11-23 gepusht (`ee20aa5..b4f1266`); der Lauf der GitHub-Action dafür war grün. Block 2 wurde am 2026-11-23 gepusht (`b4f1266..55713c7`); der Lauf der GitHub-Action für `55713c7` war grün (`npm ci`, `npm run check`, beide Builds). Der erste Versuch scheiterte: der Zugangstoken des Nutzers lag in der Sitzung nicht mehr vor (er wird nirgends gespeichert – Regel in `docs/regeln/git-sandbox.md`); der Nutzer hat ihn auf Nachfrage neu gegeben. Am 2026-11-23 wurden auf Wunsch des Nutzers der Intro-Flug und der Lava-Tausch vorab gepusht (`55713c7..8cbb41e`, Action grün). Am 2026-11-24 fragte ich nach fünf weiteren Punkten von Block 3, ob der Zwischenstand schon gepusht werden soll – Antwort: „Jetzt pushen"; gepusht `8cbb41e..a4a5abe` (3D-Schnee, Fahrspuren, Methanregen, Schwerelosigkeit, Untergründe); der Lauf der GitHub-Action für `a4a5abe` war grün. Seit dem 2026-11-24 ist das Repo privat: auch `git fetch` braucht den Token. Offen aus Block 3: Sprünge, Flug-Deko. Block 4 ist offen (`TODO.md` Abschnitt 9).
