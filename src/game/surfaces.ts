@@ -39,7 +39,8 @@ export const SURFACES: SurfaceDef[] = [
   S({ id: 'plateau', name: 'Felsplateau', grip: 1, vmax: 1, heat: 1, flat: true, wake: 'dust', tex: { set: 'cracked', kind: 'cracked', tile: 11, pal: ['#a07a5a', '#c8a480', '#e8cca8'], normal: 1.2 } }),
   // --- ice world ---
   S({ id: 'snow', name: 'Schnee', grip: 0.92, vmax: 0.97, heat: 0.9, wake: 'dust', wakeColor: '#eef4fa', tex: { set: 'snow', kind: 'snow', tile: 8, pal: ['#b4c6d8', '#e2ecf5', '#ffffff'], rough: 0.9 } }),
-  S({ id: 'powder', name: 'Pulverschnee', grip: 0.9, vmax: 0.93, heat: 0.9, dune: 0.9, wake: 'dust', wakeColor: '#f4f8fc', tex: { set: 'powder', kind: 'snow', tile: 11, pal: ['#c0d0e0', '#eaf1f8', '#ffffff'], rough: 0.95, normal: 1.3 } }),
+  // (2026-11-23, 3D snow: the powder field is 1–3 m of drifts. Fresh it holds a pod at 86 %; in a trench: snowField.ts → TRENCH_VMAX)
+  S({ id: 'powder', name: 'Pulverschnee', grip: 0.9, vmax: 0.86, heat: 0.9, dune: 0.9, wake: 'dust', wakeColor: '#f4f8fc', tex: { set: 'powder', kind: 'snow', tile: 11, pal: ['#c0d0e0', '#eaf1f8', '#ffffff'], rough: 0.95, normal: 1.3 } }),
   S({ id: 'ice', name: 'Eis', grip: 0.75, vmax: 1, heat: 0.9, wake: 'none', tex: { set: 'ice', kind: 'ice', tile: 12, pal: ['#4f7da0', '#86b4d2', '#cfe8f8'], rough: 0.42, env: 1.5 } }),
   S({ id: 'icelake', name: 'Eissee', grip: 0.75, vmax: 1, heat: 0.9, flat: true, wake: 'none', tex: { set: 'ice', kind: 'ice', tile: 22, pal: ['#2c5878', '#5c8eb0', '#a8d0e8'], rough: 0.26, env: 1.6, normal: 0.7 } }),
   // --- volcano world ---

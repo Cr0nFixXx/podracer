@@ -27,7 +27,7 @@ Nur offene Punkte, nach Thema. Erledigtes steht im Verlauf: `docs/verlauf/`, je 
 - [ ] Dampf- / Ölstrahlen je Modell (Fireflare-Radiator, Kühlschleifen) – im Plan vorgesehen, nicht gebaut
 
 ## 5. Strecken & Optik
-- [ ] **Schneedecke – Feinschliff nach der Probefahrt** (seit 2026-11-22 gebaut): Tiefe und Rand der Spuren, Körnung und Wellen des frischen Schnees, Stärke der Schneefahne, die Zahlen (frisch 93 % / fest 98,5 % Höchsttempo) – alles nur in Software-Bildern gesehen. Offen: sollen die Gegner feste Spuren suchen? Sollen auch normale Schnee-Abschnitte Spuren bekommen (der Nutzer wählte vorerst nur die Pulverschnee-Felder)?
+- [ ] **3D-Schnee – Feinschliff nach der Probefahrt** (seit 2026-11-23, löst die Schneedecke vom 2026-11-22 ab): Stärke und Farbe der Schneefahne, Schärfe der Grabenwände, Bildrate auf dem Feld, die Zahlen (frisch 86 % / Graben 99 % Höchsttempo) – alles nur in Software-Bildern gesehen. Offen: sollen auch normale Schnee-Abschnitte Schnee zum Pflügen bekommen (der Nutzer wählte nur die Pulverschnee-Felder)?
 - [ ] **Büsche und Sträucher** der Bodendeckung sind einfarbige Klumpen (Farne, Gräser und Steine haben seit 2026-11-23 Textur – `groundCover.ts`, Regel in `docs/regeln/grafik.md`)
 - [ ] **Tunnel und Höhlen – Rest:** die Felswände leuchten seit 2026-11-23 im Licht der Lampen, **Fahrbahn und Pods aber nicht** (Lavahöhle: die Fahrbahn bleibt schwarz); der **Oovo-Tunnel** ist fast schwarz (blaue Punkte, kaum Wandzeichnung – war schon vorher so). Nicht angesehen: Unterführungen, Höhlen von Frostspalt und Howler, Malastare, Methan, Executioner
 - [ ] **Aquilaris – Stadtmauern:** die Oberkanten der Metallwände sind moosgrün getönt; von oben ist das ein breites grünes Kachelband. So gewollt? (Felsen, Felsreihen und steiles Gelände haben seit 2026-11-23 echten Fels)
@@ -58,7 +58,7 @@ Auftrag und Entscheidungen: [Protokoll](docs/verlauf/2026-11-23-nach-der-probefa
 
 **Streckenanpassungen** (Entscheidungen im Protokoll)
 - [x] Intro-Flug über die Strecke bis „Rennen starten" (nur vor dem ersten Start, nicht bei „Neustart" – eigene Festlegung)
-- [ ] 3D-Schnee: Wehen 1–3 m auf Pulverfeldern, Pflügen, Bugwelle, feine Partikel; frisch 86 % / Graben 99 %, Gegner suchen Gräben
+- [x] 3D-Schnee: Wehen 1–3 m auf Pulverfeldern, Pflügen, Bugwelle, feine Partikel; frisch 86 % / Graben 99 %, Gegner suchen Gräben – **bitte in Bewegung prüfen** (Stärke der Schneefahne, Bildrate auf dem Feld)
 - [ ] Dezente Fahrspuren in Sand und Mondstaub (nur Optik)
 - [ ] Malastare: Methanregen (brennbar, +12 % Hitze, grüne Flammen), Welt düsterer
 - [ ] Schwerelosigkeit: Feder zur Röhrenmitte, Nase folgt der Röhre; wenige treibende Brocken

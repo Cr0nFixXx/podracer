@@ -109,6 +109,7 @@ export class Game {
   // Pre-allocated scratch math objects (zero per-frame GC allocations!)
   tmpV = new THREE.Vector3(); tmpV2 = new THREE.Vector3(); tmpV3 = new THREE.Vector3();
   tmpQ = new THREE.Quaternion(); tmpQ2 = new THREE.Quaternion(); tmpC = new THREE.Color(); dustCol = new THREE.Color(); barrierGlow = new THREE.Color();
+  private snowLight = 1;
   lifeAudio: LifeAudio = { bird: 0, herd: 0, crawler: 0 };
   worldAudio: WorldAudioState = { themeId: 'desert', geyser: 0, rotor: 0, rotorHz: 2, crawler: 0, bird: 0, herd: 0 };
   prevCamBtn = false; prevResetBtn = false; prevStartBtn = false;
@@ -191,7 +192,7 @@ export class Game {
     this.scene.add(this.world.group);
 
     // particles
-    this.particles = new Particles(gfx.particles);
+    this.particles = new Particles(gfx.particles, this.td.snow ? 1400 : 0); // (a powder field: room for the snow the pods plough up)
     this.particles.initAmbient(theme.ambient, build.wind, Math.max(1, build.ambMax / 0.45));
     this.wxQ = [0, 0.5, 1][gfx.weatherFx ?? 2] ?? 1; setPodLodScale(gfx.podDetail ?? 1);
     this.weather = new WeatherFx(fx, this.particles, this.scene, theme.sunAz * Math.PI / 180 + 1.1, build.bolt); this.weather.quality = this.wxQ;
@@ -703,7 +704,10 @@ export class Game {
         const envP = podEnvelope(p.def), cyD = Math.cos(p.yaw), syD = Math.sin(p.yaw);
         const near = !p.isPlayer && dist < 24 ? 0.3 : 1, aD = (p.isPlayer ? 0.42 : 0.36) * near * this.dustAmt;
         this.tmpC.copy(this.dustCol).lerp(WHITE_C, 0.3); // a little lighter than the ground, otherwise the wake is invisible on its own surface
-        const powder = (smp?.surf ?? 0) === SURF.powder && !!this.td.snow ? 1 + 1.5 * (1 - (p.snowPack ?? 0)) : 1; // fresh powder flies up in a plume, a firm trail hardly at all
+        // 2026-11-23 – 3D snow: `plough` = how much snow stands in the way of the engines (0 in a trench … 1.3 in a fresh 3 m drift).
+        // Fresh powder flies up in a bow wave (particles.plough), in a trench only the light dust of the floor is left.
+        const snowOn = (smp?.surf ?? 0) === SURF.powder && !!this.td.snow, plough = snowOn ? (1 - (p.snowPack ?? 0)) * Math.min(1.3, (p.snowDepth ?? 0) / 2) : 0;
+        const powder = snowOn ? 0.5 + 1.5 * plough : 1;
         const sfw = surfaceOf(smp?.surf), wk = sfw.liquid && sfw.liquid !== 'lava' && sfw.liquid !== 'methane' ? 'spray' : sfw.wake === 'spray' ? 'dust' : sfw.wake, wkCol = this.wakeColor(sfw);
         { // 2026-11-23 (user): spray reaches the lens without rain – from the player's own wake and from a pod close ahead (surfaces.ts)
           const lake = splashes(sfw), pl = this.player;
@@ -722,6 +726,10 @@ export class Game {
           else if (wk !== 'none') {
             this.particles.trail(this.tmpV, this.tmpV2, wkCol ?? this.tmpC, sp, (wkCol ? aD / Math.max(0.35, this.dustAmt) : aD) * powder);
             if (wk === 'embers' && this.particles.chance(0.22)) this.particles.sparks(this.tmpV, UP, p.vel, 2);
+          }
+          if (plough > 0.06 && (p.isPlayer || dist < 160)) { // at the nose of the engine, in the upper half of the snow it hits
+            this.tmpV3.set(p.pos.x + e.x * cyD + (e.frontZ - 0.6) * syD, p.groundY + 0.4 + Math.min(2.4, p.snowDepth ?? 0) * 0.6, p.pos.z - e.x * syD + (e.frontZ - 0.6) * cyD);
+            this.particles.plough(this.tmpV3, p.vel, cyD * sg, -syD * sg, plough * (p.isPlayer ? 1 : 0.35) * near, this.snowLight);
           }
         }
       }
@@ -808,6 +816,7 @@ export class Game {
       this.wetTarget = b.rainRoad ? s.wet : 1;
       const k = Math.max(0, Math.min(1, (s.rain - 0.1) / 0.3));
       this.dustCol.copy(this.dustBase).lerp(this.tmpC.set('#c9d6e0'), k * 0.75).multiplyScalar(1 - 0.55 * s.dark);
+      this.snowLight = 1 - 0.6 * s.dark; // brightness of the (unlit) snow the pods plough up
       this.lightLevel = Math.max(0, Math.min(1, (s.dark - 0.35) / 0.2));
       if (this.envInit && this.state === 'race' && this.messageT <= 0) {
         if (s.sev > 0.45 && this.sevPrev <= 0.45) this.showMsg(e.gust === 'dust' ? 'STURM ZIEHT AUF' : e.gust === 'snow' ? 'SCHNEESTURM ZIEHT AUF' : 'UNWETTER ZIEHT AUF', 2.4);
@@ -908,7 +917,7 @@ export class Game {
   private surfaceHud(): { surface: string; surfaceFx: string } {
     const p = this.player, sf = surfaceOf(this.td.paths[p.path]?.samples[p.idx]?.surf);
     const fx = sf.heat >= 3 ? 'Boost nur ganz kurz' : sf.grip <= 0.8 ? 'wenig Haftung' : sf.heat >= 1.25 ? 'Triebwerke heizen auf' : sf.vmax <= 0.95 ? 'bremst' : sf.grip < 0.95 ? 'rutschig' : '';
-    if (sf.id === 'powder' && (p.snowPack ?? 0) > 0.45 && !p.zeroG) return { surface: 'Pulverschnee · gespurt', surfaceFx: 'trägt besser' };
+    if (sf.id === 'powder' && this.td.snow && !p.zeroG) return (p.snowPack ?? 0) > 0.6 ? { surface: 'Pulverschnee · Graben', surfaceFx: 'freie Bahn' } : { surface: 'Pulverschnee', surfaceFx: 'pflügt · bremst stark' }; // 3D snow (2026-11-23)
     return { surface: p.zeroG ? 'Schwerelos' : sf.name, surfaceFx: p.zeroG ? '' : fx };
   }
 
@@ -936,7 +945,8 @@ export class Game {
     let d = tgtYaw - this.camYaw; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2;
     this.camYaw += d * Math.min(1, dt * 5.5);
     this.camY += (p.pos.y - this.camY) * Math.min(1, dt * (p.grounded ? 7 : 3.5));
-    const shake = p.shake * 0.5 + Math.min(1, sp / 180) * 0.032 + (p.boosting ? 0.045 : 0);
+    const shake = p.shake * 0.5 + Math.min(1, sp / 180) * 0.032 + (p.boosting ? 0.045 : 0)
+      + (1 - (p.snowPack ?? 0)) * Math.min(1.3, (p.snowDepth ?? 0) / 2) * 0.05; // 3D snow: the pod shudders while it ploughs fresh powder (0 in a trench, off the field)
     const sx = (Math.random() - 0.5) * shake, sy = (Math.random() - 0.5) * shake;
     const fx = Math.sin(this.camYaw), fz = Math.cos(this.camYaw);
     const mode = this.camMode;

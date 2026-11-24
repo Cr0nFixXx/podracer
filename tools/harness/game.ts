@@ -3,7 +3,7 @@ import { Game } from '../../src/game/Game';
 import { TRACKS } from '../../src/game/data';
 import { PRESETS, defaultProfile } from '../../src/game/settings';
 import { loadPhotoTextures } from '../../src/game/photoAssets';
-import { stepPod } from '../../src/game/physics';
+import { stepPod, type PodState } from '../../src/game/physics';
 import { makeBoostAlarm } from '../../src/game/audio';
 if (!location.search.includes('nophoto')) void loadPhotoTextures();
 const div = document.createElement('div'); div.style.cssText = 'width:1280px;height:720px;position:fixed;left:0;top:0'; document.body.style.margin = '0'; document.body.appendChild(div);
@@ -102,7 +102,7 @@ let g: Game | null = null; let cur = -1;
   if (cur !== i) {
     g?.dispose(); cur = i;
     const prof = defaultProfile(); prof.race.trackId = TRACKS[i].id; prof.race.opponents = 7; prof.gfx.texRes = 1024; if (location.search.includes('webgl')) prof.gfx.backend = 'webgl'; if (location.search.includes('csm')) prof.gfx.csm = true; if (location.search.includes('ssr')) prof.gfx.ssr = true;
-    { const qs = new URLSearchParams(location.search); if (qs.get('tod')) prof.race.timeOfDay = qs.get('tod') as never; if (qs.get('wx')) prof.race.weather = qs.get('wx') as never; if (qs.has('ultra')) Object.assign(prof.gfx, PRESETS.ultra, { preset: 'ultra', texRes: 1024, renderScale: 0.6 }); if (qs.get('tex')) prof.gfx.texRes = +qs.get('tex')!; if (qs.get('pod')) prof.podId = qs.get('pod')!; /* pod=brute: the player's pod */ /* tex=256: small textures for the WebGPU console check on machines with little RAM */ } prof.gfx.renderScale = 0.6; prof.gfx.shadows = 1;
+    { const qs = new URLSearchParams(location.search); if (qs.get('tod')) prof.race.timeOfDay = qs.get('tod') as never; if (qs.get('wx')) prof.race.weather = qs.get('wx') as never; if (qs.has('ultra')) Object.assign(prof.gfx, PRESETS.ultra, { preset: 'ultra', texRes: 1024, renderScale: 0.6 }); if (qs.get('tex')) prof.gfx.texRes = +qs.get('tex')!; if (qs.get('pod')) prof.podId = qs.get('pod')!; if (qs.get('fx')) prof.gfx.particles = +qs.get('fx')!; /* fx=1: particle amount of the „Hoch" preset (the harness default is 0.2 – a plume looks five times thinner than in the game) */ /* pod=brute: the player's pod */ /* tex=256: small textures for the WebGPU console check on machines with little RAM */ } prof.gfx.renderScale = 0.6; prof.gfx.shadows = 1;
     g = new Game(div, prof, { onHud: () => {}, onLoading: () => {}, onFinish: () => {}, onPause: () => {}, onReady: () => {} });
     (window as unknown as Record<string, unknown>).__podracer = g; // debug / test handle, as in the app (RaceView.tsx)
     const tLoad = performance.now(); await g.start(); (window as unknown as Record<string, unknown>).loadInfo = `load=${Math.round(performance.now() - tLoad)}ms ` + JSON.stringify(g.world.timings) + ' ' + JSON.stringify((g as unknown as { loadMs?: unknown }).loadMs ?? {}); g.paused = true; await new Promise(r => setTimeout(r, 400));
@@ -216,6 +216,24 @@ let g: Game | null = null; let cur = -1;
     chase = true;
     // three seconds of weather around that camera (rain streaks, snow, gust banks need time to fill the air)
     { const W = (G as unknown as { weather?: { update: (dt: number, t: number, cam: THREE.Camera, frozen: boolean, thunder: (v: number) => void, near: (v: number) => void) => void } }).weather; if (W) for (let k = 0; k < 90; k++) { G.clock += 1 / 30; W.update(1 / 30, G.clock, G.camera, false, () => {}, () => {}); } }
+  } else if (view.startsWith('plough_')) { // 3D snow (2026-11-23): plough_<idx>[_<lat>[_<speed m/s>[_<seconds>[_<rivals>[_<side camera m>]]]]] – the player flies the last
+    // seconds up to that sample in the REAL game loop (physics, particles, camera), held on its line `lat` m beside the centre:
+    // it cuts its trench and throws the snow up. `rivals` (0–3): that many rivals fly ahead of it, 45 m apart, 9 m further left each.
+    const [, i0, l0, v0, t0, r0, c0] = view.split('_'); const S = G.td.main.samples, N = S.length, lat = +(l0 ?? 0), speed = +(v0 ?? 110), secs = +(t0 ?? 1.6), nRiv = Math.min(3, +(r0 ?? 0)), side = +(c0 ?? 0), pl = G.player;
+    const W = (k: number) => S[((k % N) + N) % N];
+    const put = (q: PodState, idx: number, la: number) => { const s = W(idx); q.pos.set(s.x + s.rx * la, s.y + s.ramp + 2.85, s.z + s.rz * la); q.yaw = Math.atan2(s.tx, s.tz); q.yawRate = 0; q.vel.set(s.tx * speed, 0, s.tz * speed); q.path = 0; q.idx = ((idx % N) + N) % N; q.dead = 0; q.invuln = 0; q.grounded = true; q.inRoof = s.roof > 0; q.upper = false; };
+    const hold = (q: PodState, la: number) => { const s = S[q.idx], al = (q.pos.x - s.x) * s.tx + (q.pos.z - s.z) * s.tz, v = Math.hypot(q.vel.x, q.vel.z); q.pos.x = s.x + s.tx * al + s.rx * la; q.pos.z = s.z + s.tz * al + s.rz * la; q.yaw = Math.atan2(s.tx, s.tz); q.yawRate = 0; q.vel.x = s.tx * v; q.vel.z = s.tz * v; };
+    const start = +i0 - Math.round(secs * speed / 2), riv = G.pods.filter(q => q !== pl).slice(0, nRiv);
+    G.td.snow?.snowIn(9); // an untouched field for every view (the trenches of an earlier view would still be there)
+    { const g0 = S[G.td.startIdx]; for (const q of G.pods) if (q !== pl && !riv.includes(q)) { q.pos.set(g0.x, g0.y + 2.85, g0.z); q.vel.set(0, 0, 0); q.path = 0; q.idx = G.td.startIdx; } } // rivals of an earlier view: back to the start
+    put(pl, start, lat); riv.forEach((q, k) => put(q, start + 22 * (k + 1), lat - 9 * (k + 1)));
+    G.state = 'race'; (G as unknown as { keys: Set<string> }).keys.add('KeyW');
+    for (let k = 0; k < secs * 60; k++) { G.update(1 / 60); hold(pl, lat); riv.forEach((q, j) => hold(q, lat - 9 * (j + 1))); if (k % 2 === 0) G.updateVisuals(); }
+    G.lensWet = 0; G.updateVisuals(); G.updateLens(1); for (let k = 0; k < 10; k++) G.updateCamera(0.5);
+    chase = true;
+    // a 6th value: instead of the chase camera, a camera that many metres to the right of the pod (negative: left), 14 m ahead of it, looking back at it
+    if (side) { const s = S[pl.idx]; G.camera.position.set(pl.pos.x + s.rx * side + s.tx * 14, pl.pos.y + 1.6, pl.pos.z + s.rz * side + s.tz * 14); G.camera.up.set(0, 1, 0); G.camera.lookAt(pl.pos.x - s.tx * 4, pl.pos.y - 0.6, pl.pos.z - s.tz * 4); G.camera.fov = 62; }
+    (window as unknown as Record<string, unknown>).coverInfo = `probe plough: player at sample ${pl.idx}, ${Math.hypot(pl.vel.x, pl.vel.z).toFixed(0)} m/s, snow ahead ${(pl.snowDepth ?? 0).toFixed(2)} m, cut ${(pl.snowPack ?? 0).toFixed(2)}`;
   } else if (view.startsWith('fly_')) { // the intro flight (2026-11-23): fly_<metres into the pass> – the game's own flight camera, field of view and shadows
     G.startIntro(); G.flightDist = +view.slice(4); for (let k = 0; k < 12; k++) G.updateCamera(0.5);
     chase = true;

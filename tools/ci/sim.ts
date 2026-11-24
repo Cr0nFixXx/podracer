@@ -6,6 +6,8 @@ import * as THREE from 'three';
 import { DIFFICULTIES, PILOTS, TRACKS } from '../../src/game/data';
 import { ciRoster } from './roster';
 import { buildTrack, roadSurfaceAt } from '../../src/game/trackBuilder';
+import { SnowField } from '../../src/game/snowField';
+import { SURF } from '../../src/game/surfaces';
 import { aiInputs, applyDamage, collidePods, podParams, respawn, stepPod, HOVER, type PodState } from '../../src/game/physics';
 import { effectiveStats } from '../../src/game/settings';
 import { podEnvelope } from '../../src/game/podDesigns';
@@ -26,6 +28,7 @@ console.log('track         deaths  NaN  wallPen  minClear  avgSpeed  slowest  ai
 for (const def of TRACKS) {
   if (ONLY && def.id !== ONLY) continue;
   const td = buildTrack(def); const S = td.main.samples, N = td.N;
+  { const sf = new SnowField(td); if (sf.runs.length) td.snow = sf; } // 2026-11-23: as in a race (Game.start) – the rivals cut trenches through the powder field and look for them
   const pods: PodState[] = [];
   const roster = ciRoster(TRACKS.indexOf(def), !!process.env.ROSTER_OLD); // ROSTER_OLD=1: the Session 19 grid (A/B against the old table)
   for (let g = 0; g < 11; g++) {
@@ -59,6 +62,7 @@ for (const def of TRACKS) {
   const prog0 = pods.map(p => p.prog); const wasDead = pods.map(() => false); const partsLost = new Map<string, number>();
   let deaths = 0, nan = 0, wall = 0, clear = 9, airMax = 0, rolls = 0, slides = 0, dives = 0, aiFrames = 0, breaks = 0, ohHits = 0, zgV = 0, zgN = 0, gV = 0, gN = 0, t = 0, worst = '', airDbg = '', air0 = 0, air0Dist = 0;
   const h = 1 / 120, frames = SECS * 60;
+  const snN = pods.map(() => 0), snCut = pods.map(() => 0), snV = pods.map(() => 0); // 3D snow: frames on the powder field, how much of the snow ahead was cut, speed
   for (let f = 0; f < frames; f++) {
     t += 1 / 60;
     for (const p of pods) { aiInputs(p, td, pods, t, null); if (p.input.roll) rolls++; aiFrames++; if (p.ai?.dive) dives++; }
@@ -75,6 +79,7 @@ for (const def of TRACKS) {
       if (Math.abs(A.pos.y - B.pos.y) < 3 && Math.hypot(A.pos.x - B.pos.x, A.pos.z - B.pos.z) < R * 1.01) touch.add(a * 16 + b2);
     }
     for (const p of pods) { if (p.dead > 0) continue; const v = Math.hypot(p.vel.x, p.vel.z); if (p.zeroG) { zgV += v; zgN++; } else if (t > 6) { gV += v; gN++; } }
+    if (td.snow) for (let k = 0; k < pods.length; k++) { const p = pods[k]; if (p.dead > 0 || !p.grounded || p.path !== 0 || S[p.idx]?.surf !== SURF.powder) continue; snN[k]++; snCut[k] += p.snowPack ?? 0; snV[k] += Math.hypot(p.vel.x, p.vel.z); }
     // (no lift in the last 2 s of the run: it would end before the pod has spent its 20 frames on the deck – a false alarm)
     if (tunA >= 0 && !lifted && t < SECS - 2) { const p = pods[1]; if (p.path === 0 && p.dead <= 0 && p.idx >= tunA - 12 && p.idx < tunA - 5) { p.pos.y += S[tunA].roof + 9; p.vel.y = 0; lifted = true; if (process.env.DEBUG) dbgT = t; } }
     if (process.env.DEBUG && lifted && t - dbgT < 1.2 && f % 6 === 0) { const p = pods[1], q = td.paths[p.path].samples[p.idx]; console.log(`   dbg t=${(t - dbgT).toFixed(2)} path=${p.path} idx=${p.idx} tunA=${tunA} y-ground=${(p.pos.y - q.y).toFixed(1)} roof=${q.roof} upper=${p.upper} inRoof=${p.inRoof} dead=${p.dead.toFixed(1)} lat=${p.lat.toFixed(0)} hw=${q.hw.toFixed(0)}`); }
@@ -118,6 +123,11 @@ for (const def of TRACKS) {
   if (lifted) console.log(`  deck self-test: ${deckFrames} frames on a tunnel deck (${deckFrames > 20 ? 'ok' : 'FAIL'}), downward teleports: ${teleports}`);
   if (zgN > 200) console.log(`  zero-G: avg ${(zgV / zgN).toFixed(0)} m/s in the tubes vs ${(gV / Math.max(1, gN)).toFixed(0)} m/s outside`);
   if (ohIdx >= 0) console.log(`  overhead self-test: ${ohHits} hits registered (${ohHits > 0 ? 'ok' : 'FAIL'})`);
+  if (td.snow && snN.some(n => n > 30)) { // who ploughed, who followed (2026-11-23: fresh powder 86 % top speed, a trench 99 %)
+    const rows = pods.map((_, k) => ({ k, n: snN[k], cut: snCut[k] / Math.max(1, snN[k]), v: snV[k] / Math.max(1, snN[k]) })).filter(r => r.n > 30).sort((a, b) => a.cut - b.cut);
+    const mean = rows.reduce((a, r) => a + r.cut, 0) / rows.length;
+    console.log(`  powder: ${rows.length} pods crossed it – snow ahead already cut: ${(rows[0].cut * 100).toFixed(0)} % (the one that ploughed most, ${rows[0].v.toFixed(0)} m/s) … ${(rows[rows.length - 1].cut * 100).toFixed(0)} % (${rows[rows.length - 1].v.toFixed(0)} m/s), mean ${(mean * 100).toFixed(0)} %`);
+  }
   if (DAMAGE_RULES.parts) { const n = [...partsLost.values()].reduce((a, b) => a + b, 0); console.log(`  parts lost: ${n}${n ? ' (' + [...partsLost].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([l, k]) => `${l} ×${k}`).join(', ') + ')' : ''}`); }
   const bad = (lifted && deckFrames <= 20) || teleports > 0 || (ohIdx >= 0 && ohHits === 0) || divePct > LIMIT.divePct || nan > 0 || deaths > LIMIT.deaths || wall > LIMIT.wall || clear < LIMIT.clear || slow < LIMIT.minSpeed;
   if (bad) failed++; if (process.env.PITCH_AIR !== undefined) console.log(`  pod0 airborne pitch ${process.env.PITCH_AIR}: longest flight ${air0.toFixed(2)} s ≈ ${air0Dist.toFixed(0)} m`);

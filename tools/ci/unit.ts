@@ -5,7 +5,7 @@ import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, THEMES, TRACKS, type PodDef, typ
 import { makeTerrainField, terrainLeafMaker } from '../../src/game/terrain';
 import { resolveEnvironment, type TimeOfDay, type WeatherKind } from '../../src/game/environment';
 import { clipOutside } from '../../src/game/meshClip';
-import { SnowField } from '../../src/game/snowField';
+import { SnowField, SNOW_CLEAR_PIECE, SNOW_CLEAR_ROCK, SNOW_FLOOR, SNOW_LEAD, SNOW_MAX, SNOW_MIN, TRENCH_VMAX } from '../../src/game/snowField';
 import { borderRocks, ROCK_PROTRUDE, type BorderRock } from '../../src/game/borderRocks';
 import { LAVA_TEX, SURF, SURFACES, lensSpray, splashes, trackSplashes } from '../../src/game/surfaces';
 import { podLayout } from '../../src/game/podLayouts';
@@ -17,7 +17,7 @@ import { assembleHero, assembleRival, segFor, skinPoint, visibleIndices, type Br
 import { pickRivals, rivalKit } from '../../src/game/roster';
 import { engineKit, tuneTiers, NO_KIT } from '../../src/game/podKitParts';
 import { ciRoster } from './roster';
-import { applyDamage, bodyToWorld, collidePods, hullWorld, kill, manualReset, podParams, respawn, stepPod, tickRespawn, vaultOver, worldToBody, FX_NONE, HOVER, RESET_COOLDOWN, RESET_WAIT, VAULT_CLAMP, type PodState } from '../../src/game/physics';
+import { aiInputs, applyDamage, bodyToWorld, collidePods, hullWorld, kill, manualReset, podParams, respawn, stepPod, tickRespawn, vaultOver, worldToBody, FX_NONE, HOVER, RESET_COOLDOWN, RESET_WAIT, VAULT_CLAMP, type PodState } from '../../src/game/physics';
 import { ACTIONS, KEY_PRESETS, defaultPad, normalizeKeys, normalizePad, type KeyMap, type PadMap } from '../../src/game/keymap';
 import { DAMAGE_RULES, damageModel, lostMessage, partLamps, partsFx, zoneFactor, type DamageZone } from '../../src/game/podDamage';
 import { buildTrack, frameAt, tunnelCeiling, baySameStretch, DS, TUNNEL_SHOULDER, type Path, type Sample, type TrackData } from '../../src/game/trackBuilder';
@@ -1062,59 +1062,108 @@ test('boost climate: in the cold the same boost heats the engines less and they 
   ok(Math.abs((h - hc) / (n - nc) - 1 / 1.2) < 0.03, `hot: cooled by ${(h - hc).toFixed(3)} in 0.4 s against ${(n - nc).toFixed(3)} neutral – expected 83 %`);
 });
 
-// ---- powder snow keeps the trails of the pods (2026-11-22, user decision: the trails change the driving too) ----
+// ---- 3D snow on the powder fields (2026-11-23, user: "viel höherer Schnee, richtig 3D" – decision "dynamische Höhe 1–3 m") ----
+// The powder field is a layer of drifts 1 to 3 m deep (snowField.ts). A pod cuts a trench through it in one pass; fresh snow holds a
+// pod at 86 % of its top speed, in the trench of a pod ahead it runs at 99 %, and the rivals look for the trenches.
+// (2026-11-22, the step before: 0.58 m of snow that packed a little harder with every pass.)
 /** A fresh copy of the Frostspalt track with its snow field, and the middle of its powder run: [track, field, sample index]. */
-function snowTrack(): [TrackData, SnowField, number] {
-  const td = buildTrack(TRACKS.find(t => t.id === 'frost')!), snow = new SnowField(td); (td as unknown as { snow: SnowField }).snow = snow;
-  ok(snow.runs.length > 0, 'the snow field found no powder run on frost');
+function snowTrack(id = 'frost'): [TrackData, SnowField, number] {
+  const td = buildTrack(TRACKS.find(t => t.id === id)!), snow = new SnowField(td); (td as unknown as { snow: SnowField }).snow = snow;
+  ok(snow.runs.length > 0, `the snow field found no powder run on ${id}`);
   const r = snow.runs[0], mid = r.a + (r.n >> 1);
   eq(td.paths[r.path].samples[mid].surf, SURF.powder, 'surface in the middle of the run:');
   return [td, snow, mid];
 }
-/** An Aurora flying `secs` seconds along the powder run from sample `idx`, full throttle from `v0` m/s. It is kept on the centre line
- *  of the road (position and heading are put back after every step – the run bends), its speed is the physics' own. Returns it. */
-function snowPass(td: TrackData, idx: number, secs: number, v0 = 60): PodState {
-  const s = td.main.samples[idx], p = racer(byId('aurora'), td, idx, 0, s.y + HOVER);
+/** A pod flying `secs` seconds along the powder run from sample `idx`, full throttle from `v0` m/s, `lat` metres beside the centre
+ *  line (position and heading are put back onto that line after every step – the run bends), its speed is the physics' own. Returns it. */
+function snowPass(td: TrackData, idx: number, secs: number, v0 = 60, lat = 0, def = 'aurora'): PodState {
+  const s = td.main.samples[idx], p = racer(byId(def), td, idx, lat, s.y + HOVER);
   p.grounded = true; p.vel.set(s.tx * v0, 0, s.tz * v0); p.input.throttle = 1;
   for (let f = 0; f < secs * 60; f++) {
     stepPod(p, td, 1 / 60, f / 60, 1, false);
     const q = td.main.samples[p.idx], v = Math.hypot(p.vel.x, p.vel.z), al = (p.pos.x - q.x) * q.tx + (p.pos.z - q.z) * q.tz;
-    p.pos.x = q.x + q.tx * al; p.pos.z = q.z + q.tz * al; p.yaw = Math.atan2(q.tx, q.tz); p.yawRate = 0; p.vel.x = q.tx * v; p.vel.z = q.tz * v;
+    p.pos.x = q.x + q.tx * al + q.rx * lat; p.pos.z = q.z + q.tz * al + q.rz * lat; p.yaw = Math.atan2(q.tx, q.tz); p.yawRate = 0; p.vel.x = q.tx * v; p.vel.z = q.tz * v;
   }
   return p;
 }
-test('snow: a pod presses a trail into the powder – packed under its engines, fresh a few metres beside it', () => {
-  const [td, snow, mid] = snowTrack(), S = td.main.samples;
-  snowPass(td, mid - 40, 1.2); // (60 m/s and faster for 1.2 s: from 40 samples before the middle to about 5 samples behind it)
-  const at = (i: number, lat: number) => { const q = S[i]; return snow.packAt(0, i, q.x + q.rx * lat, q.z + q.rz * lat); };
-  let best = 0; for (let lat = -6; lat <= 6; lat += 0.5) best = Math.max(best, at(mid - 20, lat));
-  ok(best > 0.3 && best < 0.75, `packing in the trail after ONE pass: ${best.toFixed(2)}, expected 0.3 … 0.75`);
-  ok(at(mid - 20, 14) === 0 && at(mid - 20, -14) === 0, `14 m beside the trail the snow should be fresh: ${at(mid - 20, 14)} / ${at(mid - 20, -14)}`);
-  ok(at(mid + 60, 0) === 0, 'far ahead of the pod the snow should be fresh');
+test('snow: the drifts of a powder field are 1 to 3 m deep – shallow only at both ends, at a gate and around obstacle rocks', () => {
+  for (const id of ['frost', 'howler']) {
+    const [td, snow] = snowTrack(id);
+    for (const r of snow.runs) {
+      const S = r.samples; let lo = 9, hi = 0, sum = 0, cnt = 0, bad = 0, first = '';
+      const pieces = r.path === 0 ? td.setPieces.filter(sp => sp.idx >= r.a - 30 && sp.idx < r.a + r.n + 30).map(sp => sp.idx) : [];
+      const rocks = td.obstacles.filter(o => o.path === r.path && o.idx >= r.a - 10 && o.idx < r.a + r.n + 10);
+      for (let i = r.a + SNOW_LEAD; i < r.a + r.n - SNOW_LEAD; i += 3) {
+        if (pieces.some(g => Math.abs(g - i) < SNOW_CLEAR_PIECE)) continue;
+        const q = S[i];
+        for (let lat = -(q.hw - 2); lat <= q.hw - 2; lat += 2.5) {
+          const x = q.x + q.rx * lat, z = q.z + q.rz * lat;
+          if (rocks.some(o => Math.hypot(o.x - x, o.z - z) < o.r + SNOW_CLEAR_ROCK)) continue;
+          const d = snow.depthAt(r.path, i, x, z); lo = Math.min(lo, d); hi = Math.max(hi, d); sum += d; cnt++;
+          if (d < SNOW_MIN - 0.03 || d > SNOW_MAX + 0.03) { bad++; if (!first) first = `sample ${i}, ${lat.toFixed(1)} m beside the centre: ${d.toFixed(2)} m`; }
+        }
+      }
+      eq(bad, 0, `${id}: points on the field outside 1 … 3 m (first: ${first}):`);
+      ok(lo < 1.3 && hi > 2.7, `${id}: the drifts span ${lo.toFixed(2)} … ${hi.toFixed(2)} m – expected shallow places (< 1.3 m) and deep ones (> 2.7 m)`);
+      ok(sum / cnt > 1.6 && sum / cnt < 2.4, `${id}: mean depth ${(sum / cnt).toFixed(2)} m, expected 1.6 … 2.4`);
+      const e0 = S[r.a + 1], e1 = S[r.a + r.n - 2], d0 = snow.depthAt(r.path, r.a + 1, e0.x, e0.z), d1 = snow.depthAt(r.path, r.a + r.n - 2, e1.x, e1.z);
+      ok(d0 < 0.5 && d1 < 0.5, `${id}: the field should start and end shallow – ${d0.toFixed(2)} m at its first, ${d1.toFixed(2)} m at its last sample`);
+      for (const o of rocks) if (o.idx >= r.a + 4 && o.idx < r.a + r.n - 4) { const d = snow.depthAt(r.path, o.idx, o.x, o.z); ok(d < 0.7, `${id}: the obstacle rock at sample ${o.idx} stands in ${d.toFixed(2)} m of snow – it must stay visible (< 0.7 m)`); }
+      for (const g of pieces) if (g >= r.a + 4 && g < r.a + r.n - 4) { const q = S[g], d = snow.depthAt(r.path, g, q.x, q.z); ok(d < 0.7, `${id}: at the set piece of sample ${g} lie ${d.toFixed(2)} m of snow – expected a cleared threshold (< 0.7 m)`); }
+    }
+  }
 });
-test('snow: every further pass packs the trail harder', () => {
-  const [td, snow, mid] = snowTrack(), S = td.main.samples;
-  const best = () => { let b = 0; const q = S[mid - 20]; for (let lat = -6; lat <= 6; lat += 0.5) b = Math.max(b, snow.packAt(0, mid - 20, q.x + q.rx * lat, q.z + q.rz * lat)); return b; };
-  snowPass(td, mid - 40, 1.2); const one = best();
-  snowPass(td, mid - 40, 1.2); const two = best();
-  snowPass(td, mid - 40, 1.2); snowPass(td, mid - 40, 1.2); const four = best();
-  ok(two > one + 0.1 && four > two + 0.05 && four <= 1, `packing after 1 / 2 / 4 passes: ${one.toFixed(2)} / ${two.toFixed(2)} / ${four.toFixed(2)}`);
+test('snow: one pod cuts a trench in a single pass – down to the floor under it, the walls beside it stand untouched', () => {
+  const [td, snow, mid] = snowTrack(), S = td.main.samples, i = mid - 20, q = S[i];
+  const H = (k: number, lat: number) => snow.heightAt(0, k, S[k].x + S[k].rx * lat, S[k].z + S[k].rz * lat), D = (k: number, lat: number) => snow.depthAt(0, k, S[k].x + S[k].rx * lat, S[k].z + S[k].rz * lat);
+  ok(H(i, 0) >= SNOW_MIN - 0.03 && Math.abs(H(i, 0) - D(i, 0)) < 0.02, `before the pass ${H(i, 0).toFixed(2)} m of snow stand on the line (drift ${D(i, 0).toFixed(2)} m)`);
+  const p = snowPass(td, mid - 40, 1.2), hw = podParams(p).width; // (60 m/s and faster for 1.2 s: from 40 samples before the middle to a few samples behind it)
+  for (const lat of [0, -hw * 0.6, hw * 0.6]) ok(H(i, lat) <= SNOW_FLOOR + 0.08, `${H(i, lat).toFixed(2)} m of snow are left ${lat.toFixed(1)} m beside the pod's line after ONE pass – expected the floor of the trench (${SNOW_FLOOR} m)`);
+  for (const lat of [-(hw + 6), hw + 6]) ok(H(i, lat) > D(i, lat) - 0.02, `the snow ${lat.toFixed(1)} m beside the line lost height (${H(i, lat).toFixed(2)} of ${D(i, lat).toFixed(2)} m) – the walls of the trench must stand`);
+  ok(Math.abs(H(mid + 60, 0) - D(mid + 60, 0)) < 0.02, 'far ahead of the pod the snow should be untouched');
+  ok(snow.packAt(0, i, q.x, q.z) > 0.9, `cut on the line: ${snow.packAt(0, i, q.x, q.z).toFixed(2)}, expected > 0.9`);
+  void q;
 });
-test('snow: on a packed trail a pod is faster than in fresh powder', () => {
-  const run = (packed: boolean) => {
-    const [td, snow, mid] = snowTrack();
-    if (packed) for (const r of snow.runs) { r.data.fill(255); }
-    return Math.hypot(...snowPass(td, mid - 150, 2, 125).vel.toArray().filter((_, k) => k !== 1)); // (starts just below the top speed of fresh powder)
+test('snow: fresh powder holds a pod at 86 % of its top speed, in the trench of a pod ahead it runs at 99 % – its own trench does not help it', () => {
+  eq(SURFACES[SURF.powder].vmax, 0.86, 'top speed factor of fresh powder:'); eq(TRENCH_VMAX, 0.99, 'top speed factor in a trench:');
+  const steady = (ahead: boolean) => {
+    const [td, , mid] = snowTrack();
+    if (ahead) snowPass(td, mid - 215, 4.4, 118); // a pod ahead on the same line: its trench reaches well past the middle
+    const p = snowPass(td, mid - 195, 3, 118);
+    return [Math.hypot(p.vel.x, p.vel.z), p.snowPack ?? 0, podParams(p).vmax];
   };
-  const fresh = run(false), firm = run(true);
-  ok(firm > fresh * 1.02, `speed after 2 s: ${firm.toFixed(1)} m/s on a firm trail, ${fresh.toFixed(1)} m/s in fresh powder – expected at least 2 % more`);
+  const [fresh, pkF, vmax] = steady(false), [trench, pkT] = steady(true);
+  ok(pkF < 0.05, `a pod alone in fresh powder reads its own trench (cut ${pkF.toFixed(2)} under it) – it must plough fresh snow`);
+  ok(pkT > 0.9, `behind a pod on the same line the snow should be cut (${pkT.toFixed(2)})`);
+  ok(fresh / trench > 0.85 && fresh / trench < 0.9, `steady speed ${fresh.toFixed(1)} m/s in fresh powder, ${trench.toFixed(1)} m/s in the trench: ratio ${(fresh / trench).toFixed(3)}, expected 0.86 / 0.99 = 0.869 (0.85 … 0.90)`);
+  ok(trench > vmax * 0.9 && trench < vmax * 0.995, `in the trench the Aurora flies ${trench.toFixed(1)} m/s of ${vmax.toFixed(1)} m/s – expected just below 99 %`);
 });
-test('snow: snowfall loosens a trail again', () => {
+test('snow: a rival steers into a trench that lies beside its line, and stays in it', () => {
+  // (3.5 s over the first third of the field – further on the gate of the field decides the line)
+  const fly = (trenchAt: number | null) => {
+    const [td, snow] = snowTrack(), S = td.main.samples, r = snow.runs[0];
+    if (trenchAt !== null) for (let i = r.a; i < r.a + r.n; i++) snow.stamp(0, i, S[i].x + S[i].rx * trenchAt, S[i].z + S[i].rz * trenchAt, 4.5, 1);
+    const i0 = r.a + 40, s = S[i0], p = racer(byId('mavik'), td, i0, 0, s.y + HOVER);
+    p.isPlayer = false; p.grounded = true; p.vel.set(s.tx * 100, 0, s.tz * 100);
+    p.ai = { skill: 0.9, speedF: 1, lineOff: 0, takeShortcut: false, boostUntil: 0, repairMode: false, noiseT: 0, rubber: 1 };
+    let sum = 0, cnt = 0, pk = 0;
+    for (let f = 0; f < 3.5 * 60; f++) { const t = 20 + f / 60; aiInputs(p, td, [p], t, null); stepPod(p, td, 1 / 60, t, 1, false); if (f >= 2.5 * 60) { sum += p.lat; pk += p.snowPack ?? 0; cnt++; } }
+    const gate = td.setPieces.find(sp => sp.idx > r.a && sp.idx < r.a + r.n);
+    ok(p.idx > i0 + 100 && (!gate || p.idx < gate.idx - 50), `the rival should be on the open field after 3.5 s (sample ${p.idx}, field from ${r.a}, gate at ${gate?.idx})`);
+    return [sum / cnt, pk / cnt];
+  };
+  const [free] = fly(null), side = free > 0 ? -1 : 1, L = free + side * 13; // a trench 13 m beside the line the rival flies on its own
+  const [lat, pk] = fly(L);
+  ok(Math.abs(lat - L) < 2.5, `with a trench at ${L.toFixed(1)} m the rival flies at ${lat.toFixed(1)} m (on its own: ${free.toFixed(1)} m) – expected in the trench`);
+  ok(pk > 0.8, `the snow in front of the rival is cut ${pk.toFixed(2)} – expected > 0.8 (it flies in the trench)`);
+});
+test('snow: snowfall fills a trench again – and the snow stands as high as the drift was', () => {
   const [td, snow, mid] = snowTrack(), q = td.main.samples[mid];
   for (const r of snow.runs) r.data.fill(200);
   const before = snow.packAt(0, mid, q.x, q.z); snow.snowIn(0.25); const after = snow.packAt(0, mid, q.x, q.z);
-  ok(Math.abs(before - 200 / 255) < 0.01 && Math.abs(after - (200 / 255 - 0.25)) < 0.02, `packing ${before.toFixed(2)} → ${after.toFixed(2)} after snowIn(0.25), expected ${(200 / 255 - 0.25).toFixed(2)}`);
+  ok(Math.abs(before - 200 / 255) < 0.01 && Math.abs(after - (200 / 255 - 0.25)) < 0.02, `cut ${before.toFixed(2)} → ${after.toFixed(2)} after snowIn(0.25), expected ${(200 / 255 - 0.25).toFixed(2)}`);
   snow.snowIn(5); eq(snow.packAt(0, mid, q.x, q.z), 0, 'after a lot of snow:');
+  ok(Math.abs(snow.heightAt(0, mid, q.x, q.z) - snow.depthAt(0, mid, q.x, q.z)) < 0.02, 'a filled trench should stand as high as the drift');
 });
 
 // ---- open sections: rock borders instead of guard rails on natural ground (2026-11-22, user decision) ----

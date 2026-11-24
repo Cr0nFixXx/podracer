@@ -3,7 +3,7 @@ import type { PilotDef, PodDef, StatKey } from './data';
 import { DS, TUNNEL_SHOULDER, boulderState, tunnelCeiling, bridgeSwing, frameAt, gateDrop, nearestGlobal, nearestOnPath, roadSurfaceAt, rotorAngle, tunnelProfile, type Obstacle, type Path, type Sample, type SetPiece, type TrackData } from './trackBuilder';
 import type { PodVisual } from './podModel';
 import { COCKPIT_SWAY, podCollision, podEnvelope, type PodEnvelope } from './podDesigns';
-import { PACKED_GRIP, PACKED_VMAX, STAMP_AMOUNT, STAMP_EVERY, STAMP_RADIUS } from './snowField';
+import { STAMP_EVERY, TRENCH_GRIP, TRENCH_VMAX } from './snowField';
 import { surfaceOf } from './surfaces';
 import { DAMAGE_RULES, FX_NONE, damageModel, partsDue, partsFx, zoneFactor, type DamageZone, type PodFx } from './podDamage';
 export { FX_NONE, type DamageZone, type PodFx };
@@ -12,8 +12,9 @@ export { FX_NONE, type DamageZone, type PodFx };
 export interface Inputs { throttle: number; brake: number; steer: number; boost: boolean; airbrake: boolean; repair: boolean; pitch?: number; roll?: number; }
 
 export interface PodState {
-  /** powder snow: how firmly packed the snow under the pod is (0 fresh … 1 firm trail), and the metres flown since its last stamp */
-  snowPack?: number; snowS?: number;
+  /** powder snow (snowField.ts): how much of the snow in front of the pod's engines is already cut away (0 fresh … 1 a trench), how
+   *  high the snow stands there now (metres – what the pod ploughs through), and the metres flown since its last cut */
+  snowPack?: number; snowDepth?: number; snowS?: number;
   id: number; isPlayer: boolean; def: PodDef; pilot: PilotDef; stats: Record<StatKey, number>;
   name: string; color: string;
   pos: THREE.Vector3; vel: THREE.Vector3; yaw: number; yawRate: number; steer: number;
@@ -43,7 +44,7 @@ export interface PodState {
   place: number;
 }
 
-export interface AIState { /** grid lane held for the first seconds (start discipline) */ gridLat?: number; dive?: boolean; diveT?: number; diveRoll?: number; stuck?: number; lastT?: number; prevLat?: number; skill: number; speedF: number; lineOff: number; takeShortcut: boolean; boostUntil: number; repairMode: boolean; noiseT: number; rubber: number; }
+export interface AIState { /** grid lane held for the first seconds (start discipline) */ gridLat?: number; /** 3D snow: lateral aim correction while following a trench (metres) */ trI?: number; dive?: boolean; diveT?: number; diveRoll?: number; stuck?: number; lastT?: number; prevLat?: number; skill: number; speedF: number; lineOff: number; takeShortcut: boolean; boostUntil: number; repairMode: boolean; noiseT: number; rubber: number; }
 
 export const GRAVITY = 34;
 /** Generous repulsor hover altitude + hard per-engine/cockpit floor gap so no pod part EVER clips into the road! */
@@ -198,8 +199,10 @@ export function podParams(p: PodState) {
     repair: 6 + 16 * s.repair,
     sturdy: 1.25 - 0.5 * s.repair,
     width: podCollision(p.def).halfW,
+    /** metres from the pod's reference point to the front of its engines (they lead the pod) */ nose: noseOf(p.def),
   };
 }
+const noseOf = (def: PodDef) => { const e = podEnvelope(def); return Math.max(e.engL.frontZ, e.engR.frontZ); };
 
 function wrapAngle(a: number) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
 
@@ -212,16 +215,33 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   // in zero-G only the heat factor applies (the hot air over a lava lake, the cold over ice).
   const SF = surfaceOf(td.paths[p.path]?.samples[p.idx]?.surf), onSurf = p.grounded && !p.zeroG;
   let sfGrip = onSurf ? SF.grip : 1, sfVmax = onSurf ? SF.vmax : 1;
-  // 2026-11-22 – powder snow keeps trails (snowField.ts). A pod presses the snow down under its two engine banks, and packed snow
-  // carries it faster than fresh powder: the more often a line is flown, the faster it gets.
-  p.snowPack = 0;
+  // 2026-11-23 – 3D snow (snowField.ts): the powder field is a layer of drifts 1 to 3 m deep, and a pod cuts a trench through it.
+  // Fresh snow holds it at 86 % of its top speed (SURFACES.powder); where a pod ahead has cut, it runs at TRENCH_VMAX. The snow is
+  // read IN FRONT of the engines, beyond everything this pod has cut itself – its own trench never helps it.
+  p.snowPack = 0; p.snowDepth = 0;
   if (td.snow && onSurf && SF.id === 'powder' && !frozen) {
-    const snow = td.snow, off = P.width * 0.6, rx = -Math.cos(p.yaw), rz = Math.sin(p.yaw);
-    const lx = p.pos.x - rx * off, lz = p.pos.z - rz * off, qx = p.pos.x + rx * off, qz = p.pos.z + rz * off;
-    const pk = (snow.packAt(p.path, p.idx, lx, lz) + snow.packAt(p.path, p.idx, qx, qz)) / 2;
-    p.snowPack = pk; sfGrip += (PACKED_GRIP - sfGrip) * pk; sfVmax += (PACKED_VMAX - sfVmax) * pk;
-    p.snowS = (p.snowS ?? 0) + Math.hypot(p.vel.x, p.vel.z) * dt;
-    if (p.snowS >= STAMP_EVERY) { p.snowS = Math.min(STAMP_EVERY, p.snowS - STAMP_EVERY); snow.stamp(p.path, p.idx, lx, lz, STAMP_RADIUS, STAMP_AMOUNT); snow.stamp(p.path, p.idx, qx, qz, STAMP_RADIUS, STAMP_AMOUNT); }
+    const snow = td.snow, off = P.width * 0.55, rad = P.width * 0.45 + 0.9; // two discs under the engine banks: together one trench a little wider than the pod
+    const fx = Math.sin(p.yaw), fz = Math.cos(p.yaw), rx = -fz, rz = fx, v = Math.hypot(p.vel.x, p.vel.z), step = v * dt;
+    const nx = p.pos.x + fx * P.nose, nz = p.pos.z + fz * P.nose, ah = rad + 1.5 + step;
+    const ax = nx + fx * ah, az = nz + fz * ah;
+    const pk = (snow.packAt(p.path, p.idx, ax - rx * off, az - rz * off) + snow.packAt(p.path, p.idx, ax + rx * off, az + rz * off)) / 2;
+    p.snowPack = pk; p.snowDepth = (snow.heightAt(p.path, p.idx, ax - rx * off, az - rz * off) + snow.heightAt(p.path, p.idx, ax + rx * off, az + rz * off)) / 2;
+    sfGrip += (TRENCH_GRIP - sfGrip) * pk; sfVmax += (TRENCH_VMAX - sfVmax) * pk;
+    p.snowS = (p.snowS ?? 0) + step;
+    if (p.snowS >= STAMP_EVERY) {
+      // one cut per STAMP_EVERY metres, laid back along the way flown in this step (at 150 m/s a step is 2.5 m long)
+      const cuts = Math.min(6, Math.floor(p.snowS / STAMP_EVERY)); p.snowS = Math.min(STAMP_EVERY, p.snowS - cuts * STAMP_EVERY);
+      for (let k = 0; k < cuts; k++) {
+        const back = k * step / cuts, cx = nx - fx * back, cz = nz - fz * back;
+        snow.stamp(p.path, p.idx, cx - rx * off, cz - rz * off, rad, 1); snow.stamp(p.path, p.idx, cx + rx * off, cz + rz * off, rad, 1);
+      }
+    }
+    // slow or standing (after a reset, a crash): the repulsors blow a pit free under the whole pod within a third of a second –
+    // otherwise it would sit buried up to its engines until it has moved a pod's length
+    if (v < 25) for (const back of [P.nose * 0.5, 0, -P.nose * 0.55]) {
+      const cx = p.pos.x + fx * back, cz = p.pos.z + fz * back, am = Math.min(1, dt * 7);
+      snow.stamp(p.path, p.idx, cx - rx * off, cz - rz * off, rad, am); snow.stamp(p.path, p.idx, cx + rx * off, cz + rz * off, rad, am);
+    }
   }
   if (p.invuln > 0) p.invuln -= dt;
   { const pc = p as unknown as { obCd?: number; wCd?: number }; if (pc.obCd) pc.obCd = Math.max(0, pc.obCd - dt); if (pc.wCd) pc.wCd = Math.max(0, pc.wCd - dt); }
@@ -911,6 +931,18 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
   const lineHw = t.hw - (t.bay ?? 0);
   let idealLat = -Math.sign(cAvg) * Math.min(0.58, Math.abs(cAvg) * 34) * lineHw * ai.skill + ai.lineOff * lineHw * 0.32;
   idealLat += Math.sin(time * 0.4 + ai.noiseT) * (1 - ai.skill) * lineHw * 0.3;
+
+  // 2026-11-23 – 3D snow: fresh powder costs 14 % of the top speed, a trench nothing. A rival takes a trench that lies in reach of
+  // where it is – one near its racing line rather than one far from it (snowField.trenchNear). No trench: it ploughs its own line.
+  if (td.snow) {
+    const li = path.closed ? ((p.idx + look) % n + n) % n : Math.max(0, Math.min(n - 1, p.idx + look));
+    const tr = td.snow.trenchNear(p.path, li, p.lat, P.width, Math.max(2, t.hw - P.width - 1.5), idealLat); // (a trench may lie in a bay)
+    // The aiming point lies `look` samples ahead: in a bend the pod settles a few metres inside the line it aims at – half out of
+    // the trench. `trI` shifts the aim by the lateral error that stays (slowly: it must not fight the steering itself).
+    // (Only once the pod is nearly there: on the way over from another line the error is large and would wind the shift up.)
+    if (tr) { const err = tr.lat - p.lat; if (Math.abs(err) < 3) ai.trI = Math.max(-6, Math.min(6, (ai.trI ?? 0) + err * adt * 0.9)); idealLat = tr.lat + (ai.trI ?? 0); }
+    else if (ai.trI) ai.trI *= Math.exp(-adt * 2);
+  }
 
   // Shortcut & branching-cave entry commitment (only at branch ENTRANCE, never at its exit merge!)
   let enteringShortcut = false, entrySide = 0, entryNear = false;

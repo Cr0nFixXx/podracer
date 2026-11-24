@@ -93,6 +93,7 @@ class Pool {
 }
 
 const _v = new THREE.Vector3(), _p = new THREE.Vector3(), _c = new THREE.Color();
+const _c2 = new THREE.Color(), _c3 = new THREE.Color(), _c4 = new THREE.Color();
 const WHITE = new THREE.Color(1, 1, 1);
 const C_EXH1 = new THREE.Color(0.55, 0.14, 0.05);
 const C_SPARK0 = new THREE.Color(2.2, 1.6, 0.7), C_SPARK1 = new THREE.Color(1.3, 0.35, 0.05);
@@ -105,6 +106,9 @@ const C_VSPK0 = new THREE.Color(1.4, 1.0, 1.9), C_VSPK1 = new THREE.Color(0.6, 0
 const C_EXP0 = new THREE.Color(2.4, 1.35, 0.45), C_EXP1 = new THREE.Color(0.95, 0.15, 0.03);
 const C_EXPS0 = new THREE.Color(0.16, 0.14, 0.13), C_EXPS1 = new THREE.Color(0.32, 0.32, 0.32);
 const UP_V = new THREE.Vector3(0, 1, 0), ZERO_V = new THREE.Vector3();
+// (The sprites are unlit and the ice world is exposed brightly: anything lighter than a mid blue-grey comes out pure white and does not
+//  show against the snow. So the thrown snow is a shaded blue-grey mass that lightens as it thins out, with white clumps flying in it.)
+const C_SNOW = new THREE.Color(0.27, 0.35, 0.51), C_SNOW_LIT = new THREE.Color(0.62, 0.69, 0.82), C_CLUMP = new THREE.Color(0.96, 0.98, 1), C_POWDER = new THREE.Color(0.46, 0.54, 0.68);
 const C_SPRAY = new THREE.Color(0.74, 0.8, 0.86), C_SPLASH = new THREE.Color(0.86, 0.9, 0.95), C_AB0 = new THREE.Color(2.2, 2.3, 2.6);
 
 export class Particles {
@@ -115,10 +119,11 @@ export class Particles {
   private ambFade = uniform(1); // 0 under roofs (tunnels, covered shortcuts)
   private ambVel = uniform(new THREE.Vector3()); private prevCam = new THREE.Vector3(); private camSet = false; private ambN = 1;
   group = new THREE.Group();
-  constructor(amount: number) {
+  /** `extraAlpha`: more room in the soft (non-glowing) pool – a track with a powder field needs it for the snow the pods plough up */
+  constructor(amount: number, extraAlpha = 0) {
     this.amount = amount;
     this.add = new Pool(Math.min(3200, Math.floor(2400 * amount) + 300), true);
-    this.alpha = new Pool(Math.min(2200, Math.floor(1600 * amount) + 300), false);
+    this.alpha = new Pool(Math.min(2200, Math.floor(1600 * amount) + 300) + Math.floor(extraAlpha * Math.min(1, amount)), false);
     this.group.add(this.alpha.sprite, this.add.sprite);
   }
   setScale(h: number) { void h; }
@@ -160,6 +165,35 @@ export class Particles {
       _v.set((Math.random() - 0.5) * 7, 2.2 + Math.random() * 3.4 + speed * 0.03, (Math.random() - 0.5) * 7).addScaledVector(vel, 0.78); // carried along in the slipstream
       _p.set(p.x + (Math.random() - 0.5) * 3.2, p.y, p.z + (Math.random() - 0.5) * 3.2);
       this.alpha.spawn(_p, _v, 0.55 + Math.random() * 0.5, 0.9, 3.6 + speed * 0.028 + Math.random() * 2.5, C_SPRAY, C_SPRAY, 0.3 * alphaScale, 3.0, 7);
+    }
+  }
+  /** 3D snow (2026-11-23): an engine ploughs through a drift. `(ox, oz)` = unit vector pointing outwards from the pod, `amount` 0 … 1.3
+   *  = how much snow stands in the engine's way. Three kinds of particles:
+   *  a sheet thrown up and outwards that falls back in an arc (the bow wave) – small bright clumps on ballistic paths – fine powder
+   *  that is whirled up and hangs in the air over the trench. */
+  plough(p: THREE.Vector3, vel: THREE.Vector3, ox: number, oz: number, amount: number, light = 1) {
+    const sp = Math.hypot(vel.x, vel.z), k = amount * this.amount * this.rateScale, cnt = (w: number) => Math.floor(w) + (Math.random() < (w % 1) ? 1 : 0);
+    // (the sprites are unlit: `light` = brightness of the scene, 1 by day – at night white snow dust must not glow)
+    _c.copy(C_SNOW).multiplyScalar(light); _c2.copy(C_SNOW_LIT).multiplyScalar(light); _c3.copy(C_CLUMP).multiplyScalar(light); _c4.copy(C_POWDER).multiplyScalar(light);
+    // (As the dust wakes: the snow is carried along at most of the pod's speed and slowed by strong drag – it stays beside engines and
+    //  cockpit for the first 0.3 s, where the chase camera sees it. Thrown at rest it would be behind the camera before it has faded in.)
+    for (let i = cnt((2.9 + sp * 0.023) * k); i > 0; i--) { // the sheet
+      const out = 10 + Math.random() * 18;
+      _v.set(vel.x * 0.86 + ox * out + (Math.random() - 0.5) * 4, 8 + Math.random() * 12 + sp * 0.03, vel.z * 0.86 + oz * out + (Math.random() - 0.5) * 4);
+      _p.set(p.x + (Math.random() - 0.5) * 2 + ox * Math.random() * 1.2, p.y + Math.random() * 1.4, p.z + (Math.random() - 0.5) * 2 + oz * Math.random() * 1.2);
+      this.alpha.spawn(_p, _v, 0.75 + Math.random() * 0.5, 2.6, 6.5 + Math.random() * 3.5, _c, _c2, 0.85, 2.6, 15);
+    }
+    for (let i = cnt(3 * k); i > 0; i--) { // clumps
+      const out = 5 + Math.random() * 18;
+      _v.set(vel.x * 0.9 + ox * out + (Math.random() - 0.5) * 6, 6 + Math.random() * 14, vel.z * 0.9 + oz * out + (Math.random() - 0.5) * 6);
+      _p.set(p.x + (Math.random() - 0.5) * 1.2, p.y + Math.random() * 0.8, p.z + (Math.random() - 0.5) * 1.2);
+      this.alpha.spawn(_p, _v, 0.6 + Math.random() * 0.5, 0.5 + Math.random() * 0.5, 0.3, _c3, _c3, 0.95, 1.6, 24);
+    }
+    for (let i = cnt(0.7 * k); i > 0; i--) { // fine powder
+      const out = 1 + Math.random() * 7;
+      _v.set(vel.x * 0.6 + ox * out + (Math.random() - 0.5) * 7, 1.5 + Math.random() * 5.5, vel.z * 0.6 + oz * out + (Math.random() - 0.5) * 7);
+      _p.set(p.x + (Math.random() - 0.5) * 2.4, p.y + Math.random() * 1.6, p.z + (Math.random() - 0.5) * 2.4);
+      this.alpha.spawn(_p, _v, 1.6 + Math.random() * 1.3, 1.6, 6.5 + Math.random() * 4.5, _c4, _c4, 0.22, 3.0, -0.5);
     }
   }
   /** Tiny short-lived splash crown where a rain drop hits the road. */
