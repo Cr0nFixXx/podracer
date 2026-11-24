@@ -206,6 +206,16 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Geprüft: zwei Unit-Prüfungen `ground:` (zuerst rot): alle Werte; auf demselben Pistenstück mit getauschtem Boden klingt ein Seitenstoß auf Eis mit 45 % und auf Schnee mit 86 % der Rate der Piste ab, ein echter Slide trägt auf Eis weit. Simulation aller 13 Strecken mit elf Gegnern: kein Ausfall, kein Wandkontakt mehr als vorher.
 - Nicht geprüft: das Fahrgefühl. Vor allem der Eissee: ist das Nachrutschen zu viel oder zu wenig? Stellschraube: `slip: 0.6` bei `ice` und `icelake` in `src/game/surfaces.ts` (0 = kein Wegbrechen).
 
+### Strecken – Sprünge: Vorarbeit (noch nichts gebaut)
+Der Punkt ist offen. Was beim Einlesen herauskam – damit es nicht noch einmal gerechnet werden muss:
+- **Wo die Sprünge stehen:** `TrackDef.ramps` in `src/game/data.ts`: `{ at: Anteil der Runde, len: Rampenlänge m, h: Rampenhöhe m, gap: Lückenlänge m }`. Heute sind die Lücken 40–50 m lang; `gap: 0` ist eine Rampe ohne Lücke. Der Bau steht in `trackBuilder.ts` (Schleife `for (const r of def.ramps)`), die Rampe ist `h · t^1.7`.
+- **So weit fliegt ein Pod heute:** am Rampenende gilt `vy = min(28, Steigung · Tempo · 0,85)`. Bei Renntempo ist das die Kappe von 28 m/s – rund 1,8 s Flug, über 200 m weit. Wer die Nase hebt, halbiert die Schwerkraft (`1 − 0.5 · pc` in `stepPod`) und fliegt doppelt so weit. Eine 150-m-Lücke wäre also **ohne** Boost zu schaffen. „Nur mit Boost" entsteht nicht von selbst.
+- **Vorschlag für den weiten Sprung (nur mit Boost):** flache Rampe (Steigung am Ende rund 0,10 – ohne Boost fliegt auch der schnellste Pod höchstens etwa 125 m), Lücke 150 m. Wer am Rampenende boostet, bekommt den Auftrieb, den die Lücke braucht (`vy = Schwerkraft · (Lücke + 30) / (2 · Tempo)`, höchstens 30 m/s; reicht ab etwa 110 m/s). So schafft es jeder Pod mit Boost und keiner ohne – die Pods sind unterschiedlich schnell, eine reine Tempo-Grenze wäre für die langsamen unfair. Über der weiten Lücke darf Gleiten nur noch wenig bringen (etwa +15 %), sonst ersetzt es den Boost.
+- **Zurücksetzen:** heute landet ein gefallener Pod auf dem letzten sicheren Stück direkt vor der Rampe, mit 35 m/s. Vor dem weiten Sprung muss das rund 180 m vor der Rampe sein, mit kühlen Triebwerken – sonst reicht der Anlauf nicht und er fällt wieder.
+- **Gegner:** rund 400 m vor dem weiten Sprung nicht mehr boosten (abkühlen), auf den letzten 90 m bis in die Luft boosten.
+- **Der Abwurf** („von erhöhten auf tiefere Passagen"): die Piste steigt vorher über 200–300 m sanft um 12–18 m an (in der Fahrbahnhöhe, nicht als `ramp` – auf einer `ramp` wird der Pod abgeschossen), dann eine Kante mit kurzer Lücke, darunter geht es auf der alten Höhe weiter. So bleibt ein Rundkurs in sich geschlossen. Ein Fall aus 18 m kostet seit Block 2 keinen Rumpf (`LAND_FREE`). Bei 140 m/s landet der Pod rund 130 m hinter der Kante: dahinter braucht es 200 m gerade, freie Piste.
+- **Noch zu klären beim Bauen:** gerade Stücke von 250 m und mehr auf den sechs Strecken (Boonta, Dünenpass, Magma, Kristall, Heuler, Malastare-100) – sonst Strecken verlängern (erlaubt). Wie die Landschaft unter einer 150-m-Lücke aussieht. Ein Schild und eine HUD-Meldung vor dem weiten Sprung („BOOST!").
+
 ### Nachmeldung des Nutzers – „Introfahrt geht noch nicht"
 - Wörtlich (2026-11-23, nach dem Bericht zu Block 2): „intro fahrt geht noch nicht. lavakruste und lavasee texturen sehen vertauscht aus. pushe danach und mach dann weiter mit den restlichen teil".
 - Ursache: der Intro-Flug war fertig, lag aber nur lokal (`ba3da24`). Geplant war der Push erst am Ende von Block 3. Auf GitHub fehlte er also.
@@ -273,6 +283,6 @@ Zweig `dev`. Jeder Punkt ein eigener Commit; nach jedem Block gepusht.
 | 3 Strecken | `4e2ca0d` | Dezente Fahrspuren in Sand und Mondstaub – lokal, wird mit Block 3 gepusht |
 | 3 Strecken | `0a1f99b` | Methanregen auf Malastare, die Welt düsterer – lokal, wird mit Block 3 gepusht |
 | 3 Strecken | `c327089` | Schwerelosigkeit wie am Gummiband, treibende Felsbrocken – lokal, wird mit Block 3 gepusht |
-| 3 Strecken | (folgender Commit) | Untergründe deutlich spürbar, Eis rutscht nach – lokal, wird mit Block 3 gepusht |
+| 3 Strecken | `2874271` | Untergründe deutlich spürbar, Eis rutscht nach – lokal, wird mit Block 3 gepusht |
 
 Block 1 wurde am 2026-11-23 gepusht (`ee20aa5..b4f1266`); der Lauf der GitHub-Action dafür war grün. Block 2 wurde am 2026-11-23 gepusht (`b4f1266..55713c7`); der Lauf der GitHub-Action für `55713c7` war grün (`npm ci`, `npm run check`, beide Builds). Der erste Versuch scheiterte: der Zugangstoken des Nutzers lag in der Sitzung nicht mehr vor (er wird nirgends gespeichert – Regel in `docs/regeln/git-sandbox.md`); der Nutzer hat ihn auf Nachfrage neu gegeben. Block 3 und 4 sind offen (`TODO.md` Abschnitt 9).
