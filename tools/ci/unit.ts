@@ -7,7 +7,7 @@ import { engineHeat, envLabel, METHANE, resolveEnvironment, weatherOptionsFor, t
 import { clipOutside } from '../../src/game/meshClip';
 import { SnowField, SNOW_CLEAR_PIECE, SNOW_CLEAR_ROCK, SNOW_FLOOR, SNOW_LEAD, SNOW_MAX, SNOW_MIN, TRENCH_VMAX } from '../../src/game/snowField';
 import { borderRocks, ROCK_PROTRUDE, type BorderRock } from '../../src/game/borderRocks';
-import { LAVA_TEX, SURF, SURFACES, lensSpray, splashes, trackSplashes } from '../../src/game/surfaces';
+import { LAVA_TEX, SURF, SURFACES, WORLD_GRIP, lensSpray, splashes, trackSplashes } from '../../src/game/surfaces';
 import { podLayout } from '../../src/game/podLayouts';
 import { cockpitGeo } from '../../src/game/podCockpits';
 import { engineExtent, engineGeo } from '../../src/game/podParts';
@@ -1888,6 +1888,44 @@ test('zerog: a rival flies both tubes of Oovo IV without touching the wall or a 
     eq(p.events.filter(e => e.type === 'obstacle').length, 0, `tube ${w}: boulders hit:`);
   }
 });
+
+/* ---- 2026-11-23, user: "Fahreigenschaften auf verschiedenen Untergründen generell kaum spürbar – etwas stärker. Besonders mehr
+ *      rutschen / sliden über Eis(seen)" ----
+ * Decision ("deutlich"): ice and ice lake 45 % grip with long sliding · powder 78 % · snow 86 % · mud 80 % and 88 % top speed · dunes
+ * 85 % and 91 % · sand, gravel, ash 90 % · rock and deck 100 %. The world itself takes no grip any more (the ice world had ×0.8, the
+ * jungle moon ×0.9 on top of every surface) – what the surface says is what the pod gets. */
+test('ground: grip and top speed of every surface as decided – ice 45 %, powder 78 %, snow 86 %, mud 80 % / 88 %, dunes 85 % / 91 %, sand, gravel and ash 90 %, rock and deck 100 %', () => {
+  const want: Record<string, [number, number?]> = {
+    ice: [0.45, 1], icelake: [0.45, 1], powder: [0.78, 0.86], snow: [0.86], mud: [0.8, 0.88], dunes: [0.85, 0.91], sand: [0.9], gravel: [0.9], ash: [0.9],
+    rock: [1, 1], deck: [1, 1], road: [1, 1], plateau: [1, 1], basalt: [1, 1], reef: [1, 1],
+  };
+  for (const [id, [g, v]] of Object.entries(want)) { const sf = SURFACES[SURF[id]]; ok(sf, `no surface ${id}`); near(sf.grip, g, `${id} (${sf.name}) grip:`); if (v !== undefined) near(sf.vmax, v, `${id} (${sf.name}) top speed:`); }
+  for (const sf of SURFACES) ok(sf.grip <= 1 && sf.grip >= 0.4 && sf.vmax <= 1 && sf.vmax >= 0.85, `${sf.id}: grip ${sf.grip}, top speed ${sf.vmax} – outside 0.4 … 1 / 0.85 … 1`);
+  near(WORLD_GRIP, 1, 'grip factor of a world:');
+});
+test('ground: on ice a pod slides on – a small sideways push fades at 45 % of the rate on the built road (snow 86 %), a real slide carries far longer', () => {
+  // the same pod on the same stretch of road (a copy of Frostspalt whose ground is swapped – banking and slope stay the same), pushed
+  // sideways, no steering: how much of the push is left after half a second
+  const left = (surf: string, push: number) => {
+    const td = buildTrack(TRACKS.find(t => t.id === 'frost')!), S = td.main.samples, i0 = surfStretch(td, SURF.snow, 80); ok(i0 >= 0, 'frost has no plain stretch of snow');
+    for (let k = i0; k < i0 + 80; k++) S[k].surf = SURF[surf];
+    const s = S[i0 + 8], p = racer(byId('aurora'), td, i0 + 8, 0, s.y + HOVER); p.grounded = true; p.input.throttle = 1;
+    p.vel.set(s.tx * 110 + s.rx * push, 0, s.tz * 110 + s.rz * push);
+    for (let f = 0; f < 60; f++) stepPod(p, td, 1 / 120, f / 120, 1, false);
+    return (p.vel.x * -Math.cos(p.yaw) + p.vel.z * Math.sin(p.yaw)) / push;
+  };
+  const rate = (x: number) => -Math.log(Math.max(1e-6, x)); // fade rate × 0.5 s
+  const road = rate(left('road', 2)), ice = rate(left('ice', 2)) / road, lake = rate(left('icelake', 2)) / road, snow = rate(left('snow', 2)) / road;
+  ok(Math.abs(ice - 0.45) < 0.04 && Math.abs(lake - 0.45) < 0.04, `a small push fades on ice at ${(ice * 100).toFixed(0)} % and on the ice lake at ${(lake * 100).toFixed(0)} % of the rate on the road – expected 45 %`);
+  ok(Math.abs(snow - 0.86) < 0.04, `on snow a small push fades at ${(snow * 100).toFixed(0)} % of the rate on the road – expected 86 %`);
+  // a real slide (20 m/s sideways): on ice the grip breaks away – "langes Nachrutschen"
+  const slideIce = left('ice', 20), slideRoad = left('road', 20), slideSnow = left('snow', 20);
+  ok(slideIce > 0.3, `half a second into a slide ${(slideIce * 100).toFixed(0)} % of the sideways speed are left on ice – expected more than 30 % (it should slide on)`);
+  ok(slideRoad < 0.05 && slideSnow < 0.1, `on the road ${(slideRoad * 100).toFixed(0)} % and on snow ${(slideSnow * 100).toFixed(0)} % of a slide are left after half a second – only ice lets a pod slide on`);
+  ok((SURFACES[SURF.ice].slip ?? 0) > 0 && SURFACES[SURF.ice].slip === SURFACES[SURF.icelake].slip, 'ice and ice lake should share one slip value');
+  for (const sf of SURFACES) if (sf.id !== 'ice' && sf.id !== 'icelake') ok(!sf.slip, `${sf.id} has a slip value – only ice slides on`);
+});
+
 
 
 

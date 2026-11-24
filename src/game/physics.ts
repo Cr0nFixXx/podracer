@@ -372,7 +372,11 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   const attGrip = (p.bankGrip ?? 1) * (pc < 0 ? 1 - 0.14 * pc : 1 - 0.2 * pc);
   const zgR = zgOn ? zeroGReach(td, p, P.width) : null;
   if (zgR) vr += (ZG_OMEGA * ZG_OMEGA * (p.steer * zgR.side - p.lat) - 2 * ZG_ZETA * ZG_OMEGA * vr) * dt; // the spring to the axis, sideways (the nose points along the tube: `vr` is the speed across it)
-  else vr *= Math.exp(-P.grip * gripMul * sfGrip * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.035 * sk) * (p.grounded ? 1 : 0.15));
+  else {
+    // ice (2026-11-23): once the pod really slides the grip breaks away further (SurfaceDef.slip) – the slide carries on
+    const sl = onSurf && SF.slip ? 1 - SF.slip * Math.max(0, Math.min(1, (Math.abs(vr) - 3) / 9)) : 1;
+    vr *= Math.exp(-P.grip * gripMul * sfGrip * sl * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.035 * sk) * (p.grounded ? 1 : 0.15));
+  }
   const fx2 = Math.sin(p.yaw), fz2 = Math.cos(p.yaw), rx2 = -fz2, rz2 = fx2;
   p.vel.x = fx2 * vf + rx2 * vr; p.vel.z = fz2 * vf + rz2 * vr;
 

@@ -198,6 +198,14 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Geprüft: sieben Unit-Prüfungen `zerog:` (zuerst rot): Rückkehr in 0,8 s mit leichtem Überschwingen (seitlich und in der Höhe); 70 % Reichweite in alle vier Richtungen ohne Wandkontakt, die Nase bleibt auf der Röhre; ohne Eingabe fliegt ein Pod alle vier Röhren auf der Achse durch; Ausfahrt aller vier Röhren mit gehaltenem Knüppel in fünf Stellungen (kein Schaden, auf der Piste, auf Schwebehöhe); Brocken (Abstand, Tempo, nie durch die Wand); ein Treffer kostet, ein Vorbeiflug nicht; ein Gegner fliegt beide Röhren von Oovo IV ohne Berührung. Simulation beider Strecken. Bilder: Röhre mit Brocken, Eingang mit Schild, Ausfahrt. WebGPU-Konsolenprüfung.
 - Nicht geprüft: das Gefühl am Knüppel (Stärke der Feder: `ZG_OMEGA`, Überschwingen: `ZG_ZETA`, Reichweite: `ZG_REACH` in `src/game/physics.ts`); ob die Brocken bei Renntempo früh genug zu sehen sind.
 
+### Strecken – Untergründe deutlich spürbar
+- Neue Werte (Haftung / Höchsttempo), wie entschieden: Eis und Eissee 45 % · Pulverschnee 78 % / 86 % · Schnee 86 % · Schlamm 80 % / 88 % · Dünen 85 % / 91 % · Sand, Geröll, Asche 90 % · Fels, Piste, Deck 100 %. Vorher: Eis 75 %, Schnee 92 %, Pulverschnee 90 %, Schlamm 90 % / 93 %, Dünen 93 % / 94 %, Sand und Geröll 96 %, Asche 94 %.
+- **Eis rutscht nach:** kleine Korrekturen greifen mit 45 %. Rutscht der Pod aber richtig quer (über 3 bis 12 m/s seitlich), bricht die Haftung um weitere 60 % weg – ein Slide trägt weit. Eine halbe Sekunde nach einem Seitenstoß von 20 m/s sind auf Eis noch über 30 % davon da, auf der Piste unter 5 %.
+- **Eigene Festlegungen:** (1) Strand und Mondstaub bekommen auch 90 % (loser Boden wie Sand; vorher 95 % und 93 %). (2) Der Zuschlag je Welt entfällt: die Eiswelt nahm bisher zusätzlich 20 % Haftung von jedem Untergrund, der Dschungelmond 10 %. „Piste 100 %" wären auf Ando Prime sonst 80 % gewesen. Die Zahlen oben sind jetzt das, was der Pod bekommt. Das Wetter rechnet weiter obendrauf (Regen, Schneeböen: bis −10 %).
+- Reihenfolge: dieser Punkt wurde vor den Sprüngen gemacht (er ist klein und unabhängig).
+- Geprüft: zwei Unit-Prüfungen `ground:` (zuerst rot): alle Werte; auf demselben Pistenstück mit getauschtem Boden klingt ein Seitenstoß auf Eis mit 45 % und auf Schnee mit 86 % der Rate der Piste ab, ein echter Slide trägt auf Eis weit. Simulation aller 13 Strecken mit elf Gegnern: kein Ausfall, kein Wandkontakt mehr als vorher.
+- Nicht geprüft: das Fahrgefühl. Vor allem der Eissee: ist das Nachrutschen zu viel oder zu wenig? Stellschraube: `slip: 0.6` bei `ice` und `icelake` in `src/game/surfaces.ts` (0 = kein Wegbrechen).
+
 ### Nachmeldung des Nutzers – „Introfahrt geht noch nicht"
 - Wörtlich (2026-11-23, nach dem Bericht zu Block 2): „intro fahrt geht noch nicht. lavakruste und lavasee texturen sehen vertauscht aus. pushe danach und mach dann weiter mit den restlichen teil".
 - Ursache: der Intro-Flug war fertig, lag aber nur lokal (`ba3da24`). Geplant war der Push erst am Ende von Block 3. Auf GitHub fehlte er also.
@@ -264,6 +272,7 @@ Zweig `dev`. Jeder Punkt ein eigener Commit; nach jedem Block gepusht.
 | 3 Strecken | `c1ebd90` | 3D-Schnee auf den Pulverschnee-Feldern – lokal, wird mit Block 3 gepusht |
 | 3 Strecken | `4e2ca0d` | Dezente Fahrspuren in Sand und Mondstaub – lokal, wird mit Block 3 gepusht |
 | 3 Strecken | `0a1f99b` | Methanregen auf Malastare, die Welt düsterer – lokal, wird mit Block 3 gepusht |
-| 3 Strecken | (folgender Commit) | Schwerelosigkeit wie am Gummiband, treibende Felsbrocken – lokal, wird mit Block 3 gepusht |
+| 3 Strecken | `c327089` | Schwerelosigkeit wie am Gummiband, treibende Felsbrocken – lokal, wird mit Block 3 gepusht |
+| 3 Strecken | (folgender Commit) | Untergründe deutlich spürbar, Eis rutscht nach – lokal, wird mit Block 3 gepusht |
 
 Block 1 wurde am 2026-11-23 gepusht (`ee20aa5..b4f1266`); der Lauf der GitHub-Action dafür war grün. Block 2 wurde am 2026-11-23 gepusht (`b4f1266..55713c7`); der Lauf der GitHub-Action für `55713c7` war grün (`npm ci`, `npm run check`, beide Builds). Der erste Versuch scheiterte: der Zugangstoken des Nutzers lag in der Sitzung nicht mehr vor (er wird nirgends gespeichert – Regel in `docs/regeln/git-sandbox.md`); der Nutzer hat ihn auf Nachfrage neu gegeben. Block 3 und 4 sind offen (`TODO.md` Abschnitt 9).

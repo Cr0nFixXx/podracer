@@ -7,7 +7,7 @@ import { makeHeatShields } from './heatShield';
 import { buildGroundTracks, trackLife, TrackLayer, type GroundTracks } from './groundTracks';
 import { DebrisPool } from './debris';
 import { DS, TUNNEL_SHOULDER, roadSurfaceAt, tunnelCeiling } from './trackBuilder';
-import { SURF, lensSpray, splashes, surfaceOf, surfacePalette, trackSplashes, type SurfaceDef } from './surfaces';
+import { SURF, WORLD_GRIP, lensSpray, splashes, surfaceOf, surfacePalette, trackSplashes, type SurfaceDef } from './surfaces';
 import { SnowField } from './snowField';
 import { keysLabel, normalizeKeys, normalizePad, padLabel, padValue, type Action, type KeyMap, type PadMap } from './keymap';
 import { podEnvelope } from './podDesigns';
@@ -132,7 +132,7 @@ export class Game {
     const res = resolveEnvironment(THEMES[trackDef.theme], this.profile.race.timeOfDay, this.profile.race.weather);
     const { theme, fx, build } = res;
     this.env = fx; this.envBuild = build; this.tl = res.timeline; this.envLabel = res.label; this.keymap = normalizeKeys(this.profile.keys); this.padmap = normalizePad(this.profile.pad);
-    this.baseGrip = theme.id === 'ice' ? 0.8 : theme.id === 'jungle' ? 0.9 : 1; // Session 20: the surfaces carry the rest (ice ×0.75, snow ×0.92, mud ×0.9 …)
+    this.baseGrip = WORLD_GRIP; // 2026-11-23: the surfaces carry it all (surfaces.ts) – the weather still multiplies it
     this.gripMul = this.baseGrip * fx.grip; this.heatMul = fx.heat;
     this.dustBase.set(theme.palette.ground[1]); this.dustCol.copy(this.dustBase);
     this.dustAmt = theme.terrain === 'prison' || theme.road === 'cityRoad' ? 0.35 : theme.id === 'ice' ? 0.8 : 1; // little loose dust on metal decks
@@ -936,7 +936,9 @@ export class Game {
   /** HUD hint for the ground under the player */
   private surfaceHud(): { surface: string; surfaceFx: string } {
     const p = this.player, sf = surfaceOf(this.td.paths[p.path]?.samples[p.idx]?.surf);
-    const fx = sf.heat >= 3 ? 'Boost nur ganz kurz' : sf.grip <= 0.8 ? 'wenig Haftung' : sf.heat >= 1.25 ? 'Triebwerke heizen auf' : sf.vmax <= 0.95 ? 'bremst' : sf.grip < 0.95 ? 'rutschig' : '';
+    // (2026-11-23: the surfaces differ clearly now – ice "sehr glatt", mud brakes AND slips. The line is 224 px wide: with a long
+    //  surface name – „Dünen · tiefer Sand" – only one word fits behind it.)
+    const fx = sf.heat >= 3 ? 'Boost nur ganz kurz' : sf.slip ? 'sehr glatt' : sf.heat >= 1.25 ? 'Triebwerke heizen auf' : sf.vmax <= 0.92 && sf.grip <= 0.82 ? 'bremst · rutschig' : sf.vmax <= 0.95 ? 'bremst' : sf.grip <= 0.8 ? 'wenig Haftung' : sf.grip < 0.95 ? 'rutschig' : '';
     if (sf.id === 'powder' && this.td.snow && !p.zeroG) return (p.snowPack ?? 0) > 0.6 ? { surface: 'Pulverschnee · Graben', surfaceFx: 'freie Bahn' } : { surface: 'Pulverschnee', surfaceFx: 'pflügt · bremst stark' }; // 3D snow (2026-11-23)
     return { surface: p.zeroG ? 'Schwerelos' : sf.name, surfaceFx: p.zeroG ? '' : fx };
   }

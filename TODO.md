@@ -63,5 +63,5 @@ Auftrag und Entscheidungen: [Protokoll](docs/verlauf/2026-11-23-nach-der-probefa
 - [x] Malastare: Methanregen (brennbar, +12 % Hitze, grüne Flammen), Welt düsterer – **bitte ansehen:** ist „rund 30 % düsterer" bei klarem Wetter richtig?
 - [x] Schwerelosigkeit: Feder zur Röhrenmitte, Nase folgt der Röhre; wenige treibende Brocken – **bitte ausprobieren:** fühlt sich das Gummiband richtig an (Stärke, Überschwingen)?
 - [ ] Sprünge auf den sechs Schlucht-Strecken: Lücken 70–90 m, ein weiter Sprung (nur mit Boost), ein Abwurf
-- [ ] Untergründe „deutlich" (Eis 45 % Haftung …)
+- [x] Untergründe „deutlich" (Eis 45 % Haftung …) – **bitte fahren:** Eissee (Frostspalt, Heuler-Schlucht), Schlamm, Dünen
 - [ ] Flug-Deko: Segelbarke, Zuschauer-Logen, Frachter, Wolkenwagen, Holo-Werbetafeln statt Zeppelinen

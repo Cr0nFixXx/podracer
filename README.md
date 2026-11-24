@@ -76,10 +76,14 @@ Jede Strecke wechselt zwischen mehreren Untergründen. Unter der Wetterzeile im 
 | Untergrund | Wirkung |
 |---|---|
 | Rennpiste, Fels, Felsplateau, Riff-Fels, Stationsdeck, Basalt | volle Haftung, volles Tempo |
-| Sand, Schnee, Waldboden, Geröll, Strand, Mondstaub, Kristallfeld | fast wie Fels: 2–8 % weniger Haftung, bis 4 % weniger Höchsttempo |
-| Eis, Eissee | 25 % weniger Haftung – früher einlenken, Slides tragen weiter |
-| Dünen (tiefer Sand), Schlamm, Sumpf, Aschefeld | 5–8 % weniger Höchsttempo, 6–10 % weniger Haftung |
-| Pulverschnee (1–3 m tiefe Wehen) | frisch 14 % weniger Höchsttempo, im Graben eines anderen Pods nur 1 % – siehe unten |
+| Waldboden, Kristallfeld, Lavakruste | fast wie Fels (2–3 % weniger Haftung) |
+| Sand, Geröll, Aschefeld, Strand, Mondstaub | 10 % weniger Haftung; Sand, Geröll, Mondstaub und Strand bis 4 % weniger Höchsttempo, Asche 5 % |
+| Schnee | 14 % weniger Haftung, 3 % weniger Höchsttempo |
+| Dünen (tiefer Sand) | 15 % weniger Haftung, 9 % weniger Höchsttempo |
+| Schlamm | 20 % weniger Haftung, 12 % weniger Höchsttempo |
+| Sumpf | 6 % weniger Haftung, 8 % weniger Höchsttempo |
+| Pulverschnee (1–3 m tiefe Wehen) | 22 % weniger Haftung; frisch 14 % weniger Höchsttempo, im Graben eines anderen Pods nur 1 % – siehe unten |
+| **Eis, Eissee** | **55 % weniger Haftung – und wer einmal rutscht, rutscht lange weiter.** Früh und sanft einlenken; ein Slide trägt weit |
 | Lavakruste | Triebwerke heizen 30 % schneller auf – Boost kürzer halten |
 | Lavasee | Boost nur ganz kurz: ein kaltes Triebwerk ist nach 0,6–1 s am Hitzelimit, der Überlast-Boost hält 1 s statt 3 s, und über dem See kühlt fast nichts ab. Unter dem Pod leuchtet solange ein Plasma-Hitzeschild |
 | See (Aquilaris), Spiegelsee, Methansee | 4–5 % weniger Haftung; der Pod zieht Gischt. Methan heizt 15 % schneller auf |
