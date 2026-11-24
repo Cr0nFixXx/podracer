@@ -251,6 +251,7 @@ let g: Game | null = null; let cur = -1;
   if (!chase) { const h = Math.hypot(fwd.x, fwd.z) || 1; G.placeShadow(G.camera.position.x, G.camera.position.y, G.camera.position.z, fwd.x / h, fwd.z / h); }
   { const rt = new URLSearchParams(location.search).get('rt'); if (rt) { G.raceTime = +rt; G.applyEnv(0, true); } }
   G.updateVisuals(); G.updateLights(); G.updateShields(0.5); G.world.update(G.clock + 5, G.camera.position);
+  G.world.setPieces.update(G.clock, G.raceTime, G.pods, 0, false); // (views that step the physics themselves never run the game loop: rotors, gates and the boulders of the zero-G tubes would stand where they were built)
   if (location.search.includes('bright') && !G.scene.getObjectByName('dbgAmb')) { const al = new THREE.AmbientLight(0xffffff, 2.5); al.name = 'dbgAmb'; G.scene.add(al); } // diagnostic fill light (caves)
   if (location.search.includes('flash')) { G.sky.uniforms.flash.value = 0.9; G.hemi.intensity = 1.75; }
   if (location.search.includes('live')) { // live graphics switching: toggle everything that is switchable at runtime, render, toggle back

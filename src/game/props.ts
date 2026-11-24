@@ -566,7 +566,8 @@ export function addProps(td: TrackData, theme: ThemeDef, group: THREE.Group, gfx
     });
     const signMat = new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide }); disp.push(signMat, signTex);
     const signs: THREE.Matrix4[] = [];
-    for (let i = 1; i < N; i++) { if (S[i].zeroG && !S[i - 1].zeroG) { const s = S[i]; signs.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + 12, s.z), faceOncoming(s), new THREE.Vector3(1, 1, 1))); } }
+    // (2026-11-23: turned by half a turn – `faceOncoming` points the plane's FRONT along the track, an arriving pod saw the back of the sign: mirror writing)
+    for (let i = 1; i < N; i++) { if (S[i].zeroG && !S[i - 1].zeroG) { const s = S[i]; signs.push(new THREE.Matrix4().compose(new THREE.Vector3(s.x, s.y + 12, s.z), new THREE.Quaternion().setFromAxisAngle(UP, yawOf(s) + Math.PI), new THREE.Vector3(1, 1, 1))); } }
     inst(new THREE.PlaneGeometry(14, 7), signMat, signs, false);
   }
   if (theme.id === 'lava') {

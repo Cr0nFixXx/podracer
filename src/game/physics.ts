@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { PilotDef, PodDef, StatKey } from './data';
-import { DS, TUNNEL_SHOULDER, boulderState, tunnelCeiling, bridgeSwing, frameAt, gateDrop, nearestGlobal, nearestOnPath, roadSurfaceAt, rotorAngle, tunnelProfile, type Obstacle, type Path, type Sample, type SetPiece, type TrackData } from './trackBuilder';
+import { DS, TUNNEL_SHOULDER, ZG_AXIS, boulderState, tunnelCeiling, bridgeSwing, frameAt, gateDrop, nearestGlobal, nearestOnPath, roadSurfaceAt, rotorAngle, tunnelProfile, zgRockAt, type Obstacle, type Path, type Sample, type SetPiece, type TrackData } from './trackBuilder';
+export { ZG_AXIS };
 import type { PodVisual } from './podModel';
 import { COCKPIT_SWAY, podCollision, podEnvelope, type PodEnvelope } from './podDesigns';
 import { STAMP_EVERY, TRENCH_GRIP, TRENCH_VMAX } from './snowField';
@@ -15,6 +16,8 @@ export interface PodState {
   /** powder snow (snowField.ts): how much of the snow in front of the pod's engines is already cut away (0 fresh … 1 a trench), how
    *  high the snow stands there now (metres – what the pod ploughs through), and the metres flown since its last cut */
   snowPack?: number; snowDepth?: number; snowS?: number;
+  /** zero-G: seconds the pod has been in the tube (the nose locks onto the tube over the first half second) */
+  zgT?: number;
   id: number; isPlayer: boolean; def: PodDef; pilot: PilotDef; stats: Record<StatKey, number>;
   name: string; color: string;
   pos: THREE.Vector3; vel: THREE.Vector3; yaw: number; yawRate: number; steer: number;
@@ -206,6 +209,32 @@ const noseOf = (def: PodDef) => { const e = podEnvelope(def); return Math.max(e.
 
 function wrapAngle(a: number) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
 
+// ---- zero-G tubes (2026-11-23, user: "zentrale mittige Anziehung … wie ein Gummiband") ----
+// A spring holds the pod on the axis of the tube, sideways and in height. Steering and climb / sink do not turn or thrust it: they
+// move the point the spring pulls to, up to ZG_REACH of the tube radius off the axis. Released, the pod snaps back: with ZG_OMEGA
+// 3.5 rad/s and ZG_ZETA 0.6 it crosses the axis after 0.8 s and swings 10 % past it. The nose follows the tube by itself.
+// (Session 16/17 before: free drift with a weak pull in height only, steering turned the pod.)
+export const ZG_REACH = 0.7, ZG_OMEGA = 3.5, ZG_ZETA = 0.6;
+/** How far a pod in a zero-G tube may be pushed off the axis – `side`ways and `up` / down, metres – and how near the end of the tube
+ *  is: `exit` rises from 0 to 1 between ZG_EXIT_FROM and ZG_EXIT_FULL seconds of flight before the end. Looks ZG_EXIT_FROM seconds
+ *  ahead: where the tube narrows, or ends on a road that is narrower than the tube, the reach shrinks in time – a pod held at the
+ *  wall is led back onto the road, one held at the ceiling comes down to hover height before the tube lets it go. */
+export const ZG_EXIT_FROM = 2.2, ZG_EXIT_FULL = 0.9, ZG_EXIT_SIDE = 0.35;
+export function zeroGReach(td: TrackData, p: PodState, halfW: number): { side: number; up: number; exit: number } {
+  const path = td.paths[p.path], S = path.samples, n = S.length, v = Math.max(20, Math.hypot(p.vel.x, p.vel.z)), look = Math.max(12, Math.round(v * ZG_EXIT_FROM / DS));
+  let side = 1e9, up = 1e9, exitAt = -1, roadHw = 0;
+  for (let k = 0; k <= look; k += 4) {
+    const q = S[path.closed ? (p.idx + k) % n : Math.min(n - 1, p.idx + k)];
+    if (q.zeroG) { const R = q.hw + 1.4, m = Math.max(1.5, Math.min(ZG_REACH * R, R - halfW - 1.2)); if (m < side) side = m; if (m < up) up = m; }
+    else { if (exitAt < 0) { exitAt = k; roadHw = q.hw; } side = Math.min(side, Math.max(1.5, q.hw - halfW - 2.5)); }
+  }
+  const exit = exitAt < 0 ? 0 : Math.max(0, Math.min(1, (ZG_EXIT_FROM - exitAt * DS / v) / (ZG_EXIT_FROM - ZG_EXIT_FULL)));
+  // towards the end the sideways reach shrinks to the middle third of the road behind the tube: the tube hands the pod back with
+  // room to both walls (held at full lock it used to come out 8 m beside the rail, with the road already turning)
+  if (exit > 0) side += (Math.min(side, Math.max(1.5, roadHw * ZG_EXIT_SIDE)) - side) * exit;
+  return { side, up, exit };
+}
+
 /** `heatMul` = engine-heat factor of climate and weather (`EnvFx.heat`): while boosting the engines heat up × heatMul, they cool down ÷ heatMul. */
 export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gripMul: number, frozen: boolean, heatMul = 1) {
   const P = podParams(p);
@@ -311,10 +340,20 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
     if (slip > 1.05) omega *= Math.max(0.12, 1 - (slip - 1.05) / 0.4); // Session 16: the rear may swing out to ~60°
   }
   omega += (p.hpR - p.hpL) / 100 * 0.25 * lowF;
-  if (p.zeroG) omega *= 1.75;
   if (frozen) omega = 0;
-  p.yawRate += (omega - p.yawRate) * Math.min(1, dt * (9 - 5.2 * sk)); // in a slide the yaw builds up and carries (soft, pendulum-like) instead of snapping
-  p.yaw -= p.yawRate * dt;
+  const zgOn = p.zeroG && !frozen;
+  if (zgOn) {
+    // the nose follows the tube: the heading is the tube's direction at the pod (blended in over the first half second in the tube)
+    const zs = td.paths[p.path].samples, q = zs[p.idx], q2 = zs[td.paths[p.path].closed ? (p.idx + 1) % zs.length : Math.min(zs.length - 1, p.idx + 1)];
+    const al = Math.max(0, Math.min(1, ((p.pos.x - q.x) * q.tx + (p.pos.z - q.z) * q.tz) / DS));
+    p.zgT = (p.zgT ?? 0) + dt;
+    const turn = wrapAngle(Math.atan2(q.tx + (q2.tx - q.tx) * al, q.tz + (q2.tz - q.tz) * al) - p.yaw) * Math.min(1, dt * (5 + 115 * Math.min(1, p.zgT / 0.5)));
+    p.yaw += turn; p.yawRate = -turn / dt;
+  } else {
+    p.zgT = 0;
+    p.yawRate += (omega - p.yawRate) * Math.min(1, dt * (9 - 5.2 * sk)); // in a slide the yaw builds up and carries (soft, pendulum-like) instead of snapping
+    p.yaw -= p.yawRate * dt;
+  }
 
   // thrust
   let vmaxE = P.vmax * sfVmax * (0.72 + 0.28 * hp) * (p.boosting ? 1.32 : 1) * (p.repairing ? 0.55 : 1) * (p.zeroG ? 1.28 : 1); // Session 16: zero-G = no drag → faster
@@ -331,7 +370,9 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   } else vf *= Math.exp(-3 * dt);
   vf *= Math.exp(-(p.zeroG ? (inp.throttle > 0 ? 0 : 0.05) : inp.throttle > 0 ? 0.04 : 0.28) * dt);
   const attGrip = (p.bankGrip ?? 1) * (pc < 0 ? 1 - 0.14 * pc : 1 - 0.2 * pc);
-  vr *= Math.exp(-P.grip * gripMul * sfGrip * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.035 * sk) * (p.grounded ? 1 : p.zeroG ? 0.6 : 0.15)); // zero-G: the pod floats sideways, but stays steerable
+  const zgR = zgOn ? zeroGReach(td, p, P.width) : null;
+  if (zgR) vr += (ZG_OMEGA * ZG_OMEGA * (p.steer * zgR.side - p.lat) - 2 * ZG_ZETA * ZG_OMEGA * vr) * dt; // the spring to the axis, sideways (the nose points along the tube: `vr` is the speed across it)
+  else vr *= Math.exp(-P.grip * gripMul * sfGrip * attGrip * dt * ((p.airbraking ? 0.5 : 1) * (1 - sk) + 0.035 * sk) * (p.grounded ? 1 : 0.15));
   const fx2 = Math.sin(p.yaw), fz2 = Math.cos(p.yaw), rx2 = -fz2, rz2 = fx2;
   p.vel.x = fx2 * vf + rx2 * vr; p.vel.z = fz2 * vf + rz2 * vr;
 
@@ -400,12 +441,12 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   let landImpulse = 0;
   p.zeroG = fr.zeroG && !fr.gap;
   if (p.zeroG) {
-    // Session 16 – real weightlessness: no spring that glues the pod to the tube axis. It drifts freely (weak centring, little damping),
-    // lift/dive are vertical thrusters, momentum carries. Shortly before the tube ends it is guided down to hover height (soft landing).
-    let exit = false; const nS = path.samples.length;
-    for (let k = 6; k <= 26 && !exit; k += 5) { const j = path.closed ? (p.idx + k) % nS : Math.min(nS - 1, p.idx + k); if (!path.samples[j].zeroG) exit = true; }
-    const tubeY = fr.groundY + (exit ? HOVER + 0.8 : 7), kC = exit ? 3.2 : 2.6, dC = exit ? 2.2 : 1.4; // Session 17: centred on the tube axis again
-    p.vel.y += ((tubeY - p.pos.y) * kC - p.vel.y * dC + pc * 14) * dt;
+    // 2026-11-23 – the spring to the axis, in height: climb / sink move the point it pulls to. It damps the speed RELATIVE to the
+    // axis (the tube climbs and falls with the track – damping the absolute speed left the pod metres behind on a slope). Over the
+    // last second before the tube ends the point sinks to hover height: the pod leaves the tube where the road begins.
+    const R0 = zgR ?? zeroGReach(td, p, P.width), e = R0.exit * R0.exit * (3 - 2 * R0.exit);
+    const hT = pc * R0.up * (1 - e) + (HOVER + 0.8 - ZG_AXIS) * e, axisVy = Math.max(-40, Math.min(40, (p.groundY - p.prevGroundY) / dt));
+    p.vel.y += (ZG_OMEGA * ZG_OMEGA * (fr.groundY + ZG_AXIS + hT - p.pos.y) - 2 * ZG_ZETA * ZG_OMEGA * (p.vel.y - axisVy)) * dt;
     p.grounded = false;
   } else if (!gap && p.pos.y <= targetY + 1.05) {
     const k = 155, c = 22;
@@ -443,7 +484,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   }
   // zero-G tubes (tunnel vaults: at the end of the step, once the pod's pose is final)
   if (p.zeroG) {
-    const dy = p.pos.y - (fr.groundY + 7), dl = fr.lat, dist = Math.hypot(dl, dy), R = fr.hw + 1.4;
+    const dy = p.pos.y - (fr.groundY + ZG_AXIS), dl = fr.lat, dist = Math.hypot(dl, dy), R = fr.hw + 1.4;
     if (dist > R) {
       const rl = dl / dist, ry = dy / dist, k = dist - R;
       p.pos.x -= S.rx * rl * k; p.pos.z -= S.rz * rl * k; p.pos.y -= ry * k;
@@ -540,6 +581,12 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
     for (const o of list) if (o.kind !== 3 && !o.broken) collideObstacle(p, o, P.sturdy);
   }
   if (td.setPieces.length) collideSetPieces(p, td, time, P.sturdy);
+  // boulders drifting in a zero-G tube: a hit is a hit on an obstacle rock
+  if (p.zeroG && p.path === 0) for (const k of td.zgRocks) {
+    if (Math.abs(k.idx - p.idx) > 14) continue;
+    const q = zgRockAt(td, k, time);
+    collideObstacle(p, { path: 0, idx: k.idx, lat: q.lat, r: k.r, kind: 0, x: q.x, y: q.y, z: q.z }, P.sturdy, true);
+  }
 
   // progress
   const N = td.N;
@@ -700,9 +747,10 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   p.shake *= Math.exp(-dt * 3);
 }
 
-function collideObstacle(p: PodState, o: Obstacle, sturdy: number) {
+/** `floating`: a boulder in a zero-G tube – `o.y` is its centre, the pod hits it only at its own height */
+function collideObstacle(p: PodState, o: Obstacle, sturdy: number, floating = false) {
   const height = o.kind === 1 || o.kind === 4 ? 9 : o.r * 1.6;
-  if (p.pos.y > o.y + height + 1.5) return;
+  if (floating ? Math.abs(p.pos.y - o.y) > o.r + 1.8 : p.pos.y > o.y + height + 1.5) return;
   const C = podCollision(p.def).circles; const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw); const rollW = Math.max(0.22, Math.abs(Math.cos((p.rollCtl ?? 0) * Math.PI / 2)));
   for (const c of C) {
     const cxr = c.x * rollW; const wx = p.pos.x + cxr * cy + c.z * sy, wz = p.pos.z - cxr * sy + c.z * cy;
@@ -988,6 +1036,17 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
     }
   }
 
+  // 2026-11-23 – boulders drifting in a zero-G tube: where each will be when the pod gets there. One that will be well above or below
+  // the pod's height (rivals fly on the axis) is no obstacle.
+  if (p.path === 0 && td.zgRocks.length && (p.zeroG || t.zeroG)) {
+    const hPod = p.zeroG ? p.pos.y - (p.groundY + ZG_AXIS) : 0;
+    for (const k of td.zgRocks) {
+      const ah = aheadOf(k.idx); if (ah < -2 || ah > 80) continue;
+      const q = zgRockAt(td, k, time + (Math.max(0, ah) * 2) / estSpd);
+      if (Math.abs(q.h - hPod * Math.max(0, 1 - ah / 40)) > k.r + 3.4) continue; // (far ahead the pod will be back on the axis)
+      obs.push({ ahead: Math.max(1, ah), lat: q.lat, r: k.r + P.width + 2.6, weight: 1.1 });
+    }
+  }
   if (p.path === 0) {
     for (const sp of td.setPieces) {
       const ah = aheadOf(sp.idx);
@@ -1139,6 +1198,9 @@ export function aiInputs(p: PodState, td: TrackData, pods: PodState[], time: num
   const diff = wrapAngle(desired - p.yaw);
   let steer = Math.max(-1, Math.min(1, -diff * (denseField ? 4.0 : 3.4) + p.yawRate * 0.16));
   if (Math.abs(steer) < 0.02) steer = 0;
+  // zero-G (2026-11-23): steering does not turn the pod there, it pushes it off the axis – full lock = `zeroGReach().side` metres.
+  // So the stick position IS the lateral position the rival wants.
+  if (p.zeroG) steer = Math.max(-1, Math.min(1, lat / zeroGReach(td, p, P.width).side));
 
   // 4. Speed, boost & repair control (eases throttle slightly through tight boulder/rock slaloms)
   let vlim = 999, rampAhead = false;

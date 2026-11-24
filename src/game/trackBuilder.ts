@@ -71,6 +71,14 @@ export interface Crossing {
 export interface Obstacle { path: number; idx: number; lat: number; r: number; kind: number; x: number; y: number; z: number; hz?: number; /** Session 14: small rocks & crates can be smashed at speed */ breakable?: boolean; broken?: boolean }
 /** Overhead structure across the main path (sponsor gantry, start portal): solid between y0 and y1 within ±half metres along the track. */
 export interface Overhead { idx: number; y0: number; y1: number; half: number; /** half-elliptic arch (checkpoint gate): inner radius R, vertical squash sy – the ceiling height depends on the lateral position */ arch?: { R: number; sy: number; /** tube radius towards the inside (default 1.7) */ inner?: number; /** base height relative to the road (default 0) */ yOff?: number; /** vertical thickness (default 3.6) */ thick?: number; /** set-piece index: after its collapse only the two stumps (|lat| > R/2) remain solid */ sp?: number } } // kind 3 = AI keep-out only (hazard / rotor disc), kind 4 = set-piece solid (no generic visual)
+/** Height of the axis of a zero-G tube above the road reference (metres). */
+export const ZG_AXIS = 7;
+/** samples (2 m each) over which the road loses its bank before a zero-G tube and gets it back behind it */
+export const ZG_UNBANK = 30;
+/** A boulder drifting in a zero-G tube (2026-11-23, user decision: a few, every 150–200 m, slow). It swings about a fixed point of the
+ *  tube's cross-section: `lat` / `h` = that point (metres beside / above the axis at sample `idx` of the main path), `ax` / `ah` =
+ *  how far it swings, `wx` / `wh` = angular speeds (rad/s), `px` / `ph` = phases. `y0` = height of the axis there. Where it is: `zgRockAt`. */
+export interface ZgRock { idx: number; lat: number; h: number; r: number; ax: number; ah: number; wx: number; wh: number; px: number; ph: number; y0: number; seed: number }
 /** Periodic eruption zone (methane geyser / lava vent). state: 0 idle, 0.5 warning, 1 erupting (set by Game). */
 export interface Hazard { idx: number; lat: number; r: number; x: number; y: number; z: number; period: number; phase: number; duty: number; state: number; }
 
@@ -101,6 +109,8 @@ export interface TrackData {
   obstaclesByPath: Map<number, Obstacle[]>[];
   hazards: Hazard[];
   setPieces: SetPiece[];
+  /** boulders drifting in the zero-G tubes of the main path (empty on a track without a tube) */
+  zgRocks: ZgRock[];
   arches: number[];
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number; minY: number; maxY: number };
 }
@@ -207,7 +217,7 @@ function finalizeSamples(S: Sample[], closed: boolean, banked = false) {
     const cr = a.tx * b.tz - a.tz * b.tx, dt = a.tx * b.tx + a.tz * b.tz;
     raw.push(Math.atan2(cr, dt) / (4 * DS));
   }
-  const W = 8;
+  const W = 8, anyZeroG = S.some(q => q.zeroG);
   for (let i = 0; i < n; i++) {
     let s = 0, c = 0;
     for (let k = -W; k <= W; k++) { let j = i + k; if (closed) j = (j + n) % n; else if (j < 0 || j >= n) continue; s += raw[j]; c++; }
@@ -215,6 +225,14 @@ function finalizeSamples(S: Sample[], closed: boolean, banked = false) {
     // Session 10: main circuits get real banked corners (up to ~21° / 6.2 m outer-edge rise); shortcuts keep the gentle camber
     const bl = S[i].bridge ? Math.min(0.16, 2.6 / Math.max(1, S[i].hw)) : banked ? Math.min(0.39, 6.2 / Math.max(1, S[i].hw)) : Math.min(0.2, 2.4 / Math.max(1, S[i].hw));
     S[i].bank = S[i].gap || S[i].zeroG ? 0 : Math.max(-bl, Math.min(bl, S[i].curv * (banked ? 46 : 14))) * (1 - (S[i].lvl ?? 0));
+    // 2026-11-23: a zero-G tube is flat inside. The road before and behind it now loses its bank over ZG_UNBANK samples – until then
+    // a road banked at up to 21° met the flat tube in ONE sample: at the edge of the road the surface jumped by metres, and a pod
+    // that left the tube off-centre was thrown into the air by the step.
+    if (anyZeroG && S[i].bank !== 0) {
+      let near = ZG_UNBANK + 1;
+      for (let k = 1; k <= ZG_UNBANK && near > ZG_UNBANK; k++) if (get(i + k).zeroG || get(i - k).zeroG) near = k;
+      if (near <= ZG_UNBANK) { const f = (near - 1) / ZG_UNBANK; S[i].bank *= f * f * (3 - 2 * f); }
+    }
   }
   // AI reference speeds
   for (let i = 0; i < n; i++) {
@@ -1074,7 +1092,7 @@ export function buildTrack(def: TrackDef): TrackData {
     bounds.minY = Math.min(bounds.minY, s.y); bounds.maxY = Math.max(bounds.maxY, s.y);
   }
   for (const o of obstacles) if (o.kind === 2 || (o.kind === 0 && o.r < 2.9)) o.breakable = true; // crates + small rocks
-  return { def, paths, main, N, startIdx, finishIdx, obstacles, obstaclesByPath, hazards, setPieces, arches, bounds, overheads: [], seaY, crossings };
+  return { def, paths, main, N, startIdx, finishIdx, obstacles, obstaclesByPath, hazards, setPieces, arches, bounds, overheads: [], seaY, crossings, zgRocks: buildZgRocks(def, main) };
 }
 
 function findShortcut(S: Sample[], N: number, fa: number, closed: boolean): [number, number] | null {
@@ -1148,6 +1166,36 @@ export function frameAt(path: Path, idx: number, x: number, z: number): Frame {
   // Exact rendered road-surface elevation including camber crown, curb edge lip & displacement allowance
   const crown = (1 - e * e) * 0.2 + (e > 0.88 ? ((e - 0.88) / 0.12) * 0.18 : 0) + 0.08;
   return { idx, lat, along, groundY: y + ramp - clampedLat * bank + crown, gap: s.gap, zeroG: s.zeroG, hw, wallL: s.wallL + (s2.wallL - s.wallL) * f, wallR: s.wallR + (s2.wallR - s.wallR) * f, s };
+}
+
+/** Boulders for the zero-G tubes of the main path: one every 150–200 m, none within 80 m of a tube's end. Each swings slowly about a
+ *  point near the axis – where the pods fly – and never reaches the wall. Deterministic per track; its own hash, so the random
+ *  sequence of the rest of the builder is untouched. */
+function buildZgRocks(def: TrackDef, main: Path): ZgRock[] {
+  const S = main.samples, out: ZgRock[] = [], seed0 = [...def.id].reduce((a, c) => (Math.imul(a, 31) + c.charCodeAt(0)) | 0, 7);
+  const rnd = (i: number, k: number) => { let h = Math.imul(i + seed0, 374761393) + Math.imul(k, 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+  let a = -1;
+  for (let i = 0; i <= S.length; i++) {
+    const on = i < S.length && S[i].zeroG && !S[i].gap;
+    if (on && a < 0) a = i;
+    if (!on && a >= 0) {
+      for (let k = a + 40 + Math.floor(rnd(a, 0) * 12); k <= i - 1 - 40; k += 75 + Math.floor(rnd(k, 1) * 26)) {
+        const s = S[k], R = s.hw + 1.4, r = 1.6 + rnd(k, 2) * 1.4;
+        const ang = rnd(k, 3) * Math.PI * 2, d0 = Math.min(9, R * 0.3) * Math.sqrt(rnd(k, 4)); // its resting point: within 9 m of the axis
+        const ax = 2.5 + rnd(k, 5) * 2.5, ah = 1.5 + rnd(k, 6) * 2, room = Math.max(0, R - r - 1.5 - d0);
+        const f = Math.min(1, room / Math.hypot(ax, ah)); // (a narrow tube: it swings less)
+        const crown = 0.2 + 0.08; // frameAt's road surface on the centre line
+        out.push({ idx: k, lat: Math.cos(ang) * d0, h: Math.sin(ang) * d0, r, ax: ax * f, ah: ah * f, wx: 0.22 + rnd(k, 7) * 0.18, wh: 0.22 + rnd(k, 8) * 0.18, px: rnd(k, 9) * 6.283, ph: rnd(k, 10) * 6.283, y0: s.y + s.ramp + crown + ZG_AXIS, seed: Math.floor(rnd(k, 11) * 1000) });
+      }
+      a = -1;
+    }
+  }
+  return out;
+}
+/** Where a boulder of a zero-G tube is at `time`: world position, and its offset from the axis (metres beside / above it). */
+export function zgRockAt(td: TrackData, k: ZgRock, time: number) {
+  const s = td.main.samples[k.idx], lat = k.lat + k.ax * Math.sin(k.wx * time + k.px), h = k.h + k.ah * Math.sin(k.wh * time + k.ph);
+  return { x: s.x + s.rx * lat, y: k.y0 + h, z: s.z + s.rz * lat, lat, h };
 }
 
 /** Fast exact rendered road-surface elevation under any world point `(x, z)` (used for 5-point pod ground collision). */

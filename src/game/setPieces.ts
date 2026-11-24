@@ -1,8 +1,14 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+import * as TSLmod from 'three/tsl';
 import type { ThemeDef } from './data';
 import type { PodState } from './physics';
-import { boulderState, bridgeSwing, bridgeWarn, gateDrop, gateWarn, nearestOnPath, rotorAngle, type Obstacle, type Sample, type TrackData } from './trackBuilder';
+import { boulderState, bridgeSwing, bridgeWarn, gateDrop, gateWarn, nearestOnPath, rotorAngle, zgRockAt, type Obstacle, type Sample, type TrackData } from './trackBuilder';
+
+// TSL typings are stricter than the runtime → loosely typed on purpose (see CLAUDE.md)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const TSL = TSLmod as any;
 
 /**
  * Dynamic set pieces (visuals + state). Collision & AI timing live in physics.ts and read the exact same state:
@@ -78,7 +84,29 @@ function footDrop(s: Sample, worldSide: number, off: number, heightAt: (x: numbe
 
 export function buildSetPieces(td: TrackData, theme: ThemeDef, group: THREE.Group, disp: Disp, rockMat: THREE.Material, heightAt: (x: number, z: number) => number = () => -40) {
   const S = td.main.samples, N = S.length; const fns: Fn[] = [];
-  if (!td.setPieces.length) return { update: (): SetPieceFx[] => [] };
+  if (!td.setPieces.length && !td.zgRocks.length) return { update: (): SetPieceFx[] => [] };
+  // 2026-11-23 – boulders drifting in the zero-G tubes (trackBuilder.zgRockAt gives their place for the physics, the rivals and this
+  // mesh alike): one instanced mesh of a craggy ball of radius 1, moved and slowly turned every frame.
+  if (td.zgRocks.length) {
+    const bg = new THREE.IcosahedronGeometry(1, 2), bp = bg.attributes.position as THREE.BufferAttribute, uv = bg.attributes.uv as THREE.BufferAttribute;
+    for (let i = 0; i < bp.count; i++) {
+      const x = bp.getX(i), y = bp.getY(i), z = bp.getZ(i);
+      const k = 0.84 + h2(Math.round(x * 4.2), Math.round(y * 4.2 + z * 6.3)) * 0.24 + Math.sin(x * 3.9 + y * 3.3) * 0.1;
+      bp.setXYZ(i, x * k, y * k * 0.86, z * k); uv.setXY(i, (x + z) * 0.35, y * 0.35);
+    }
+    bg.computeVertexNormals(); disp.push(bg);
+    // Their own material: plain grey rock with a rim in the colour of the tube's energy field. The tubes stand in the dark (Oovo IV,
+    // the Executioner) – without the rim a boulder is a black shape against black, and a hit comes from nowhere.
+    const zm = new MeshStandardNodeMaterial({ color: new THREE.Color('#615e5a'), roughness: 0.93, metalness: 0.05 });
+    zm.emissiveNode = TSL.color(theme.barrierColor).mul(TSL.pow(TSL.oneMinus(TSL.dot(TSL.normalView, TSL.positionViewDirection).clamp(0.0, 1.0)), 2.0)).mul(0.9);
+    zm.name = 'zgRock'; disp.push(zm);
+    const im = new THREE.InstancedMesh(bg, zm, td.zgRocks.length); im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false; im.name = 'zgRocks'; group.add(im);
+    const m4 = new THREE.Matrix4(), qt = new THREE.Quaternion(), eu = new THREE.Euler(), pv = new THREE.Vector3(), sv = new THREE.Vector3();
+    fns.push((_t, rt) => {
+      td.zgRocks.forEach((k, i) => { const p = zgRockAt(td, k, rt); eu.set(rt * 0.11 + k.seed, rt * 0.07 + k.seed * 1.7, k.seed * 0.3); m4.compose(pv.set(p.x, p.y, p.z), qt.setFromEuler(eu), sv.setScalar(k.r)); im.setMatrixAt(i, m4); });
+      im.instanceMatrix.needsUpdate = true;
+    });
+  }
   const isPrison = theme.terrain === 'prison', isOcean = theme.terrain === 'ocean', isIce = theme.id === 'ice', isCrystal = theme.id === 'crystal';
   // Biome-tinted architectural alloy so futuristic gates blend harmoniously into each world's palette
   const wallTint = new THREE.Color(theme.palette.wall[1]).lerp(new THREE.Color('#646c78'), isPrison || isOcean ? 0.75 : 0.52);

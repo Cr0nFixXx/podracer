@@ -61,7 +61,7 @@ Auftrag und Entscheidungen: [Protokoll](docs/verlauf/2026-11-23-nach-der-probefa
 - [x] 3D-Schnee: Wehen 1–3 m auf Pulverfeldern, Pflügen, Bugwelle, feine Partikel; frisch 86 % / Graben 99 %, Gegner suchen Gräben – **bitte in Bewegung prüfen** (Stärke der Schneefahne, Bildrate auf dem Feld)
 - [x] Dezente Fahrspuren in Sand und Mondstaub (nur Optik) – zwei Streifen je Pod; Sand, Dünen, Strand, Asche: nach 40 s verweht; Mondstaub: bleiben
 - [x] Malastare: Methanregen (brennbar, +12 % Hitze, grüne Flammen), Welt düsterer – **bitte ansehen:** ist „rund 30 % düsterer" bei klarem Wetter richtig?
-- [ ] Schwerelosigkeit: Feder zur Röhrenmitte, Nase folgt der Röhre; wenige treibende Brocken
+- [x] Schwerelosigkeit: Feder zur Röhrenmitte, Nase folgt der Röhre; wenige treibende Brocken – **bitte ausprobieren:** fühlt sich das Gummiband richtig an (Stärke, Überschwingen)?
 - [ ] Sprünge auf den sechs Schlucht-Strecken: Lücken 70–90 m, ein weiter Sprung (nur mit Boost), ein Abwurf
 - [ ] Untergründe „deutlich" (Eis 45 % Haftung …)
 - [ ] Flug-Deko: Segelbarke, Zuschauer-Logen, Frachter, Wolkenwagen, Holo-Werbetafeln statt Zeppelinen

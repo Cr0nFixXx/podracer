@@ -62,6 +62,7 @@ for (const def of TRACKS) {
   const prog0 = pods.map(p => p.prog); const wasDead = pods.map(() => false); const partsLost = new Map<string, number>();
   let deaths = 0, nan = 0, wall = 0, clear = 9, airMax = 0, rolls = 0, slides = 0, dives = 0, aiFrames = 0, breaks = 0, ohHits = 0, zgV = 0, zgN = 0, gV = 0, gN = 0, t = 0, worst = '', airDbg = '', air0 = 0, air0Dist = 0;
   const h = 1 / 120, frames = SECS * 60;
+  let zgHits = 0, zgWall = 0; // zero-G (2026-11-23): boulders hit, tube wall touched – by all eleven rivals together
   const snN = pods.map(() => 0), snCut = pods.map(() => 0), snV = pods.map(() => 0); // 3D snow: frames on the powder field, how much of the snow ahead was cut, speed
   for (let f = 0; f < frames; f++) {
     t += 1 / 60;
@@ -91,7 +92,7 @@ for (const def of TRACKS) {
       for (const p of pods) { if (p.dead > 0) continue; const dx = p.pos.x - hz.x, dz = p.pos.z - hz.z; if (dx * dx + dz * dz > hz.r ** 2 || p.pos.y > hz.y + 18) continue; const P = podParams(p); if (p.invuln <= 0) applyDamage(p, 'both', 12 / 60 * P.sturdy, 'heat'); p.heat = Math.min(1, p.heat + 0.55 / 60); p.vel.y += 28 / 60; }
     }
     pods.forEach((p, i) => {
-      for (const ev of p.events) { if (ev.type === 'part') { const b = damageModel(p.def.id).parts[ev.part ?? 0]; partsLost.set(b.label, (partsLost.get(b.label) ?? 0) + 1); } if (ev.type === 'break') breaks++; if (ev.type === 'wall' && ev.nx === 0 && ev.nz === 0 && ev.y > 0 && ohIdx >= 0 && Math.abs(p.idx - ohIdx) < 8) ohHits++; }
+      for (const ev of p.events) { if (p.zeroG && ev.type === 'obstacle') zgHits++; if (p.zeroG && ev.type === 'field') zgWall++; if (ev.type === 'part') { const b = damageModel(p.def.id).parts[ev.part ?? 0]; partsLost.set(b.label, (partsLost.get(b.label) ?? 0) + 1); } if (ev.type === 'break') breaks++; if (ev.type === 'wall' && ev.nx === 0 && ev.nz === 0 && ev.y > 0 && ohIdx >= 0 && Math.abs(p.idx - ohIdx) < 8) ohHits++; }
       p.events.length = 0;
       if (!isFinite(p.pos.x + p.pos.y + p.pos.z + p.vel.x + p.vel.y + p.vel.z + p.yaw + p.roll + p.pitch)) nan++;
       if (p.dead > 0) { if (!wasDead[i]) deaths++; wasDead[i] = true; p.dead -= 1 / 60; if (p.dead <= 0) respawn(p, td); return; }
@@ -121,7 +122,7 @@ for (const def of TRACKS) {
     console.log(`  layout: ${(N * 2 / 1000).toFixed(2)} km · ${turns} corners · ${nSc} shortcut(s) · ${nCv} cave-branch(es)${cxStr} · open flats ${wide * 2} m`); }
   if (runs.length && process.env.DEBUG !== '0') console.log(`  tunnels: ${runs.join(' · ')}`);
   if (lifted) console.log(`  deck self-test: ${deckFrames} frames on a tunnel deck (${deckFrames > 20 ? 'ok' : 'FAIL'}), downward teleports: ${teleports}`);
-  if (zgN > 200) console.log(`  zero-G: avg ${(zgV / zgN).toFixed(0)} m/s in the tubes vs ${(gV / Math.max(1, gN)).toFixed(0)} m/s outside`);
+  if (zgN > 200) console.log(`  zero-G: avg ${(zgV / zgN).toFixed(0)} m/s in the tubes vs ${(gV / Math.max(1, gN)).toFixed(0)} m/s outside · ${td.zgRocks.length} boulders, hit ${zgHits} × · tube wall touched ${zgWall} ×`);
   if (ohIdx >= 0) console.log(`  overhead self-test: ${ohHits} hits registered (${ohHits > 0 ? 'ok' : 'FAIL'})`);
   if (td.snow && snN.some(n => n > 30)) { // who ploughed, who followed (2026-11-23: fresh powder 86 % top speed, a trench 99 %)
     const rows = pods.map((_, k) => ({ k, n: snN[k], cut: snCut[k] / Math.max(1, snN[k]), v: snV[k] / Math.max(1, snN[k]) })).filter(r => r.n > 30).sort((a, b) => a.cut - b.cut);

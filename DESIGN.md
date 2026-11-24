@@ -120,7 +120,7 @@ Leitidee: **Lenken hebt, Tasten neigen.** Der Pod kippt nie von selbst – jede 
 | Thema | Gestaltung | Stand |
 |---|---|---|
 | Fahrgefühl | spürbar, aber fair: höchstens 25 % weniger Haftung (Eis) oder 8 % weniger Tempo (Sumpf); gilt für alle Pods; das HUD nennt Boden und Wirkung in zwei Wörtern | S20 Strecken |
-| Schwerelosigkeit | nichts hält den Pod: langsames Taumeln, Triebwerke wippen einzeln, weiteres Sichtfeld, Sternenstaub; Tempo spürbar höher | S16 |
+| Schwerelosigkeit | der Pod schwebt auf der Achse der Röhre und hängt an ihr wie an einem Gummiband: Lenken und Steigen/Sinken verschieben ihn (bis 70 % des Radius), losgelassen schnellt er zurück und schwingt leicht über; die Nase folgt der Röhre. Langsames Taumeln, Triebwerke wippen einzeln, weiteres Sichtfeld, Sternenstaub; Tempo spürbar höher. In der Röhre treiben einzelne graue Felsbrocken, ihr Rand leuchtet in der Farbe des Energiefelds – sonst wären sie im Dunkeln nicht zu sehen | 2026-11-23 (S16) |
 | Ego-Ansicht | kein Cockpit-Rahmen, freier Blick auf Triebwerke, Leitungen und Blitz | S17 |
 
 - **Kamera:** rollt nur 20 % der Pod-Rolle mit (Horizont bleibt lesbar, 90°-Rolle ≈ 18° Kamerarolle). *(S10)*

@@ -187,6 +187,17 @@ Aus der Liste des Nutzers folgt außerdem: „ist Eis mit −25 % Haftung fair?"
 - Geprüft: vier Unit-Prüfungen `methane:` (zuerst rot): Namen und Kennzeichnung, andere Welten behalten Wasser; +12 % / −10 % Hitze, Haftung wie Regen; Dunst und alle Regenfarben grün – auf dem Dschungelmond weiter blaugrau; rund 30 % weniger Licht. Die Prüfung „Nacht + Unwetter" läuft weiter durch. Bilder: Methangewitter am Tag (Piste, Methansee, von oben), Boost mit Flammenfahnen, klares Wetter (die düsterere Welt), Nacht + Methangewitter mit Blitz. WebGPU-Konsolenprüfung im Gewitter mit Boost.
 - Nicht geprüft: in Bewegung; ob „30 % düsterer" bei klarem Wetter gefällt (Stellschraube: die Werte von `malastare` in `src/game/data.ts`, die alten stehen im Kommentar); Methan-Derby im Bild (gleiche Welt, nur gerechnet).
 
+### Strecken – Schwerelosigkeit wie am Gummiband
+- In den Röhren (Oovo IV, Executioner – je zwei) hält jetzt eine Feder den Pod auf der Mittelachse, seitlich und in der Höhe.
+- Lenken dreht den Pod dort nicht mehr, es verschiebt ihn: bis etwa 70 % des Röhrenradius zur Seite. Steigen/Sinken genauso nach oben und unten. Die Röhren sind 30 bis 56 m im Radius – das sind 21 bis 39 m Weg.
+- Losgelassen schnellt der Pod in rund 0,8 s zur Mitte zurück und schwingt etwa 10 % darüber hinaus, dann ruht er.
+- Die Nase folgt von selbst dem Verlauf der Röhre, auch durch enge Bögen.
+- **Am Ende der Röhre** wird der Pod über die letzten gut zwei Sekunden zur Mitte und auf Schwebehöhe geführt – auch wenn man den Knüppel am Anschlag hält. Er kommt ohne Schaden auf der Piste an.
+- **Felsbrocken:** in jeder Röhre treiben alle 150–200 m einzelne Brocken (1,6 bis 3 m Radius) langsam umher, nah an der Mitte. Ein Treffer kostet Tempo und Rumpf wie ein Hindernisfels. Ihr Rand leuchtet in der Farbe des Energiefelds – die Röhren liegen im Dunkeln, ohne den Rand wären die Brocken nicht zu sehen (eigene Festlegung). Die Gegner weichen aus; in der Simulation trafen elf Gegner zusammen zwei bis drei Brocken je Strecke.
+- **Nebenbei gefunden und behoben:** (1) Die Piste war vor und hinter einer Röhre bis zu 21° geneigt, in der Röhre flach – ohne Übergang. Am Pistenrand sprang die Fahrbahn um Meter; ein Pod, der die Röhre seitlich versetzt verließ, wurde hochgeschleudert. Die Neigung läuft jetzt über 60 m aus und wieder ein. (2) Das Warnschild „ZERO-G" am Röhreneingang stand mit dem Rücken zur Fahrtrichtung – Spiegelschrift. Es ist jetzt lesbar.
+- Geprüft: sieben Unit-Prüfungen `zerog:` (zuerst rot): Rückkehr in 0,8 s mit leichtem Überschwingen (seitlich und in der Höhe); 70 % Reichweite in alle vier Richtungen ohne Wandkontakt, die Nase bleibt auf der Röhre; ohne Eingabe fliegt ein Pod alle vier Röhren auf der Achse durch; Ausfahrt aller vier Röhren mit gehaltenem Knüppel in fünf Stellungen (kein Schaden, auf der Piste, auf Schwebehöhe); Brocken (Abstand, Tempo, nie durch die Wand); ein Treffer kostet, ein Vorbeiflug nicht; ein Gegner fliegt beide Röhren von Oovo IV ohne Berührung. Simulation beider Strecken. Bilder: Röhre mit Brocken, Eingang mit Schild, Ausfahrt. WebGPU-Konsolenprüfung.
+- Nicht geprüft: das Gefühl am Knüppel (Stärke der Feder: `ZG_OMEGA`, Überschwingen: `ZG_ZETA`, Reichweite: `ZG_REACH` in `src/game/physics.ts`); ob die Brocken bei Renntempo früh genug zu sehen sind.
+
 ### Nachmeldung des Nutzers – „Introfahrt geht noch nicht"
 - Wörtlich (2026-11-23, nach dem Bericht zu Block 2): „intro fahrt geht noch nicht. lavakruste und lavasee texturen sehen vertauscht aus. pushe danach und mach dann weiter mit den restlichen teil".
 - Ursache: der Intro-Flug war fertig, lag aber nur lokal (`ba3da24`). Geplant war der Push erst am Ende von Block 3. Auf GitHub fehlte er also.
@@ -252,6 +263,7 @@ Zweig `dev`. Jeder Punkt ein eigener Commit; nach jedem Block gepusht.
 | Nachmeldung | `6d1ccc9` | Test: Intro-Flug auch auf WebGPU und mit echtem Mausklick |
 | 3 Strecken | `c1ebd90` | 3D-Schnee auf den Pulverschnee-Feldern – lokal, wird mit Block 3 gepusht |
 | 3 Strecken | `4e2ca0d` | Dezente Fahrspuren in Sand und Mondstaub – lokal, wird mit Block 3 gepusht |
-| 3 Strecken | (folgender Commit) | Methanregen auf Malastare, die Welt düsterer – lokal, wird mit Block 3 gepusht |
+| 3 Strecken | `0a1f99b` | Methanregen auf Malastare, die Welt düsterer – lokal, wird mit Block 3 gepusht |
+| 3 Strecken | (folgender Commit) | Schwerelosigkeit wie am Gummiband, treibende Felsbrocken – lokal, wird mit Block 3 gepusht |
 
 Block 1 wurde am 2026-11-23 gepusht (`ee20aa5..b4f1266`); der Lauf der GitHub-Action dafür war grün. Block 2 wurde am 2026-11-23 gepusht (`b4f1266..55713c7`); der Lauf der GitHub-Action für `55713c7` war grün (`npm ci`, `npm run check`, beide Builds). Der erste Versuch scheiterte: der Zugangstoken des Nutzers lag in der Sitzung nicht mehr vor (er wird nirgends gespeichert – Regel in `docs/regeln/git-sandbox.md`); der Nutzer hat ihn auf Nachfrage neu gegeben. Block 3 und 4 sind offen (`TODO.md` Abschnitt 9).

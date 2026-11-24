@@ -17,10 +17,10 @@ import { assembleHero, assembleRival, segFor, skinPoint, visibleIndices, type Br
 import { pickRivals, rivalKit } from '../../src/game/roster';
 import { engineKit, tuneTiers, NO_KIT } from '../../src/game/podKitParts';
 import { ciRoster } from './roster';
-import { aiInputs, applyDamage, bodyToWorld, collidePods, hullWorld, kill, manualReset, podParams, respawn, stepPod, tickRespawn, vaultOver, worldToBody, FX_NONE, HOVER, RESET_COOLDOWN, RESET_WAIT, VAULT_CLAMP, type PodState } from '../../src/game/physics';
+import { ZG_AXIS, ZG_EXIT_FROM, ZG_REACH, aiInputs, applyDamage, bodyToWorld, collidePods, hullWorld, kill, manualReset, podParams, respawn, stepPod, tickRespawn, vaultOver, worldToBody, FX_NONE, HOVER, RESET_COOLDOWN, RESET_WAIT, VAULT_CLAMP, type PodState } from '../../src/game/physics';
 import { ACTIONS, KEY_PRESETS, defaultPad, normalizeKeys, normalizePad, type KeyMap, type PadMap } from '../../src/game/keymap';
 import { DAMAGE_RULES, damageModel, lostMessage, partLamps, partsFx, zoneFactor, type DamageZone } from '../../src/game/podDamage';
-import { buildTrack, frameAt, tunnelCeiling, baySameStretch, DS, TUNNEL_SHOULDER, type Path, type Sample, type TrackData } from '../../src/game/trackBuilder';
+import { buildTrack, frameAt, tunnelCeiling, baySameStretch, zgRockAt, DS, TUNNEL_SHOULDER, type Path, type Sample, type TrackData } from '../../src/game/trackBuilder';
 import { defaultProfile, effectiveStats, loadProfile, saveProfile, CAMERA_NAMES, MAX_LAPS, PRESETS, type GfxSettings } from '../../src/game/settings';
 import { ALARM_FROM, boostAlarmLevel, boostAlarmVoice } from '../../src/game/audio';
 import { PadRepeater, nextFocus, readPadNav, stepRange, type NavRect, type PadSnapshot } from '../../src/ui/padNav';
@@ -1747,6 +1747,148 @@ test('tracks: a full layer overwrites its oldest quads – it never grows, never
   ok(n > 24, `${n} quads laid into a layer of 24`); eq(layer.count, 24, 'quads held:'); ok(layer.alive(20) <= 24, 'more visible than the layer holds');
   eq(layer.pos.length, 24 * 4 * 3, 'the buffer grew:');
 });
+
+/* ---- 2026-11-23, user: "Schwerelosigkeitsüberarbeitung: zentrale mittige Anziehung. Wenn gelenkt wird, wird man danach zurückgezogen
+ *      so wie im echten Spiel auch (wie ein Gummiband)" ----
+ * Decisions: a spring to the tube's centre axis, sideways and in height; steering and climb / sink push the pod up to about 70 % of the
+ * tube radius off centre; on release it snaps back in about 0.8 s with a slight overshoot; the nose follows the tube by itself.
+ * A few slowly drifting boulders (every 150–200 m); a hit costs speed and hull like an obstacle rock. */
+/** a zero-G stretch of the main path as [first, last] sample; `straight`: start of its straightest 220 samples */
+function zgStretch(td: TrackData, which = 0): { a: number; b: number; straight: number } {
+  const S = td.main.samples; let a = -1, n = 0;
+  for (let i = 0; i <= S.length; i++) {
+    const on = i < S.length && S[i].zeroG; if (on && a < 0) a = i;
+    if (!on && a >= 0) {
+      if (n++ === which) { let best = a + 20, bc = 1e9; for (let k = a + 20; k < i - 230; k += 5) { let c = 0; for (let j = k; j < k + 220; j++) c = Math.max(c, Math.abs(S[j].curv)); if (c < bc) { bc = c; best = k; } } return { a, b: i - 1, straight: best }; }
+      a = -1;
+    }
+  }
+  throw new Error(`no zero-G stretch ${which} on ${td.def.id}`);
+}
+/** a pod floating in the tube at sample `idx`: `lat` m beside the axis, `h` m above it, flying along the tube at `v` m/s */
+function zgPod(td: TrackData, idx: number, lat = 0, h = 0, v = 140, def = 'aurora'): PodState {
+  const s = td.main.samples[idx], p = racer(byId(def), td, idx, lat, frameAt(td.main, idx, s.x, s.z).groundY + ZG_AXIS + h);
+  p.zeroG = true; p.grounded = false; p.zgT = 9; p.vel.set(s.tx * v, 0, s.tz * v); p.input.throttle = 1; p.invuln = 0;
+  return p;
+}
+const zgH = (td: TrackData, p: PodState) => p.pos.y - (frameAt(td.main, p.idx, p.pos.x, p.pos.z).groundY + ZG_AXIS);
+const zgYawErr = (td: TrackData, p: PodState) => { const q = td.main.samples[p.idx]; let d = p.yaw - Math.atan2(q.tx, q.tz); while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return Math.abs(d); };
+/** `td` without its drifting boulders (the spring is tested alone) */
+const noRocks = (td: TrackData): TrackData => ({ ...td, zgRocks: [] });
+test('zerog: a pod released off-centre is pulled back to the tube\'s axis in about 0.8 s, swings a little past it and settles', () => {
+  const td = noRocks(trackOf('oovo')), z = zgStretch(td), p = zgPod(td, z.straight, 8, 6);
+  let cross = -1, over = 0, crossH = -1, overH = 0;
+  for (let f = 0; f < 3 * 120; f++) {
+    stepPod(p, td, 1 / 120, f / 120, 1, false); const t = (f + 1) / 120, h = zgH(td, p);
+    if (cross < 0 && p.lat <= 0) cross = t; if (cross >= 0) over = Math.min(over, p.lat);
+    if (crossH < 0 && h <= 0) crossH = t; if (crossH >= 0) overH = Math.min(overH, h);
+  }
+  ok(cross > 0.5 && cross < 1.1, `sideways: back on the axis after ${cross.toFixed(2)} s – expected about 0.8 s (0.5 … 1.1)`);
+  ok(crossH > 0.5 && crossH < 1.1, `in height: back on the axis after ${crossH.toFixed(2)} s – expected about 0.8 s (0.5 … 1.1)`);
+  ok(-over > 8 * 0.02 && -over < 8 * 0.25, `sideways it swings ${(-over).toFixed(2)} m past the axis (from 8 m) – expected a slight overshoot, 2 … 25 %`);
+  ok(-overH > 6 * 0.02 && -overH < 6 * 0.25, `in height it swings ${(-overH).toFixed(2)} m past the axis (from 6 m) – expected a slight overshoot, 2 … 25 %`);
+  ok(Math.abs(p.lat) < 0.6 && Math.abs(zgH(td, p)) < 0.6, `after 3 s the pod should rest on the axis: ${p.lat.toFixed(2)} m beside, ${zgH(td, p).toFixed(2)} m above it`);
+  eq(p.events.filter(e => e.type === 'field').length, 0, 'hits on the tube wall:');
+});
+test('zerog: steering and climb / sink push the pod out to about 70 % of the tube radius – never into the wall, and the nose stays on the tube', () => {
+  const td = noRocks(trackOf('oovo')), z = zgStretch(td);
+  for (const [st, pi] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+    const p = zgPod(td, z.straight); p.input.steer = st; p.input.pitch = pi; let yawMax = 0;
+    for (let f = 0; f < 2.6 * 120; f++) { stepPod(p, td, 1 / 120, f / 120, 1, false); yawMax = Math.max(yawMax, zgYawErr(td, p)); }
+    const R = td.main.samples[p.idx].hw + 1.4, reach = Math.min(ZG_REACH * R, R - podParams(p).width - 1.2), lat = p.lat, h = zgH(td, p), name = st ? `steer ${st}` : `climb ${pi}`;
+    near(ZG_REACH, 0.7, 'ZG_REACH:');
+    if (st) { ok(Math.abs(lat - st * reach) < 0.08 * R, `${name}: ${lat.toFixed(1)} m beside the axis – expected ${(st * reach).toFixed(1)} m (70 % of the radius ${R.toFixed(1)} m)`); ok(Math.abs(h) < 1.5, `${name}: the pod left the axis in height (${h.toFixed(1)} m)`); }
+    else { ok(Math.abs(h - pi * reach) < 0.08 * R, `${name}: ${h.toFixed(1)} m above the axis – expected ${(pi * reach).toFixed(1)} m`); ok(Math.abs(lat) < 1.5, `${name}: the pod left the axis sideways (${lat.toFixed(1)} m)`); }
+    eq(p.events.filter(e => e.type === 'field').length, 0, `${name}: hits on the tube wall:`);
+    ok(yawMax < 0.2, `${name}: the nose turned ${(yawMax * 57.3).toFixed(0)}° away from the tube – steering must push the pod, not turn it`);
+  }
+});
+test('zerog: the nose follows the tube by itself – without any input a pod flies every tube from end to end on its axis', () => {
+  for (const [id, n] of [['oovo', 2], ['executioner', 2]] as const) for (let w = 0; w < n; w++) {
+    const td = noRocks(trackOf(id)), z = zgStretch(td, w), p = zgPod(td, z.a + 30, 0, 0, 150);
+    let latMax = 0, hMax = 0, yawMax = 0, f = 0;
+    // (up to 2.2 s before the end: from there the pod is led down to hover height – the check below this one)
+    const stop = z.b - Math.ceil(150 * ZG_EXIT_FROM / DS) - 10;
+    for (; f < 40 * 120 && p.idx < stop; f++) { stepPod(p, td, 1 / 120, f / 120, 1, false); latMax = Math.max(latMax, Math.abs(p.lat)); hMax = Math.max(hMax, Math.abs(zgH(td, p))); yawMax = Math.max(yawMax, zgYawErr(td, p)); }
+    ok(p.idx >= stop, `${id} tube ${w}: the pod did not reach the end (sample ${p.idx} of ${z.b})`);
+    ok(latMax < 3 && hMax < 2, `${id} tube ${w}: the pod wandered ${latMax.toFixed(1)} m sideways and ${hMax.toFixed(1)} m in height from the axis – expected under 3 m / 2 m`);
+    ok(yawMax < 0.12, `${id} tube ${w}: the nose was up to ${(yawMax * 57.3).toFixed(0)}° off the tube's direction`);
+    eq(p.events.filter(e => e.type === 'field').length, 0, `${id} tube ${w}: hits on the tube wall:`);
+  }
+});
+test('zerog: at the end of a tube the pod is led back to the road – even when it is held against the wall or the ceiling', () => {
+  for (const [id, n] of [['oovo', 2], ['executioner', 2]] as const) for (let w = 0; w < n; w++) for (const [st, pi] of [[1, 0], [-1, 0], [0, 1], [0, -1], [0, 0]] as const) {
+    const td = noRocks(trackOf(id)), z = zgStretch(td, w), S = td.main.samples, p = zgPod(td, z.b - 260, 0, 0, 150), hp0 = p.hpL + p.hpR;
+    p.input.steer = st; p.input.pitch = pi; let offRoad = 0;
+    // (the stick is held until the tube lets the pod go; the 40 m after that it flies straight – nobody steers this pod)
+    for (let f = 0; f < 12 * 120 && p.idx < z.b + 20 && p.dead <= 0; f++) {
+      stepPod(p, td, 1 / 120, f / 120, 1, false);
+      if (!p.zeroG) { p.input.steer = 0; p.input.pitch = 0; if (Math.abs(p.lat) > S[p.idx].hw + 0.5) offRoad++; }
+    }
+    const name = `${id} tube ${w}, steer ${st}, climb ${pi}`;
+    ok(p.dead <= 0 && p.idx >= z.b + 20, `${name}: the pod did not get out of the tube (sample ${p.idx}, tube ends at ${z.b}, dead ${p.dead})`);
+    ok(p.grounded || p.pos.y - p.groundY < HOVER + 4, `${name}: the pod leaves the tube ${(p.pos.y - p.groundY).toFixed(1)} m above the road – expected at hover height`);
+    eq(offRoad, 0, `${name}: steps beside the road after the tube:`);
+    ok(hp0 - p.hpL - p.hpR < 0.01, `${name}: leaving the tube cost ${(hp0 - p.hpL - p.hpR).toFixed(1)} hull points`);
+    eq(p.events.filter(e => e.type === 'fall').length, 0, `${name}: falls:`);
+  }
+});
+test('zerog: every tube has a few boulders, 150–200 m apart, drifting slowly and never through the wall', () => {
+  for (const id of ['oovo', 'executioner']) {
+    const td = trackOf(id), S = td.main.samples; ok(td.zgRocks.length > 0, `${id}: no boulders`);
+    for (let w = 0; w < 2; w++) {
+      const z = zgStretch(td, w), rocks = td.zgRocks.filter(r => r.idx >= z.a && r.idx <= z.b).sort((a, b) => a.idx - b.idx), len = (z.b - z.a) * DS;
+      ok(rocks.length >= Math.floor((len - 300) / 200) && rocks.length <= Math.ceil(len / 150), `${id} tube ${w} (${len} m): ${rocks.length} boulders`);
+      for (let k = 1; k < rocks.length; k++) { const d = (rocks[k].idx - rocks[k - 1].idx) * DS; ok(d >= 150 && d <= 200, `${id} tube ${w}: ${d} m between two boulders – expected 150 … 200`); }
+      ok(rocks[0].idx - z.a >= 40 && z.b - rocks[rocks.length - 1].idx >= 40, `${id} tube ${w}: a boulder within 80 m of the tube's end`);
+      for (const r of rocks) {
+        ok(r.r >= 1.5 && r.r <= 3.2, `${id}: boulder radius ${r.r}`);
+        const R = S[r.idx].hw + 1.4; let vmax = 0, prev = zgRockAt(td, r, 0);
+        for (let t = 0.25; t <= 60; t += 0.25) {
+          const q = zgRockAt(td, r, t); vmax = Math.max(vmax, Math.hypot(q.lat - prev.lat, q.h - prev.h) / 0.25); prev = q;
+          ok(Math.hypot(q.lat, q.h) + r.r < R - 0.5, `${id}: the boulder at sample ${r.idx} reaches the tube wall at ${t} s (${Math.hypot(q.lat, q.h).toFixed(1)} m + ${r.r} m of ${R.toFixed(1)} m)`);
+          ok(Math.abs(q.y - (frameAt(td.main, r.idx, S[r.idx].x, S[r.idx].z).groundY + ZG_AXIS + q.h)) < 0.5, 'the boulder\'s world height does not match its offset from the axis');
+        }
+        ok(vmax > 0.2 && vmax < 3, `${id}: the boulder at sample ${r.idx} drifts at up to ${vmax.toFixed(2)} m/s – expected slow, 0.2 … 3`);
+      }
+    }
+  }
+  for (const id of ['boonta', 'frost']) eq(trackOf(id).zgRocks.length, 0, `${id} has no zero-G tube, boulders:`);
+});
+test('zerog: hitting a boulder costs speed and hull like an obstacle rock – flying past it costs nothing', () => {
+  const td = trackOf('oovo'), z = zgStretch(td), rock = td.zgRocks.find(r => r.idx > z.a + 120 && r.idx < z.b - 60)!; ok(rock, 'no boulder in the first tube of oovo');
+  const fly = (off: number) => {
+    // (the boulder is frozen where it is at t = 0: the pod is held on a line `off` metres beside the boulder's centre, at its height)
+    const one: TrackData = { ...td, zgRocks: [{ ...rock, ax: 0, ah: 0 }] }, q0 = zgRockAt(one, one.zgRocks[0], 0);
+    const p = zgPod(one, rock.idx - 60, q0.lat + off, q0.h, 140), hp0 = p.hpL + p.hpR; let vMin = 1e9;
+    for (let f = 0; f < 1.4 * 120; f++) {
+      const before = p.events.length; stepPod(p, one, 1 / 120, 0, 1, false);
+      if (p.events.length === before && p.idx < rock.idx - 3) { // hold the line until the hit: the spring would pull the pod to the axis
+        const s = one.main.samples[p.idx], al = (p.pos.x - s.x) * s.tx + (p.pos.z - s.z) * s.tz, v = Math.hypot(p.vel.x, p.vel.z);
+        p.pos.x = s.x + s.tx * al + s.rx * (q0.lat + off); p.pos.z = s.z + s.tz * al + s.rz * (q0.lat + off); p.pos.y = frameAt(one.main, p.idx, p.pos.x, p.pos.z).groundY + ZG_AXIS + q0.h; p.vel.set(s.tx * v, 0, s.tz * v);
+      }
+      vMin = Math.min(vMin, Math.hypot(p.vel.x, p.vel.z));
+    }
+    return { lost: hp0 - p.hpL - p.hpR, vMin, hits: p.events.filter(e => e.type === 'obstacle').length };
+  };
+  const hit = fly(1.2), miss = fly(rock.r + podParams(zgPod(td, rock.idx)).width + 4);
+  ok(hit.hits >= 1, 'a pod flying into the boulder reports no hit'); ok(hit.lost > 3, `the hit cost ${hit.lost.toFixed(1)} hull points – expected a clear hit like an obstacle rock`);
+  ok(hit.vMin < 140 * 0.9, `the hit slowed the pod to ${hit.vMin.toFixed(0)} m/s only (from 140)`);
+  eq(miss.hits, 0, 'hits when flying past:'); eq(miss.lost, 0, 'hull lost when flying past:');
+});
+test('zerog: a rival flies both tubes of Oovo IV without touching the wall or a boulder', () => {
+  const td = trackOf('oovo');
+  for (let w = 0; w < 2; w++) {
+    const z = zgStretch(td, w), s = td.main.samples[z.a - 30], p = racer(byId('mavik'), td, z.a - 30, 0, s.y + HOVER);
+    p.isPlayer = false; p.grounded = true; p.invuln = 0; p.vel.set(s.tx * 120, 0, s.tz * 120);
+    p.ai = { skill: 0.9, speedF: 1, lineOff: 0, takeShortcut: false, boostUntil: 0, repairMode: false, noiseT: 0, rubber: 1 };
+    let f = 0; for (; f < 40 * 60 && p.idx < z.b + 20 && p.dead <= 0; f++) { const t = 30 + f / 60; aiInputs(p, td, [p], t, null); stepPod(p, td, 1 / 60, t, 1, false); }
+    ok(p.idx >= z.b + 20 && p.dead <= 0, `tube ${w}: the rival did not come through (sample ${p.idx}, tube ${z.a} … ${z.b}, dead ${p.dead})`);
+    eq(p.events.filter(e => e.type === 'field').length, 0, `tube ${w}: hits on the tube wall:`);
+    eq(p.events.filter(e => e.type === 'obstacle').length, 0, `tube ${w}: boulders hit:`);
+  }
+});
+
 
 
 
