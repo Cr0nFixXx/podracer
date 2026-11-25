@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three/webgpu';
-import { PODS, THEMES } from '../game/data';
+import { PODS, STAT_KEYS, THEMES } from '../game/data';
 import { buildPodModel, type PodLook, type PodVisual } from '../game/podModel';
 import { podEnvelope } from '../game/podDesigns';
 import { damageModel, partsDue } from '../game/podDamage';
@@ -77,6 +77,8 @@ export default function PodPreview({ podId, colors, pattern, finish, kit, tune, 
     const def = PODS.find(p => p.id === podId)!;
     const pod = buildPodModel(def, colors, 3, 1024, false, { pattern, finish, kit, tune });
     st.scene.add(pod.group); st.pod = pod; st.podId = podId;
+    // what this preview shows, for the UI check (tools/harness/pui.mjs): pod | fins, intake, nozzle | part tier per tuning value | canopy
+    if (ref.current) ref.current.dataset.podLook = `${podId}|${kit?.fins ?? 0}${kit?.intake ?? 0}${kit?.nozzle ?? 0}|${STAT_KEYS.map(k => tuneTiers(tune)[k]).join('')}|${kit?.canopy ?? 0}`;
     pod.setParts(partsDue(damageModel(podId), st.health, st.health));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [podId, colors, pattern, finish, JSON.stringify(kit), JSON.stringify(tuneTiers(tune))]); // (the model shows tuning as part tiers: a step that changes no tier needs no rebuild)

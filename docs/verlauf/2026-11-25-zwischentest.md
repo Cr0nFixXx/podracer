@@ -37,3 +37,8 @@ Reihenfolge: erst die vier Fehler, dann die sieben Verbesserungen. Jeder Punkt e
 - **Jetzt:** Das jüngste Stück eines Streifens wächst in jedem Bild mit dem Pod mit, seine Vorderkante liegt unter den Triebwerken. Eingeblendet wird nach Flugzeit je Eckpunkt über 0,04 s (`TRACK_FADE_IN`) – bei 120 m/s ist der Streifen 5 m hinter den Triebwerken voll da.
 - **Geprüft:** neue Prüfung `tracks: a stripe grows right under the engines in every frame …` (erst rot, dann grün – bei 30, 120 und 190 m/s). Bilder Boonta-Sand bei 128 m/s, Verfolger-Ansicht: vorher (`tb`) kein Streifen hinter dem Pod, nachher (`ta`) zwei Streifen von den Triebwerken bis zur Kamera; Seitenansicht ebenso.
 - **Nicht geprüft:** in Bewegung (nur Standbilder). Der Schneegraben im Pulverschnee war schon vorher sofort da (Bilder `sn` von Block 3, 120 m/s, Verfolger-Ansicht) – nicht neu angefasst.
+
+### Fehler 3 – Hauptmenü zeigt den gewählten Pod ohne seine eingebauten Teile
+- **Ursache:** Die Vorschau im Hauptmenü bekam Farben, Muster und Lack, aber weder die Style-Teile noch die Tuning-Stufen (`screens.tsx`). Hangar und Rennen bekamen sie.
+- **Jetzt:** Das Hauptmenü reicht `kit` und `tune` durch. Jede Pod-Vorschau schreibt, was sie zeigt, in `data-pod-look` – daran prüft `pui.mjs`.
+- **Geprüft:** `pui.mjs` (Fenster 1280) speichert ein Profil mit Teilen, lädt neu und vergleicht Hauptmenü und Hangar. Vorher rot (`Hauptmenü aurora|000|0000000|0`, `Hangar aurora|213|2212122|1`), nachher grün (beide `aurora|213|2212122|1`).

@@ -57,7 +57,8 @@ export function MainMenu({ profile, go }: { profile: Profile; go: (s: string) =>
         <div className="mt-12 text-stone-400 text-xs tracking-widest uppercase">Aktueller Pod: <span className="text-amber-300">{pod.name}</span></div>
       </div>
       <div className="relative w-1/2">
-        <PodPreview podId={profile.podId} colors={profile.custom[profile.podId].colors} pattern={profile.custom[profile.podId].pattern} finish={profile.custom[profile.podId].finish} className="absolute inset-0" />
+        {/* the pod as it is built: paint, Style-Teile and the Tuning-Teile of its tuning steps – as in the hangar and in the race (2026-11-25: the menu showed it bare) */}
+        <PodPreview podId={profile.podId} colors={profile.custom[profile.podId].colors} pattern={profile.custom[profile.podId].pattern} finish={profile.custom[profile.podId].finish} kit={profile.custom[profile.podId].kit} tune={profile.custom[profile.podId].tuning} className="absolute inset-0" />
       </div>
       </div>
       </Fit>

@@ -38,6 +38,7 @@ Part of the agent manual (`CLAUDE.md`). Read this before you change a menu, the 
 
 ## Hangar
 - **Hangar preview:** the model is rebuilt only when a part tier changes (`tuneTiers(tune)` in the effect's dependencies of `PodPreview.tsx`) – a tuning step that mounts no new part must not rebuild it. The list is headed "Racer" (glossary: Podracer is the game). *(2026-11-22)*
+- **The player's pod is shown as built wherever it is shown (2026-11-25, user: the main menu showed the pod without its parts):** every `<PodPreview>` and `Game.createPods` get `pattern`, `finish`, `kit` AND `tune` from `profile.custom[podId]`. Each preview writes what it shows into `data-pod-look` (`pod | fins intake nozzle | tier per tuning value | canopy`); `pui.mjs` stores a profile with parts, reloads and fails when the main menu and the hangar differ from it. A new place that shows the player's pod: pass all four.
 - **Hangar pod list:** one line per racer (28 px, pod name left, pilot's first name right) – 14 fit; with more racers make the list denser, never scroll. *(S20 Pods)*
 
 ## Saved profile
