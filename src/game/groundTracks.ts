@@ -34,8 +34,12 @@ const TRACK_MIN = 0.2;
 /** how long the wind needs to erase a track in sand (seconds) */
 export const TRACK_SAND_LIFE = 40;
 const LIFE: Record<string, number> = { sand: TRACK_SAND_LIFE, dunes: TRACK_SAND_LIFE, beach: TRACK_SAND_LIFE, ash: TRACK_SAND_LIFE, regolith: Infinity };
-/** how dark the stripe is, relative to sand: the dark grounds need more or a track does not show at all */
-const STRENGTH: Record<string, number> = { ash: 1.8, regolith: 2.2 };
+/** how dark the stripe is, relative to sand: the dark grounds need more or a track does not show at all.
+ *  (2026-11-25: sand became TRACK_BAND 0.165 instead of 0.115 – ash and moon dust keep what they had: 1.8 and 2.2 × 0.115.) */
+const STRENGTH: Record<string, number> = { ash: 1.25, regolith: 1.53 };
+/** opacity of the pressed band and of the darker line along each edge, on sand. 2026-11-25, user: "etwas besser sichtbare Spuren
+ *  im Sand" – they were 0.115 and 0.085. */
+export const TRACK_BAND = 0.165, TRACK_EDGE = 0.12;
 /** Seconds a track stays on a surface (index into SURFACES): 0 = this ground keeps no tracks, Infinity = for the whole race. */
 export function trackLife(surf: number | undefined): number { return surf === undefined ? 0 : LIFE[SURFACES[surf]?.id ?? ''] ?? 0; }
 
@@ -153,7 +157,7 @@ export function buildGroundTracks(layer: TrackLayer, group: THREE.Object3D, disp
   const band: N = oneMinus(smoothstep(0.84, 1.0, d)), edge: N = smoothstep(0.6, 0.78, d).mul(oneMinus(smoothstep(0.86, 1.0, d)));
   const grainy: N = texture(macroTexture(), positionLocal.xz.mul(1 / 7)).r.mul(0.5).add(0.75); // (the mesh is built in world coordinates)
   mat.colorNode = vec3(0, 0, 0);
-  mat.opacityNode = band.mul(0.115).add(edge.mul(0.085)).mul(fade).mul(grainy).mul(varying(info.w)).min(float(0.6));
+  mat.opacityNode = band.mul(TRACK_BAND).add(edge.mul(TRACK_EDGE)).mul(fade).mul(grainy).mul(varying(info.w)).min(float(0.6));
   mat.name = 'groundTracks';
   const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false; mesh.renderOrder = -1; mesh.name = 'groundTracks'; group.add(mesh);
   layer.prime(); g.setDrawRange(0, layer.count * 6); layer.dirty = 0; // (never an empty draw: WebGPU warns about a draw call with an index count of 0)
