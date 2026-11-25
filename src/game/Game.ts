@@ -14,7 +14,7 @@ import { podCollision, podEnvelope } from './podDesigns';
 import { WeatherFx } from './weather';
 import { SH_BACK, setupSunShadow, type SunShadow } from './sunShadow';
 import { DIFFICULTIES, PILOTS, PODS, THEMES, TRACKS } from './data';
-import { CAMERA_NAMES, effectiveStats, MAX_OPPONENTS, type Profile, type GfxSettings } from './settings';
+import { CAMERA_NAMES, ENV_MAP_SIZE, effectiveStats, MAX_OPPONENTS, type Profile, type GfxSettings } from './settings';
 import { pickRivals, rivalKit } from './roster';
 import { buildTrack, type TrackData } from './trackBuilder';
 import { buildWorld, type World, worldTextureSpecs } from './world';
@@ -179,7 +179,7 @@ export class Game {
     // reflections are baked from the brightest sky the timeline reaches and dimmed at runtime (applyEnv)
     const envScene = new THREE.Scene(); const envSky = makeSky(build.envTheme, true); envScene.add(envSky.mesh);
     { const c1 = new THREE.Color(build.envTheme.skyHorizon), c2 = new THREE.Color(build.envTheme.skyTop), L = (c: THREE.Color) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; this.envLum = Math.max(1e-3, L(c1) * 0.6 + L(c2) * 0.4); }
-    this.scene.environment = pm.fromScene(envScene, 0.035, 1, 2000).texture;
+    this.scene.environment = pm.fromScene(envScene, 0.035, 1, 2000, { size: this.profile.gfx.texRes >= 1024 ? ENV_MAP_SIZE : 256 }).texture; // (512 per face since 2026-11-25; 256 only with the smallest textures)
     this.scene.environmentIntensity = 0.85;
     envSky.mesh.geometry.dispose(); (envSky.mesh.material as THREE.Material).dispose();
     pm.dispose();

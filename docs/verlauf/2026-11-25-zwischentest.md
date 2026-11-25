@@ -72,3 +72,9 @@ Reihenfolge: erst die vier Fehler, dann die sieben Verbesserungen. Jeder Punkt e
 ### Verbesserung 5 – etwas nähere Verfolger-Kamera
 - Abstand 12 m + bis 4 m mit dem Tempo statt 13,5 m + bis 5 m, Höhe 4,1 m statt 4,5 m: bei vollem Tempo 14,5 m statt 16,2 m hinter dem Pod (rund 10 % näher). Die weite Kamera bleibt.
 - **Geprüft:** Bilder `cm` (Boonta, 128 m/s und im Stand) und `cn` (Frostspalt mit dem Brute – sein Cockpit hängt am weitesten hinten: nichts ragt ins Bild). Im Pulverschnee sieht man dabei auch den Graben direkt hinter dem Pod entstehen.
+
+### Verbesserung 7 – Schatten- und Reflexions-Auflösung erhöht
+- **Schatten:** Karten 2048 / 3072 / 4096 statt 1024 / 1536 / 2048 (Stufe 1 / 2 / 3) – ein Schattenpixel ist 12 / 10 / 9 cm groß statt 23 / 20 / 18 cm. Mit Kaskaden („Ultra") hat die nahe Kaskade 8 cm. Gilt sofort für jedes gespeicherte Profil (die Stufe ist gespeichert, nicht die Größe).
+- **Reflexionen:** Spiegelungen auf nasser Fahrbahn, Eis und Wasser laufen bei „Hoch" mit 100 % der Bildauflösung statt 75 % („Mittel": 75 % statt 50 %, dort sind sie aber aus). Ein gespeichertes Profil hat seine eigene Zahl – es wird beim ersten Laden einmal um denselben Faktor angehoben (`GFX_REV` 2), danach gilt, was im Menü steht. Der gespiegelte Himmel (auf Pods, Eis, Wasser) hat 512 statt 256 Pixel je Würfelseite.
+- **Geprüft:** zwei neue Prüfungen `resolution: …` (erst rot: „quality 1: map 1024, 23 cm per texel", „[0.75, 1]"; dann grün). Bild `sh` (Boonta): der Schatten des Pods zeigt beide Triebwerke und das Cockpit getrennt, vorher ein weicher Fleck. WebGPU-Prüfung auf „Ultra" (zwei Kaskaden mit 4096, Himmel 512): 0 Fehler und Warnungen.
+- **Nicht geprüft:** die Bildrate auf echter Hardware. Die größeren Karten kosten Füllrate und Speicher (4096² = 64 MB je Karte). Wenn es ruckelt: Schattenqualität eine Stufe tiefer, Spiegelungs-Auflösung auf 75 %.

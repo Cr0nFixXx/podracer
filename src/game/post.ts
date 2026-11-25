@@ -90,7 +90,7 @@ export class PostFX {
       const mrNode = scenePass.getTextureNode('metalrough');
       const normal = sample((uvN: N) => unpackRGBToNormal(nNode.sample(uvN)));
       const s = ssr(sceneColor, depthNode, normal, { metalnessNode: mrNode.r, roughnessNode: mrNode.g, camera });
-      s.resolutionScale = Math.max(0.25, Math.min(1, gfx.reflRes ?? 0.75)); // Session 17: adjustable, default 75 % (was 35 %)
+      s.resolutionScale = Math.max(0.25, Math.min(1, gfx.reflRes ?? 1)); // adjustable; „Hoch" and „Ultra": 100 % (2026-11-25; 75 % before, 35 % before Session 17)
       s.quality.value = 0.22;
       s.maxDistance.value = 130; // far enough to catch buildings, walls and other pods in puddles
       s.thickness.value = 3.5;

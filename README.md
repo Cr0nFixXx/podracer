@@ -187,10 +187,11 @@ Dazu überall drei **Wetterverläufe**: „Aufziehendes Unwetter" (ruhig → hef
 ## Grafik-Einstellungen (Auswahl)
 
 - **Erreichbar** über „Einstellungen → Grafik & Ton" und im Rennen über **Pause (`Esc`) → Grafik-Einstellungen**. **Sofort wirksam:** alle Effekte (Bloom, Ambient Occlusion, God Rays, Unschärfe, Kino-Shader, Linseneffekte), Kantenglättung, Schatten, Textur-Filter, Volumetrie, Partikel, Wetter-Effekte, Sichtweite, LOD, Gegner-Pod-Detail, Render-Skalierung, Sichtfeld, Lautstärke. **Neustart des Rennens nötig:** Texturauflösung, Geometrie/Detaildichte, Tessellation, Material-Optionen, Spiegelungen (SSR), Kaskaden-Schatten, Renderer.
-- **Spiegelungen:** „Screen Space Reflections" spiegeln jetzt auch in Pfützen, auf nasser Fahrbahn und Eis (in „Hoch" und „Ultra" eingeschaltet). Die **Spiegelungs-Auflösung** ist einstellbar (35–100 %, Standard 75 %).
+- **Spiegelungen:** „Screen Space Reflections" spiegeln jetzt auch in Pfützen, auf nasser Fahrbahn und Eis (in „Hoch" und „Ultra" eingeschaltet). Die **Spiegelungs-Auflösung** ist einstellbar (35–100 %; „Hoch" und „Ultra": 100 %, bis 2026-11-25 waren es 75 % – ein gespeichertes Profil wird beim ersten Laden einmal entsprechend angehoben). Der Himmel, den Pods, Eis und Wasser spiegeln, ist doppelt so fein aufgelöst.
 - **Voreinstellung „Ultra":** stellt jede Option auf ihr Maximum (nur Sichtfeld und Bloom-Stärke bleiben). Sehr leistungshungrig.
 - **Neu:** LOD-Distanz (ab wann ferne Bäume/Felsen vereinfacht werden), Gegner-Pod-Detail (bis zu welcher Entfernung Gegner voll detailliert sind), Wetter-Effekte (Aus/Reduziert/Voll), Volumetrie (Nebelbänke und Lichtkegel).
 
+- **Schatten-Auflösung:** die Schattenkarten sind doppelt so fein wie zuvor (2048 / 3072 / 4096 statt 1024 / 1536 / 2048 Pixel Kantenlänge – ein Schattenpixel ist 9–12 cm statt 18–23 cm groß). Wem das zu viel Leistung kostet: Schattenqualität eine Stufe tiefer stellen.
 - **Schatten-Sichtweite:** Schatten reichen je nach Schattenqualität 195 m, 245 m oder 295 m vor den Pod und laufen am Ende weich aus. Mit **Kaskaden-Schatten** (in „Ultra" eingeschaltet, sonst optional) reichen sie 700 m weit: bis 112 m scharf, dahinter weicher. Die weite Stufe kostet einen zusätzlichen Schattenpass in jedem zweiten Bild – nur bei Leistungsreserve einschalten.
 
 | Schalter | Wirkung |

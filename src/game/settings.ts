@@ -6,7 +6,7 @@ import { defaultKeys, defaultPad, normalizeKeys, normalizePad, type KeyMap, type
 export interface GfxSettings {
   preset: 'low' | 'medium' | 'high' | 'ultra' | 'custom';
   renderScale: number;
-  shadows: number; // 0 off, 1 1024, 2 1536, 3 2048 (map size; box and reach: SH_BOX in sunShadow.ts)
+  shadows: number; // 0 off, 1 2048, 2 3072, 3 4096 (map size; box and reach: SH_BOX in sunShadow.ts)
   texRes: number;
   parallax: boolean;
   ao: boolean;
@@ -35,18 +35,24 @@ export interface GfxSettings {
   drawDistance: number;
   showFps: boolean;
   backend?: 'auto' | 'webgl'; // auto = WebGPU with WebGL2 fallback
+  /** revision of the saved settings (`GFX_REV`): an older save gets the raises made since, once */ rev?: number;
   batching?: boolean; // static track geometry as BatchedMesh (per-object culling, fewer draws)
 }
 
 export const PRESETS: Record<'low' | 'medium' | 'high' | 'ultra', Omit<GfxSettings, 'preset' | 'fov' | 'showFps' | 'bloomStrength'>> = {
   low: { renderScale: 0.75, shadows: 0, texRes: 512, parallax: false, ao: false, bloom: false, godRays: false, ssr: false, motionBlur: false, cinematic: false, particles: 0.35, detail: 0.4, geometry: 1, aa: 'none', drawDistance: 0.6, anisotropy: 4, shaderDetail: 0, bumpMapping: true, tessellation: 0, csm: false, lensFx: false, lodBias: 0.6, podDetail: 0.6, weatherFx: 1, volumetrics: 0, reflRes: 0.35 },
-  medium: { renderScale: 1, shadows: 1, texRes: 1024, parallax: false, ao: false, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 0.6, detail: 0.7, geometry: 2, aa: 'fxaa', drawDistance: 0.8, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 0, csm: false, lensFx: true, lodBias: 0.8, podDetail: 0.8, weatherFx: 1, volumetrics: 1, reflRes: 0.5 },
-  high: { renderScale: 1, shadows: 2, texRes: 1024, parallax: true, ao: false, bloom: true, godRays: true, ssr: true, motionBlur: true, cinematic: true, particles: 1, detail: 1, geometry: 2, aa: 'smaa', drawDistance: 1, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 1, csm: false, lensFx: true, lodBias: 1, podDetail: 1, weatherFx: 2, volumetrics: 2, reflRes: 0.75 },
+  medium: { renderScale: 1, shadows: 1, texRes: 1024, parallax: false, ao: false, bloom: true, godRays: true, ssr: false, motionBlur: true, cinematic: true, particles: 0.6, detail: 0.7, geometry: 2, aa: 'fxaa', drawDistance: 0.8, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 0, csm: false, lensFx: true, lodBias: 0.8, podDetail: 0.8, weatherFx: 1, volumetrics: 1, reflRes: 0.75 },
+  high: { renderScale: 1, shadows: 2, texRes: 1024, parallax: true, ao: false, bloom: true, godRays: true, ssr: true, motionBlur: true, cinematic: true, particles: 1, detail: 1, geometry: 2, aa: 'smaa', drawDistance: 1, anisotropy: 8, shaderDetail: 1, bumpMapping: true, tessellation: 1, csm: false, lensFx: true, lodBias: 1, podDetail: 1, weatherFx: 2, volumetrics: 2, reflRes: 1 },
   // Session 14: "Ultra" = every option at its maximum (only field of view and bloom strength stay as chosen)
   ultra: { renderScale: 1.5, shadows: 3, texRes: 2048, parallax: true, ao: true, bloom: true, godRays: true, ssr: true, motionBlur: true, cinematic: true, particles: 1.5, detail: 1.6, geometry: 3, aa: 'smaa', drawDistance: 1.5, anisotropy: 16, shaderDetail: 2, bumpMapping: true, tessellation: 2, csm: true, lensFx: true, lodBias: 2, podDetail: 3, weatherFx: 2, volumetrics: 2, reflRes: 1 },
 };
 
-export const defaultGfx = (): GfxSettings => ({ preset: 'high', backend: 'auto', batching: true, fov: 75, showFps: true, bloomStrength: 0.5, ...PRESETS.high });
+/** Revision of the saved graphics settings. 2 (2026-11-25, user: "Schatten- und Reflektions-Auflösung erhöhen"): the reflections of
+ *  „Hoch" run at 100 % instead of 75 % – a profile saved before gets the same raise once (`sanitizeGfx`), a value chosen after it stays. */
+export const GFX_REV = 2;
+/** Pixels per cube face of the sky that pods, ice and water reflect (it was 256). */
+export const ENV_MAP_SIZE = 512;
+export const defaultGfx = (): GfxSettings => ({ preset: 'high', backend: 'auto', batching: true, fov: 75, showFps: true, bloomStrength: 0.5, rev: GFX_REV, ...PRESETS.high });
 
 export type PaintFinish = 0 | 1 | 2; // 0 = Klarlack, 1 = Chrom-Metallic, 2 = Carbon-Matt
 export const LIVERY_PATTERNS = ['Klassik', 'Streifen', 'Flammen', 'Rennringe', 'Chevron', 'Rallye'] as const;
@@ -149,7 +155,8 @@ export function sanitizeGfx(g: Partial<GfxSettings> | undefined | null, d: GfxSe
     parallax: bool(o.parallax, d.parallax), ao: bool(o.ao, d.ao), bloom: bool(o.bloom, d.bloom),
     bloomStrength: clampNum(o.bloomStrength, 0, 1.5, d.bloomStrength),
     godRays: bool(o.godRays, d.godRays), ssr: bool(o.ssr, d.ssr),
-    reflRes: clampNum(o.reflRes, 0.35, 1, d.reflRes ?? 0.75),
+    // (a save from before GFX_REV 2: the old default of 75 % becomes 100 %, any other value rises by the same factor)
+    reflRes: Math.min(1, clampNum(o.reflRes, 0.35, 1, d.reflRes ?? 1) / (typeof o.rev === 'number' && o.rev >= 2 ? 1 : 0.75)),
     lodBias: clampNum(o.lodBias, 0.5, 2, d.lodBias ?? 1),
     podDetail: clampNum(o.podDetail, 0.5, 3, d.podDetail ?? 1),
     weatherFx: clampInt(o.weatherFx, 0, 2, d.weatherFx ?? 2),
@@ -169,6 +176,7 @@ export function sanitizeGfx(g: Partial<GfxSettings> | undefined | null, d: GfxSe
     showFps: bool(o.showFps, d.showFps),
     backend: oneOf(o.backend, ['auto', 'webgl'] as const, d.backend ?? 'auto'),
     batching: bool(o.batching, d.batching ?? true),
+    rev: GFX_REV,
   };
 }
 

@@ -31,7 +31,7 @@ export function GfxPanels({ profile, update }: { profile: Profile; update: Upd }
         <Slider label="Sichtfeld (FOV)" value={g.fov} min={60} max={100} step={1} onChange={v => set('fov', v)} fmt={v => v + '°'} />
       </Panel>
       <Panel title="Beleuchtung & Material">
-        <Slider label="Schattenqualität" value={g.shadows} min={0} max={3} step={1} onChange={v => set('shadows', v)} fmt={v => ['Aus', '1024 · 195 m', '1536 · 245 m', '2048 · 295 m'][v]} />
+        <Slider label="Schattenqualität" value={g.shadows} min={0} max={3} step={1} onChange={v => set('shadows', v)} fmt={v => ['Aus', '2048 · 195 m', '3072 · 245 m', '4096 · 295 m'][v]} />
         <Slider label="Shader-Details" value={g.shaderDetail ?? 1} min={0} max={2} step={1} onChange={v => set('shaderDetail', v)} fmt={v => ['Niedrig', 'Mittel', 'Hoch'][v]} />
         <Slider label="Tessellation" value={g.tessellation ?? 1} min={0} max={2} step={1} onChange={v => set('tessellation', v)} fmt={v => ['Aus', 'Mittel', 'Hoch'][v]} />
         <Slider label="Partikel" value={g.particles} min={0.2} max={1.5} step={0.1} onChange={v => set('particles', v)} fmt={v => Math.round(v * 100) + '%'} />
@@ -45,7 +45,7 @@ export function GfxPanels({ profile, update }: { profile: Profile; update: Upd }
       </Panel>
       <Panel title="Effekte & Ton">
         <Toggle label="Spiegelungen (Screen Space Reflections)" value={g.ssr} onChange={v => set('ssr', v)} />
-        <Slider label="Spiegelungs-Auflösung" value={g.reflRes ?? 0.75} min={0.35} max={1} step={0.05} onChange={v => set('reflRes', v)} fmt={v => Math.round(v * 100) + '%'} />
+        <Slider label="Spiegelungs-Auflösung" value={g.reflRes ?? 1} min={0.35} max={1} step={0.05} onChange={v => set('reflRes', v)} fmt={v => Math.round(v * 100) + '%'} />
         <Toggle label="Ambient Occlusion" value={g.ao} onChange={v => set('ao', v)} />
         <Toggle label="God Rays" value={g.godRays} onChange={v => set('godRays', v)} />
         <Toggle label="Linseneffekte (Blendung, Regentropfen)" value={g.lensFx ?? true} onChange={v => set('lensFx', v)} />

@@ -25,9 +25,11 @@ export const SH_BEYOND = 2400;
 /** One shadow map, by shadow quality 1 … 3: half width of the box, how far ahead of the player its centre lies, map size. */
 export const SH_BOX = [
   { ext: 0, ahead: 0, map: 0 },
-  { ext: 120, ahead: 76, map: 1024 },  // reaches 196 m ahead, 0.23 m per texel
-  { ext: 150, ahead: 95, map: 1536 },  // 245 m, 0.20 m
-  { ext: 180, ahead: 115, map: 2048 }, // 295 m, 0.18 m
+  // 2026-11-25, user: "Schatten-Auflösung erhöhen" – the maps were 1024 / 1536 / 2048 (23 / 20 / 18 cm per texel). With cascades
+  // every cascade gets the map of the chosen quality: the near one (0 … 112 m) then has 8 cm per texel at quality 3.
+  { ext: 120, ahead: 76, map: 2048 },  // reaches 196 m ahead, 12 cm per texel
+  { ext: 150, ahead: 95, map: 3072 },  // 245 m, 10 cm
+  { ext: 180, ahead: 115, map: 4096 }, // 295 m, 9 cm
 ] as const;
 /** Cascaded shadows: where they end (they fade out over the last quarter) and where the crisp near cascade hands over. */
 export const CSM_FAR = 700, CSM_SPLIT = 0.16;

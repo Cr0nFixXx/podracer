@@ -21,7 +21,7 @@ import { ZG_AXIS, ZG_EXIT_FROM, ZG_REACH, aiInputs, applyDamage, bodyToWorld, co
 import { ACTIONS, KEY_PRESETS, defaultPad, normalizeKeys, normalizePad, type KeyMap, type PadMap } from '../../src/game/keymap';
 import { DAMAGE_RULES, damageModel, lostMessage, partLamps, partsFx, zoneFactor, type DamageZone } from '../../src/game/podDamage';
 import { buildTrack, frameAt, tunnelCeiling, baySameStretch, zgRockAt, DS, TUNNEL_SHOULDER, type Path, type Sample, type TrackData } from '../../src/game/trackBuilder';
-import { defaultProfile, effectiveStats, loadProfile, saveProfile, CAMERA_NAMES, MAX_LAPS, PRESETS, type GfxSettings } from '../../src/game/settings';
+import { defaultProfile, effectiveStats, loadProfile, sanitizeGfx, saveProfile, CAMERA_NAMES, ENV_MAP_SIZE, GFX_REV, MAX_LAPS, PRESETS, type GfxSettings } from '../../src/game/settings';
 import { ALARM_FROM, boostAlarmLevel, boostAlarmVoice } from '../../src/game/audio';
 import { PadRepeater, nextFocus, readPadNav, stepRange, type NavRect, type PadSnapshot } from '../../src/ui/padNav';
 import { FLIGHT_BAND, FLIGHT_LOOK, FLIGHT_SPEED, buildIntroFlight, type FlightPose } from '../../src/game/introFlight';
@@ -2085,6 +2085,21 @@ test('shadow: one map – the ground inside the map lies inside its depth range 
     rig.dispose();
   }
   eq(bad.length, 0, `${bad.length} of ${n} · ${bad.slice(0, 3).join(' · ')} –`);
+});
+// 2026-11-25, user: "Schatten- und Reflektions-Auflösung erhöhen". The maps were 1024 / 1536 / 2048 (18–23 cm per texel), the
+// screen-space reflections ran at 75 % of the picture on „Hoch", and a saved profile kept that 75 % whatever the presets say.
+test('resolution: a shadow texel is at most 12 cm in every shadow quality (maps of 2048 and more)', () => {
+  for (const q of [1, 2, 3]) { const b = SH_BOX[q], texel = b.ext * 2 / b.map; ok(b.map >= 2048 && texel <= 0.12, `quality ${q}: map ${b.map}, ${(texel * 100).toFixed(0)} cm per texel`); }
+  ok(SH_BOX[3].map >= 4096, `the best quality has a map of ${SH_BOX[3].map}`);
+});
+test('resolution: reflections run at full resolution on „Hoch" and „Ultra" – and a profile saved before gets the raise once', () => {
+  eq([PRESETS.high.reflRes, PRESETS.ultra.reflRes], [1, 1], 'preset reflection resolution [Hoch, Ultra]:');
+  const d = defaultProfile().gfx;
+  eq(sanitizeGfx({ ...d, reflRes: 0.75, rev: undefined }, d).reflRes, 1, 'a profile saved with the old 75 %:');
+  ok(Math.abs(sanitizeGfx({ ...d, reflRes: 0.45, rev: undefined }, d).reflRes! - 0.6) < 1e-9, 'a profile saved with 45 % should get the same raise (60 %)');
+  eq(sanitizeGfx({ ...d, reflRes: 0.6, rev: GFX_REV }, d).reflRes, 0.6, 'a value chosen after the raise stays:');
+  eq(sanitizeGfx({ ...d, reflRes: 0.75, rev: undefined }, d).rev, GFX_REV, 'the profile is marked as raised:');
+  ok(ENV_MAP_SIZE >= 512, `the sky reflected on pods, ice and water has ${ENV_MAP_SIZE} pixels per cube face`);
 });
 test('shadow: reach – one map shades at least 190 m ahead of the pod, the cascades 600 m; scenery throws shadows that far', () => {
   for (const q of [1, 2, 3]) { const b = SH_BOX[q]; ok(b.ext + b.ahead >= 190, `quality ${q}: the map ends ${b.ext + b.ahead} m ahead`); ok(b.ext - b.ahead >= 40, `quality ${q}: only ${b.ext - b.ahead} m behind the pod`); ok(b.ext * 2 / b.map <= 0.25, `quality ${q}: ${(b.ext * 2 / b.map).toFixed(2)} m per texel`); }
