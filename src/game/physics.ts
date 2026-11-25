@@ -1278,8 +1278,10 @@ function dtChance(skill: number) { return 0.004 + skill * 0.01; }
 /** Pod-vs-pod contact (shared by the game and the node CI sim). Roll-aware: a knife-edge pod is narrow but tall, so it slips through
  *  side-by-side gaps; pods at clearly different heights pass over/under each other. */
 /** Pod against pod (2026-11-25): hull a contact costs = (closing speed − RAM_FREE m/s) × RAM_RATE, at most RAM_MAX, once for each
- *  of the two pods – shared out so that the pod that is rammed pays RAM_SHARE of the sum (three times what the rammer pays). */
-export const RAM_FREE = 5, RAM_RATE = 1, RAM_MAX = 24, RAM_SHARE = 0.75;
+ *  of the two pods – shared out so that the pod that is rammed pays RAM_SHARE of the sum (three times what the rammer pays).
+ *  RAM_MAX 16: the rammed pod loses at most 24 (it was 22 for each of the two before). With 24 a pod standing still – stuck at a
+ *  rock, parked behind the finish line – lost 36–43 per pod that ran into it and was gone after two of them (sim: 4 → 6 deaths). */
+export const RAM_FREE = 5, RAM_RATE = 1, RAM_MAX = 16, RAM_SHARE = 0.75;
 /** `td`: the track – without it nobody is the rammer (both pods pay the same). */
 export function collidePods(ps: PodState[], time: number, td?: TrackData) {
   for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {

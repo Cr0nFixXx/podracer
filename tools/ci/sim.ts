@@ -59,6 +59,7 @@ for (const def of TRACKS) {
     runs.push(`${['?', 'std', 'sea', 'cave', 'under'][S[i].tun ?? 1]} ${(e - i) * 2}m(h${rMax.toFixed(0)})${td.seaY !== undefined && S[i].tun === 2 ? ` [${(lo - td.seaY).toFixed(1)}m vs sea]` : ''}`); if (tunA < 0 && S[i].tun === 1 && i > 80) tunA = i; }
   let lifted = false, deckFrames = 0, teleports = 0, dbgT = 0; const prevY = pods.map(p => p.pos.y), prevInv = pods.map(p => p.invuln);
   let tunnels = 0, tunLen = 0; for (let i = 1; i < N; i++) { if (S[i].roof > 0) { tunLen += 2; if (!(S[i - 1].roof > 0)) tunnels++; } }
+  const hpWas: number[] = [], hits: string[][] = [];
   const prog0 = pods.map(p => p.prog); const wasDead = pods.map(() => false); const partsLost = new Map<string, number>();
   let deaths = 0, nan = 0, wall = 0, clear = 9, airMax = 0, rolls = 0, slides = 0, dives = 0, aiFrames = 0, breaks = 0, ohHits = 0, zgV = 0, zgN = 0, gV = 0, gN = 0, t = 0, worst = '', airDbg = '', air0 = 0, air0Dist = 0;
   const h = 1 / 120, frames = SECS * 60;
@@ -84,7 +85,11 @@ for (const def of TRACKS) {
     // (no lift in the last 2 s of the run: it would end before the pod has spent its 20 frames on the deck – a false alarm)
     if (tunA >= 0 && !lifted && t < SECS - 2) { const p = pods[1]; if (p.path === 0 && p.dead <= 0 && p.idx >= tunA - 12 && p.idx < tunA - 5) { p.pos.y += S[tunA].roof + 9; p.vel.y = 0; lifted = true; if (process.env.DEBUG) dbgT = t; } }
     if (process.env.DEBUG && lifted && t - dbgT < 1.2 && f % 6 === 0) { const p = pods[1], q = td.paths[p.path].samples[p.idx]; console.log(`   dbg t=${(t - dbgT).toFixed(2)} path=${p.path} idx=${p.idx} tunA=${tunA} y-ground=${(p.pos.y - q.y).toFixed(1)} roof=${q.roof} upper=${p.upper} inRoof=${p.inRoof} dead=${p.dead.toFixed(1)} lat=${p.lat.toFixed(0)} hw=${q.hw.toFixed(0)}`); }
-    for (let k = 0; k < 2; k++) { for (const p of pods) stepPod(p, td, h, t, GRIP, false); collidePods(pods, t, td); }
+    for (let k = 0; k < 2; k++) {
+      for (const p of pods) stepPod(p, td, h, t, GRIP, false); collidePods(pods, t, td);
+      // DEATHS=1: what cost each pod hull, the last six hits (printed when it dies)
+      if (process.env.DEATHS) pods.forEach((p, i) => { const hp = p.hpL + p.hpR, was = hpWas[i] ?? 200; if (hp < was - 0.5) { (hits[i] ??= []).push(`t=${t.toFixed(2)} idx=${p.idx} −${(was - hp).toFixed(0)} [${p.events.map(e => `${e.type}${e.type === 'pod' ? '' : ':' + e.strength.toFixed(0)}`).join(',')}] air=${p.air.toFixed(2)} vy=${p.vel.y.toFixed(0)}`); if (hits[i].length > 6) hits[i].shift(); } hpWas[i] = hp; });
+    }
     pods.forEach((p, i) => { if (p.upper) deckFrames++; const reset = p.invuln > prevInv[i] + 1; prevInv[i] = p.invuln; /* (invulnerability jumped up = respawned in this frame, e.g. the AI's stuck recovery: a reset, not a teleport – exactly that one frame is left out) */ if (p.dead <= 0 && prevY[i] - p.pos.y > 4.5 && i !== 1 && !reset) { teleports++; if (process.env.DEBUG) console.log(`   teleport: pod${i} ${p.def.id} t=${t.toFixed(1)} path=${p.path} idx=${p.idx}/${td.paths[p.path].samples.length} finishIdx=${td.finishIdx} closed=${td.main.closed} dy=${(prevY[i] - p.pos.y).toFixed(1)} invuln=${p.invuln.toFixed(2)} hp=${p.hpL.toFixed(0)}/${p.hpR.toFixed(0)} roof=${td.paths[p.path].samples[p.idx].roof} tun=${td.paths[p.path].samples[p.idx].tun} upper=${p.upper} inRoof=${p.inRoof} grounded=${p.grounded} vy=${p.vel.y.toFixed(1)} y-ground=${(p.pos.y - td.paths[p.path].samples[p.idx].y).toFixed(1)} lat=${p.lat.toFixed(1)} hw=${td.paths[p.path].samples[p.idx].hw.toFixed(1)} bridge=${(td.paths[p.path].samples[p.idx] as { bridge?: unknown }).bridge} underpass=${(td.paths[p.path].samples[p.idx] as { underpass?: unknown }).underpass} gap=${td.paths[p.path].samples[p.idx].gap} ramp=${td.paths[p.path].samples[p.idx].ramp}`); } prevY[i] = p.pos.y; }); // > 4.5 m down within one frame = teleport
     for (const hz of td.hazards) {
       const ph = (((t + hz.phase) % hz.period) + hz.period) % hz.period; hz.state = ph < hz.period * hz.duty ? 1 : ph > hz.period - 1 ? 0.5 : 0;
@@ -95,7 +100,7 @@ for (const def of TRACKS) {
       for (const ev of p.events) { if (p.zeroG && ev.type === 'obstacle') zgHits++; if (p.zeroG && ev.type === 'field') zgWall++; if (ev.type === 'part') { const b = damageModel(p.def.id).parts[ev.part ?? 0]; partsLost.set(b.label, (partsLost.get(b.label) ?? 0) + 1); } if (ev.type === 'break') breaks++; if (ev.type === 'wall' && ev.nx === 0 && ev.nz === 0 && ev.y > 0 && ohIdx >= 0 && Math.abs(p.idx - ohIdx) < 8) ohHits++; }
       p.events.length = 0;
       if (!isFinite(p.pos.x + p.pos.y + p.pos.z + p.vel.x + p.vel.y + p.vel.z + p.yaw + p.roll + p.pitch)) nan++;
-      if (p.dead > 0) { if (!wasDead[i]) deaths++; wasDead[i] = true; p.dead -= 1 / 60; if (p.dead <= 0) respawn(p, td); return; }
+      if (p.dead > 0) { if (!wasDead[i]) { deaths++; if (process.env.DEATHS) { const q = td.paths[p.path].samples[p.idx]; console.log(`   death (${p.dead > 2 ? "explode" : "fall"}): pod${i} t=${t.toFixed(1)} path=${p.path} idx=${p.idx} lat=${p.lat.toFixed(1)} hw=${q.hw.toFixed(0)} y-ground=${(p.pos.y - q.y).toFixed(1)} v=${Math.hypot(p.vel.x, p.vel.z).toFixed(0)} hp=${p.hpL.toFixed(0)}/${p.hpR.toFixed(0)} gap=${!!q.gap} ramp=${q.ramp.toFixed(1)}\n      ${(hits[i] ?? []).join('\n      ')}`); } } wasDead[i] = true; p.dead -= 1 / 60; if (p.dead <= 0) respawn(p, td); return; }
       wasDead[i] = false; if (p.sliding) slides++;
       if (p.air > airMax) { airMax = p.air; if (process.env.DEBUG) airDbg = `pod${i} t=${t.toFixed(1)} air=${p.air.toFixed(1)} idx=${p.idx} path=${p.path} h=${(p.pos.y - p.groundY).toFixed(1)} vy=${p.vel.y.toFixed(1)} lat=${p.lat.toFixed(1)} pitchIn=${p.input.pitch} zeroG=${p.zeroG}`; }
       const path = td.paths[p.path], s = path.samples[p.idx]; const lat = (p.pos.x - s.x) * s.rx + (p.pos.z - s.z) * s.rz;
