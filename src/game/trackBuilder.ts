@@ -72,6 +72,15 @@ export interface Obstacle { path: number; idx: number; lat: number; r: number; k
 /** Overhead structure across the main path (sponsor gantry, start portal): solid between y0 and y1 within ±half metres along the track. */
 export interface Overhead { idx: number; y0: number; y1: number; half: number; /** half-elliptic arch (checkpoint gate): inner radius R, vertical squash sy – the ceiling height depends on the lateral position */ arch?: { R: number; sy: number; /** tube radius towards the inside (default 1.7) */ inner?: number; /** base height relative to the road (default 0) */ yOff?: number; /** vertical thickness (default 3.6) */ thick?: number; /** set-piece index: after its collapse only the two stumps (|lat| > R/2) remain solid */ sp?: number } } // kind 3 = AI keep-out only (hazard / rotor disc), kind 4 = set-piece solid (no generic visual)
 /** Height of the axis of a zero-G tube above the road reference (metres). */
+/** Shape of a jump ramp, 0 … 1 along its length → 0 … 1 of its height: eased in over the first RAMP_EASE of the length, then
+ *  straight up to the lip (slope there = height / length × 2 / (2 − RAMP_EASE) = × 1.25).
+ *  2026-11-25 (shorter jumps): it used to be t^1.7 with 4–6 m of height – 23–28 % at the lip, a pod left it climbing at up to
+ *  50 m/s. Now the ramps are 2–2.6 m high (data.ts) and 8–9 % steep at the lip: at full speed that is about the upward speed
+ *  `launchVy` (physics.ts) gives every pod – the flight leaves the ramp without a kink. Never convex: where a ramp flattens towards
+ *  the lip, a fast pod lifts off before the lip. The LENGTH of the ramps is unchanged on purpose: tunnels, obstacles and surfaces
+ *  are placed around the ramp samples – longer ramps moved tunnels on six tracks. */
+export const RAMP_EASE = 0.4;
+export const rampProfile = (t: number): number => t < RAMP_EASE ? t * t / (RAMP_EASE * (2 - RAMP_EASE)) : (2 * t - RAMP_EASE) / (2 - RAMP_EASE);
 export const ZG_AXIS = 7;
 /** samples (2 m each) over which the road loses its bank before a zero-G tube and gets it back behind it */
 export const ZG_UNBANK = 30;
@@ -424,7 +433,7 @@ export function buildTrack(def: TrackDef): TrackData {
   for (const r of def.ramps) {
     const i0 = findStraight(samples, N, r.at, closed, taken, Math.round((r.len + r.gap + 80) / DS)); taken.push(i0);
     const nr = Math.round(r.len / DS), ng = Math.round(r.gap / DS);
-    for (let k = 0; k < nr; k++) { const t = (k + 1) / nr; samples[(i0 + k) % N].ramp = r.h * Math.pow(t, 1.7); }
+    for (let k = 0; k < nr; k++) samples[(i0 + k) % N].ramp = r.h * rampProfile((k + 1) / nr);
     for (let k = 0; k < ng; k++) { const sm = samples[(i0 + nr + k) % N]; sm.gap = true; }
     rampSpans.push([i0, nr + ng]);
   }

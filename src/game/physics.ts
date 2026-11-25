@@ -22,6 +22,7 @@ export interface PodState {
   name: string; color: string;
   pos: THREE.Vector3; vel: THREE.Vector3; yaw: number; yawRate: number; steer: number;
   path: number; idx: number; lat: number; grounded: boolean; zeroG: boolean; air: number; groundY: number; prevGroundY: number;
+  /** race time at which the pod was last on a jump ramp (leaving the ground within 0.1 s of it, it gets `launchVy`) */ rampAt?: number;
   input: Inputs;
   hpL: number; hpR: number; heat: number; boosting: boolean; overheat: boolean; repairing: boolean; airbraking: boolean;
   lap: number; passedMid: boolean; rel: number; prog: number; finished: boolean; finishTime: number; lapStart: number; lapTimes: number[];
@@ -237,6 +238,24 @@ export function zeroGReach(td: TrackData, p: PodState, halfW: number): { side: n
   // room to both walls (held at full lock it used to come out 8 m beside the rail, with the road already turning)
   if (exit > 0) side += (Math.min(side, Math.max(1.5, roadHw * ZG_EXIT_SIDE)) - side) * exit;
   return { side, up, down: ZG_DOWN, exit };
+}
+
+// ===== Jumps (2026-11-25, user: "reduziere die generelle Sprungweite. Diese ist gerade bei Boost zu weit.") =====
+// Measured before: 160–310 m at full speed (1.2–2.4 s in the air), 250–570 m with boost, 600 m with boost and nose up – over gaps of
+// 40–50 m. The upward speed at the lip was slope × speed (up to 62 m/s, and it depended on the frame the pod left in).
+// Now every pod leaves a ramp with the SAME upward speed, a little less the faster it is: about one second in the air, and the
+// distance grows with the pod's speed, not with its square – about 125 m at full speed, 160 m with boost.
+/** upward speed at the lip (m/s) by the pod's speed: up to JUMP_SLOW m/s → JUMP_VY[0] (a slow pod must still clear a gap of 50 m),
+ *  at JUMP_MID → JUMP_VY[1], from JUMP_FAST on → JUMP_VY[2] */
+export const JUMP_VY: [number, number, number] = [16, 14, 11], JUMP_SLOW = 60, JUMP_MID = 90, JUMP_FAST = 180;
+/** nose up in the air: this share of gravity is carried (it was 0.5 – a jump went twice as far) · and it adds / takes this much at the lip (m/s per full deflection) */
+export const JUMP_GLIDE = 0.25, JUMP_PITCH_UP = 1, JUMP_PITCH_DOWN = 1;
+/** Upward speed (m/s) a pod leaves a ramp with: `speed` over the ground, `pc` −1 (nose down) … 1 (nose up). A very slow pod gets no
+ *  more than a ramp gives (0.24 × speed). */
+export function launchVy(speed: number, pc: number): number {
+  const base = speed <= JUMP_SLOW ? JUMP_VY[0] : speed <= JUMP_MID ? JUMP_VY[0] + (JUMP_VY[1] - JUMP_VY[0]) * (speed - JUMP_SLOW) / (JUMP_MID - JUMP_SLOW)
+    : JUMP_VY[1] + (JUMP_VY[2] - JUMP_VY[1]) * Math.min(1, (speed - JUMP_MID) / (JUMP_FAST - JUMP_MID));
+  return Math.min(base, 0.24 * speed) + (pc > 0 ? pc * JUMP_PITCH_UP : pc * JUMP_PITCH_DOWN);
 }
 
 /** `heatMul` = engine-heat factor of climate and weather (`EnvFx.heat`): while boosting the engines heat up × heatMul, they cool down ÷ heatMul. */
@@ -459,12 +478,18 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
   } else if (!gap && p.pos.y <= targetY + 1.05) {
     const k = 155, c = 22;
     p.vel.y += ((targetY - p.pos.y) * k - p.vel.y * c) * dt;
-    if (S.ramp > 0) p.vel.y = Math.max(p.vel.y, Math.min(28 + Math.max(0, pc) * 6, (p.groundY - p.prevGroundY) / dt * (0.85 + Math.max(0, pc) * 0.2)));
+    if (S.ramp > 0) p.vel.y = Math.max(p.vel.y, Math.min(28, (p.groundY - p.prevGroundY) / dt * 0.85)); // (it follows the ramp up)
+    if (S.ramp > 0) p.rampAt = time;
     p.grounded = true;
   } else {
     // Airborne attitude: nose up = glide (longer jump, costs a little speed), nose down = dive (fast descent)
     const hsA = Math.hypot(p.vel.x, p.vel.z);
-    p.vel.y -= GRAVITY * (pc > 0 ? 1 - 0.5 * pc * Math.min(1, hsA / 70) : 1 - 1.15 * pc) * dt;
+    // take-off from a ramp: the pod leaves it with the upward speed of `launchVy` – not with whatever the ramp's slope, the pod's
+    // speed and the frame it left in had added up to (2026-11-25)
+    // (`rampAt`: behind the lip the road falls back to its level within one sample – at speed the pod is over that sample for a
+    //  frame, still held by its repulsors, before it is in the air)
+    if (wasGrounded && p.rampAt !== undefined && time - p.rampAt < 0.1) { p.vel.y = launchVy(hsA, pc); p.rampAt = undefined; }
+    p.vel.y -= GRAVITY * (pc > 0 ? 1 - JUMP_GLIDE * pc * Math.min(1, hsA / 70) : 1 - 1.15 * pc) * dt;
     if (pc > 0) { if (p.vel.y < 0) p.vel.y *= Math.exp(-0.7 * pc * dt); const dr = Math.exp(-0.1 * pc * dt); p.vel.x *= dr; p.vel.z *= dr; }
     p.grounded = false;
   }

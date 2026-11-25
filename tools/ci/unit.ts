@@ -2154,6 +2154,71 @@ test('landing: a normal landing costs nothing – 30 m/s (a ramp jump) and 36 m/
   ok(jumpEv === 1 && fallEv === 1, `every landing still reports itself (dust, sound, shake): ${jumpEv} and ${fallEv} events`);
 });
 
+// ---- jumps (2026-11-25, user: "reduziere die generelle Sprungweite. Diese ist gerade bei Boost zu weit.") ----
+// Measured before: at full speed 160–310 m (1.2–2.4 s in the air), with boost 250–570 m, with boost and nose up 600 m and more – over
+// gaps of 40–50 m. The launch took its upward speed from the ramp's slope times the pod's speed, up to 62 m/s. Now a ramp throws
+// every pod up at the same, slow speed (`launchVy`): the distance grows with the pod's speed only, not with its square.
+/** every ramp of the main path: first and last ramp sample, last sample of the gap behind it (= `b` when there is none), lip height */
+function rampsOf(td: TrackData): { a: number; b: number; gapEnd: number; h: number }[] {
+  const S = td.main.samples, N = S.length, out: { a: number; b: number; gapEnd: number; h: number }[] = [];
+  for (let i = 1; i < N - 1; i++) if (S[i].ramp > 0 && !(S[i - 1].ramp > 0)) { let b = i; while (b + 1 < N && S[b + 1].ramp > 0) b++; let g = b; while (g + 1 < N && S[g + 1].gap) g++; out.push({ a: i, b, gapEnd: g, h: S[b].ramp }); i = b; }
+  return out;
+}
+/** An Aurora takes the ramp `r`, held on the centre line: `v` m/s at the start of the run-up (50 m before the ramp – further back
+ *  stand a rock on Executioner and its rotor, right on the centre line), throttle
+ *  open, `boost` held or not, `pitch` held on the ramp and in the air. Returns metres from take-off to touch-down (0 = it never came
+ *  down, −1 = it died), seconds in the air, upward speed at take-off, speed at take-off, height of the apex above the lip. */
+function jumpOver(td: TrackData, r: { a: number; b: number; gapEnd: number }, v: number, o: { boost?: boolean; pitch?: number; hz?: number } = {}) {
+  const S = td.main.samples, start = Math.max(2, r.a - 25), p = racer(byId('aurora'), td, start, 0, S[start].y + HOVER), hz = o.hz ?? 120;
+  p.grounded = true; p.invuln = 0; p.vel.set(S[start].tx * v, 0, S[start].tz * v); p.input.throttle = 1;
+  let took = -1, t = 0, vy = 0, v0 = 0, x0 = 0, z0 = 0, y0 = 0, apex = 0;
+  for (let f = 0; f < hz * 12; f++) {
+    { const q = S[p.idx], al = (p.pos.x - q.x) * q.tx + (p.pos.z - q.z) * q.tz, sp = Math.hypot(p.vel.x, p.vel.z); p.pos.x = q.x + q.tx * al; p.pos.z = q.z + q.tz * al; p.yaw = Math.atan2(q.tx, q.tz); p.yawRate = 0; p.vel.x = q.tx * sp; p.vel.z = q.tz * sp; }
+    p.input.boost = !!o.boost; if (o.boost) p.heat = 0;
+    p.input.pitch = (took >= 0 || S[p.idx].ramp > 0) ? o.pitch ?? 0 : 0;
+    const was = p.grounded; stepPod(p, td, 1 / hz, t, 1, false); t += 1 / hz;
+    if (p.dead > 0) return { dist: -1, air: 0, vy, v: v0, apex };
+    if (took < 0 && was && !p.grounded && p.idx >= r.b - 1 && p.idx <= r.gapEnd + 3) { took = t; vy = p.vel.y; v0 = Math.hypot(p.vel.x, p.vel.z); x0 = p.pos.x; z0 = p.pos.z; y0 = p.pos.y; }
+    else if (took >= 0) { apex = Math.max(apex, p.pos.y - y0); if (p.grounded) return { dist: Math.hypot(p.pos.x - x0, p.pos.z - z0), air: t - took, vy, v: v0, apex }; }
+    if (p.idx > r.gapEnd + 500) break;
+  }
+  return { dist: 0, air: 0, vy, v: v0, apex };
+}
+const JUMP_TRACKS = TRACKS.filter(t => t.ramps.length).map(t => t.id);
+test('jump: at full speed a ramp carries a pod 85–145 m (under a second in the air), with boost at most 190 m – every ramp of every track', () => {
+  const bad: string[] = []; let n = 0; const top = podParams(racer(byId('aurora'), trackOf('boonta'), 60, 0, 0)).vmax0;
+  for (const id of JUMP_TRACKS) { const td = trackOf(id); for (const r of rampsOf(td)) {
+    n++;
+    const full = jumpOver(td, r, top * 0.98), boost = jumpOver(td, r, top * 1.3, { boost: true });
+    if (process.env.DEBUG) console.log(`   ${id.padEnd(11)} ramp ${r.a} h ${r.h.toFixed(0)} gap ${(r.gapEnd - r.b) * DS} m · full: ${full.v.toFixed(0)} m/s up ${full.vy.toFixed(1)} → ${full.dist.toFixed(0)} m, ${full.air.toFixed(2)} s, apex ${full.apex.toFixed(1)} · boost: ${boost.v.toFixed(0)} m/s up ${boost.vy.toFixed(1)} → ${boost.dist.toFixed(0)} m, ${boost.air.toFixed(2)} s`);
+    if (!(full.dist >= 85 && full.dist <= 145)) bad.push(`${id} ramp ${r.a}: ${full.dist.toFixed(0)} m at full speed (${full.v.toFixed(0)} m/s, up ${full.vy.toFixed(1)} m/s)`);
+    if (!(full.air <= 1.15)) bad.push(`${id} ramp ${r.a}: ${full.air.toFixed(2)} s in the air at full speed`);
+    if (!(boost.dist >= full.dist && boost.dist <= 190)) bad.push(`${id} ramp ${r.a}: ${boost.dist.toFixed(0)} m with boost (${boost.v.toFixed(0)} m/s, up ${boost.vy.toFixed(1)} m/s; ${full.dist.toFixed(0)} m without)`);
+  } }
+  ok(n >= 20, `only ${n} ramps found`);
+  eq(bad.length, 0, `${bad.length} of ${n} ramps · ${bad.slice(0, 5).join(' · ')} –`);
+});
+test('jump: over a gap nose up carries 10–40 % further, nose down brings the pod down sooner – and every gap is cleared flying level, also by a slow pod', () => {
+  const bad: string[] = []; const top = podParams(racer(byId('aurora'), trackOf('boonta'), 60, 0, 0)).vmax0;
+  for (const id of JUMP_TRACKS) { const td = trackOf(id); for (const r of rampsOf(td)) {
+    const gap = (r.gapEnd - r.b) * DS, full = jumpOver(td, r, top * 0.98), up = jumpOver(td, r, top * 0.98, { pitch: 1 }), down = jumpOver(td, r, top * 0.98, { pitch: -1 }), slow = jumpOver(td, r, 60);
+    // (a ramp without a gap: with the nose up the pod also hovers 1.6 m higher – the repulsors catch it that much sooner, the two cancel out)
+    if (gap > 0 && !(up.dist > full.dist * 1.1 && up.dist < full.dist * 1.4)) bad.push(`${id} ramp ${r.a}: nose up ${up.dist.toFixed(0)} m, level ${full.dist.toFixed(0)} m`);
+    // (a dive right off the lip comes down after 44–50 m: over the widest gaps that is the far edge – the pilot's risk)
+    if (!((down.dist > 0 || gap > 0) && down.dist < full.dist * 0.85)) bad.push(`${id} ramp ${r.a}: nose down ${down.dist.toFixed(0)} m, level ${full.dist.toFixed(0)} m`);
+    if (gap > 0) for (const [name, j, room] of [['level', full, 30], ['slow (60 m/s)', slow, 10]] as const) if (!(j.dist >= gap + room)) bad.push(`${id} ramp ${r.a}: ${name} ${j.dist.toFixed(0)} m over a gap of ${gap} m`);
+  } }
+  eq(bad.length, 0, `${bad.length} · ${bad.slice(0, 5).join(' · ')} –`);
+});
+test('jump: the same jump at 60 and at 120 physics steps a second – the distance differs by less than 8 %', () => {
+  const bad: string[] = []; const top = podParams(racer(byId('aurora'), trackOf('boonta'), 60, 0, 0)).vmax0;
+  for (const id of ['boonta', 'magma', 'crystal']) { const td = trackOf(id); for (const r of rampsOf(td)) for (const boost of [false, true]) {
+    const a = jumpOver(td, r, top * (boost ? 1.3 : 0.98), { boost, hz: 60 }), b = jumpOver(td, r, top * (boost ? 1.3 : 0.98), { boost, hz: 120 });
+    if (!(a.dist > 0 && b.dist > 0 && Math.abs(a.dist - b.dist) < 0.08 * b.dist)) bad.push(`${id} ramp ${r.a}${boost ? ' boost' : ''}: ${a.dist.toFixed(0)} m at 60 Hz, ${b.dist.toFixed(0)} m at 120 Hz`);
+  } }
+  eq(bad.length, 0, `${bad.length} · ${bad.slice(0, 5).join(' · ')} –`);
+});
+
 // ---- night × bad weather (2026-11-23, reported by the user: "extrem schlechte Sicht bei Nacht + Gewitter") ----
 // A night storm was night × overcast: moonlight 0.30 instead of 1.15, a quarter less fill light, black fog. Bad weather at night may
 // change the mood, not the amount of light.
