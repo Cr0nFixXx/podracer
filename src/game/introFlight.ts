@@ -1,6 +1,6 @@
 // ===== Intro flight over the track (2026-11-23, user request) =====
 // Before the countdown the camera flies along the main road in an endless loop until the player presses „Rennen starten":
-// 20–35 m above the centre line, about three times race pace, looking ahead. This file works out the flight from the track data
+// 20–35 m above the centre line, at the speed of a pod without boost, looking ahead. This file works out the flight from the track data
 // alone (no scene, no DOM – unit checks `intro:`); `Game` moves the camera along it.
 //
 // The height above the road is a slow wave inside the band, bent by what is above the road:
@@ -14,8 +14,9 @@ import { DS, type Sample, type TrackData } from './trackBuilder';
 
 /** Height above the road over open ground (m). */
 export const FLIGHT_BAND: [number, number] = [20, 35];
-/** Speed on a straight (m/s) – the field races at about 118 m/s on average, pods top out near 146 m/s. */
-export const FLIGHT_SPEED = 420;
+/** Speed on a straight (m/s): what a pod reaches without boost (138 … 157 m/s by pod; the field averages about 118 m/s over a
+ *  lap). 2026-11-25, user: "viel zu schnell – lieber in Podracer-Geschwindigkeit (ohne Boost)"; it was 420 m/s. */
+export const FLIGHT_SPEED = 145;
 /** The camera looks at the road this far ahead (m). */
 export const FLIGHT_LOOK = 110;
 

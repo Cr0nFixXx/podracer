@@ -32,7 +32,7 @@ npm run build:web  # erzeugt den Ordner build/ für einen Webserver (mehrere Dat
 | Zurück auf die Strecke (Reset) | `⌫` Rücktaste | Back / Select |
 | Pause | `Esc` / `P` | Start |
 
-**Intro-Flug:** Nach dem Laden fliegt die Kamera in einer Endlosschleife über die Strecke – 20 bis 35 m über der Fahrbahn, etwa mit dreifachem Renntempo, durch Tunnel und Röhren hindurch. Unten stehen Strecke, Länge, Runden, Wetter und Gegner. **„Rennen starten"** (auch `Enter` oder Gamepad **A** / **Start**) schneidet auf die Startaufstellung, dann läuft der Countdown. Bei „Neustart" und „Nochmal" entfällt der Flug.
+**Intro-Flug:** Nach dem Laden fliegt die Kamera in einer Endlosschleife über die Strecke – 20 bis 35 m über der Fahrbahn, so schnell wie ein Podracer ohne Boost (rund 520 km/h), durch Tunnel und Röhren hindurch. Unten stehen Strecke, Länge, Runden, Wetter und Gegner. **„Rennen starten"** (auch `Enter` oder Gamepad **A** / **Start**) schneidet auf die Startaufstellung, dann läuft der Countdown. Bei „Neustart" und „Nochmal" entfällt der Flug.
 
 **Gamepad im Menü:** Alle Menüs lassen sich mit dem Gamepad bedienen – auch Pause und Ergebnis. Steuerkreuz oder linker Stick bewegen die Markierung (türkiser Rahmen), **A** wählt aus, **B** geht zurück, **Start** startet das Rennen bzw. setzt es fort. Auf Schiebereglern und Auswahllisten ändern links / rechts den Wert; **LB / RB** springen von dort zur Nachbarspalte. Unten im Fenster steht die Tastenhilfe, solange das Gamepad benutzt wird; bewegt man die Maus, verschwindet sie.
 

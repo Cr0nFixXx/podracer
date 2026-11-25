@@ -1450,15 +1450,19 @@ test('intro: what stands across the road – the camera flies over a gate (start
   for (let k = -4; k <= 4; k++) ok(fl.heightAt(b + k) <= under - 3 && fl.heightAt(b + k) >= 5, `under the arch: ${fl.heightAt(b + k).toFixed(1)} m (underside at ${under.toFixed(1)} m)`);
   ok(fl.heightAt(b + 150) >= 20, `back in the band 300 m after the arch: ${fl.heightAt(b + 150).toFixed(1)} m`);
 });
-test('intro: a calm flight – about three times race pace, no hard turns, no steps in height, one pass takes 20 to 70 seconds (every track)', () => {
+// (2026-11-25, user: "Intro-Flug ist viel zu schnell. Lieber in Podracer-Geschwindigkeit (ohne Boost)" – it was about three times race pace.)
+test('intro: a calm flight – at the speed of a pod without boost, no hard turns, no steps in height, one pass takes 40 seconds to 4 minutes (every track)', () => {
   const bad: string[] = []; const P: FlightPose = { x: 0, y: 0, z: 0, lx: 0, ly: 0, lz: 0, roll: 0 }, Q = { ...P };
-  ok(FLIGHT_SPEED / RACE_PACE >= 3 && FLIGHT_SPEED / RACE_PACE <= 4, `top flight speed ${FLIGHT_SPEED} m/s = ${(FLIGHT_SPEED / RACE_PACE).toFixed(1)} × race pace`);
+  { // what the pods reach on a straight without boost (factory tuning): the flight is no faster than the fastest and no slower than the slowest of them
+    const tops = PODS.map(d => podParams(racer(d, trackOf('boonta'), 60, 0, 0)).vmax0), lo = Math.min(...tops), hi = Math.max(...tops);
+    ok(FLIGHT_SPEED >= lo && FLIGHT_SPEED <= hi, `top flight speed ${FLIGHT_SPEED} m/s – the pods reach ${lo.toFixed(0)} … ${hi.toFixed(0)} m/s without boost`);
+  }
   for (const t of TRACKS) {
     const td = trackOf(t.id), fl = buildIntroFlight(td), N = td.main.samples.length;
     for (let i = 0; i < N - 1; i++) { const d = Math.abs(fl.heightAt(i + 1) - fl.heightAt(i)); if (d > 0.36 * DS + 1e-6) { bad.push(`${t.id} ${i}: the height steps by ${d.toFixed(2)} m in ${DS} m`); break; } }
     let time = 0, dist = 0, maxTurn = 0, maxV = 0, minV = 1e9, maxClimb = 0; const dt = 1 / 60;
     fl.pose(0, P);
-    while (dist < fl.length && time < 200) {
+    while (dist < fl.length && time < 400) {
       const v = fl.speedAt(dist); maxV = Math.max(maxV, v); minV = Math.min(minV, v);
       dist += v * dt; time += dt; fl.pose(dist, Q);
       if (dist < fl.length) { // (a sprint cuts back to its start at the end of the pass)
@@ -1469,8 +1473,8 @@ test('intro: a calm flight – about three times race pace, no hard turns, no st
     }
     const avg = fl.length / time;
     if (process.env.DEBUG) console.log(`   ${t.id.padEnd(12)} pass ${time.toFixed(1)} s · avg ${avg.toFixed(0)} m/s (${(avg / RACE_PACE).toFixed(2)} ×) · speed ${minV.toFixed(0)}–${maxV.toFixed(0)} · turn ${maxTurn.toFixed(2)} rad/s · climb ${maxClimb.toFixed(0)} m/s`);
-    if (time < 20 || time > 70) bad.push(`${t.id}: one pass takes ${time.toFixed(0)} s`);
-    if (avg < 2.3 * RACE_PACE || avg > 3.6 * RACE_PACE) bad.push(`${t.id}: average ${avg.toFixed(0)} m/s = ${(avg / RACE_PACE).toFixed(1)} × race pace`);
+    if (time < 40 || time > 240) bad.push(`${t.id}: one pass takes ${time.toFixed(0)} s`);
+    if (avg < 0.8 * RACE_PACE || avg > 1.3 * RACE_PACE) bad.push(`${t.id}: average ${avg.toFixed(0)} m/s = ${(avg / RACE_PACE).toFixed(1)} × race pace`);
     if (maxV > FLIGHT_SPEED + 0.01 || minV < 60) bad.push(`${t.id}: speed ${minV.toFixed(0)} … ${maxV.toFixed(0)} m/s`);
     if (maxTurn > 2.4) bad.push(`${t.id}: the view turns at ${maxTurn.toFixed(2)} rad/s`);
     if (maxClimb > 140) bad.push(`${t.id}: climbs or sinks at ${maxClimb.toFixed(0)} m/s`);

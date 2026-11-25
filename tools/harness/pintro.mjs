@@ -45,7 +45,7 @@ const c = await game(p, () => { const G = window.__podracer, pl = G.player; retu
 console.log(`state ${a.state} · flown ${a.dist.toFixed(0)} → ${c.dist.toFixed(0)} m of ${a.len} m · race time ${c.raceTime} · pod speed ${c.speed.toFixed(1)} · camera ${c.camToPod.toFixed(0)} m from the pod`);
 console.log(`card: ${a.text}`);
 check(a.state === 'intro', `state is '${a.state}' after loading`);
-check(c.dist > a.dist + 20, `the camera does not fly (${a.dist.toFixed(1)} → ${c.dist.toFixed(1)} m in six frames)`);
+check(c.dist > a.dist + 8, `the camera does not fly (${a.dist.toFixed(1)} → ${c.dist.toFixed(1)} m in six frames)`); // (145 m/s since 2026-11-25: six frames are 14 m at 60 frames/s)
 check(c.raceTime === 0 && c.speed < 1, `the race runs during the intro (time ${c.raceTime}, pod speed ${c.speed})`);
 check(/Boonta/.test(a.text) && /km/.test(a.text) && /Runden\s*2/.test(a.text) && /Wetter/.test(a.text) && /Rennen starten/.test(a.text), `the card lacks track name, length, laps, weather or the button: "${a.text}"`);
 check(!a.hud, 'the race HUD shows during the intro'); check(a.focus.includes('Rennen starten'), `the focus is on "${a.focus}", not on „Rennen starten"`);

@@ -587,7 +587,7 @@ export class Game {
       const rc = Math.abs(pl.rollCtl ?? 0); if (rc > 0.5 && this.prevRoll <= 0.5) this.audio.whoosh(); this.prevRoll = rc;
     }
     { const pl = this.player; this.audio.setBoostAlarm(this.state === 'race' ? boostAlarmLevel(pl.heat, pl.boosting, pl.overT ?? 0, pl.overheat) : 0); } // warning tone: the boost is close to its maximum
-    this.audio.update(fly ? this.flightSpeed * 0.3 : Math.hypot(this.player.vel.x, this.player.vel.z), fly ? 0 : this.player.input.throttle, !fly && this.player.boosting, nd, os, wa, dt);
+    this.audio.update(fly ? this.flightSpeed * 0.87 : Math.hypot(this.player.vel.x, this.player.vel.z), fly ? 0 : this.player.input.throttle, !fly && this.player.boosting, nd, os, wa, dt);
 
     this.hudTimer += dt;
     if (this.hudTimer > 0.085) { this.hudTimer = 0; this.cb.onHud(this.hud()); }
