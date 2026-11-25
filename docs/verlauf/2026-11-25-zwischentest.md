@@ -68,3 +68,7 @@ Reihenfolge: erst die vier Fehler, dann die sieben Verbesserungen. Jeder Punkt e
 ### Verbesserung 4 – etwas besser sichtbare Spuren im Sand
 - Deckkraft der Streifen im Sand (auch Dünen, Strand) von 0,115 auf 0,165, der Randlinie von 0,085 auf 0,12 – rund 45 % mehr. Asche und Mondstaub bleiben, wie sie waren (ihr Faktor wurde entsprechend gesenkt).
 - **Geprüft:** Bild `tc` (Boonta-Sand, 128 m/s, Verfolger- und Seitenansicht) gegen `ta` (vorher): die zwei Streifen sind klar zu erkennen, bleiben aber dezent.
+
+### Verbesserung 5 – etwas nähere Verfolger-Kamera
+- Abstand 12 m + bis 4 m mit dem Tempo statt 13,5 m + bis 5 m, Höhe 4,1 m statt 4,5 m: bei vollem Tempo 14,5 m statt 16,2 m hinter dem Pod (rund 10 % näher). Die weite Kamera bleibt.
+- **Geprüft:** Bilder `cm` (Boonta, 128 m/s und im Stand) und `cn` (Frostspalt mit dem Brute – sein Cockpit hängt am weitesten hinten: nichts ragt ins Bild). Im Pulverschnee sieht man dabei auch den Graben direkt hinter dem Pod entstehen.

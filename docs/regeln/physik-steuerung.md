@@ -34,6 +34,9 @@ Part of the agent manual (`CLAUDE.md`). Read this before you change `physics.ts`
 - **Knife-edge controls:** `stepPod` mixes steer/pitch by the roll amount (`steerMix`, `pitchMix`); `aiInputs` applies the inverse so the AI keeps thinking in turn/pitch. Any new input consumer must read the mixed values. *(S14)*
 - **`Inputs.pitch` / `Inputs.roll` are optional** (old call sites keep compiling). Smoothed states live in `PodState.pitchCtl / rollCtl`; `p.roll = rollBase·(1-knife) + rollCtl·π/2`. *(S10)*
 
+## Cameras
+- **Chase camera (`Game.updateCamera`, mode 0):** `CHASE_DIST` 12 m behind the pod's origin + up to 4 m with speed (`sp × 0.018`), −1.5 m while boosting, `CHASE_HEIGHT` 4.1 m above it; it looks at a point 16 m ahead of the pod. 2026-11-25, user: "etwas nähere Verfolger-Cam" – it was 13.5 m + up to 5 m and 4.5 m high (16.2 m at full speed, now 14.5 m). The cockpit hangs 2.4–6.8 m behind the origin (Brute: 6.75 m): going closer than about 11 m puts the largest cockpit right in front of the lens. The far camera (mode 1: 24 m, 7.6 m) is unchanged. Alpha particles fade out 3–8.5 m in front of any camera – the player's wakes start under the engines, 12 m and more ahead.
+
 ## Pod contact
 - **Pod contact** lives in `physics.ts → collidePods` (game + CI share it). *(S11)*
 - Who gets the event of a contact, and which zone a wall hit counts as: `pods.md` → "Damage". *(2026-11-22)*

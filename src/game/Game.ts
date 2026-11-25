@@ -34,6 +34,8 @@ const C_ICE = new THREE.Color('#d8f2ff'), WHITE_C = new THREE.Color(1, 1, 1);
 export { CAMERA_NAMES };
 
 export interface Standing { name: string; color: string; isPlayer: boolean; gap: string; finished: boolean; }
+/** Chase camera: metres behind the pod's origin at rest (the cockpit hangs 2.4–6.8 m behind the origin) and above it. */
+export const CHASE_DIST = 12, CHASE_HEIGHT = 4.1;
 /** A Gegner's engine smokes below this much hull (percent). The player's own: below 40. */
 const RIVAL_SMOKE = 60;
 export interface HudState {
@@ -992,7 +994,9 @@ export class Game {
     const fx = Math.sin(this.camYaw), fz = Math.cos(this.camYaw);
     const mode = this.camMode;
     if (mode === 0 || mode === 1) {
-      const dist = (mode === 0 ? 13.5 : 24) + Math.min(5, sp * 0.02) - (p.boosting ? 1.5 : 0); const hgt = mode === 0 ? 4.5 : 7.6;
+      // (2026-11-25, user: "etwas nähere Verfolger-Cam" – it was 13.5 m + up to 5 m with speed, 4.5 m high: 16.2 m at full speed, now 14.5 m.
+      //  The far camera is unchanged.)
+      const dist = mode === 0 ? CHASE_DIST + Math.min(4, sp * 0.018) - (p.boosting ? 1.5 : 0) : 24 + Math.min(5, sp * 0.02) - (p.boosting ? 1.5 : 0); const hgt = mode === 0 ? CHASE_HEIGHT : 7.6;
       cam.position.set(p.pos.x - fx * dist + sx, this.camY + hgt + sy, p.pos.z - fz * dist);
       const gy = p.zeroG ? -1e9 : this.world.heightAt(cam.position.x, cam.position.z);
       const S = this.td.paths[p.path].samples[p.idx];
