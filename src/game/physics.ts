@@ -220,7 +220,11 @@ export const ZG_REACH = 0.7, ZG_OMEGA = 3.5, ZG_ZETA = 0.6;
  *  ahead: where the tube narrows, or ends on a road that is narrower than the tube, the reach shrinks in time – a pod held at the
  *  wall is led back onto the road, one held at the ceiling comes down to hover height before the tube lets it go. */
 export const ZG_EXIT_FROM = 2.2, ZG_EXIT_FULL = 0.9, ZG_EXIT_SIDE = 0.35;
-export function zeroGReach(td: TrackData, p: PodState, halfW: number): { side: number; up: number; exit: number } {
+/** Down, the reach ends at the deck: the tube is a circle of 30–56 m radius round an axis only ZG_AXIS = 7 m above the road – 70 % of
+ *  the radius down would be far below the deck (2026-11-25, reported by the user: "man kann durch den Boden tauchen"). Held down,
+ *  the pod sinks to hover height; `stepPod` also holds it there by force. */
+export const ZG_DOWN = ZG_AXIS - HOVER - 0.3;
+export function zeroGReach(td: TrackData, p: PodState, halfW: number): { side: number; up: number; down: number; exit: number } {
   const path = td.paths[p.path], S = path.samples, n = S.length, v = Math.max(20, Math.hypot(p.vel.x, p.vel.z)), look = Math.max(12, Math.round(v * ZG_EXIT_FROM / DS));
   let side = 1e9, up = 1e9, exitAt = -1, roadHw = 0;
   for (let k = 0; k <= look; k += 4) {
@@ -232,7 +236,7 @@ export function zeroGReach(td: TrackData, p: PodState, halfW: number): { side: n
   // towards the end the sideways reach shrinks to the middle third of the road behind the tube: the tube hands the pod back with
   // room to both walls (held at full lock it used to come out 8 m beside the rail, with the road already turning)
   if (exit > 0) side += (Math.min(side, Math.max(1.5, roadHw * ZG_EXIT_SIDE)) - side) * exit;
-  return { side, up, exit };
+  return { side, up, down: ZG_DOWN, exit };
 }
 
 /** `heatMul` = engine-heat factor of climate and weather (`EnvFx.heat`): while boosting the engines heat up × heatMul, they cool down ÷ heatMul. */
@@ -449,7 +453,7 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
     // axis (the tube climbs and falls with the track – damping the absolute speed left the pod metres behind on a slope). Over the
     // last second before the tube ends the point sinks to hover height: the pod leaves the tube where the road begins.
     const R0 = zgR ?? zeroGReach(td, p, P.width), e = R0.exit * R0.exit * (3 - 2 * R0.exit);
-    const hT = pc * R0.up * (1 - e) + (HOVER + 0.8 - ZG_AXIS) * e, axisVy = Math.max(-40, Math.min(40, (p.groundY - p.prevGroundY) / dt));
+    const hT = pc * (pc > 0 ? R0.up : R0.down) * (1 - e) + (HOVER + 0.8 - ZG_AXIS) * e, axisVy = Math.max(-40, Math.min(40, (p.groundY - p.prevGroundY) / dt));
     p.vel.y += (ZG_OMEGA * ZG_OMEGA * (fr.groundY + ZG_AXIS + hT - p.pos.y) - 2 * ZG_ZETA * ZG_OMEGA * (p.vel.y - axisVy)) * dt;
     p.grounded = false;
   } else if (!gap && p.pos.y <= targetY + 1.05) {
@@ -465,6 +469,8 @@ export function stepPod(p: PodState, td: TrackData, dt: number, time: number, gr
     p.grounded = false;
   }
   p.pos.y += p.vel.y * dt;
+  // zero-G: the deck of the tube is solid – the pod stops at hover height (no landing, no damage: it floats)
+  if (p.zeroG && p.pos.y < fr.groundY + HOVER - 0.4) { p.pos.y = fr.groundY + HOVER - 0.4; p.vel.y = Math.max(p.vel.y, Math.max(-40, Math.min(40, (p.groundY - p.prevGroundY) / dt))); }
   // Hard chassis floor above road surface (prevents sinking on steep climbs, ramps & heavy landings)
   if (!gap && !p.zeroG && p.pos.y < fr.groundY + HOVER - 0.52) {
     const gv = (p.groundY - p.prevGroundY) / dt;

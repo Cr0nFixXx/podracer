@@ -1185,7 +1185,9 @@ function buildZgRocks(def: TrackDef, main: Path): ZgRock[] {
         const ax = 2.5 + rnd(k, 5) * 2.5, ah = 1.5 + rnd(k, 6) * 2, room = Math.max(0, R - r - 1.5 - d0);
         const f = Math.min(1, room / Math.hypot(ax, ah)); // (a narrow tube: it swings less)
         const crown = 0.2 + 0.08; // frameAt's road surface on the centre line
-        out.push({ idx: k, lat: Math.cos(ang) * d0, h: Math.sin(ang) * d0, r, ax: ax * f, ah: ah * f, wx: 0.22 + rnd(k, 7) * 0.18, wh: 0.22 + rnd(k, 8) * 0.18, px: rnd(k, 9) * 6.283, ph: rnd(k, 10) * 6.283, y0: s.y + s.ramp + crown + ZG_AXIS, seed: Math.floor(rnd(k, 11) * 1000) });
+        // (2026-11-25: never into the deck – the axis is only ZG_AXIS above the road; the lowest point of a boulder stays 1.2 m above it)
+        const h0 = Math.max(Math.sin(ang) * d0, -ZG_AXIS + r + 1.2 + ah * f);
+        out.push({ idx: k, lat: Math.cos(ang) * d0, h: h0, r, ax: ax * f, ah: ah * f, wx: 0.22 + rnd(k, 7) * 0.18, wh: 0.22 + rnd(k, 8) * 0.18, px: rnd(k, 9) * 6.283, ph: rnd(k, 10) * 6.283, y0: s.y + s.ramp + crown + ZG_AXIS, seed: Math.floor(rnd(k, 11) * 1000) });
       }
       a = -1;
     }

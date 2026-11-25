@@ -1790,7 +1790,7 @@ test('zerog: a pod released off-centre is pulled back to the tube\'s axis in abo
   ok(Math.abs(p.lat) < 0.6 && Math.abs(zgH(td, p)) < 0.6, `after 3 s the pod should rest on the axis: ${p.lat.toFixed(2)} m beside, ${zgH(td, p).toFixed(2)} m above it`);
   eq(p.events.filter(e => e.type === 'field').length, 0, 'hits on the tube wall:');
 });
-test('zerog: steering and climb / sink push the pod out to about 70 % of the tube radius – never into the wall, and the nose stays on the tube', () => {
+test('zerog: steering and climb push the pod out to about 70 % of the tube radius, sink down to hover height – never into the wall, and the nose stays on the tube', () => {
   const td = noRocks(trackOf('oovo')), z = zgStretch(td);
   for (const [st, pi] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
     const p = zgPod(td, z.straight); p.input.steer = st; p.input.pitch = pi; let yawMax = 0;
@@ -1798,7 +1798,8 @@ test('zerog: steering and climb / sink push the pod out to about 70 % of the tub
     const R = td.main.samples[p.idx].hw + 1.4, reach = Math.min(ZG_REACH * R, R - podParams(p).width - 1.2), lat = p.lat, h = zgH(td, p), name = st ? `steer ${st}` : `climb ${pi}`;
     near(ZG_REACH, 0.7, 'ZG_REACH:');
     if (st) { ok(Math.abs(lat - st * reach) < 0.08 * R, `${name}: ${lat.toFixed(1)} m beside the axis – expected ${(st * reach).toFixed(1)} m (70 % of the radius ${R.toFixed(1)} m)`); ok(Math.abs(h) < 1.5, `${name}: the pod left the axis in height (${h.toFixed(1)} m)`); }
-    else { ok(Math.abs(h - pi * reach) < 0.08 * R, `${name}: ${h.toFixed(1)} m above the axis – expected ${(pi * reach).toFixed(1)} m`); ok(Math.abs(lat) < 1.5, `${name}: the pod left the axis sideways (${lat.toFixed(1)} m)`); }
+    else if (pi > 0) { ok(Math.abs(h - reach) < 0.08 * R, `${name}: ${h.toFixed(1)} m above the axis – expected ${reach.toFixed(1)} m`); ok(Math.abs(lat) < 1.5, `${name}: the pod left the axis sideways (${lat.toFixed(1)} m)`); }
+    else { ok(Math.abs(h + (ZG_AXIS - HOVER)) < 1, `${name}: ${h.toFixed(1)} m below the axis – down, the reach ends at hover height over the deck (${(HOVER - ZG_AXIS).toFixed(1)} m)`); ok(Math.abs(lat) < 1.5, `${name}: the pod left the axis sideways (${lat.toFixed(1)} m)`); }
     eq(p.events.filter(e => e.type === 'field').length, 0, `${name}: hits on the tube wall:`);
     ok(yawMax < 0.2, `${name}: the nose turned ${(yawMax * 57.3).toFixed(0)}° away from the tube – steering must push the pod, not turn it`);
   }
@@ -1832,6 +1833,26 @@ test('zerog: at the end of a tube the pod is led back to the road – even when 
     ok(hp0 - p.hpL - p.hpR < 0.01, `${name}: leaving the tube cost ${(hp0 - p.hpL - p.hpR).toFixed(1)} hull points`);
     eq(p.events.filter(e => e.type === 'fall').length, 0, `${name}: falls:`);
   }
+});
+// 2026-11-25, reported by the user: "Schwerkrafttunnel: man kann durch den Boden tauchen". The tube is a circle of 30–56 m radius round
+// an axis 7 m above the deck – 70 % of the radius DOWN is 14–32 m below the deck. Down, the reach ends at hover height.
+test('zerog: the pod cannot dive through the deck of a tube – held down it settles at hover height; thrown down, the deck holds; boulders float above it', () => {
+  for (const [id, n] of [['oovo', 2], ['executioner', 2]] as const) for (let w = 0; w < n; w++) {
+    const td = noRocks(trackOf(id)), z = zgStretch(td, w);
+    const above = (p: PodState) => p.pos.y - frameAt(td.main, p.idx, p.pos.x, p.pos.z).groundY; // metres above the deck
+    for (const st of [0, 1, -1]) {
+      const p = zgPod(td, z.straight); p.input.steer = st; p.input.pitch = -1; let low = 1e9;
+      for (let f = 0; f < 1.8 * 120; f++) { stepPod(p, td, 1 / 120, f / 120, 1, false); low = Math.min(low, above(p)); } // (1.8 s: settled, and still well inside the tube)
+      ok(p.zeroG, `${id} tube ${w}: the check left the tube`);
+      ok(low >= HOVER - 0.6, `${id} tube ${w}, sink held, steer ${st}: the pod came down to ${low.toFixed(1)} m above the deck – it must not go below hover height (${HOVER} m)`);
+      ok(above(p) < HOVER + 1.5, `${id} tube ${w}, sink held, steer ${st}: the pod rests ${above(p).toFixed(1)} m above the deck – expected at hover height`);
+    }
+    const q = zgPod(td, z.straight, 0, -2); q.vel.y = -45; let low = 1e9, hp0 = q.hpL + q.hpR;
+    for (let f = 0; f < 120; f++) { stepPod(q, td, 1 / 120, f / 120, 1, false); low = Math.min(low, above(q)); }
+    ok(low >= HOVER - 0.6, `${id} tube ${w}: thrown down at 45 m/s the pod reached ${low.toFixed(1)} m above the deck – the deck must hold`);
+    eq(hp0 - q.hpL - q.hpR, 0, `${id} tube ${w}: hull lost on the deck of a zero-G tube:`);
+  }
+  for (const id of ['oovo', 'executioner']) { const td = trackOf(id); for (const r of td.zgRocks) for (let t = 0; t <= 60; t += 0.5) { const q = zgRockAt(td, r, t), deck = frameAt(td.main, r.idx, q.x, q.z).groundY; ok(q.y - r.r >= deck + 0.5, `${id}: the boulder at sample ${r.idx} hangs ${(q.y - r.r - deck).toFixed(1)} m above the deck at ${t} s – it must float clear of it`); } }
 });
 test('zerog: every tube has a few boulders, 150–200 m apart, drifting slowly and never through the wall', () => {
   for (const id of ['oovo', 'executioner']) {

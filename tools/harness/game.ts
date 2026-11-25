@@ -228,15 +228,17 @@ let g: Game | null = null; let cur = -1;
     { const g0 = S[G.td.startIdx]; for (const q of G.pods) if (q !== pl && !riv.includes(q)) { q.pos.set(g0.x, g0.y + 2.85, g0.z); q.vel.set(0, 0, 0); q.path = 0; q.idx = G.td.startIdx; } } // rivals of an earlier view: back to the start
     put(pl, start, lat); riv.forEach((q, k) => put(q, start + 22 * (k + 1), lat - 9 * (k + 1)));
     G.state = 'race'; (G as unknown as { keys: Set<string> }).keys.add('KeyW');
+    // `?hold=ArrowUp,…`: further keys held down for the whole flight (2026-11-25: sink in a zero-G tube)
+    const held = (new URLSearchParams(location.search).get('hold') ?? '').split(',').filter(Boolean); for (const c of held) (G as unknown as { keys: Set<string> }).keys.add(c);
     // a 7th value of 1: the player (and the rivals of this view) boost for the last 0.7 s – flames, heat, alarm
     const boostFrom = b0 === '1' ? secs * 60 - 42 : 1e9;
     for (let k = 0; k < secs * 60; k++) { if (k >= boostFrom) { (G as unknown as { keys: Set<string> }).keys.add('ShiftLeft'); for (const q of riv) { q.heat = 0; if (q.ai) q.ai.boostUntil = G.raceTime + 2; } } G.update(1 / 60); hold(pl, lat); riv.forEach((q, j) => hold(q, lat - 9 * (j + 1))); if (k % 2 === 0) G.updateVisuals(); }
-    (G as unknown as { keys: Set<string> }).keys.delete('ShiftLeft');
+    (G as unknown as { keys: Set<string> }).keys.delete('ShiftLeft'); for (const c of held) (G as unknown as { keys: Set<string> }).keys.delete(c);
     G.updateVisuals(); G.updateLens(1); for (let k = 0; k < 10; k++) G.updateCamera(0.5); // (the lens keeps what the weather and the wake put on it)
     chase = true;
     // a 6th value: instead of the chase camera, a camera that many metres to the right of the pod (negative: left), 14 m ahead of it, looking back at it
     if (side) { const s = S[pl.idx]; G.camera.position.set(pl.pos.x + s.rx * side + s.tx * 14, pl.pos.y + 1.6, pl.pos.z + s.rz * side + s.tz * 14); G.camera.up.set(0, 1, 0); G.camera.lookAt(pl.pos.x - s.tx * 4, pl.pos.y - 0.6, pl.pos.z - s.tz * 4); G.camera.fov = 62; }
-    (window as unknown as Record<string, unknown>).coverInfo = `probe plough: player at sample ${pl.idx}, ${Math.hypot(pl.vel.x, pl.vel.z).toFixed(0)} m/s, snow ahead ${(pl.snowDepth ?? 0).toFixed(2)} m, cut ${(pl.snowPack ?? 0).toFixed(2)}`;
+    (window as unknown as Record<string, unknown>).coverInfo = `probe plough: player at sample ${pl.idx}, ${Math.hypot(pl.vel.x, pl.vel.z).toFixed(0)} m/s, ${(pl.pos.y - pl.groundY).toFixed(2)} m above the ground${pl.zeroG ? ' (zero-G)' : ''}, snow ahead ${(pl.snowDepth ?? 0).toFixed(2)} m, cut ${(pl.snowPack ?? 0).toFixed(2)}`;
   } else if (view.startsWith('fly_')) { // the intro flight (2026-11-23): fly_<metres into the pass> – the game's own flight camera, field of view and shadows
     G.startIntro(); G.flightDist = +view.slice(4); for (let k = 0; k < 12; k++) G.updateCamera(0.5);
     chase = true;
