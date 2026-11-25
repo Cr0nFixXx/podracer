@@ -7,12 +7,12 @@ import { damageModel, partsDue } from '../game/podDamage';
 import { makeSky } from '../game/sky';
 import { tuneTiers } from '../game/podKitParts';
 
-interface Props { podId: string; colors: [string, string, string]; pattern?: number; finish?: number; /** Style-Teile */ kit?: PodLook['kit']; /** tuning steps (their parts show on the pod) */ tune?: PodLook['tune'];
+interface Props { podId: string; colors: [string, string, string]; pattern?: number; finish?: number; /** Style-Teile and the paint of the add-on parts */ kit?: PodLook['kit']; /** tuning steps (their parts show on the pod) */ tune?: PodLook['tune']; /** the own colour of the add-on parts */ partColor?: string;
   /** Schadens-Vorschau: engine health in percent (both sides); Bruchteile below their step are gone. Default 100 */ health?: number; className?: string; autoRotate?: boolean; }
 interface St { scene: THREE.Scene; cam: THREE.PerspectiveCamera; pod: PodVisual | null; podId: string; drag: boolean; rot: number; lastX: number; zoom: number; health: number; }
 
 /** Rotating hangar preview – WebGPURenderer (WebGPU, automatic WebGL2 fallback). */
-export default function PodPreview({ podId, colors, pattern, finish, kit, tune, health = 100, className, autoRotate = true }: Props) {
+export default function PodPreview({ podId, colors, pattern, finish, kit, tune, partColor, health = 100, className, autoRotate = true }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const stateRef = useRef<St | null>(null);
 
@@ -75,13 +75,13 @@ export default function PodPreview({ podId, colors, pattern, finish, kit, tune, 
     const st = stateRef.current; if (!st) return;
     if (st.pod) { st.scene.remove(st.pod.group); st.pod.dispose(); }
     const def = PODS.find(p => p.id === podId)!;
-    const pod = buildPodModel(def, colors, 3, 1024, false, { pattern, finish, kit, tune });
+    const pod = buildPodModel(def, colors, 3, 1024, false, { pattern, finish, kit, tune, partColor });
     st.scene.add(pod.group); st.pod = pod; st.podId = podId;
-    // what this preview shows, for the UI check (tools/harness/pui.mjs): pod | fins, intake, nozzle | part tier per tuning value | canopy
-    if (ref.current) ref.current.dataset.podLook = `${podId}|${kit?.fins ?? 0}${kit?.intake ?? 0}${kit?.nozzle ?? 0}|${STAT_KEYS.map(k => tuneTiers(tune)[k]).join('')}|${kit?.canopy ?? 0}`;
+    // what this preview shows, for the UI check (tools/harness/pui.mjs): pod | fins, intake, nozzle | part tier per tuning value | canopy [| paint of the parts]
+    if (ref.current) ref.current.dataset.podLook = `${podId}|${kit?.fins ?? 0}${kit?.intake ?? 0}${kit?.nozzle ?? 0}|${STAT_KEYS.map(k => tuneTiers(tune)[k]).join('')}|${kit?.canopy ?? 0}${kit?.paint ? `|paint ${kit.paint}${kit.paint === 3 ? ' ' + (partColor ?? '') : ''}` : ''}`;
     pod.setParts(partsDue(damageModel(podId), st.health, st.health));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [podId, colors, pattern, finish, JSON.stringify(kit), JSON.stringify(tuneTiers(tune))]); // (the model shows tuning as part tiers: a step that changes no tier needs no rebuild)
+  }, [podId, colors, pattern, finish, JSON.stringify(kit), JSON.stringify(tuneTiers(tune)), partColor]); // (the model shows tuning as part tiers: a step that changes no tier needs no rebuild)
 
   useEffect(() => { // Schadens-Vorschau: no rebuild, the model only drops or gets back its Bruchteile
     const st = stateRef.current; if (!st) return;

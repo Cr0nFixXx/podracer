@@ -59,13 +59,17 @@ export const LIVERY_PATTERNS = ['Klassik', 'Streifen', 'Flammen', 'Rennringe', '
 export const PAINT_FINISHES = ['Klarlack', 'Metallic', 'Matt'] as const;
 
 /** Style-Teile of a pod: one choice per slot, 0 = Werk (factory look). Look only – they never change how the pod drives. */
-export interface PodKit { fins: number; intake: number; nozzle: number; canopy: number }
+export interface PodKit { fins: number; intake: number; nozzle: number; canopy: number; /** paint of the add-on parts, see KitSpec.paint */ paint?: number }
 export const KIT_SLOTS: { key: keyof PodKit; label: string; choices: readonly string[] }[] = [
   { key: 'fins', label: 'Finnen', choices: ['Werk', 'Haifinne', 'Doppel-Leitwerk', 'Pfeilflügel'] },
   { key: 'intake', label: 'Einlass', choices: ['Werk', 'Gitter', 'Langer Dorn', 'Irisblende'] },
   { key: 'nozzle', label: 'Düse', choices: ['Werk', 'Lang', 'Schubvektor-Paddel', 'Zackenkrone'] },
   { key: 'canopy', label: 'Kanzel', choices: ['Klar', 'Rauch', 'Bernstein', 'Spiegel'] },
+  // 2026-11-25 (user: "Tuning-Teile auch lackierbar machen"): the shells of all add-on parts – Tuning-Teile and Style-Teile
+  { key: 'paint', label: 'Lack der Teile', choices: ['Werk (Metall)', 'Farbe 1', 'Farbe 2', 'Eigene Farbe'] },
 ];
+/** the own colour of the add-on parts until the player picks one */
+export const PART_COLOR = '#d8dde6';
 
 export interface PodCustom {
   colors: [string, string, string];
@@ -76,6 +80,8 @@ export interface PodCustom {
   finish?: PaintFinish;
   /** Style-Teile; undefined = everything Werk */
   kit?: PodKit;
+  /** the own colour of the add-on parts (`kit.paint` 3), '#rrggbb' */
+  partColor?: string;
 }
 
 export interface RaceConfig {
@@ -127,6 +133,7 @@ export function sanitizeCustom(c: Partial<PodCustom> | undefined | null, base: P
   if (c?.pattern !== undefined && c.pattern !== null) out.pattern = clampInt(c.pattern, 0, LIVERY_PATTERNS.length - 1, 0); // absent = the pod's factory pattern
   if (c?.finish !== undefined && c.finish !== null) out.finish = clampInt(c.finish, 0, PAINT_FINISHES.length - 1, 0) as PaintFinish;
   if (c?.kit && typeof c.kit === 'object') out.kit = Object.fromEntries(KIT_SLOTS.map(s => [s.key, clampInt((c.kit as Partial<PodKit>)[s.key], 0, s.choices.length - 1, 0)])) as unknown as PodKit;
+  { const pc = c?.partColor; if (typeof pc === 'string' && /^#[0-9a-fA-F]{6}$/.test(pc)) out.partColor = pc.toLowerCase(); }
   return out;
 }
 

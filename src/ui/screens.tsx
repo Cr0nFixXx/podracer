@@ -4,7 +4,7 @@ import { KeyBindings, PadBindings } from './KeyBindings';
 import { resolveEnvironment, sanitizeEnv, timeOptionsFor, weatherOptionsFor, type TimeOfDay, type WeatherKind } from '../game/environment';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIFFICULTIES, PILOTS, PODS, STAT_KEYS, STAT_LABELS, THEMES, TRACKS, type StatKey } from '../game/data';
-import { effectiveStats, KIT_SLOTS, LIVERY_PATTERNS, MAX_LAPS, MAX_OPPONENTS, PAINT_FINISHES, type PaintFinish, type PodKit, type Profile } from '../game/settings';
+import { effectiveStats, KIT_SLOTS, LIVERY_PATTERNS, MAX_LAPS, MAX_OPPONENTS, PAINT_FINISHES, PART_COLOR, type PaintFinish, type PodKit, type Profile } from '../game/settings';
 import { buildTrack, type TrackData } from '../game/trackBuilder';
 import { damageModel } from '../game/podDamage';
 import { CAMERA_NAMES, fmt } from '../game/Game';
@@ -58,7 +58,7 @@ export function MainMenu({ profile, go }: { profile: Profile; go: (s: string) =>
       </div>
       <div className="relative w-1/2">
         {/* the pod as it is built: paint, Style-Teile and the Tuning-Teile of its tuning steps – as in the hangar and in the race (2026-11-25: the menu showed it bare) */}
-        <PodPreview podId={profile.podId} colors={profile.custom[profile.podId].colors} pattern={profile.custom[profile.podId].pattern} finish={profile.custom[profile.podId].finish} kit={profile.custom[profile.podId].kit} tune={profile.custom[profile.podId].tuning} className="absolute inset-0" />
+        <PodPreview podId={profile.podId} colors={profile.custom[profile.podId].colors} pattern={profile.custom[profile.podId].pattern} finish={profile.custom[profile.podId].finish} kit={profile.custom[profile.podId].kit} tune={profile.custom[profile.podId].tuning} partColor={profile.custom[profile.podId].partColor} className="absolute inset-0" />
       </div>
       </div>
       </Fit>
@@ -210,7 +210,7 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
   const setCustom = (c: typeof custom) => update(p => ({ ...p, custom: { ...p.custom, [sel]: c } }));
   const setColor = (i: number, v: string) => { const cols = [...custom.colors] as [string, string, string]; cols[i] = v; setCustom({ ...custom, colors: cols }); };
   const setTune = (k: StatKey, v: number) => setCustom({ ...custom, tuning: { ...custom.tuning, [k]: Math.max(0, Math.min(5, v)) } });
-  const setKit = (k: keyof PodKit, v: number) => setCustom({ ...custom, kit: { fins: 0, intake: 0, nozzle: 0, canopy: 0, ...(custom.kit ?? {}), [k]: v } });
+  const setKit = (k: keyof PodKit, v: number) => setCustom({ ...custom, kit: { fins: 0, intake: 0, nozzle: 0, canopy: 0, paint: 0, ...(custom.kit ?? {}), [k]: v } });
   const [tab, setTab] = useState<'lack' | 'teile'>('lack');
   // Schadens-Vorschau: engine health of the preview pod (both sides) and the racer's Bruchteile per step
   const [health, setHealth] = useState(100);
@@ -240,7 +240,7 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
           </Panel>
           <div className="flex flex-col gap-4 min-h-0">
             <div className="relative flex-1 min-h-[210px] border border-amber-500/20 bg-black/40 clip-corner overflow-hidden">
-              <PodPreview podId={sel} colors={custom.colors} pattern={custom.pattern} finish={custom.finish} kit={custom.kit} tune={custom.tuning} health={health} className="absolute inset-0" />
+              <PodPreview podId={sel} colors={custom.colors} pattern={custom.pattern} finish={custom.finish} kit={custom.kit} tune={custom.tuning} partColor={custom.partColor} health={health} className="absolute inset-0" />
               <div className="absolute top-3 left-4 pointer-events-none">
                 <div className="font-display text-2xl text-amber-100">{pod.name}</div>
                 <div className="text-stone-300 text-xs max-w-md">{pod.desc}</div>
@@ -300,17 +300,26 @@ export function Garage({ profile, update, go }: { profile: Profile; update: Upd;
               </>) : (
               <div className="grid grid-cols-2 gap-x-5 gap-y-2.5">
                 {KIT_SLOTS.map(sl => (
-                  <div key={sl.key}>
-                    <div className="text-[10px] uppercase tracking-widest text-stone-300 mb-1">{sl.label}</div>
-                    <div className="flex flex-wrap gap-1">
-                      {sl.choices.map((c, i) => (
-                        <button key={c} data-kit={`${sl.key}:${i}`} onClick={() => setKit(sl.key, i)} className={`px-1.5 py-0.5 border text-[10px] ${(custom.kit?.[sl.key] ?? 0) === i ? 'border-amber-300 bg-amber-400/15 text-amber-200' : 'border-stone-700 text-stone-300 hover:border-stone-400'}`}>{c}</button>
-                      ))}
+                  <div key={sl.key} className={sl.key === 'paint' ? 'col-span-2 flex items-end gap-4' : undefined}>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-widest text-stone-300 mb-1">{sl.label}</div>
+                      <div className="flex flex-wrap gap-1">
+                        {sl.choices.map((c, i) => (
+                          <button key={c} data-kit={`${sl.key}:${i}`} onClick={() => setKit(sl.key, i)} className={`px-1.5 py-0.5 border text-[10px] ${(custom.kit?.[sl.key] ?? 0) === i ? 'border-amber-300 bg-amber-400/15 text-amber-200' : 'border-stone-700 text-stone-300 hover:border-stone-400'}`}>{c}</button>
+                        ))}
+                      </div>
                     </div>
+                    {/* the own colour of the add-on parts: picker and swatches, shown with „Eigene Farbe" (2026-11-25) */}
+                    {sl.key === 'paint' && (custom.kit?.paint ?? 0) === 3 && (
+                      <div className="flex items-center gap-1.5" data-part-color>
+                        <input type="color" aria-label="Farbe der Teile" value={custom.partColor ?? PART_COLOR} onChange={e => setCustom({ ...custom, partColor: e.target.value })} className="w-6 h-6 bg-transparent cursor-pointer" />
+                        <div className="flex flex-wrap gap-1">{SWATCHES.map(sw => <button key={sw} onClick={() => setCustom({ ...custom, partColor: sw })} className={`w-5 h-5 border ${(custom.partColor ?? PART_COLOR) === sw ? 'border-white scale-110' : 'border-black/50'}`} style={{ background: sw }} />)}</div>
+                      </div>
+                    )}
                   </div>
                 ))}
                 <div className="col-span-2 flex items-center justify-between gap-3 text-[10px] text-stone-500">
-                  <span>Style-Teile ändern nur das Aussehen. Tuning-Teile wachsen mit den Tuning-Stufen rechts: ab Stufe 2 klein, ab Stufe 4 groß.</span>
+                  <span>Style-Teile ändern nur das Aussehen. Tuning-Teile wachsen mit den Tuning-Stufen rechts: ab Stufe 2 klein, ab Stufe 4 groß. „Lack der Teile" färbt die Gehäuse beider.</span>
                   <button onClick={() => setCustom({ ...custom, kit: undefined })} className={`shrink-0 px-1.5 py-1 border ${custom.kit && Object.values(custom.kit).some(v => v > 0) ? 'border-stone-700 text-stone-300 hover:border-stone-400' : 'border-amber-400 text-amber-200'}`}>Alles Werk</button>
                 </div>
               </div>

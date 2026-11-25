@@ -304,7 +304,7 @@ export class Game {
       const colors = custom ? custom.colors : e.def.colors;
       const geo = this.profile.gfx.geometry;
       // player: saved paint, Style-Teile and the Tuning-Teile of the tuning steps · Gegner: paint pattern and Style-Teile by grid slot (look only)
-      const podOpts = e.isPlayer ? { pattern: custom?.pattern, finish: custom?.finish, kit: custom?.kit, tune: custom?.tuning } : { pattern: (g + 1) % 6, kit: rivalKit(g * 31 + e.def.id.length * 7 + e.def.id.charCodeAt(0)) };
+      const podOpts = e.isPlayer ? { pattern: custom?.pattern, finish: custom?.finish, kit: custom?.kit, tune: custom?.tuning, partColor: custom?.partColor } : { pattern: (g + 1) % 6, kit: rivalKit(g * 31 + e.def.id.length * 7 + e.def.id.charCodeAt(0)) };
       const vis = buildPodModel(e.def, colors, geo, this.profile.gfx.texRes, !e.isPlayer, podOpts);
       this.scene.add(vis.group);
       const eLat = Math.min(1, Math.abs(lat) / s.hw);

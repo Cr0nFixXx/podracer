@@ -53,16 +53,22 @@ for (const [w, h] of sizes) {
   if (w === 1280) { await click(p, 'Rennen starten'); await sleep(600); const listed = () => p.evaluate(() => ['Frostspalt-Ring', 'Boonta-Kessel'].map(n => document.body.textContent.includes(n))); const before = await listed(); await p.select('select[aria-label="Planet"]', 'Tatooine'); await sleep(400); const after = await listed(); const fine = before[0] && before[1] && !after[0] && after[1]; console.log('planet filter "Tatooine": Frostspalt-Ring (Ando Prime) listed before/after:', before[0], after[0], '· Boonta-Kessel (Tatooine) before/after:', before[1], after[1], fine ? 'ok' : 'FAIL'); if (!fine) bad++; }
   // 2026-11-25 (reported by the user: "im Hauptmenü werden beim ausgewählten Podracer nicht die eingebauten Teile angezeigt"): a pod
   // with Tuning-Teile and Style-Teile must look the same in the main menu and in the hangar. Every pod preview writes what it shows
-  // into `data-pod-look` (pod | fins, intake, nozzle | part tier per tuning value | canopy).
+  // into `data-pod-look` (pod | fins, intake, nozzle | part tier per tuning value | canopy | paint of the parts).
   if (w === 1280) {
     await click(p, 'Zurück'); await sleep(400);
     const look = () => p.evaluate(() => document.querySelector('[data-pod-look]')?.dataset.podLook ?? '(no pod preview)');
     const pod = (await look()).split('|')[0];
-    await p.evaluate(id => localStorage.setItem('podracer-profile-v2', JSON.stringify({ podId: id, custom: { [id]: { tuning: { topSpeed: 4, accel: 4, turn: 2, traction: 4, airbrake: 2, cooling: 4, repair: 4 }, kit: { fins: 2, intake: 1, nozzle: 3, canopy: 1 } } } })), pod);
+    await p.evaluate(id => localStorage.setItem('podracer-profile-v2', JSON.stringify({ podId: id, custom: { [id]: { tuning: { topSpeed: 4, accel: 4, turn: 2, traction: 4, airbrake: 2, cooling: 4, repair: 4 }, kit: { fins: 2, intake: 1, nozzle: 3, canopy: 1, paint: 3 }, partColor: '#27a36d' } } })), pod);
     await p.reload(); await p.waitForFunction(() => document.body.textContent.includes('Rennen starten') && document.querySelector('[data-pod-look]'), { timeout: 120000 }); await sleep(600);
     const menu = await look(); await click(p, 'Hangar & Tuning'); await sleep(900); const hangar = await look();
-    const want = `${pod}|213|2212122|1`, fine = menu === want && hangar === want;
+    const want = `${pod}|213|2212122|1|paint 3 #27a36d`, fine = menu === want && hangar === want;
     console.log(`pod with parts: main menu shows "${menu}", hangar shows "${hangar}", built: "${want}" ${fine ? 'ok' : 'FAIL'}`); if (!fine) bad++;
+    // the „Teile" tab of the hangar with the own colour of the parts chosen (its tallest state: picker and swatches show) must fit too
+    await p.evaluate(() => document.querySelector('[data-tab="teile"]').click()); await sleep(700);
+    { const issues = await audit(p), picker = await p.evaluate(() => !!document.querySelector('[data-part-color] input[type=color]'));
+      if (!picker) issues.push('no colour picker for the parts'); if (issues.length) bad++;
+      console.log(`${w}x${h} garage · Teile, own part colour: ${issues.length ? 'FAIL ' + issues.slice(0, 3).join(' | ') : 'ok'}`);
+      shots.push([`${w}x${h} garage Teile`, 'data:image/jpeg;base64,' + Buffer.from(await p.screenshot({ type: 'jpeg', quality: 70 })).toString('base64'), w, h]); }
     await p.evaluate(() => localStorage.removeItem('podracer-profile-v2'));
   }
   const uni = new Set(scales).size === 1; console.log(`${w}x${h} uniform UI scale across screens: ${uni ? 'ok (' + scales[0] + ')' : 'FAIL ' + [...new Set(scales)].join(', ')}`); if (!uni) bad++;

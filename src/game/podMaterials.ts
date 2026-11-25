@@ -34,7 +34,7 @@ function safeHullNormal(nTex: THREE.Texture, tuv: N, scale: number) {
 }
 
 export interface HullU {
-  uPaint2: { value: THREE.Color }; uGlowCol: { value: THREE.Color }; uWear: { value: number }; uScorch: { value: number }; uHeat: { value: number }; uGrime: { value: number }; uLivery: { value: number };
+  uPaint2: { value: THREE.Color }; /** the own colour of the add-on parts (paint mode 4) */ uPaint3: { value: THREE.Color }; uGlowCol: { value: THREE.Color }; uWear: { value: number }; uScorch: { value: number }; uHeat: { value: number }; uGrime: { value: number }; uLivery: { value: number };
   /** Treffermarken: the last HIT_MARKS hits on this hull – xyz = where (mesh-local), w = strength 0..1 (0 = none) */
   uHits: { value: THREE.Vector4 }[];
 }
@@ -42,7 +42,7 @@ export interface HullU {
 export const HIT_MARKS = 4;
 
 /** Full hero hull material (player pod & Hangar showcase): 6 racing livery patterns, 3 paint finishes, chipped metal, scorch, heat glow & LEDs. */
-export function hullMaterial(c1: string, c2: string, glow: string, livery: number, texSize: number, finish = 0) {
+export function hullMaterial(c1: string, c2: string, glow: string, livery: number, texSize: number, finish = 0, partColor: string = c2) {
   const tex = hullTextures(texSize);
   const mat = new THREE.MeshPhysicalNodeMaterial();
   const baseMet = finish === 1 ? 0.88 : finish === 2 ? 0.2 : 0.48;
@@ -51,7 +51,7 @@ export function hullMaterial(c1: string, c2: string, glow: string, livery: numbe
   mat.color = new THREE.Color(c1); mat.metalness = baseMet; mat.roughness = baseRgh;
   mat.clearcoat = baseCoat; mat.clearcoatRoughness = finish === 2 ? 0.45 : 0.12; mat.envMapIntensity = finish === 1 ? 1.2 : 0.95;
   const u = {
-    uPaint2: uniform(new THREE.Color(c2)), uGlowCol: uniform(new THREE.Color(glow)), uWear: uniform(0.28),
+    uPaint2: uniform(new THREE.Color(c2)), uPaint3: uniform(new THREE.Color(partColor)), uGlowCol: uniform(new THREE.Color(glow)), uWear: uniform(0.28),
     uScorch: uniform(0), uHeat: uniform(0), uGrime: uniform(0.75), uLivery: uniform(livery),
     uHits: Array.from({ length: HIT_MARKS }, () => uniform(new THREE.Vector4(0, 0, 0, 0))),
   };
@@ -82,6 +82,7 @@ export function hullMaterial(c1: string, c2: string, glow: string, livery: numbe
   const wt = oneMinus(u.uWear);
   const hWear = smoothstep(wt.sub(0.06), wt.add(0.06), hMask.b);
   let col = mix(materialColor, u.uPaint2, livM);
+  col = mix(col, u.uPaint3, step(3.5, L.z)); // paint mode 4: the own colour of the add-on parts (2026-11-25)
   col = mix(col, vec3(0.025), hDec.r.mul(0.9));
   col = mix(col, vec3(0.78, 0.56, 0.07), hDec.g);
   col = mix(col, vec3(0.52, 0.53, 0.56), hWear);

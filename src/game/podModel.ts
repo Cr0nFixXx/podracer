@@ -99,12 +99,12 @@ function partsSwitch(podId: string, breaks: Map<string, BreakShow>, hiders: Hide
 
 /** Geometry comes from podAssembly.ts (material-free, audited in CI); this file adds materials, meshes and animation. */
 /** Look options of a pod model: paint pattern / finish, Style-Teile (`kit`, 0 = Werk per slot) and the tuning steps whose parts show (`tune`). */
-export interface PodLook { pattern?: number; finish?: number; kit?: { fins?: number; intake?: number; nozzle?: number; canopy?: number }; tune?: Partial<Record<StatKey, number>> }
+export interface PodLook { pattern?: number; finish?: number; kit?: { fins?: number; intake?: number; nozzle?: number; canopy?: number; /** paint of the add-on parts: 0 Werk · 1 first colour · 2 second colour · 3 `partColor` */ paint?: number }; tune?: Partial<Record<StatKey, number>>; /** the own colour of the add-on parts, '#rrggbb' */ partColor?: string }
 export function buildPodModel(def: PodDef, colors: [string, string, string], quality = 2, texRes = 1024, isOpponent = false, opts?: PodLook): PodVisual {
   const seg = segFor(quality, isOpponent);
   const texSize = texRes >= 2048 && !isOpponent ? 2048 : 1024;
   const fin = opts?.finish ?? 0;
-  const kit: KitSpec = { fins: opts?.kit?.fins ?? 0, intake: opts?.kit?.intake ?? 0, nozzle: opts?.kit?.nozzle ?? 0, tune: tuneTiers(opts?.tune) };
+  const kit: KitSpec = { fins: opts?.kit?.fins ?? 0, intake: opts?.kit?.intake ?? 0, nozzle: opts?.kit?.nozzle ?? 0, tune: tuneTiers(opts?.tune), paint: opts?.kit?.paint ?? 0 };
   // the canopy tint is a Style-Teil too: one of four shared glass materials (same shader, no extra pipeline)
   const shared: Record<string, THREE.Material> = { ...(sharedPodMaterials(texSize) as Record<string, THREE.Material>), glass: canopyGlass(opts?.kit?.canopy ?? 0) };
   const glowCol = new THREE.Color(colors[2]);
@@ -217,8 +217,8 @@ export function buildPodModel(def: PodDef, colors: [string, string, string], qua
   const A = assembleHero(def, seg, pilot.head, kit);
   body.position.z = A.bodyZ;
   const liv = opts?.pattern !== undefined && opts.pattern >= 0 ? opts.pattern : A.layout.livery;
-  const hullL = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
-  const hullR = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin);
+  const hullL = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin, opts?.partColor);
+  const hullR = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin, opts?.partColor);
   const hullC = hullMaterial(colors[0], colors[1], colors[2], liv, texSize, fin); // cockpit: own instance (no engine heat glow)
   const ckGrp = new THREE.Group(); // cockpit hangs on its cables and sways (setCockpitSway)
   const glow = new THREE.MeshBasicMaterial({ color: glowCol.clone().multiplyScalar(1.2) });

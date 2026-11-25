@@ -21,7 +21,7 @@ import { ZG_AXIS, ZG_EXIT_FROM, ZG_REACH, aiInputs, applyDamage, bodyToWorld, co
 import { ACTIONS, KEY_PRESETS, defaultPad, normalizeKeys, normalizePad, type KeyMap, type PadMap } from '../../src/game/keymap';
 import { DAMAGE_RULES, damageModel, lostMessage, partLamps, partsFx, zoneFactor, type DamageZone } from '../../src/game/podDamage';
 import { buildTrack, frameAt, tunnelCeiling, baySameStretch, zgRockAt, DS, TUNNEL_SHOULDER, type Path, type Sample, type TrackData } from '../../src/game/trackBuilder';
-import { defaultProfile, effectiveStats, loadProfile, sanitizeGfx, saveProfile, CAMERA_NAMES, ENV_MAP_SIZE, GFX_REV, MAX_LAPS, PRESETS, type GfxSettings } from '../../src/game/settings';
+import { defaultProfile, effectiveStats, loadProfile, sanitizeCustom, sanitizeGfx, saveProfile, CAMERA_NAMES, ENV_MAP_SIZE, GFX_REV, KIT_SLOTS, MAX_LAPS, PRESETS, type GfxSettings } from '../../src/game/settings';
 import { ALARM_FROM, boostAlarmLevel, boostAlarmVoice } from '../../src/game/audio';
 import { PadRepeater, nextFocus, readPadNav, stepRange, type NavRect, type PadSnapshot } from '../../src/ui/padNav';
 import { FLIGHT_BAND, FLIGHT_LOOK, FLIGHT_SPEED, buildIntroFlight, type FlightPose } from '../../src/game/introFlight';
@@ -192,6 +192,37 @@ test('kit: every tuning value shows a part at tier 1 and more at tier 2 on every
     const s = podLayout(p).engines[0].spec, a = kitSize(s, { ...NO_KIT, tune: { ...ZERO, [st]: 1 } }), b = kitSize(s, { ...NO_KIT, tune: { ...ZERO, [st]: 2 } });
     ok(a > 0, `${p.id}: ${st} tier 1 shows nothing`); ok(b > a, `${p.id}: ${st} tier 2 (${b}) is not more than tier 1 (${a})`);
   }
+});
+// 2026-11-25, user: "Tuning-Teile auch lackierbar machen". Ex works the add-on parts are bare metal (steel, dark) – only the canards,
+// the armour plates and the fins carried paint, always the second colour. Now one choice for all of them: Werk · Farbe 1 · Farbe 2 ·
+// an own colour. Paint mode of a hull triangle = aLiv.z: 0 first colour, 3 second colour, 4 the own colour.
+const kitTris = (k: ReturnType<typeof engineKit>, key?: string) => { let n = 0; for (const [m, g] of k.parts) if (!key || m === key) n += triCount(g); return n; };
+function paintedTris(k: ReturnType<typeof engineKit>, mode: number) { const g = k.parts.get('hull'); if (!g) return 0; const liv = g.attributes.aLiv, idx = g.index!; let n = 0; for (let i = 0; i < idx.count; i += 3) if (Math.round(liv.getZ(idx.getX(i))) === mode) n++; return n; }
+test('kit paint: with the paint option the shell of every tuning part and Style-Teil takes the chosen colour – same parts, nothing in another colour', () => {
+  const ALL = { ...NO_KIT, fins: 3, intake: 3, nozzle: 1, tune: Object.fromEntries(STAT_KEYS.map(k => [k, 2])) as Record<StatKey, number> };
+  for (const p of PODS) {
+    const s = podLayout(p).engines[0].spec, werk = engineKit(s, 28, ALL);
+    for (const [paint, mode] of [[1, 0], [2, 3], [3, 4]] as const) {
+      const k = engineKit(s, 28, { ...ALL, paint });
+      eq(kitTris(k), kitTris(werk), `${p.id}, paint ${paint}: triangles of the kit (painting must not add or drop a part):`);
+      eq(kitTris(k, 'hull') - paintedTris(k, mode), 0, `${p.id}, paint ${paint}: painted triangles in another colour:`);
+      ok(paintedTris(k, mode) >= kitTris(werk, 'hull') * 1.5, `${p.id}, paint ${paint}: ${paintedTris(k, mode)} painted triangles, ${kitTris(werk, 'hull')} ex works – the shells should take paint`);
+      ok(kitTris(k, 'steel') < kitTris(werk, 'steel'), `${p.id}, paint ${paint}: as much bare steel as ex works`);
+    }
+    // every tuning value by itself (the air brake has no part of its own: it enlarges the engine's flaps)
+    for (const st of STAT_KEYS) if (st !== 'airbrake') ok(paintedTris(engineKit(s, 28, { ...NO_KIT, paint: 3, tune: { ...ZERO, [st]: 2 } }), 4) > 0, `${p.id}: the ${st} part takes no paint`);
+    for (const slot of ['fins', 'nozzle'] as const) ok(paintedTris(engineKit(s, 28, { ...NO_KIT, paint: 3, [slot]: 1 }), 4) > 0, `${p.id}: Style-Teil ${slot} takes no paint`);
+  }
+  eq(kitTris(engineKit(podLayout(PODS[0]).engines[0].spec, 28, { ...NO_KIT, paint: 3 })), 0, 'paint without any part adds something:');
+});
+test('kit paint: choice and colour survive saving – 0 … 3 and a hex colour; anything else falls back', () => {
+  const base = defaultProfile().custom[PODS[0].id];
+  const a = sanitizeCustom({ kit: { fins: 1, intake: 0, nozzle: 0, canopy: 0, paint: 3 }, partColor: '#12ab34' }, base);
+  eq([a.kit?.paint, a.partColor], [3, '#12ab34'], 'own colour:');
+  eq(sanitizeCustom({ kit: { fins: 0, intake: 0, nozzle: 0, canopy: 0, paint: 9 } }, base).kit?.paint, 3, 'paint 9 is clamped:');
+  eq(sanitizeCustom({ kit: { fins: 2, intake: 0, nozzle: 0, canopy: 0 } as never }, base).kit?.paint, 0, 'a save without the choice:');
+  eq(sanitizeCustom({ partColor: 'red' as never }, base).partColor, undefined, 'a colour that is no hex colour:');
+  ok(KIT_SLOTS.some(sl => sl.key === 'paint' && sl.choices.length === 4), 'the hangar lists no paint choice for the parts');
 });
 test('kit: Gegner get their Style-Teile from a seeded draw (same seed = same parts, every value 0..3)', () => {
   eq(rivalKit(42), rivalKit(42)); const seen = new Set<number>();
