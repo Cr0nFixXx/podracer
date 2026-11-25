@@ -25,7 +25,7 @@ import { defaultProfile, effectiveStats, loadProfile, saveProfile, CAMERA_NAMES,
 import { ALARM_FROM, boostAlarmLevel, boostAlarmVoice } from '../../src/game/audio';
 import { PadRepeater, nextFocus, readPadNav, stepRange, type NavRect, type PadSnapshot } from '../../src/ui/padNav';
 import { FLIGHT_BAND, FLIGHT_LOOK, FLIGHT_SPEED, buildIntroFlight, type FlightPose } from '../../src/game/introFlight';
-import { TrackLayer, TRACK_SEG, trackLife } from '../../src/game/groundTracks';
+import { TrackLayer, TRACK_FADE_IN, TRACK_SEG, trackLife } from '../../src/game/groundTracks';
 import * as GPU3 from 'three/webgpu';
 import { setupSunShadow, CSM_FAR, CSM_SPLIT, SH_BACK, SH_BOX } from '../../src/game/sunShadow';
 
@@ -1740,6 +1740,31 @@ test('tracks: in moon dust a track stays for the whole race and is never laid tw
   ok(first > 20, `${first} quads on 80 m of moon dust`);
   eq(layer.alive(10 + 1800), first, 'visible half an hour later:');
   eq(layTracks(layer, td, 'mavik', i0 + 5, 80, 1000), 0, 'new quads on the same line 16 minutes later:');
+});
+// 2026-11-25, reported by the user: "man sieht das Erzeugen seiner eigenen Spuren bei normaler Geschwindigkeit nicht (langsam sieht man
+// es etwas) (nur Verfolger-Ansicht)". A stripe grew in steps of TRACK_SEG metres and faded in over 0.4 s: at 120 m/s it was 48 m behind
+// the pod – behind the chase camera – before it showed.
+test('tracks: a stripe grows right under the engines in every frame, and it is fully there well before the chase camera', () => {
+  const td = trackOf('boonta'), S = td.main.samples, i0 = surfStretch(td, SURF.sand) + 5, env = podEnvelope(byId('aurora'));
+  for (const v of [30, 120, 190]) {
+    const layer = new TrackLayer(4000), p = racer(byId('aurora'), td, i0, 0, S[i0].y + HOVER); p.grounded = true;
+    let worst = 0;
+    for (let d = 0, f = 0; d <= 80; d += v / 60, f++) {
+      const k = i0 + Math.floor(d / DS), q = S[k], al = d - (k - i0) * DS;
+      p.pos.x = q.x + q.tx * al; p.pos.z = q.z + q.tz * al; p.idx = k; p.lat = 0; p.vel.set(q.tx * v, 0, q.tz * v); p.yaw = Math.atan2(q.tx, q.tz); p.groundY = q.y; p.pos.y = q.y + HOVER;
+      layer.step([p], td, 10 + f / 60);
+      if (f < 2) continue; // (the first frame only notes where the pod is)
+      for (const e of [env.engL, env.engR]) {
+        // the point on the ground under the middle of this engine bank, and the stripe corner nearest to it
+        const zc = (e.frontZ + e.backZ) / 2, cx = p.pos.x + e.x * q.tz + zc * q.tx, cz = p.pos.z - e.x * q.tx + zc * q.tz, hw = Math.abs(e.outerX) - Math.abs(e.x);
+        let near = 1e9; for (let c = 0; c < layer.count * 4; c++) near = Math.min(near, Math.hypot(layer.pos[c * 3] - cx, layer.pos[c * 3 + 2] - cz));
+        worst = Math.max(worst, near - hw);
+      }
+    }
+    ok(worst < 0.5, `at ${v} m/s the stripe ends up to ${worst.toFixed(1)} m behind the engines – it must reach them in every frame`);
+  }
+  // the chase camera flies 13.5 m and more behind the pod: at top speed with boost the stripe has to be fully there within 9 m
+  ok(TRACK_FADE_IN > 0 && TRACK_FADE_IN * 190 <= 9, `a stripe fades in over ${TRACK_FADE_IN} s = ${(TRACK_FADE_IN * 190).toFixed(0)} m at 190 m/s – more than 9 m and it shows only behind the chase camera`);
 });
 test('tracks: a full layer overwrites its oldest quads – it never grows, never throws', () => {
   const td = trackOf('oovo'), i0 = surfStretch(td, SURF.regolith) + 5, layer = new TrackLayer(24);
