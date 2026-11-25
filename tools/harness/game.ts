@@ -239,6 +239,34 @@ let g: Game | null = null; let cur = -1;
     // a 6th value: instead of the chase camera, a camera that many metres to the right of the pod (negative: left), 14 m ahead of it, looking back at it
     if (side) { const s = S[pl.idx]; G.camera.position.set(pl.pos.x + s.rx * side + s.tx * 14, pl.pos.y + 1.6, pl.pos.z + s.rz * side + s.tz * 14); G.camera.up.set(0, 1, 0); G.camera.lookAt(pl.pos.x - s.tx * 4, pl.pos.y - 0.6, pl.pos.z - s.tz * 4); G.camera.fov = 62; }
     (window as unknown as Record<string, unknown>).coverInfo = `probe plough: player at sample ${pl.idx}, ${Math.hypot(pl.vel.x, pl.vel.z).toFixed(0)} m/s, ${(pl.pos.y - pl.groundY).toFixed(2)} m above the ground${pl.zeroG ? ' (zero-G)' : ''}, snow ahead ${(pl.snowDepth ?? 0).toFixed(2)} m, cut ${(pl.snowPack ?? 0).toFixed(2)}`;
+  } else if (view.startsWith('ram_')) { // 2026-11-25: ram_<idx>[_<rams>[_<m/s across>]] – the player rams the Gegner flying beside it, in the REAL
+    // game loop: sparks and smoke at the Gegner, the Treffermarke on its hull, the HUD line. Before every ram the two are put side
+    // by side again (the Gegner 11 m ahead of the chase camera's left edge: both are in the picture).
+    const [, i0, n0, v0] = view.split('_'); const S = G.td.main.samples, N = S.length, pl = G.player, rv = G.pods.find(q => q !== pl)!, rams = +(n0 ?? 1), across = +(v0 ?? 18), speed = 110;
+    const put = (q: PodState, idx: number, la: number, al: number) => { const s = S[((idx % N) + N) % N]; q.pos.set(s.x + s.rx * la + s.tx * al, s.y + s.ramp + 2.85, s.z + s.rz * la + s.tz * al); q.yaw = Math.atan2(s.tx, s.tz); q.yawRate = 0; q.vel.set(s.tx * speed, 0, s.tz * speed); q.path = 0; q.idx = ((idx % N) + N) % N; q.dead = 0; q.invuln = 0; q.grounded = true; q.inRoof = s.roof > 0; q.upper = false; };
+    { const g0 = S[G.td.startIdx]; for (const q of G.pods) if (q !== pl && q !== rv) { q.pos.set(g0.x, g0.y + 2.85, g0.z); q.vel.set(0, 0, 0); q.path = 0; q.idx = G.td.startIdx; } }
+    G.state = 'race'; (G as unknown as { keys: Set<string> }).keys.add('KeyW');
+    put(pl, +i0, -5, 0); put(rv, +i0, 5, 0); for (let k = 0; k < 30; k++) { G.update(1 / 60); put(pl, pl.idx, -5, 0); put(rv, pl.idx, 5, 0); }
+    const log: string[] = [];
+    for (let r = 0; r < rams; r++) {
+      const at = pl.idx; put(pl, at, -5, 0); put(rv, at, 5, 0);
+      const h0 = [pl.hpL + pl.hpR, rv.hpL + rv.hpR]; let hit = false;
+      for (let k = 0, after = 0; k < 30; k++) {
+        if (hit && r === rams - 1 && ++after > 5 && !view.split('_')[5]) break; // the picture: six frames after the last hit (a 5th value: half a second later)
+        if (!hit) { // until they touch: the Gegner holds its line (its AI would steer back to its own), the player comes across at `across` m/s
+          const s = S[pl.idx], vt = pl.vel.x * s.tx + pl.vel.z * s.tz; pl.vel.x = s.tx * vt + s.rx * across; pl.vel.z = s.tz * vt + s.rz * across;
+          const q = S[rv.idx], al = (rv.pos.x - q.x) * q.tx + (rv.pos.z - q.z) * q.tz, vr = Math.hypot(rv.vel.x, rv.vel.z); rv.pos.x = q.x + q.tx * al + q.rx * 5; rv.pos.z = q.z + q.tz * al + q.rz * 5; rv.vel.x = q.tx * vr; rv.vel.z = q.tz * vr; rv.yaw = Math.atan2(q.tx, q.tz);
+        }
+        G.update(1 / 60); if (k % 2 === 0) G.updateVisuals();
+        hit = hit || pl.hpL + pl.hpR < h0[0] || rv.hpL + rv.hpR < h0[1];
+      }
+      log.push(`ram ${r + 1}: player −${(h0[0] - pl.hpL - pl.hpR).toFixed(1)}, Gegner −${(h0[1] - rv.hpL - rv.hpR).toFixed(1)}`);
+    }
+    G.updateVisuals(); for (let k = 0; k < 10; k++) G.updateCamera(0.5);
+    chase = true;
+    // a 4th value of 1: a camera close behind the Gegner, on the side it was hit from (Treffermarke, smoke)
+    if (view.split('_')[4] === '1') { const s = S[rv.idx]; G.camera.position.set(rv.pos.x - s.rx * 4.5 - s.tx * 9, rv.pos.y + 2.2, rv.pos.z - s.rz * 4.5 - s.tz * 9); G.camera.up.set(0, 1, 0); G.camera.lookAt(rv.pos.x + s.tx * 2, rv.pos.y, rv.pos.z + s.tz * 2); G.camera.fov = 55; }
+    (window as unknown as Record<string, unknown>).coverInfo = `probe ${log.join(' · ')} · Gegner ${rv.name}: engines ${rv.hpL.toFixed(0)} / ${rv.hpR.toFixed(0)}, parts lost ${(rv.parts ?? 0).toString(2)}, dead ${rv.dead > 0} · player engines ${pl.hpL.toFixed(0)} / ${pl.hpR.toFixed(0)} · HUD ${JSON.stringify(G.hud().ram)}`;
   } else if (view.startsWith('fly_')) { // the intro flight (2026-11-23): fly_<metres into the pass> – the game's own flight camera, field of view and shadows
     G.startIntro(); G.flightDist = +view.slice(4); for (let k = 0; k < 12; k++) G.updateCamera(0.5);
     chase = true;

@@ -259,6 +259,22 @@ export class Particles {
     this.alpha.spawn(p, _v, 0.9 + Math.random() * 0.5, 0.65, 2.8, _c, _c, 0.16 * alphaScale, 1.2, -1.5);
   }
 
+  /** A pod was rammed (2026-11-25): a short burst of fire where it was hit and dark smoke that rises over the pod and stays with it
+   *  for a moment. `k` 0 … 1 = how hard. (Smoke alone, between two dark pods, does not show: the fire is what the eye catches.) */
+  ramPuff(p: THREE.Vector3, vel: THREE.Vector3, k: number) {
+    const m = Math.min(1, this.amount + 0.4), nf = Math.max(2, Math.ceil((3 + 5 * k) * m)), ns = Math.max(3, Math.ceil((6 + 8 * k) * m));
+    for (let i = 0; i < nf; i++) {
+      _v.set((Math.random() - 0.5) * 8, 2 + Math.random() * 5, (Math.random() - 0.5) * 8).addScaledVector(vel, 0.92);
+      _p.set(p.x + (Math.random() - 0.5) * 1.2, p.y + 0.3 + Math.random() * 0.9, p.z + (Math.random() - 0.5) * 1.2);
+      this.add.spawn(_p, _v, 0.16 + Math.random() * 0.16, 1.3 + k, 2.8 + k * 1.2, C_FIRE0, C_FIRE1, 0.75, 1.2, -2);
+    }
+    for (let i = 0; i < ns; i++) {
+      _v.set((Math.random() - 0.5) * 6, 3 + Math.random() * 5, (Math.random() - 0.5) * 6).addScaledVector(vel, 0.86);
+      _p.set(p.x + (Math.random() - 0.5) * 1.6, p.y + 0.6 + Math.random() * 1.2, p.z + (Math.random() - 0.5) * 1.6);
+      this.alpha.spawn(_p, _v, 0.7 + Math.random() * 0.5, 2, 5.5 + k * 2, C_SMK_DK, C_SMK_LT, 0.5 + 0.2 * k, 0.9, -2);
+    }
+  }
+
   fire(p: THREE.Vector3, vel: THREE.Vector3, alphaScale = 1) {
     if (!this.chance(0.45 * alphaScale)) return;
     _v.set((Math.random() - 0.5) * 2.5, 1.8 + Math.random() * 2.5, (Math.random() - 0.5) * 2.5).addScaledVector(vel, 0.45);

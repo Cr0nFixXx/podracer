@@ -119,6 +119,9 @@ export default function RaceView({ profile, update, onExit, onBest }: Props) {
           {/* Session 20: ground under the pod + what it does (amber when it changes the handling) */}
           {h.surface && <div className="absolute top-[15.5rem] right-4 w-56 text-right text-[10px] tracking-[0.2em] uppercase" style={{ textShadow: '0 1px 2px #000' }}><span className="text-sky-100/75">{h.surface}</span>{h.surfaceFx && <span className="text-amber-300"> · {h.surfaceFx}</span>}</div>}
 
+          {/* 2026-11-25: the Gegner the player just hit, and what is left of its weaker engine */}
+          {h.ram && <div data-hud-ram className="absolute top-[16.6rem] right-4 w-96 text-right whitespace-nowrap text-[10px] tracking-[0.2em] uppercase" style={{ textShadow: '0 1px 2px #000' }}><span className="text-red-300">{h.ram.hp > 0 ? 'Treffer' : 'Zerstört'}</span><span className="text-sky-100/75"> · {h.ram.name}</span>{h.ram.hp > 0 && <span className={h.ram.hp < 40 ? 'text-red-300' : 'text-amber-300'}> · {h.ram.hp} %</span>}</div>}
+
           {/* ===== engine damage (bottom left, original style) ===== */}
           <div className="absolute bottom-6 left-5 flex gap-3">
             {[{ v: h.hpL, lamps: h.partsL }, { v: h.hpR, lamps: h.partsR }].map((e, i) => (

@@ -41,7 +41,7 @@ export interface PodState {
    *  seconds until the key works again. */
   manualReset?: boolean; resetCd?: number;
   /** `part`: a Bruchteil broke off (`part` = its index in the Schadensmodell) */
-  events: { type: 'wall' | 'obstacle' | 'land' | 'explode' | 'pod' | 'fall' | 'field' | 'break' | 'part'; strength: number; x: number; y: number; z: number; nx: number; nz: number; ref?: Obstacle; part?: number }[];
+  events: { type: 'wall' | 'obstacle' | 'land' | 'explode' | 'pod' | 'fall' | 'field' | 'break' | 'part'; strength: number; x: number; y: number; z: number; nx: number; nz: number; ref?: Obstacle; part?: number; /** 'pod': the other pod of the contact and the hull it lost */ pod?: PodState; dealt?: number }[];
   visual: PodVisual | null;
   ai: AIState | null;
   place: number;
@@ -1277,7 +1277,11 @@ function dtChance(skill: number) { return 0.004 + skill * 0.01; }
 
 /** Pod-vs-pod contact (shared by the game and the node CI sim). Roll-aware: a knife-edge pod is narrow but tall, so it slips through
  *  side-by-side gaps; pods at clearly different heights pass over/under each other. */
-export function collidePods(ps: PodState[], time: number) {
+/** Pod against pod (2026-11-25): hull a contact costs = (closing speed − RAM_FREE m/s) × RAM_RATE, at most RAM_MAX, once for each
+ *  of the two pods – shared out so that the pod that is rammed pays RAM_SHARE of the sum (three times what the rammer pays). */
+export const RAM_FREE = 5, RAM_RATE = 1, RAM_MAX = 24, RAM_SHARE = 0.75;
+/** `td`: the track – without it nobody is the rammer (both pods pay the same). */
+export function collidePods(ps: PodState[], time: number, td?: TrackData) {
   for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
     const a = ps[i], b = ps[j]; if (a.dead > 0 || b.dead > 0 || a.invuln > 0 || b.invuln > 0) continue;
     const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z, dy = b.pos.y - a.pos.y;
@@ -1289,17 +1293,35 @@ export function collidePods(ps: PodState[], time: number) {
     a.pos.x -= nx * pen / 2; a.pos.z -= nz * pen / 2; b.pos.x += nx * pen / 2; b.pos.z += nz * pen / 2;
     const rv = (b.vel.x - a.vel.x) * nx + (b.vel.z - a.vel.z) * nz;
     if (rv < 0) {
+      // 2026-11-25 – who rams whom (user: "Gegner nehmen keinen Schaden wenn ich sie ramme, nur ich"). Both used to get the same,
+      // half on each engine. Now the pod that is rammed pays RAM_SHARE of the two shares and the rammer the rest. Who rams is read
+      // against the ROAD, from the speeds the two arrive with: the speed across it towards the other pod, plus – for the pod
+      // behind – the speed it closes in with. (Against each other the two always approach at the same speed: without the road
+      // there is no rammer.) `sA`: how much of the ramming is `a`'s doing, 0 … 1.
+      let sA = 0.5;
+      const q = td?.paths[a.path]?.samples[a.idx];
+      if (q) {
+        const nr = nx * q.rx + nz * q.rz, nt = nx * q.tx + nz * q.tz;
+        const la = a.vel.x * q.rx + a.vel.z * q.rz, lb = b.vel.x * q.rx + b.vel.z * q.rz, dvt = (a.vel.x - b.vel.x) * q.tx + (a.vel.z - b.vel.z) * q.tz;
+        const A = Math.max(0, la * nr) + (nt > 0 ? Math.max(0, dvt) * nt : 0), B = Math.max(0, -lb * nr) + (nt < 0 ? Math.max(0, -dvt) * -nt : 0);
+        if (A + B > 0.5) sA = A / (A + B);
+      }
       const jv = -rv * 0.65;
       a.vel.x -= nx * jv; a.vel.z -= nz * jv; b.vel.x += nx * jv; b.vel.z += nz * jv;
       const ac = a as unknown as { pCd?: number }, bc = b as unknown as { pCd?: number };
-      const dmg = Math.min(22, Math.max(0, -rv - 5) * 0.85);
+      const dmg = Math.min(RAM_MAX, Math.max(0, -rv - RAM_FREE) * RAM_RATE);
       if (dmg > 0 && time - (ac.pCd ?? -1) > 0.2 && time - (bc.pCd ?? -1) > 0.2) {
         ac.pCd = time; bc.pCd = time;
-        applyDamage(a, 0, dmg, 'side'); applyDamage(b, 0, dmg, 'side'); // pod contact knows only the centre normal: half and half, no sturdy
+        const fA = 2 * (RAM_SHARE + (1 - 2 * RAM_SHARE) * sA), fB = 2 - fA; // (a pure rammer: 2 × (1 − RAM_SHARE) = 0.5 · the rammed pod: 1.5 · both alike: 1)
+        // the engine on the side of the hit pays; a hit on the nose or the tail goes to both (yaw: local +x = (cos, −sin))
+        const sideOf = (p: PodState, ox: number, oz: number): number => { const d = ox * Math.cos(p.yaw) - oz * Math.sin(p.yaw); return Math.abs(d) > 0.5 ? Math.sign(d) : 0; };
+        const hpA = a.hpL + a.hpR, hpB = b.hpL + b.hpR;
+        applyDamage(a, sideOf(a, nx, nz), dmg * fA, 'side'); applyDamage(b, sideOf(b, -nx, -nz), dmg * fB, 'side'); // (no sturdy: the hull of the pod that is hit decides nothing here)
         a.shake = Math.min(1, a.shake + 0.3); b.shake = Math.min(1, b.shake + 0.3);
-        // one event per contact (sparks, sound, Treffermarke) – it goes to the player when the player is one of the two
-        if (b.isPlayer) b.events.push({ type: 'pod', strength: -rv, x: b.pos.x - nx * rb, y: b.pos.y, z: b.pos.z - nz * rb, nx, nz });
-        else a.events.push({ type: 'pod', strength: -rv, x: a.pos.x + nx * ra, y: a.pos.y, z: a.pos.z + nz * ra, nx: -nx, nz: -nz });
+        // one event per contact (sparks, sound, Treffermarke) – it goes to the player when the player is one of the two. It names
+        // the other pod and the hull that pod lost: the game shows the player what the hit did to it.
+        if (b.isPlayer) b.events.push({ type: 'pod', strength: -rv, x: b.pos.x - nx * rb, y: b.pos.y, z: b.pos.z - nz * rb, nx, nz, pod: a, dealt: hpA - a.hpL - a.hpR });
+        else a.events.push({ type: 'pod', strength: -rv, x: a.pos.x + nx * ra, y: a.pos.y, z: a.pos.z + nz * ra, nx: -nx, nz: -nz, pod: b, dealt: hpB - b.hpL - b.hpR });
       }
     }
   }

@@ -890,6 +890,52 @@ test('pod contact: one event per contact – the player gets it whichever of the
   const a = mk(-1, 12), b = mk(1, -12); collidePods([a, b], 1); eq([a.events.length, b.events.length], [1, 0], 'two Gegner – the first one reports:');
 });
 
+// ------------------------------------------------------------------ pod against pod: who pays (2026-11-25)
+// Reported by the user: "Gegner nehmen keinen Schaden wenn ich sie ramme, nur ich." Both pods got the same, spread over both engines,
+// and nothing showed it on a Gegner. Now: the pod that is rammed pays 1.5 ×, the one that rams 0.5 × (who rams = who moves across
+// the road towards the other, or closes in from behind); the engine on the hit side pays; the player's event names the other pod.
+/** two pods on a straight piece of Boonta: `a` left of the centre, `b` right of it, touching; both at 120 m/s along the road.
+ *  `va` / `vb`: speed across the road towards the other pod · `ahead`: 0 = side by side … 1 = `b` straight ahead of `a` · `dv`: m/s `a` is faster */
+function ramPair(td: TrackData, va: number, vb: number, o: { ahead?: number; dv?: number; playerIsB?: boolean } = {}) {
+  const S = td.main.samples; let i0 = 0; for (let i = 40, run = 0; i < S.length - 40; i++) { run = Math.abs(S[i].curv) < 2e-4 && !S[i].gap && !S[i].ramp && !S[i].zeroG ? run + 1 : 0; if (run > 40) { i0 = i - 20; break; } }
+  const q = S[i0], def = byId('aurora'), R = podCollision(def).halfW * 0.8 * 2, ah = (o.ahead ?? 0) * R * 0.9, gap = Math.sqrt(Math.max(0, (R * 0.9) ** 2 - ah * ah)) / 2;
+  const mk = (lat: number, al: number, lv: number, fv: number, isPlayer: boolean) => { const p = racer(def, td, i0, lat, q.y + HOVER); p.isPlayer = isPlayer; p.pos.x += q.tx * al; p.pos.z += q.tz * al; p.vel.set(q.tx * fv + q.rx * lv, 0, q.tz * fv + q.rz * lv); p.invuln = 0; p.dead = 0; p.events.length = 0; return p; };
+  const a = mk(-gap, 0, va, 120 + (o.dv ?? 0), !o.playerIsB), b = mk(gap, ah, -vb, 120, !!o.playerIsB);
+  collidePods([a, b], 1, td);
+  const loss = (p: PodState) => 200 - p.hpL - p.hpR;
+  /** hull the engine on the side of the other pod lost / the engine on the far side lost */
+  const sides = (p: PodState, other: PodState) => { const right = (other.pos.x - p.pos.x) * Math.cos(p.yaw) - (other.pos.z - p.pos.z) * Math.sin(p.yaw) > 0; return right ? [100 - p.hpR, 100 - p.hpL] : [100 - p.hpL, 100 - p.hpR]; };
+  return { a, b, lossA: loss(a), lossB: loss(b), sidesA: sides(a, b), sidesB: sides(b, a) };
+}
+test('ram: the pod that is rammed pays three times what the rammer pays – from the side and from behind, player or Gegner', () => plain(() => {
+  const td = trackOf('boonta');
+  for (const playerIsB of [false, true]) {
+    const who = playerIsB ? 'a Gegner rams the player' : 'the player rams a Gegner';
+    const side = ramPair(td, 18, 0, { playerIsB });
+    ok(side.lossB >= 12, `${who} from the side at 18 m/s: the rammed pod lost ${side.lossB.toFixed(1)} – expected a hit that counts (≥ 12)`);
+    ok(side.lossA > 0 && Math.abs(side.lossB / side.lossA - 3) < 0.3, `${who} from the side: rammed ${side.lossB.toFixed(1)}, rammer ${side.lossA.toFixed(1)} – expected 3 : 1`);
+    const rear = ramPair(td, 0, 0, { ahead: 1, dv: 22, playerIsB });
+    ok(rear.lossA > 0 && Math.abs(rear.lossB / rear.lossA - 3) < 0.3, `${who} from behind at 22 m/s: rammed ${rear.lossB.toFixed(1)}, rammer ${rear.lossA.toFixed(1)} – expected 3 : 1`);
+  }
+  const both = ramPair(td, 9, 9);
+  ok(both.lossA > 0 && Math.abs(both.lossA - both.lossB) < 0.01, `both steer into each other: ${both.lossA.toFixed(1)} / ${both.lossB.toFixed(1)} – expected the same for both`);
+  const drift = ramPair(td, -3, 14); // `a` moves away, `b` comes after it
+  ok(drift.lossA > drift.lossB * 2.5, `a pod that is caught while moving away is the rammed one: ${drift.lossA.toFixed(1)} / ${drift.lossB.toFixed(1)}`);
+  const touch = ramPair(td, 4, 0);
+  eq([touch.lossA, touch.lossB], [0, 0], 'a touch at 4 m/s costs nothing:');
+}));
+test('ram: the engine on the side of the hit pays – from behind both do; the player\'s event names the pod it hit and what that pod lost', () => plain(() => {
+  const td = trackOf('boonta');
+  const side = ramPair(td, 18, 0);
+  ok(side.sidesB[0] > 0 && side.sidesB[1] === 0, `rammed from the side: near engine −${side.sidesB[0].toFixed(1)}, far engine −${side.sidesB[1].toFixed(1)} – only the near one should pay`);
+  ok(side.sidesA[0] > 0 && side.sidesA[1] === 0, `the rammer: near engine −${side.sidesA[0].toFixed(1)}, far engine −${side.sidesA[1].toFixed(1)}`);
+  const rear = ramPair(td, 0, 0, { ahead: 1, dv: 22 });
+  ok(Math.abs(rear.sidesB[0] - rear.sidesB[1]) < 0.01 && rear.sidesB[0] > 0, `rammed from behind: engines −${rear.sidesB[0].toFixed(1)} / −${rear.sidesB[1].toFixed(1)} – both should pay the same`);
+  const e = side.a.events.find(x => x.type === 'pod'); ok(!!e, 'the player got no event for the contact');
+  ok(e!.pod === side.b, 'the event does not name the pod that was hit'); ok(Math.abs((e!.dealt ?? 0) - side.lossB) < 0.01, `the event says the other pod lost ${e!.dealt}, it lost ${side.lossB.toFixed(1)}`);
+  eq(side.b.events.length, 0, 'events at the Gegner (one event per contact):');
+}));
+
 // ------------------------------------------------------------------ walls: which part of the pod pays (user decision 2026-11-22)
 /** Puts `def` against the right-hand rock wall of a straight piece of canyon on Boonta, moving `into` m/s towards the wall, nose turned
  *  `nose` rad towards it (0 = along the wall), and steps once. Rock, because a guard rail only hurts a pod that flies low – above it the

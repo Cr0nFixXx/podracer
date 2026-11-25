@@ -65,7 +65,11 @@ await p.screenshot({ path: out + '_race.png' });
 await p.keyboard.up('ArrowRight');
 // HUD sides: damage the internal "L" engine (= screen-RIGHT in the chase view) and heat up the boost gauge for the screenshot
 await p.evaluate(() => { const g = window.__podracer; g.player.hpL = 32; g.player.heat = 0.86; });
+// 2026-11-25: the HUD line for a Gegner the player has just hit (name and weaker engine) – set as the game sets it after a contact
+const ramWant = await p.evaluate(() => { const g = window.__podracer, o = g.pods.find(x => !x.isPlayer); o.hpL = 58; o.hpR = 91; g.ramPod = o; g.ramT = 30; return o.name; });
 await sleep(2500); await p.screenshot({ path: out + '_hud.png' });
+{ const line = await p.evaluate(() => document.querySelector('[data-hud-ram]')?.textContent ?? ''), fine = line.includes('Treffer') && line.includes(ramWant) && line.includes('58 %');
+  console.log('HUD line for a rammed Gegner:', JSON.stringify(line), fine ? 'ok' : `FAIL (expected "Treffer · ${ramWant} · 58 %")`); if (!fine) errs++; await p.evaluate(() => { window.__podracer.ramT = 0; }); }
 const hudSide = await p.evaluate(() => { const g = window.__podracer, h = g.hud(); return { internalL: Math.round(g.player.hpL), internalR: Math.round(g.player.hpR), hudLeftBox: Math.round(h.hpL), hudRightBox: Math.round(h.hpR) }; });
 console.log('HUD damage sides:', JSON.stringify(hudSide), hudSide.hudRightBox < hudSide.hudLeftBox ? 'ok (damaged screen-right engine shown right)' : 'FAIL');
 if (!(hudSide.hudRightBox < hudSide.hudLeftBox)) errs++;

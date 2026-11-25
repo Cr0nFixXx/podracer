@@ -10,7 +10,7 @@ import { DS, TUNNEL_SHOULDER, roadSurfaceAt, tunnelCeiling } from './trackBuilde
 import { SURF, WORLD_GRIP, lensSpray, splashes, surfaceOf, surfacePalette, trackSplashes, type SurfaceDef } from './surfaces';
 import { SnowField } from './snowField';
 import { keysLabel, normalizeKeys, normalizePad, padLabel, padValue, type Action, type KeyMap, type PadMap } from './keymap';
-import { podEnvelope } from './podDesigns';
+import { podCollision, podEnvelope } from './podDesigns';
 import { WeatherFx } from './weather';
 import { SH_BACK, setupSunShadow, type SunShadow } from './sunShadow';
 import { DIFFICULTIES, PILOTS, PODS, THEMES, TRACKS } from './data';
@@ -34,6 +34,8 @@ const C_ICE = new THREE.Color('#d8f2ff'), WHITE_C = new THREE.Color(1, 1, 1);
 export { CAMERA_NAMES };
 
 export interface Standing { name: string; color: string; isPlayer: boolean; gap: string; finished: boolean; }
+/** A Gegner's engine smokes below this much hull (percent). The player's own: below 40. */
+const RIVAL_SMOKE = 60;
 export interface HudState {
   speed: number; place: number; total: number; lap: number; laps: number; sprint: boolean; progress: number;
   time: number; lastLap: number | null; bestLap: number | null;
@@ -41,6 +43,8 @@ export interface HudState {
   /** 2026-11-23: the intro flight is showing (RaceView then shows the track's card and „Rennen starten" instead of the HUD); length of the main path */
   intro: boolean; trackKm: number;
   wrongWay: boolean; zeroG: boolean; countdown: number; message: string; camName: string; fps: number; backend: string; standings: Standing[]; dead: boolean;
+  /** 2026-11-25: the Gegner the player hit a moment ago and its weaker engine in percent (0 = destroyed) – null when there is none */
+  ram: { name: string; hp: number } | null;
   finished: boolean;
   /** Session 12: flight attitude (roll -1..1 = ∓90°, pitch -1 dive..+1 lift), slide state/charge, weather label */
   roll: number; pitch: number; sliding: boolean; slideCharge: number; airborne: boolean; env: string;
@@ -107,6 +111,8 @@ export class Game {
   minimap: HTMLCanvasElement | null = null;
   private mapBg: HTMLCanvasElement | null = null; private mapW = 0; private mapH = 0;
   message = ''; messageT = 0; finishShown = false; postTimer = 0;
+  /** 2026-11-25: the Gegner the player last hit and for how long the HUD still shows what the hit did to it */
+  ramPod: PodState | null = null; ramT = 0;
   gripMul = 1; /** engine-heat factor of climate and weather (EnvFx.heat) */ heatMul = 1; private snowAcc = 0; lastBeep = 99;
   raf = 0; ro: ResizeObserver | null = null;
   // Pre-allocated scratch math objects (zero per-frame GC allocations!)
@@ -540,7 +546,7 @@ export class Game {
     this.applyEnv(dt);
     if (this.env.wind > 0.6 && this.cover < 0.5 && this.state === 'race') this.player.shake = Math.max(this.player.shake, this.weather.gust * (this.env.wind - 0.5) * 0.22); // storm gusts buffet the pod
     this.updateLens(dt); this.watchStuck(dt);
-    if (this.messageT > 0) this.messageT -= dt;
+    if (this.messageT > 0) this.messageT -= dt; if (this.ramT > 0) this.ramT -= dt;
     this.flash = Math.max(0, this.flash - dt * 2);
 
     // audio
@@ -589,7 +595,7 @@ export class Game {
     if (this.mapTimer > 0.065) { this.mapTimer = 0; this.drawMinimap(); }
   }
 
-  podCollisions() { collidePods(this.pods, this.raceTime); }
+  podCollisions() { collidePods(this.pods, this.raceTime, this.td); }
 
   updateVisuals(dt = 0.016) {
     this.particles.setFrameDt(dt);
@@ -644,6 +650,15 @@ export class Game {
           if (p.isPlayer && e.strength > 5 && v.hitMark) { // Treffermarke where the hit landed (this step's pose: the model still stands where it was last frame)
             worldToBody(p, v.body.position.z, this.tmpV2.set(e.x, e.y, e.z)); v.hitMark(this.tmpV2.x, this.tmpV2.y, this.tmpV2.z, e.strength);
           }
+          // 2026-11-25 (user: "Gegner nehmen keinen Schaden wenn ich sie ramme"): the player hit a Gegner and it lost hull – the hit
+          // shows ON the Gegner (sparks and a dark puff at its flank, a Treffermarke on its hull) and the HUD names it and its engines
+          if (p.isPlayer && e.type === 'pod' && e.pod && (e.dealt ?? 0) > 0) {
+            const o = e.pod, ov = o.visual, rO = podCollision(o.def).halfW * 0.8, wx = o.pos.x + e.nx * rO, wz = o.pos.z + e.nz * rO;
+            this.ramPod = o; this.ramT = 3.5;
+            this.particles.sparks(this.tmpV.set(wx, o.pos.y, wz), this.tmpV2.set(-e.nx, 0.5, -e.nz), o.vel, 6 + e.dealt! * 0.8);
+            if (e.dealt! > 3) this.particles.ramPuff(this.tmpV.set(wx, o.pos.y, wz), o.vel, Math.min(1, e.dealt! / 22));
+            if (ov?.hitMark) { worldToBody(o, ov.body.position.z, this.tmpV2.set(wx, o.pos.y, wz)); ov.hitMark(this.tmpV2.x, this.tmpV2.y, this.tmpV2.z, e.strength); }
+          }
         } else if (e.type === 'break') {
           if (e.ref) this.world.breakObstacle(e.ref);
           if (dist < 420) { this.tmpC.copy(this.dustBase).multiplyScalar(0.6); this.particles.debris(this.tmpV, p.vel, this.tmpC); this.debris.spawn(e.x, e.y, e.z, e.y, p.vel, this.tmpC, e.strength, 16); }
@@ -691,7 +706,10 @@ export class Game {
       // Skip exhaust/dust particle spawning while stationary on countdown grid; keep rival trails super clean for visibility!
       if (this.state === 'countdown' || this.state === 'intro') continue;
       const emitScale = p.isPlayer ? 0.85 : (dist > 16 && dist < 68) ? (1 - dist / 68) * 0.22 : 0;
-      if (emitScale <= 0.02) continue;
+      // a damaged Gegner smokes wherever the player can see it – also right beside the player's pod (2026-11-25: the smoke began
+      // below 40 % and only 22–62 m from the camera, so a Gegner the player had just rammed never showed anything)
+      const hurt = !p.isPlayer && dist < 170 && Math.min(p.hpL, p.hpR) < RIVAL_SMOKE;
+      if (emitScale <= 0.02 && !hurt) continue;
       const back = this.tmpV2.set(-Math.sin(p.yaw), 0, -Math.cos(p.yaw));
       const glowHex = p.isPlayer ? this.profile.custom[p.def.id].colors[2] : p.def.colors[2];
       this.tmpC.set(glowHex).multiplyScalar(0.88);
@@ -705,12 +723,13 @@ export class Game {
         // methane rain is flammable: a boost sets it alight – green flames in the exhaust and a flame trail behind every engine
         const burn = !!this.methaneFlame && p.boosting && this.env.rain > 0.15 && !(roofed && !p.upper);
         if (burn) { this.tmpC.lerp(this.methaneFlame!, 0.75); this.particles.flameTrail(this.tmpV3, back, p.vel, this.methaneFlame!, p.isPlayer ? 1 : 0.5); }
-        this.particles.exhaust(this.tmpV3, back, p.vel, this.tmpC, p.input.throttle, p.boosting ? 1 : 0, emitScale);
+        if (emitScale > 0.02) this.particles.exhaust(this.tmpV3, back, p.vel, this.tmpC, p.input.throttle, p.boosting ? 1 : 0, emitScale);
         // close to the heat limit the engines spit sparks (more while overdriving)
         if (p.heat > 0.86 && (p.isPlayer || dist < 160) && this.particles.chance((p.heat - 0.86) * 4 + (p.overT ?? 0) * 0.5)) this.particles.sparks(this.tmpV3, back, p.vel, 3);
         const hp = loc.x < 0 ? p.hpL : p.hpR;
-        if (hp < 40 && (p.isPlayer || (i < 2 && dist > 22))) this.particles.smoke(this.tmpV3, p.vel, 1 - hp / 40, rivalVis);
-        if ((hp < 20 || p.overheat) && (p.isPlayer || i < 2)) this.particles.fire(this.tmpV3, p.vel, rivalVis);
+        // (a Gegner's smoke: thin at 60 %, as dense as the player's own below 35 % – `rivalVis` alone made it all but invisible)
+        if (p.isPlayer ? hp < 40 : hp < RIVAL_SMOKE && i < 2) this.particles.smoke(this.tmpV3, p.vel, 1 - hp / (p.isPlayer ? 40 : RIVAL_SMOKE), p.isPlayer ? 1 : 0.7 + 1.8 * (1 - hp / RIVAL_SMOKE));
+        if ((hp < 20 || p.overheat) && (p.isPlayer || i < 2)) this.particles.fire(this.tmpV3, p.vel, p.isPlayer || hp < 20 ? 1 : rivalVis);
       }
       const sp = Math.hypot(p.vel.x, p.vel.z);
       // Every pod drags two dust wakes from under its engines (spray on a wet road); denser and longer with speed.
@@ -1111,6 +1130,7 @@ export class Game {
       hpL: Math.max(0, p.hpR), hpR: Math.max(0, p.hpL), partsL: partLamps(dm, lostParts, 1), partsR: partLamps(dm, lostParts, -1), heat: p.heat, boosting: p.boosting, overheat: p.overheat, repairing: p.repairing, airbrake: p.airbraking,
       wrongWay: p.wrongWay > 1.2, zeroG: p.zeroG, countdown: this.state === 'countdown' ? this.countdown : -1, intro: this.state === 'intro', trackKm: this.td.main.length / 1000,
       message: this.messageT > 0 ? this.message : '', camName: CAMERA_NAMES[this.camMode], fps: this.fps, backend: this.backend,
+      ram: this.ramT > 0 && this.ramPod ? { name: this.ramPod.name, hp: this.ramPod.dead > 0 ? 0 : Math.max(1, Math.round(Math.min(this.ramPod.hpL, this.ramPod.hpR))) } : null,
       standings: [], dead: p.dead > 0, finished: p.finished,
       roll: p.rollCtl ?? 0, pitch: p.pitchCtl ?? 0, sliding: !!p.sliding, slideCharge: Math.min(1, (p.slideT ?? 0) / 1.6), airborne: !p.grounded && !p.zeroG, env: this.envLabel, ...this.surfaceHud(), heatEnv: this.heatMul, overdrive: Math.min(1, (p.overT ?? 0) / 3),
     };
