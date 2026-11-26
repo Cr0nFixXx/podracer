@@ -218,6 +218,19 @@ Leitidee: **Silhouette vor Textur** – jede Form muss aus 300 m als Gestein, Ba
 | Eis / Kristall | 5–8 sechseckige Prismen mit exzentrischer Spitze, Bruchstücke am Fuß, flat-shaded, leicht emissiv | 2 |
 | Saguaro | 8 Rippen, runde Kuppe, 2–3 aufgebogene Arme | 2 |
 
+**Flug-Deko (2026-11-25)** – bekannte Vorbilder, so genau wie die Silhouette es aus 300 m braucht; sie ersetzt die Rennluftschiffe und ist 20 % seltener:
+
+| Asset | Wo | Formregeln | Bewegung |
+|---|---|---|---|
+| Segelbarke | Tatooine, Tafelberge | 32 m langer Rumpf mit hochgezogenem Bug, zwei rote Sonnensegel breiter als der Rumpf, Deckshaus, Reling | kreist mit 6–10 m/s |
+| Leichter Frachter | Tatooine, Tafelberge | Untertasse, zwei Mandibeln nach vorn, Cockpit-Röhre allein an Steuerbord, Radarschüssel, blaues Triebwerksband am Heck | kreist mit 14–26 m/s, neigt sich in die Kurve |
+| Zuschauer-Loge | Tatooine, Tafelberge – an der Start-Geraden | ovale Schwebeplattform mit Brüstung, sechs Zuschauer, Steuerpult | steigt 9–17 m auf und ab |
+| Wolkenwagen | Aquilaris | zwei orange Kapseln mit dunkler Kanzel, Triebwerk dazwischen | kreist mit 22–38 m/s, stark geneigt |
+| Transporter | Aquilaris | weiße Muschelschale, bunte Frachtkisten darunter, Triebwerke am Heck | kreist mit 5–9 m/s, weit weg |
+| Holo-Werbetafel | alle Welten, 8–10 je Strecke | schwebender Projektor-Balken, darüber eine durchscheinende dunkle Scheibe 25 × 14 m mit Rahmen, Zeichen und Schrift in Licht; vier Motive | flackert leicht |
+
+Regeln: kein Flieger tiefer als 60 m über der Fahrbahn, keiner durch einen Tafelberg; Tafeln und Logen nie an Tunnel, Rampe, Lücke oder Schwerelosigkeit und nie in etwas, das schon dort steht.
+
 | Thema | Gestaltung | Stand |
 |---|---|---|
 | Schneekiefer (HQ) | hängende Nadelzweige in Quirlen, Schnee auf den Oberseiten, dunkler Stamm mit Rinde; aus der Ferne Kegel-Etagen gleicher Silhouette | S20 Strecken |

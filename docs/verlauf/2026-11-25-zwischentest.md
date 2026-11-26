@@ -65,6 +65,32 @@ Reihenfolge: erst die vier Fehler, dann die sieben Verbesserungen. Jeder Punkt e
 - **Geprüft:** drei neue Prüfungen `jump: …` (erst rot mit den Messwerten oben, dann grün – alle Rampen aller Strecken; Nase hoch / runter / langsam; 60 gegen 120 Schritte/s). Alle 184 Prüfungen grün. Simulation 13 Strecken × 120 s, drei Startwerte: 1 / 0 / 0 Ausfälle, längste Flugzeit 0,9–1,5 s (vorher 2,2–2,9 s). Bilder `jp` (Boonta: Rampe von vorn, Pod an der Kante, über der Schlucht, Seitenansicht).
 - **Nicht geprüft:** das Gefühl im Rennen. **Für die Überarbeitung der Sprünge danach** (Lücken 70–90 m, ein weiter Sprung nur mit Boost): die heutige Reichweite reicht auf den kurzen Rampen nicht für 90 m (Frostspalt 89 m) – dort müssen Rampe oder Abwurf höher werden; „nur mit Boost" braucht eine Rampe, deren Abwurf vom Boost abhängt.
 
+### Verbesserung 3 – Flug-Deko: 20 % weniger, Zeppeline ersetzt wie geplant
+- **Vorher:** 40 Zeppeline × Detailstufe × Streckenlänge standen still am Himmel von Tatooine (Boonta, Mos Espa), den Tafelbergen (Dünenpass) und Aquilaris – bei „Hoch" 77 über Boonta, 87 über Mos Espa, 71 über dem Dünenpass und 104 über Aquilaris; bei „Ultra" 123, 140, 114 und 166.
+- **Jetzt – Anzahl:** überall 20 % weniger (`flyerPlan` in `flyerGeo.ts`). In der neuen Zahl stecken auch die Logen (bis 8) und Holo-Tafeln (bis 10) – am Himmel selbst ist es deshalb auf den Wüstenwelten deutlich leerer als 20 %:
+
+  | Strecke | Zeppeline „Hoch" | Flug-Deko „Hoch" | davon am Himmel | Zeppeline „Ultra" | Flug-Deko „Ultra" | davon am Himmel |
+  |---|---|---|---|---|---|---|
+  | Boonta | 77 | 61 | 43 | 123 | 98 | 80 |
+  | Mos Espa | 87 | 69 | 51 | 140 | 112 | 94 |
+  | Dünenpass | 71 | 56 | 38 | 114 | 91 | 73 |
+  | Aquilaris | 104 | 83 | 73 | 166 | 132 | 122 |
+
+  Die anderen neun Strecken hatten keine Zeppeline; sie bekommen nur Holo-Tafeln (8–10 bei „Hoch").
+- **Jetzt – Modelle (bekannte Vorbilder, wie am 2026-11-23 ausgewählt):**
+  - **Tatooine und Tafelberge:** Segelbarke (32 m, zwei rote Sonnensegel, Deckshaus, Reling), leichter Frachter (Untertasse mit zwei Mandibeln, Cockpit-Röhre an Steuerbord, Radarschüssel, blaues Triebwerksband am Heck), bis zu acht **Zuschauer-Logen** beidseits der Start-Geraden (52–430 m vor und hinter der Linie), die wie in der Mos-Espa-Arena auf- und absteigen (9–17 m Hub, eine Fahrt 18–32 s).
+  - **Aquilaris:** Wolkenwagen (zwei orange Kapseln, Triebwerk dazwischen) und Transporter (weiße Muschelschale, Frachtkisten darunter).
+  - **Alle 13 Strecken:** 8–10 **Holo-Werbetafeln** bei „Hoch" (25 × 14 m, durchscheinend, vier Motive, flackern leicht) neben der Strecke, dem ankommenden Pod zugedreht – etwa eine je Kilometer.
+- **Jetzt – Bewegung:** Die Schiffe fliegen langsame Kreise (Barke 6–10 m/s, Frachter 14–26, Wolkenwagen 22–38, Transporter 5–9), Nase voraus, in die Kurve geneigt – mindestens 60 m über jeder Fahrbahn unter ihrem Kreis (der Intro-Flug fliegt 20–35 m hoch). Steht ein Tafelberg, eine Felsnadel oder ein Wahrzeichen unter dem Kreis, sucht sich das Schiff einen anderen Kreis oder überfliegt es mit 30 m Abstand.
+- **Platzierung der Tafeln und Logen:** nie an Tunneln, Brücken, in der Schwerelosigkeit, an Lücken oder Rampen (auch nicht 260 m dahinter – dort fliegen Pods), nicht im Start-Bereich; nicht in Felsen, Bäumen, Masten oder Zuschauer-Decks (`buildWorld` merkt sich jetzt, wo etwas steht), und nichts steht zwischen Tafel und Fahrbahn.
+- **Eigene Entscheidungen (bitte prüfen):**
+  - Der zweite Flieger über Aquilaris ist ein **mittlerer Transporter** (Muschelform), nicht noch einmal der leichte Frachter von Tatooine – abgesprochen war „Wolkenwagen und Frachter".
+  - Die Holo-Tafeln sind **25 m breit**. Mit 10 m und 16 m waren sie von der Fahrbahnmitte aus (Fahrbahn 70–110 m breit) nur ein Fleck. Die Scheibe ist dunkel getönt: eine helle, nur leuchtende Scheibe verschwand vor dem hellen Wüstendunst.
+  - Die Werbetexte sind erfunden („Repulsor-Tec", „Kessel Fuel", „Grand Arena", „Toydarian Parts").
+- **Geprüft:** drei neue Prüfungen `flyers: …` (jeweils erst rot): Anzahl 20 % unter den Zeppelinen bei jeder Detailstufe und Streckenlänge; die Modelle haben die Form ihres Vorbilds (Segel breiter als der Rumpf, Cockpit allein an Steuerbord, zwei Kapseln, …) und keine nach innen gedrehten Flächen; auf allen 13 Strecken × 3 Detailstufen stehen Tafeln und Logen nur an freier Fahrbahn, zeigen die Tafeln zum ankommenden Pod, fliegt jedes Schiff hoch genug und um einen Test-Tafelberg herum. Bilder `fl` (Boonta, Dünenpass, Aquilaris, Mos Espa, Frostspalt, Kristallhöhlen bei Nacht): jedes Modell aus der Nähe, Tafeln und Logen aus Fahrersicht. WebGPU-Prüfung auf Boonta und Aquilaris („Ultra"): 0 Fehler und Warnungen.
+- **Nicht geprüft:** in Bewegung (nur Standbilder) – also ob die Kreise natürlich wirken und ob das Flackern der Tafeln stört. Die Bildrate auf echter Hardware: die Flug-Deko kostet bei „Hoch" 84 000 (Aquilaris) bis 106 000 (Boonta) Dreiecke je Bild, bei „Ultra" 140 000–185 000 – das sind 4–8 % eines Bildes, ohne Schatten, in höchstens 12 Zeichenaufrufen.
+- **Nebenwirkung:** Felsen, Kakteen und Felsnadeln stehen auf Boonta, Mos Espa, Dünenpass und Aquilaris an anderen Stellen als vorher (die Zeppeline verbrauchten Zufallszahlen, die jetzt fehlen). Hindernisse auf der Fahrbahn sind davon nicht betroffen.
+
 ### Verbesserung 4 – etwas besser sichtbare Spuren im Sand
 - Deckkraft der Streifen im Sand (auch Dünen, Strand) von 0,115 auf 0,165, der Randlinie von 0,085 auf 0,12 – rund 45 % mehr. Asche und Mondstaub bleiben, wie sie waren (ihr Faktor wurde entsprechend gesenkt).
 - **Geprüft:** Bild `tc` (Boonta-Sand, 128 m/s, Verfolger- und Seitenansicht) gegen `ta` (vorher): die zwei Streifen sind klar zu erkennen, bleiben aber dezent.

@@ -9,12 +9,13 @@ import { TUNNEL_SHOULDER, mulberry32, tunnelArc, tunnelProfile, type Path, type 
 import { borderRocks, ROCK_VARIANTS } from './borderRocks';
 import { addProps, type Emitter } from './props';
 import { addMechProps } from './mechProps';
+import { addFlyers } from './flyers';
 import { addSciFi, oceanWindowMaterial } from './scifi';
 import { cactusMaterial, pineMaterial, treeMaterial } from './foliage';
 import { TUNNEL_DECK } from './physics';
 import { addTrackDetail } from './trackDetail';
 import { GROUND_ORDER, StaticBatcher } from './trackMesh';
-import { airshipGeometry, boulderGeometry, pylonGeometry, cactusGeometry, crystalClusterGeometry, jungleTreeGeometry, mesaGeometry, pineGeometry, rockGeometry, snowPineGeometry, spireGeometry } from './decorGeo';
+import { boulderGeometry, pylonGeometry, cactusGeometry, crystalClusterGeometry, jungleTreeGeometry, mesaGeometry, pineGeometry, rockGeometry, snowPineGeometry, spireGeometry } from './decorGeo';
 import { addSkyline, buildTerrain, makeTerrainField, terrainCell, terrainMeshHeight } from './terrain';
 import { clipOutside } from './meshClip';
 import { buildSnowDeck } from './snowDeck';
@@ -96,7 +97,11 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   const TL = layersFor(theme.id);
   const specs = worldTextureSpecs(theme, gfx);
   const texJob = generateTextures(specs, aniso);
-  const field = makeTerrainField(td, theme, terrainCell(gfx.geometry)); const { heightAt, nearest, roadClear, avgY } = field;
+  const field = makeTerrainField(td, theme, terrainCell(gfx.geometry)); const { heightAt, nearest, avgY } = field;
+  // (2026-11-25) Whoever asks „is this spot clear of the road?" and hears yes, puts something there – rocks, trees, towers, decks.
+  // The spots are kept, so that what is placed last (the holo boards and spectator boxes of flyers.ts) does not stand inside them.
+  const taken: { x: number; z: number; r: number }[] = []; let keepSpots = true; // (only while the world is built)
+  const roadClear = (x: number, z: number, r: number, margin?: number) => { const ok = field.roadClear(x, z, r, margin); if (ok && keepSpots && r >= 1.5) taken.push({ x, z, r }); return ok; };
   const [roadTex, wallTex, groundTex, gravelTex, basinTex, cliffT] = await texJob; const cliffTex = cliffT ?? wallTex;
   const texMs = Math.round(performance.now() - tTex0);
   await yield_();
@@ -584,7 +589,8 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
 
   progress(0.82, 'Platziere Landschaftsdetails …'); await yield_();
   const distToTrack = (x: number, z: number) => nearest(x, z);
-  const decorCells = scatterDecor(theme, group, td, heightAt, distToTrack, gfx, disposables, rng, rockTex, roadClear, waterY);
+  const tall: TallSpot[] = [];
+  const decorCells = scatterDecor(theme, group, td, heightAt, distToTrack, gfx, disposables, rng, rockTex, roadClear, waterY, tall);
   addArches(td, group, rockMat, disposables, rng, roadClear, heightAt, waterY, T === 'prison');
   // obstacle rocks on the track are the closest rocks of all → HQ boulder (wallMat has no uv repeat: 2.4 rock units per tile)
   const obstRockH = gfx.geometry >= 2 ? heightSampler(rockTex) : undefined;
@@ -607,6 +613,11 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
   const smokes: SmokeSrc[] = [];
   const cascades = addWaterfalls(td, theme, group, disposables, rng, smokes, landRock);
   const landmarks = addLandmarks(td, theme, group, disposables, field, rng, landRock, props.emitters, smokes);
+  // flight decor (2026-11-25): craft in the sky of Tatooine, the mesas and Aquilaris, spectator boxes at the start, holo boards on every
+  // world. Last of everything that stands: it keeps clear of what is there. (How high a landmark is, nobody says – 260 m is above all of them.)
+  for (const lm of landmarks) { taken.push(lm); tall.push({ x: lm.x, z: lm.z, r: lm.r, top: heightAt(lm.x, lm.z) + 260 }); }
+  const flyers = addFlyers(td, theme, group, disposables, (x, z) => groundMin(x, z, 3), gfx.detail, 9173 + td.N, taken, tall);
+  keepSpots = false; taken.length = 0; tall.length = 0;
   progress(0.92, 'Belebe Landschaft …'); await yield_();
   const smoke = buildSmoke(smokes, theme, td, field, group, disposables, rng, waterY);
   const cover = buildGroundCover(td, theme, gfx, field, waterY, rng, group, disposables, rockTex);
@@ -668,7 +679,7 @@ export async function buildWorld(td: TrackData, theme: ThemeDef, gfx: GfxSetting
         if (dc.pad > 0) { const r = shReach + dc.pad, cast = vis && d2 < r * r; dc.mesh.castShadow = cast; if (dc.lod) dc.lod.castShadow = cast; }
       }
     }
-    props.update(t); detail.update(t); mech.update(t); snowDeck?.update();
+    props.update(t); detail.update(t); mech.update(t); flyers.update(t); snowDeck?.update();
   };
   return {
     breakObstacle: obstFx.breakObstacle, setLodBias, setShadowReach,
@@ -1428,6 +1439,7 @@ function heightSampler(set: { map: THREE.Texture }, res = 16): ((u: number, v: n
 
 /** A sector of instanced scenery: hidden beyond `view2`, far twin beyond `lod2` (squared distances from the sector centre); shadows
  *  only within the reach of the sun shadows + `pad` (`setShadowReach`). */
+interface TallSpot { x: number; z: number; r: number; top: number }
 interface DecorCell { mesh: THREE.InstancedMesh; x: number; z: number; view2: number; /** radius of the sector if it throws shadows, else 0 */ pad: number; lod?: THREE.InstancedMesh; lod2?: number }
 
 /** 2026-11-23: the rock rows along natural roads. `borderRocks.ts` says where a rock stands and how big it is; here it gets its shape
@@ -1495,6 +1507,8 @@ function scatterDecor(
   theme: ThemeDef, group: THREE.Group, td: TrackData, heightAt: (x: number, z: number) => number,
   near: (x: number, z: number) => { d: number; s: Sample }, gfx: GfxSettings, disp: { dispose: () => void }[], rng: () => number,
   wallTex: ReturnType<typeof generateTexture>, roadClear: (x: number, z: number, r: number, margin?: number) => boolean, waterY: number,
+  /** filled with what stands more than 30 m above the road next to it (table mountains, needles, pylons): the craft of flyers.ts fly round or above it */
+  tall: TallSpot[] = [],
 ) {
   const det = gfx.detail; const gq = gfx.geometry; const dens = Math.min(2.6, Math.max(1, td.N / 3000) * 1.2);
   const rockMat = surfaceMaterial(wallTex, {
@@ -1508,6 +1522,7 @@ function scatterDecor(
   const place = (geo: THREE.BufferGeometry, mat: THREE.Material, count: number, dMin: number, dMax: number, sMin: number, sMax: number, opts: { foot?: number; yOff?: number; tilt?: number; air?: number; shadow?: boolean; scaleY?: [number, number]; colors?: string[]; keepDry?: boolean; view?: number; lod?: { geo: THREE.BufferGeometry; dist: number } } = {}) => {
     count = Math.floor(count * det * dens); // Session 18: density follows the (longer) track + 20 % more decoration
     if (count <= 0) { geo.dispose(); opts.lod?.geo.dispose(); return; }
+    geo.computeBoundingBox(); const geoTop = geo.boundingBox!.max.y;
     const SEC = dMax > 900 ? 900 : 340;
     const sectors = new Map<string, { m: THREE.Matrix4[]; c: THREE.Color[]; cx: number; cz: number }>();
     const q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
@@ -1532,6 +1547,7 @@ function scatterDecor(
       let sec = sectors.get(key); if (!sec) { sec = { m: [], c: [], cx: (sxI + 0.5) * SEC, cz: (szI + 0.5) * SEC }; sectors.set(key, sec); }
       sec.m.push(new THREE.Matrix4().compose(v.set(x, y, z), q, sc.set(size, size * sy, size)));
       if (opts.colors) sec.c.push(new THREE.Color(opts.colors[Math.floor(rng() * opts.colors.length)]));
+      if (!opts.air) { const top = y + geoTop * size * sy; if (top > nn.s.y + 30) tall.push({ x, z, r: size * (opts.foot ?? 1.4), top }); }
       placed++;
     }
     const cast = opts.shadow ?? (dMin < 40 && sMax >= 2.2);
@@ -1635,10 +1651,7 @@ function scatterDecor(
         const wm = new THREE.MeshStandardMaterial({ color: '#615044', metalness: 0.72, roughness: 0.56, side: THREE.DoubleSide }); disp.push(wm);
         place(g, wm, 64, 10, 210, 0.85, 1.55, { foot: 3.5, tilt: 0.55, yOff: -0.05, keepDry: true }); break;
       }
-      case 'balloons': {
-        const bm = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.48, metalness: 0.22 }); disp.push(bm);
-        place(airshipGeometry(), bm, 40, 60, 1200, 6, 14, { air: 120, shadow: false, colors: ['#d84a3a', '#e8c24a', '#4a8ad8', '#e8e0d0'] }); break;
-      }
+      case 'flyers': break; // the craft that fly here: flyers.ts (2026-11-25; until then 40 airships stood in the sky)
       case 'pylons': {
         const pm = new THREE.MeshStandardMaterial({ color: '#606878', metalness: 0.9, roughness: 0.28, emissive: theme.barrierColor, emissiveIntensity: 0.38 }); disp.push(pm);
         place(pylonGeometry(), pm, 90, 30, 900, 1, 2, { foot: 3.2 }); break;

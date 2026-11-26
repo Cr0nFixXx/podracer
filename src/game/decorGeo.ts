@@ -411,29 +411,6 @@ export function cactusGeometry(seed: number): THREE.BufferGeometry {
   return out;
 }
 
-/** Racing-blimp: gored teardrop hull, swept cruciform tail fins, gondola on struts, twin engine nacelles. Length ≈ 4.6 (z), radius ≈ 1. */
-export function airshipGeometry(): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = [];
-  parts.push(smooth(ringSurface(18, 14, (a, j) => {
-    const t = j / 13, prof = Math.pow(Math.max(0, Math.sin(Math.PI * Math.pow(t, 0.72))), 0.62);
-    const rad = Math.max(0.03, prof) * (1 - 0.04 * Math.pow(Math.abs(Math.sin(a * 6)), 6));
-    return [Math.cos(a) * rad, Math.sin(a) * rad * 0.86, lerp(2.3, -2.3, t)];
-  }, [0, 0, -2.34], [0, 0, 2.34])));
-  for (let k = 0; k < 4; k++) { // swept tail fins
-    const f = new THREE.BoxGeometry(0.07, 0.95, 1.15); const p = f.attributes.position as THREE.BufferAttribute;
-    for (let i = 0; i < p.count; i++) if (p.getZ(i) > 0) p.setY(i, p.getY(i) * 0.3 - 0.3);
-    parts.push(flat(f.translate(0, 0.72, -1.72).rotateZ(k * Math.PI / 2 + Math.PI / 4)));
-  }
-  parts.push(smooth(ringSurface(8, 6, (a, j) => { const t = j / 5, rad = Math.sin(Math.PI * (0.12 + t * 0.76)) * 0.3; return [Math.cos(a) * rad * 0.8, -1.0 + Math.sin(a) * rad * 0.62, lerp(0.85, -0.75, t)]; }, [0, -1.0, -0.8], [0, -1.0, 0.9])));
-  for (const sx of [-1, 1]) {
-    for (const z of [0.45, -0.35]) parts.push(smooth(tube([[sx * 0.14, -0.9, z], [sx * 0.3, -0.72, z]], [0.03, 0.03], 4)));
-    parts.push(smooth(tube([[sx * 0.82, -0.52, 0.1], [sx * 0.82, -0.52, -0.55]], [0.13, 0.1], 8, true)));
-    parts.push(smooth(tube([[sx * 0.82, -0.52, 0.1], [sx * 0.82, -0.52, 0.16]], [0.26, 0.26], 10, true)));
-    parts.push(smooth(tube([[sx * 0.5, -0.56, -0.2], [sx * 0.82, -0.52, -0.2]], [0.035, 0.035], 4)));
-  }
-  return merge(parts);
-}
-
 /** Energy pylon: splayed tripod legs with foot pads & cross braces, hex mast, ring platforms, pronged emitter head. Height ≈ 32. */
 export function pylonGeometry(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];

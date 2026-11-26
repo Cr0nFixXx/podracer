@@ -64,4 +64,4 @@ Auftrag und Entscheidungen: [Protokoll](docs/verlauf/2026-11-23-nach-der-probefa
 - [x] Schwerelosigkeit: Feder zur Röhrenmitte, Nase folgt der Röhre; wenige treibende Brocken – **bitte ausprobieren:** fühlt sich das Gummiband richtig an (Stärke, Überschwingen)?
 - [ ] Sprünge auf den sechs Schlucht-Strecken: Lücken 70–90 m, ein weiter Sprung (nur mit Boost), ein Abwurf
 - [x] Untergründe „deutlich" (Eis 45 % Haftung …) – **bitte fahren:** Eissee (Frostspalt, Heuler-Schlucht), Schlamm, Dünen
-- [ ] Flug-Deko: Segelbarke, Zuschauer-Logen, Frachter, Wolkenwagen, Holo-Werbetafeln statt Zeppelinen
+- [x] Flug-Deko: Segelbarke, Zuschauer-Logen, Frachter, Wolkenwagen, Transporter, Holo-Werbetafeln statt Zeppelinen; 20 % weniger – **bitte ansehen:** Größe der Holo-Tafeln (25 m), Transporter statt zweitem Frachter über Aquilaris, wirken die Kreise natürlich?

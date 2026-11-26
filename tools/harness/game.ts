@@ -267,6 +267,38 @@ let g: Game | null = null; let cur = -1;
     // a 4th value of 1: a camera close behind the Gegner, on the side it was hit from (Treffermarke, smoke)
     if (view.split('_')[4] === '1') { const s = S[rv.idx]; G.camera.position.set(rv.pos.x - s.rx * 4.5 - s.tx * 9, rv.pos.y + 2.2, rv.pos.z - s.rz * 4.5 - s.tz * 9); G.camera.up.set(0, 1, 0); G.camera.lookAt(rv.pos.x + s.tx * 2, rv.pos.y, rv.pos.z + s.tz * 2); G.camera.fov = 55; }
     (window as unknown as Record<string, unknown>).coverInfo = `probe ${log.join(' · ')} · Gegner ${rv.name}: engines ${rv.hpL.toFixed(0)} / ${rv.hpR.toFixed(0)}, parts lost ${(rv.parts ?? 0).toString(2)}, dead ${rv.dead > 0} · player engines ${pl.hpL.toFixed(0)} / ${pl.hpR.toFixed(0)} · HUD ${JSON.stringify(G.hud().ram)}`;
+  } else if (view.startsWith('flyrd_')) { // 2026-11-25: flyrd_<kind>_<which one>_<metres before it> – the driver's view of a holo board or a spectator
+    // box: the camera on the middle of the road, as high as the chase camera, looking along the road.
+    const [, kind, i0, b0] = view.split('_'); const im = G.scene.getObjectByName('flyer:' + kind) as THREE.InstancedMesh | undefined;
+    G.world.update(G.clock + 5, G.camera.position);
+    if (!im) (window as unknown as Record<string, unknown>).coverInfo = `probe flyer: no '${kind}' on this track`;
+    else {
+      const S = G.td.main.samples, N = S.length, m = new THREE.Matrix4(), p = new THREE.Vector3(); im.getMatrixAt(Math.min(im.count - 1, +(i0 ?? 0)), m); p.setFromMatrixPosition(m);
+      let near = 0, nd = 1e18; S.forEach((sm, k) => { const dd = (sm.x - p.x) ** 2 + (sm.z - p.z) ** 2; if (dd < nd) { nd = dd; near = k; } });
+      const back = Math.round(+(b0 ?? 120) / 2), a = S[((near - back) % N + N) % N], b = S[((near - back + 30) % N + N) % N];
+      G.camera.position.set(a.x, a.y + 2.85 + 4.1, a.z); G.camera.up.set(0, 1, 0); G.camera.lookAt(b.x, b.y + 5, b.z); G.camera.fov = 62;
+      (window as unknown as Record<string, unknown>).coverInfo = `probe flyer ${kind} ${i0 ?? 0} of ${im.count}: ${Math.sqrt(nd).toFixed(0)} m from sample ${near} (road half width ${S[near].hw.toFixed(0)} m), seen from sample ${near - back}`;
+    }
+    chase = true;
+  } else if (view.startsWith('flyer_')) { // 2026-11-25: flyer_<kind>[_<metres away>[_<azimuth °>[_<elevation °>[_<which one>]]]] – a camera beside a craft of
+    // the flight decor (barge, freighter, cloudCar, transport, box, holo): in a race they are far away, this shows the model.
+    // Azimuth 0 = from straight ahead of it, 90 = from its starboard side, 180 = from astern.
+    const [, kind, d0, a0, e0, i0] = view.split('_'); const im = G.scene.getObjectByName('flyer:' + kind) as THREE.InstancedMesh | undefined;
+    G.world.update(G.clock + 5, G.camera.position); // (the picture is taken at this time – the craft fly on)
+    if (!im) (window as unknown as Record<string, unknown>).coverInfo = `probe flyer: no '${kind}' on this track`;
+    else {
+      const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3(); im.getMatrixAt(Math.min(im.count - 1, +(i0 ?? 0)), m); m.decompose(p, q, sc);
+      const az = +(a0 ?? 35) * Math.PI / 180, el = +(e0 ?? 18) * Math.PI / 180, dist = +(d0 ?? 50);
+      G.camera.position.copy(p).add(new THREE.Vector3(-Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).multiplyScalar(dist).applyQuaternion(q));
+      G.camera.up.set(0, 1, 0); G.camera.lookAt(p.x, p.y + (kind === 'holo' ? 4 : 1) * sc.y, p.z); G.camera.fov = 42;
+      let near = 0, nd = 1e18; G.td.main.samples.forEach((sm, k) => { const dd = (sm.x - p.x) ** 2 + (sm.z - p.z) ** 2; if (dd < nd) { nd = dd; near = k; } });
+      // how high all of this kind fly above the road nearest to them, and how far from it
+      const hs: number[] = [], ds: number[] = [], pp = new THREE.Vector3();
+      for (let k = 0; k < im.count; k++) { im.getMatrixAt(k, m); pp.setFromMatrixPosition(m); let bd = 1e18, by = 0; for (const sm of G.td.main.samples) { const dd = (sm.x - pp.x) ** 2 + (sm.z - pp.z) ** 2; if (dd < bd) { bd = dd; by = sm.y; } } hs.push(pp.y - by); ds.push(Math.sqrt(bd)); }
+      hs.sort((a, b) => a - b); ds.sort((a, b) => a - b); const mid = (a: number[]) => a[Math.floor(a.length / 2)].toFixed(0);
+      (window as unknown as Record<string, unknown>).coverInfo = `probe flyer ${kind}: ${im.count} on this track, this one ${p.y.toFixed(0)} m up, size × ${sc.x.toFixed(2)}, ${Math.sqrt(nd).toFixed(0)} m from sample ${near}; all: ${hs[0].toFixed(0)} / ${mid(hs)} / ${hs[hs.length - 1].toFixed(0)} m above the nearest road, ${ds[0].toFixed(0)} / ${mid(ds)} / ${ds[ds.length - 1].toFixed(0)} m from it`;
+    }
+    chase = true;
   } else if (view.startsWith('fly_')) { // the intro flight (2026-11-23): fly_<metres into the pass> – the game's own flight camera, field of view and shadows
     G.startIntro(); G.flightDist = +view.slice(4); for (let k = 0; k < 12; k++) G.updateCamera(0.5);
     chase = true;

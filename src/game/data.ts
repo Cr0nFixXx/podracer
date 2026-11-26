@@ -135,7 +135,7 @@ export const PODS: PodDef[] = [
 
 // ===================== THEMES =====================
 export type TexKind = 'sand' | 'rock' | 'road' | 'snow' | 'ice' | 'jungle' | 'basalt' | 'metal' | 'crystal' | 'lavaRoad' | 'cityRoad' | 'mud' | 'oovoRoad' | 'oovoWall' | 'gravel' | 'cracked';
-export type DecorKind = 'rocks' | 'spires' | 'mesas' | 'cacti' | 'iceSpikes' | 'pines' | 'trees' | 'ferns' | 'lavaRocks' | 'crystals' | 'wrecks' | 'balloons' | 'pylons' | 'asteroids' | 'cells' | 'satellites' | 'antennas' | 'debris';
+export type DecorKind = 'rocks' | 'spires' | 'mesas' | 'cacti' | 'iceSpikes' | 'pines' | 'trees' | 'ferns' | 'lavaRocks' | 'crystals' | 'wrecks' | 'flyers' | 'pylons' | 'asteroids' | 'cells' | 'satellites' | 'antennas' | 'debris';
 
 export interface ThemeDef {
   id: string;
@@ -174,7 +174,7 @@ export const THEMES: Record<string, ThemeDef> = {
     fogColor: '#e8c9a0', fogDensity: 0.00055, sunIntensity: 4.2, hemiSky: '#bcd5ff', hemiGround: '#b08050', exposure: 0.95,
     road: 'road', wall: 'rock', ground: 'sand',
     palette: { road: ['#8a6a48', '#b08d64', '#cfae80'], wall: ['#7a4a2c', '#b8743f', '#e0a86a'], ground: ['#b88a58', '#d8ae78', '#efcf9a'] },
-    decor: ['rocks', 'spires', 'mesas', 'wrecks', 'balloons'], ambient: 'dust', terrain: 'canyon', barrierColor: '#ffb040',
+    decor: ['rocks', 'spires', 'mesas', 'wrecks', 'flyers'], ambient: 'dust', terrain: 'canyon', barrierColor: '#ffb040',
   },
   ice: {
     id: 'ice', name: 'Ando Prime', skyTop: '#5a7fa8', skyHorizon: '#dde8f2', sunColor: '#e8f2ff', sunElev: 14, sunAz: 120, clouds: 0.55,
@@ -202,7 +202,7 @@ export const THEMES: Record<string, ThemeDef> = {
     fogColor: '#b8d8ec', fogDensity: 0.0005, sunIntensity: 3.6, hemiSky: '#c8e8ff', hemiGround: '#3a6a5a', exposure: 1.0,
     road: 'cityRoad', wall: 'metal', ground: 'sand',
     palette: { road: ['#2a3848', '#3a4a5c', '#5a6a7c'], wall: ['#3a4a5a', '#5a6a7a', '#8aa0b0'], ground: ['#c8b898', '#e0d0b0', '#f0e4c8'] },
-    decor: ['rocks', 'wrecks', 'balloons', 'pylons'], ambient: 'rain', terrain: 'ocean', barrierColor: '#3ad8ff',
+    decor: ['rocks', 'wrecks', 'flyers', 'pylons'], ambient: 'rain', terrain: 'ocean', barrierColor: '#3ad8ff',
   },
   oovo: {
     // Session 20: the sun stands higher (8° → 19°) and the fill light is a little stronger – the track now runs over a real moon surface
@@ -233,7 +233,7 @@ export const THEMES: Record<string, ThemeDef> = {
     fogColor: '#e0a070', fogDensity: 0.0006, sunIntensity: 3.8, hemiSky: '#b0c8ff', hemiGround: '#a05030', exposure: 1.0,
     road: 'road', wall: 'rock', ground: 'sand',
     palette: { road: ['#7a4a30', '#a06040', '#c08058'], wall: ['#6a2a18', '#a8482a', '#d87a4a'], ground: ['#a05a38', '#c87a50', '#e8a070'] },
-    decor: ['mesas', 'spires', 'rocks', 'cacti', 'balloons'], ambient: 'dust', terrain: 'canyon', barrierColor: '#ffa040',
+    decor: ['mesas', 'spires', 'rocks', 'cacti', 'flyers'], ambient: 'dust', terrain: 'canyon', barrierColor: '#ffa040',
   },
 };
 

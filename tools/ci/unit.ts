@@ -26,6 +26,8 @@ import { ALARM_FROM, boostAlarmLevel, boostAlarmVoice } from '../../src/game/aud
 import { PadRepeater, nextFocus, readPadNav, stepRange, type NavRect, type PadSnapshot } from '../../src/ui/padNav';
 import { FLIGHT_BAND, FLIGHT_LOOK, FLIGHT_SPEED, buildIntroFlight, type FlightPose } from '../../src/game/introFlight';
 import { TrackLayer, TRACK_FADE_IN, TRACK_SEG, trackLife } from '../../src/game/groundTracks';
+import { flyerGeometry, flyerPlan, flyerTotal, FLYERS_BEFORE } from '../../src/game/flyerGeo';
+import { flyerSpots } from '../../src/game/flyers';
 import * as GPU3 from 'three/webgpu';
 import { setupSunShadow, CSM_FAR, CSM_SPLIT, SH_BACK, SH_BOX } from '../../src/game/sunShadow';
 
@@ -671,7 +673,7 @@ test('profile: a broken colour falls back to that pod\'s own colour', () => {
 });
 test('profile: Style-Teile are clamped into range; a save without them means Werk', () => {
   saved(V2, { podId: 'aurora', custom: { aurora: { colors: PODS[0].colors, tuning: {}, kit: { fins: 9, intake: -2, nozzle: 2.4, canopy: 'x' } } } });
-  const p = loadProfile(); eq(p.custom.aurora.kit, { fins: 3, intake: 0, nozzle: 2, canopy: 0 }); eq(p.custom.brute.kit, undefined, 'pod without saved parts');
+  const p = loadProfile(); eq(p.custom.aurora.kit, { fins: 3, intake: 0, nozzle: 2, canopy: 0, paint: 0 }, '(a save from before the part paint has no paint: Werk)'); eq(p.custom.brute.kit, undefined, 'pod without saved parts');
 });
 test('profile: the rival count is clamped to 0..10', () => {
   saved(V2, { race: { opponents: 99 } }); eq(loadProfile().race.opponents, 10);
@@ -2198,6 +2200,122 @@ test('landing: a normal landing costs nothing – 30 m/s (a ramp jump) and 36 m/
   eq(jump, 0, 'hull points lost by landing at 30 m/s –'); eq(drop, 0, 'hull points lost by landing at 36 m/s –');
   ok(fall > 6 && fall < 40, `a fall at 55 m/s cost ${fall.toFixed(1)} hull points – expected a clear but survivable hit`);
   ok(jumpEv === 1 && fallEv === 1, `every landing still reports itself (dust, sound, shake): ${jumpEv} and ${fallEv} events`);
+});
+
+// ---- flight decor (2026-11-25) ----
+// User, 2026-11-23: "bekannte Modelle so genau wie möglich nachbauen" – Tatooine and the mesas: sail barge, rising spectator boxes as in
+// the Mos Espa arena, light freighter (saucer with a side cockpit); Aquilaris: cloud car (two pods) and freighter; holo billboards on
+// all worlds. User, 2026-11-25: "der Himmel ist teilweise ziemlich voll mit Zeppelinen. Verringere die Anzahl der Flug-Deko um 20 % –
+// ersetze aber sonst wie geplant."
+test('flyers: 20 % fewer than the airships at every detail and track length – and each world gets the kinds that were planned for it', () => {
+  for (const scale of [0.4, 1, 1.92, 2.6, 4.16]) { // detail × track length, as `place()` scaled the airships
+    const before = Math.floor(FLYERS_BEFORE * scale);
+    for (const id of ['desert', 'mesa', 'aquilaris']) {
+      const pl = flyerPlan(id, true, scale), sum = Object.values(pl).reduce((a, b) => a + b, 0);
+      ok(sum <= Math.floor(before * 0.8) && sum >= Math.floor(before * 0.8) - 1, `${id} at scale ${scale}: ${sum} flyers, ${before} airships before – expected 20 % fewer (${Math.floor(before * 0.8)})`);
+      eq(flyerTotal(scale), Math.floor(before * 0.8), `flyerTotal(${scale}):`);
+      if (id === 'aquilaris') { ok(pl.cloudCar > 0 && pl.transport > 0 && pl.holo > 0, `${id}: ${JSON.stringify(pl)}`); eq([pl.barge, pl.freighter, pl.box], [0, 0, 0], `${id} has no desert craft:`); }
+      else { ok(pl.barge > 0 && pl.freighter > 0 && pl.box > 0 && pl.holo > 0, `${id}: ${JSON.stringify(pl)}`); eq([pl.cloudCar, pl.transport], [0, 0], `${id} has no Aquilaris craft:`); ok(pl.box <= 8, `${id}: ${pl.box} spectator boxes round the start – at most 8`); }
+      ok(pl.holo <= 10, `${id}: ${pl.holo} holo boards – at most 10 a track`);
+    }
+    for (const id of Object.keys(THEMES)) if (!['desert', 'mesa', 'aquilaris'].includes(id)) {
+      const pl = flyerPlan(id, false, scale);
+      ok(pl.holo >= 2 && pl.holo <= 10, `${id} at scale ${scale}: ${pl.holo} holo boards`); eq(Object.values(pl).reduce((a, b) => a + b, 0), pl.holo, `${id}: only holo boards:`);
+    }
+  }
+  for (const id of ['desert', 'mesa', 'aquilaris']) ok(THEMES[id].decor.includes('flyers' as never) && !THEMES[id].decor.includes('balloons' as never), `${id}: decor ${THEMES[id].decor.join(', ')}`);
+});
+test('flyers: holo boards hover beside open road on every world, spectator boxes round the start line, and every craft flies well above the road below it', () => {
+  for (const tr of TRACKS) {
+    const td = trackOf(tr.id), theme = THEMES[tr.theme], S = td.main.samples, N = td.N;
+    const at = (i: number) => S[td.main.closed ? ((i % N) + N) % N : Math.max(0, Math.min(N - 1, i))];
+    const idxDist = (a: number, b: number) => { const d = Math.abs(a - b); return td.main.closed ? Math.min(d, N - d) : d; };
+    for (const detail of [0.4, 1, 1.6]) {
+      const sp = flyerSpots(td, theme, () => -1e4, detail, 9173 + N, []);
+      const craft = ['barge', 'freighter', 'cloudCar', 'transport'] as const;
+      if (process.env.DEBUG && detail === 1) console.log(`  ${tr.id.padEnd(12)} ${theme.id.padEnd(10)} plan ${JSON.stringify(sp.plan)} → boards ${sp.boards.length} at ${sp.boards.map(b => b.i).join(' ')}, boxes ${sp.boxes.length}, craft ${craft.map(k => sp.craft[k]?.length ?? 0).join(' / ')}`);
+      // holo boards: on every world, never where the road is roofed, weightless, missing or a ramp – and not where pods come flying
+      ok(sp.boards.length >= 2 && sp.boards.length <= 10, `${tr.id} at detail ${detail}: ${sp.boards.length} holo boards (planned ${sp.plan.holo})`);
+      for (const b of sp.boards) {
+        for (let k = -30; k <= 30; k += 2) { const s = at(b.i + k); ok(!(s.roof > 0) && !s.zeroG && !s.gap && s.ramp === 0 && !s.bridge && !s.underpass, `${tr.id}: holo board at sample ${b.i} – the road ${k * 2} m from it is roofed, weightless, a gap, a ramp or a bridge`); }
+        for (let k = -130; k <= 40; k += 2) ok(!(at(b.i + k).ramp > 0) && !at(b.i + k).gap, `${tr.id}: holo board at sample ${b.i} – a ramp or gap ${-k * 2} m before it`);
+        ok(idxDist(b.i, td.startIdx) >= 110, `${tr.id}: holo board at sample ${b.i}, ${idxDist(b.i, td.startIdx) * 2} m from the start line (grandstands)`);
+        const s = at(b.i), lat = (b.x - s.x) * s.rx + (b.z - s.z) * s.rz;
+        ok(Math.abs(lat) > s.hw + 11 && Math.abs(lat) < s.hw + 40 && Math.sign(lat) === b.side, `${tr.id}: holo board at sample ${b.i} stands ${lat.toFixed(1)} m beside the middle, road half width ${s.hw.toFixed(1)} m`);
+        // its picture looks back along the road, towards the pods that come: (sin yaw, cos yaw) against the driving direction
+        ok(Math.sin(b.yaw) * s.tx + Math.cos(b.yaw) * s.tz < -0.85, `${tr.id}: holo board at sample ${b.i} does not face the pods that come`);
+        ok((Math.sin(b.yaw) * s.rx + Math.cos(b.yaw) * s.rz) * b.side < -0.2, `${tr.id}: holo board at sample ${b.i} is turned away from the road`);
+        ok(b.y >= s.y + 5 && b.y <= s.y + 12, `${tr.id}: holo board at sample ${b.i} hovers ${(b.y - s.y).toFixed(1)} m above the road`);
+      }
+      ok(new Set(sp.boards.map(b => b.ad)).size >= Math.min(4, sp.boards.length), `${tr.id}: ${sp.boards.length} boards show only ${new Set(sp.boards.map(b => b.ad)).size} different pictures`);
+      // spectator boxes: only where the airships flew over Tatooine and the mesas, near the line, beside the road
+      if (theme.id === 'desert' || theme.id === 'mesa') {
+        ok(sp.boxes.length >= 3 && sp.boxes.length <= 8, `${tr.id} at detail ${detail}: ${sp.boxes.length} spectator boxes (planned ${sp.plan.box})`);
+        for (const b of sp.boxes) {
+          const s = at(b.i), lat = (b.x - s.x) * s.rx + (b.z - s.z) * s.rz;
+          ok(idxDist(b.i, td.startIdx) <= 215 && idxDist(b.i, td.startIdx) >= 26, `${tr.id}: spectator box at sample ${b.i}, ${idxDist(b.i, td.startIdx) * 2} m from the start line`);
+          ok(Math.abs(lat) >= s.hw + 14 && Math.abs(lat) <= s.hw + 18.01, `${tr.id}: spectator box ${lat.toFixed(1)} m beside the middle (road half width ${s.hw.toFixed(1)}) – between the posts at the edge and the grandstand roof`);
+          ok(b.y >= s.y + 4 && b.rise >= 8 && b.rise <= 18, `${tr.id}: spectator box rises ${b.rise.toFixed(1)} m from ${(b.y - s.y).toFixed(1)} m above the road`);
+          ok(!(s.roof > 0) && !s.zeroG && !s.gap && s.ramp === 0, `${tr.id}: spectator box at sample ${b.i} on a roofed, weightless or missing road`);
+        }
+      } else eq(sp.boxes.length, 0, `${tr.id}: spectator boxes on a world without them:`);
+      // craft: as many as planned, and above every piece of road inside and near their circle (the intro flight passes 20–35 m above the road)
+      for (const kind of craft) {
+        const list = sp.craft[kind] ?? []; eq(list.length, sp.plan[kind], `${tr.id} at detail ${detail}: ${kind} –`);
+        for (const c of list) {
+          let top = -1e9; for (let i = 0; i < N; i += 3) { const s = S[i]; if (Math.hypot(s.x - c.x, s.z - c.z) < c.r + 120) top = Math.max(top, s.y); }
+          ok(top < -1e8 || c.y - c.bob >= top + 55, `${tr.id}: a ${kind} flies ${(c.y - c.bob - top).toFixed(0)} m above the highest road under its circle`);
+          ok(Math.abs(c.w) * c.r >= 4 && Math.abs(c.w) * c.r <= 40, `${tr.id}: a ${kind} flies at ${(Math.abs(c.w) * c.r).toFixed(0)} m/s`);
+        }
+      }
+      if (theme.decor.includes('flyers' as never)) ok(craft.reduce((n, k) => n + (sp.craft[k]?.length ?? 0), 0) > 0, `${tr.id}: no craft in the sky`);
+      else eq(craft.reduce((n, k) => n + (sp.craft[k]?.length ?? 0), 0), 0, `${tr.id}: craft in a sky that had no airships:`);
+    }
+    // the same track gives the same sky
+    eq(JSON.stringify(flyerSpots(td, theme, () => -1e4, 1, 9173 + N, [])), JSON.stringify(flyerSpots(td, theme, () => -1e4, 1, 9173 + N, [])), `${tr.id}: two builds differ:`);
+    // a table mountain under a craft's circle, higher than the craft flies: the craft flies somewhere else or 30 m above it
+    if (theme.decor.includes('flyers' as never)) {
+      const a = flyerSpots(td, theme, () => -1e4, 1, 9173 + N, []), kind = (['barge', 'cloudCar'] as const).find(k => a.craft[k]?.length)!, c0 = a.craft[kind]![0];
+      const rock = { x: c0.x + c0.r, z: c0.z, r: 90, top: c0.y + 40 }, b = flyerSpots(td, theme, () => -1e4, 1, 9173 + N, [], [rock]);
+      ok(Math.abs(Math.hypot(rock.x - c0.x, rock.z - c0.z) - c0.r) < rock.r, `${tr.id}: the test rock does not stand under the first ${kind}`);
+      for (const k of ['barge', 'freighter', 'cloudCar', 'transport'] as const) for (const c of b.craft[k] ?? []) {
+        const crosses = Math.abs(Math.hypot(rock.x - c.x, rock.z - c.z) - c.r) < rock.r + 45;
+        ok(!crosses || c.y - c.bob >= rock.top + 29.9, `${tr.id}: a ${k} flies through a table mountain (its top ${rock.top.toFixed(0)} m, the craft at ${c.y.toFixed(0)} m)`);
+      }
+    }
+    // something standing where a board would go moves the board
+    { const a = flyerSpots(td, theme, () => -1e4, 1, 9173 + N, []), b0 = a.boards[0], b = flyerSpots(td, theme, () => -1e4, 1, 9173 + N, [{ x: b0.x, z: b0.z, r: 4 }]);
+      ok(b.boards.every(q => Math.hypot(q.x - b0.x, q.z - b0.z) > 6), `${tr.id}: a holo board stands inside a rock`); }
+  }
+});
+
+test('flyers: the models have the shapes they are named after (sail barge, saucer freighter with a side cockpit, twin-pod cloud car, transport, spectator box, holo board)', () => {
+  const box = (g: GPU3.BufferGeometry) => { g.computeBoundingBox(); const b = g.boundingBox!; return { x0: b.min.x, x1: b.max.x, y0: b.min.y, y1: b.max.y, z0: b.min.z, z1: b.max.z, w: b.max.x - b.min.x, h: b.max.y - b.min.y, l: b.max.z - b.min.z }; };
+  /** widest extent in x of the vertices inside a slab of y */
+  const widthAt = (g: GPU3.BufferGeometry, y0: number, y1: number) => { const p = g.attributes.position; let lo = 1e9, hi = -1e9; for (let i = 0; i < p.count; i++) { const y = p.getY(i); if (y >= y0 && y <= y1) { lo = Math.min(lo, p.getX(i)); hi = Math.max(hi, p.getX(i)); } } return hi - lo; };
+  for (const kind of ['barge', 'freighter', 'box', 'cloudCar', 'transport', 'holo'] as const) {
+    const { body, glow } = flyerGeometry(kind), tris = triCount(body);
+    ok(tris > 60 && tris < 9000, `${kind}: ${tris} triangles`); ok(!!body.attributes.color && !!body.attributes.normal, `${kind}: no vertex colours / normals`);
+    const p = body.attributes.position; for (let i = 0; i < p.count * 3; i++) if (!Number.isFinite(p.array[i])) throw new Error(`${kind}: a vertex is not a number`);
+    if (kind !== 'box') ok(!!glow && triCount(glow) > 0, `${kind}: nothing glows (engines, lights, the holo picture)`);
+    // faces outside: the volume the triangles enclose, counted with their sign – a hull built inside out counts negative
+    { let vol = 0; const P = p.array as Float32Array; for (let t = 0; t < p.count * 3; t += 9) vol += (P[t] * (P[t + 4] * P[t + 8] - P[t + 5] * P[t + 7]) - P[t + 1] * (P[t + 3] * P[t + 8] - P[t + 5] * P[t + 6]) + P[t + 2] * (P[t + 3] * P[t + 7] - P[t + 4] * P[t + 6])) / 6;
+      body.computeBoundingBox(); const sz = body.boundingBox!.getSize(new GPU3.Vector3()), share = vol / (sz.x * sz.y * sz.z); ok(share > 0.03, `${kind}: the triangles enclose ${vol.toFixed(1)} m³ (${(share * 100).toFixed(0)} % of the bounding box) – a part is inside out`); }
+  }
+  { const g = flyerGeometry('barge').body, b = box(g); // Khetanna: 30 m long, the two sails stand wider than the hull and high above the deck
+    ok(b.l > 28 && b.l < 34, `barge: ${b.l.toFixed(1)} m long`); const hull = widthAt(g, -0.5, 1.5), sails = widthAt(g, 6, 12);
+    ok(hull > 6 && hull < 9, `barge: hull ${hull.toFixed(1)} m wide`); ok(sails > hull * 1.3, `barge: sails ${sails.toFixed(1)} m wide over a hull of ${hull.toFixed(1)} m`); ok(b.y1 > 9, `barge: top at ${b.y1.toFixed(1)} m – the sails stand high above the deck`); }
+  { const g = flyerGeometry('freighter').body, b = box(g); // saucer, two mandibles forward, the cockpit on the starboard side
+    ok(b.w > 24 && b.w < 32, `freighter: ${b.w.toFixed(1)} m wide`); ok(b.z1 > 1.5 * -b.z0, `freighter: reaches ${b.z1.toFixed(1)} m forward, ${(-b.z0).toFixed(1)} m back – no mandibles`);
+    // (nose towards +z, y up: starboard is −x)
+    { const p = g.attributes.position; let star = 0, port = 0; for (let i = 0; i < p.count; i++) if (p.getZ(i) > 11.5 && Math.abs(p.getX(i)) > 9) { if (p.getX(i) < 0) star++; else port++; } ok(star > 20 && port === 0, `freighter: ${star} vertices forward on the starboard side, ${port} to port – the cockpit should sit off to starboard, alone`); }
+    ok(b.h < b.w * 0.45, `freighter: ${b.h.toFixed(1)} m high – not a saucer`); }
+  { const g = flyerGeometry('cloudCar').body, b = box(g); // two pods side by side, an engine between them
+    ok(Math.abs(b.x1 + b.x0) < 0.05, 'cloud car: not symmetric'); ok(b.w > b.l * 0.7 && b.w < b.l * 1.2, `cloud car: ${b.w.toFixed(1)} m wide, ${b.l.toFixed(1)} m long`);
+    const p = g.attributes.position; let mid = 0, out = 0; for (let i = 0; i < p.count; i++) { if (p.getY(i) > 0.75) { if (Math.abs(p.getX(i)) < 0.8) mid++; else out++; } } ok(out > 20 && mid === 0, `cloud car: ${out} vertices high on the pods, ${mid} high in the middle – two pods, low bar between`); }
+  { const g = flyerGeometry('transport').body, b = box(g); ok(b.l > 80 && b.l < 100, `transport: ${b.l.toFixed(0)} m long`); ok(b.y0 < -3, 'transport: no cargo hangs under the shell'); ok(b.w < b.l * 0.4, `transport: ${b.w.toFixed(0)} m wide`); }
+  { const g = flyerGeometry('box').body, b = box(g); ok(b.w > 5 && b.w < 10 && b.l > 4 && b.l < 8, `spectator box: ${b.w.toFixed(1)} × ${b.l.toFixed(1)} m`); ok(b.y1 > 1.6, `spectator box: top at ${b.y1.toFixed(1)} m – nobody stands on it`); }
+  { const f = flyerGeometry('holo'), b = box(f.glow!); ok(b.w > 8 && b.h > 4 && b.w / b.h > 1.5, `holo board: picture ${b.w.toFixed(1)} × ${b.h.toFixed(1)} m`); ok(!!f.glow!.attributes.uv, 'holo board: the picture has no texture coordinates'); }
 });
 
 // ---- jumps (2026-11-25, user: "reduziere die generelle Sprungweite. Diese ist gerade bei Boost zu weit.") ----
