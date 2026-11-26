@@ -59,7 +59,7 @@ Reihenfolge: erst die vier Fehler, dann die sieben Verbesserungen. Jeder Punkt e
 
 ### Verbesserung 2 – kürzere Sprünge
 - **Gemessen vorher** (alle 29 Rampen, Aurora auf der Mittellinie): volles Tempo 160–310 m (1,2–2,4 s in der Luft, bis 23 m über der Kante), Boost 250–570 m, Boost + Nase hoch über 600 m – bei Lücken von 40–50 m. Die Steiggeschwindigkeit an der Kante war Rampensteigung × Tempo (bis 62 m/s) und hing vom Bild ab, in dem der Pod die Rampe verließ: dieselbe Rampe 144 m bei 60 Bildern/s, 215 m bei 120.
-- **Jetzt:** Eine Rampe gibt jedem Pod dieselbe Steiggeschwindigkeit mit (`launchVy`: 16 m/s bis 60 m/s Tempo, 14 bei 90, 11 ab 180 m/s). Volles Tempo 89–126 m (0,65–0,92 s), Boost 99–159 m (eine Rampe auf Magma 186 m: dahinter fällt die Straße ab), langsam (60 m/s) 62–70 m – jede Lücke wird weiter überflogen. „Nase hoch" trägt über einer Lücke 10–40 % weiter (vorher etwa das Doppelte), „Nase runter" bringt den Pod nach 44–50 m herunter.
+- **Jetzt:** Eine Rampe gibt jedem Pod dieselbe Steiggeschwindigkeit mit (`launchVy`: 16 m/s bis 60 m/s Tempo, 14 bei 90, 11 ab 180 m/s). Volles Tempo 89–126 m (0,65–0,92 s), Boost 99–159 m (eine Rampe auf Magma 186 m: dahinter fällt die Straße ab), langsam (60 m/s) 74–95 m – jede Lücke wird weiter überflogen. „Nase hoch" trägt über einer Lücke 13–24 % weiter (102–154 m; vorher etwa das Doppelte), „Nase runter" bringt den Pod nach 44–63 m herunter. (Die drei letzten Zahlen standen hier zuerst geschätzt – 62–70 m, 10–40 %, 44–50 m; am 2026-11-26 nachgemessen, die Prüfung druckt sie jetzt mit `DEBUG=1` je Rampe.)
 - **Rampen:** 2–2,6 m hoch statt 4–6 m, erst sanft ansteigend, dann gerade bis zur Kante (8–9 % Steigung). Bei vollem Tempo passt das zur neuen Steiggeschwindigkeit – der Pod verlässt die Rampe ohne Knick. Die Länge der Rampen bleibt.
 - **Verworfen:** doppelt so lange Rampen. Tunnel, Hindernisse und Böden werden um die Rampen herum gesetzt; mit längeren Rampen standen auf sechs Strecken Tunnel an anderer Stelle (Frostspalt, Magma, Heuler, Executioner, leicht Aquilaris und Methan). Mit unveränderter Länge ist der Aufbau aller 13 Strecken derselbe wie vorher (`info.mjs`, 0 geänderte Zeilen).
 - **Geprüft:** drei neue Prüfungen `jump: …` (erst rot mit den Messwerten oben, dann grün – alle Rampen aller Strecken; Nase hoch / runter / langsam; 60 gegen 120 Schritte/s). Alle 184 Prüfungen grün. Simulation 13 Strecken × 120 s, drei Startwerte: 1 / 0 / 0 Ausfälle, längste Flugzeit 0,9–1,5 s (vorher 2,2–2,9 s). Bilder `jp` (Boonta: Rampe von vorn, Pod an der Kante, über der Schlucht, Seitenansicht).
@@ -78,7 +78,7 @@ Reihenfolge: erst die vier Fehler, dann die sieben Verbesserungen. Jeder Punkt e
 
   Die anderen neun Strecken hatten keine Zeppeline; sie bekommen nur Holo-Tafeln (8–10 bei „Hoch").
 - **Jetzt – Modelle (bekannte Vorbilder, wie am 2026-11-23 ausgewählt):**
-  - **Tatooine und Tafelberge:** Segelbarke (32 m, zwei rote Sonnensegel, Deckshaus, Reling), leichter Frachter (Untertasse mit zwei Mandibeln, Cockpit-Röhre an Steuerbord, Radarschüssel, blaues Triebwerksband am Heck), bis zu acht **Zuschauer-Logen** beidseits der Start-Geraden (52–430 m vor und hinter der Linie), die wie in der Mos-Espa-Arena auf- und absteigen (9–17 m Hub, eine Fahrt 18–32 s).
+  - **Tatooine und Tafelberge:** Segelbarke (32 m, zwei rote Sonnensegel, Deckshaus, Reling), leichter Frachter (Untertasse mit zwei Mandibeln, Cockpit-Röhre an Steuerbord, Radarschüssel, blaues Triebwerksband am Heck), bis zu acht **Zuschauer-Logen** beidseits der Start-Geraden (52–430 m vor und hinter der Linie), die wie in der Mos-Espa-Arena auf- und absteigen (9–17 m Hub, einmal auf und ab in 18–32 s).
   - **Aquilaris:** Wolkenwagen (zwei orange Kapseln, Triebwerk dazwischen) und Transporter (weiße Muschelschale, Frachtkisten darunter).
   - **Alle 13 Strecken:** 8–10 **Holo-Werbetafeln** bei „Hoch" (25 × 14 m, durchscheinend, vier Motive, flackern leicht) neben der Strecke, dem ankommenden Pod zugedreht – etwa eine je Kilometer.
 - **Jetzt – Bewegung:** Die Schiffe fliegen langsame Kreise (Barke 6–10 m/s, Frachter 14–26, Wolkenwagen 22–38, Transporter 5–9), Nase voraus, in die Kurve geneigt – mindestens 60 m über jeder Fahrbahn unter ihrem Kreis (der Intro-Flug fliegt 20–35 m hoch). Steht ein Tafelberg, eine Felsnadel oder ein Wahrzeichen unter dem Kreis, sucht sich das Schiff einen anderen Kreis oder überfliegt es mit 30 m Abstand.
@@ -87,8 +87,8 @@ Reihenfolge: erst die vier Fehler, dann die sieben Verbesserungen. Jeder Punkt e
   - Der zweite Flieger über Aquilaris ist ein **mittlerer Transporter** (Muschelform), nicht noch einmal der leichte Frachter von Tatooine – abgesprochen war „Wolkenwagen und Frachter".
   - Die Holo-Tafeln sind **25 m breit**. Mit 10 m und 16 m waren sie von der Fahrbahnmitte aus (Fahrbahn 70–110 m breit) nur ein Fleck. Die Scheibe ist dunkel getönt: eine helle, nur leuchtende Scheibe verschwand vor dem hellen Wüstendunst.
   - Die Werbetexte sind erfunden („Repulsor-Tec", „Kessel Fuel", „Grand Arena", „Toydarian Parts").
-- **Geprüft:** drei neue Prüfungen `flyers: …` (jeweils erst rot): Anzahl 20 % unter den Zeppelinen bei jeder Detailstufe und Streckenlänge; die Modelle haben die Form ihres Vorbilds (Segel breiter als der Rumpf, Cockpit allein an Steuerbord, zwei Kapseln, …) und keine nach innen gedrehten Flächen; auf allen 13 Strecken × 3 Detailstufen stehen Tafeln und Logen nur an freier Fahrbahn, zeigen die Tafeln zum ankommenden Pod, fliegt jedes Schiff hoch genug und um einen Test-Tafelberg herum. Bilder `fl` (Boonta, Dünenpass, Aquilaris, Mos Espa, Frostspalt, Kristallhöhlen bei Nacht): jedes Modell aus der Nähe, Tafeln und Logen aus Fahrersicht. WebGPU-Prüfung auf Boonta und Aquilaris („Ultra"): 0 Fehler und Warnungen.
-- **Nicht geprüft:** in Bewegung (nur Standbilder) – also ob die Kreise natürlich wirken und ob das Flackern der Tafeln stört. Die Bildrate auf echter Hardware: die Flug-Deko kostet bei „Hoch" 84 000 (Aquilaris) bis 106 000 (Boonta) Dreiecke je Bild, bei „Ultra" 140 000–185 000 – das sind 4–8 % eines Bildes, ohne Schatten, in höchstens 12 Zeichenaufrufen.
+- **Geprüft:** vier neue Prüfungen `flyers: …` (drei davon erst rot, die vierte – Bewegung – kam am 2026-11-26 dazu und wurde mit zwei absichtlich eingebauten Fehlern gegengeprüft: falsche Neigung und rückwärts fliegende Schiffe lassen sie rot werden): Anzahl 20 % unter den Zeppelinen bei jeder Detailstufe und Streckenlänge; die Modelle haben die Form ihres Vorbilds (Segel breiter als der Rumpf, Cockpit allein an Steuerbord, zwei Kapseln, …) und keine nach innen gedrehten Flächen; auf allen 13 Strecken × 3 Detailstufen stehen Tafeln und Logen nur an freier Fahrbahn, zeigen die Tafeln zum ankommenden Pod, fliegt jedes Schiff hoch genug und um einen Test-Tafelberg herum; **Bewegung** (aus den Matrizen, die das Spiel je Bild schreibt – Boonta, Dünenpass, Aquilaris: 154 Schiffe zu je drei Zeitpunkten, 16 Logen): jedes Schiff fliegt mit der Nase voraus auf seinem Kreis, mit seinem Tempo, auf seiner Höhe und neigt sich zur Kreismitte; jede Loge steigt und sinkt an ihrem Platz zwischen ihren zwei Höhen. Bilder `fl` (Boonta, Dünenpass, Aquilaris, Mos Espa, Frostspalt, Kristallhöhlen bei Nacht): jedes Modell aus der Nähe, Tafeln und Logen aus Fahrersicht (Boonta und Aquilaris am 2026-11-26 mit dem fertigen Stand noch einmal: Barke, Frachter, Tafel, Start-Gerade; Wolkenwagen, Transporter, Tafel). WebGPU-Prüfung auf Boonta und Aquilaris („Ultra"): 0 Fehler und Warnungen.
+- **Nicht geprüft:** wie die Bewegung aussieht (gesehen sind nur Standbilder; gerechnet ist sie, siehe oben) – also ob die Kreise natürlich wirken und ob das Flackern der Tafeln stört. Die Bildrate auf echter Hardware: die Flug-Deko kostet bei „Hoch" 84 000 (Aquilaris) bis 106 000 (Boonta) Dreiecke je Bild, bei „Ultra" 140 000–185 000 – das sind 4–8 % eines Bildes, ohne Schatten, in höchstens 12 Zeichenaufrufen.
 - **Nebenwirkung:** Felsen, Kakteen und Felsnadeln stehen auf Boonta, Mos Espa, Dünenpass und Aquilaris an anderen Stellen als vorher (die Zeppeline verbrauchten Zufallszahlen, die jetzt fehlen). Hindernisse auf der Fahrbahn sind davon nicht betroffen.
 
 ### Verbesserung 4 – etwas besser sichtbare Spuren im Sand
@@ -111,3 +111,54 @@ Reihenfolge: erst die vier Fehler, dann die sieben Verbesserungen. Jeder Punkt e
 - **Eigene Entscheidung:** eine Wahl für alle Anbauteile zusammen, nicht je Teil. Wenn du je Teil eine Farbe willst, sag es.
 - **Geprüft:** zwei neue Prüfungen `kit paint: …` (erst rot; dann grün – auf allen 14 Pods: gleich viele Dreiecke wie ab Werk, alles Lackierte in der gewählten Farbe, jedes Tuning-Teil nimmt Lack; die Wahl übersteht das Speichern). Bilder `kp3` (Hangar und Hauptmenü mit eigener Farbe Grün: Düsen, Ringe, Hutzen, Radiatoren, Panzerbänder und Finnen grün, Leitungen kupfern). `pui.mjs` öffnet den Reiter „Teile" mit eigener Farbe: nichts ragt heraus, Hauptmenü und Hangar zeigen dasselbe.
 - **Nicht geprüft:** jede Kombination aus Pod und Teil im Bild (14 Pods × 3 Lackarten) – nur die Aurora.
+
+## Abschluss der Liste (2026-11-26)
+Alle elf Punkte sind gebaut, jeder in einem eigenen Commit. Danach lief der fertige Stand durch alle Prüfungen.
+
+### Geprüft
+- **`npm run check` grün:** Typprüfung, 192 Unit-Prüfungen, Pod-Audit, Simulation auf allen 13 Strecken.
+- **Beide Builds gebaut:** `npm run build` (`dist/index.html`, 16,55 MB) und `npm run build:web` (`build/`).
+- **Im gebauten Spiel** (Chromium, Software-Grafik, je ein Lauf):
+  - `pintro.mjs` auf WebGL und auf WebGPU: der Intro-Flug läuft mit dem neuen Tempo (in sechs Bildern 22 → 60 m und 29 → 80 m geflogen – die Bilder der Software-Grafik sind lang), Enter startet das Rennen. Nur auf WebGL geprüft: Gamepad A, Gamepad Start und ein Mausklick starten das Rennen, „Neustart" zeigt den Flug nicht noch einmal.
+  - `papp.mjs`: HUD, Schadensseiten, die neue HUD-Zeile nach einem Rammstoß („Treffer · Mavik Hollo · 58 %"), Pause (Ton, Grafikmenü), Tastenbelegung.
+  - `pui.mjs` in fünf Fenstergrößen: nichts scrollt, nichts ragt heraus. Hauptmenü und Hangar zeigen denselben Pod mit Teilen und eigener Teile-Farbe. Der Reiter „Teile" mit offenem Farbwähler passt im Quer- und im Hochformat (das Hochformat prüft der Test seit dem 2026-11-26 mit).
+  - `ppad.mjs`: jedes Bedienelement ist mit dem Gamepad erreichbar, auch der neue Lack-Wähler (Hangar-Reiter „Teile": 56 Elemente).
+- **Nachträge beim Abschluss:**
+  - Die Prüfung `profile: Style-Teile are clamped into range …` war seit dem Commit „Anbauteile lackierbar" rot (ein Teilesatz trägt jetzt auch `paint`). Das blieb unbemerkt, weil vor jenem Commit nur einzelne Prüf-Gruppen liefen. Im Flug-Deko-Commit korrigiert. Seitdem läuft vor jedem Commit der ganze Unit-Lauf.
+  - Sprünge: drei Zahlen im Abschnitt oben waren geschätzt statt gemessen – nachgemessen und korrigiert (bei 60 m/s 74–95 m; Nase hoch 13–24 % weiter; Nase runter 44–63 m).
+  - Flug-Deko: die Bewegung wird jetzt gerechnet geprüft (vierte Prüfung); die Bilder von Boonta und Aquilaris sind mit dem fertigen Stand wiederholt.
+
+### Nicht geprüft – bitte selbst fahren
+Alles lief in Software-Grafik, ohne Ton, ohne echtes Gamepad und fast nur als Standbild. Was nur am echten Gerät zu beurteilen ist:
+
+| Punkt | Was ansehen | Stellschraube |
+|---|---|---|
+| Schwerkrafttunnel | Boden der Röhre mit „Sinken" (Oovo IV, Executioner): hält er, fühlt er sich weich genug an? | `ZG_DOWN` in `physics.ts` |
+| Eigene Spuren | Verfolger-Ansicht bei vollem Tempo auf Sand: entstehen die Streifen direkt hinter den Triebwerken? Deckkraft recht? | `TRACK_FADE_IN`, `TRACK_BAND` in `groundTracks.ts` |
+| Rammen | Stärke (Gerammter 1,5-fach, Rammender 0,5-fach, höchstens 24), HUD-Zeile, Rauch des Gegners | `RAM_*` in `physics.ts` |
+| Intro-Flug | Tempo 145 m/s – ruhig genug? | `FLIGHT_SPEED` in `introFlight.ts` |
+| Sprünge | Weite bei vollem Tempo (89–126 m) und mit Boost (99–159 m) | `JUMP_VY` in `physics.ts`, Rampenhöhe `h` in `data.ts` |
+| Flug-Deko | Menge am Himmel, Größe der Holo-Tafeln (25 m), Kreise, Flackern, Bildrate | `flyerTotal` in `flyerGeo.ts`, `HOLO_SIZE` und `CRAFT` in `flyers.ts` |
+| Verfolger-Kamera | Abstand 12–16 m, Höhe 4,1 m | `CHASE_DIST`, `CHASE_HEIGHT` in `Game.ts` |
+| Teile-Lack | eine Wahl für alle Anbauteile – reicht das? Andere Pods als die Aurora ansehen | `podKitParts.ts` (`inPaint`) |
+| Schatten und Spiegelungen | Bildrate auf „Hoch" und „Ultra" mit den größeren Karten | Menü: Schattenqualität, Spiegelungs-Auflösung |
+
+### Git
+Zweig `dev`, vor diesem Auftrag `72a581d`. Jeder Punkt ein Commit, danach `git gc --prune=now`.
+
+| Commit | Inhalt |
+|---|---|
+| `a032966` | Fehler 1: Boden der Schwerkraft-Röhre ist fest, Brocken schweben über der Fahrbahn |
+| `6d4b123` | Fehler 2: die Fahrspur wächst mit dem Pod mit |
+| `831616e` | Fehler 3: Hauptmenü zeigt die eingebauten Teile |
+| `825bf52`, `b8c0e58` | Fehler 4: Rammen 3 : 1, Treffer am Gegner sichtbar; Obergrenze 16 |
+| `6181f05` | Verbesserung 1: Intro-Flug mit 145 m/s |
+| `0659caf` | Verbesserung 2: kürzere Sprünge |
+| `9cf13e2` | Verbesserung 4: Spuren im Sand besser sichtbar |
+| `4563a03` | Verbesserung 5: Verfolger-Kamera näher |
+| `7ea1787` | Verbesserung 7: Schatten- und Reflexions-Auflösung |
+| `b2304fc` | Verbesserung 6: Anbauteile lackierbar |
+| `e0c2e8a` | Verbesserung 3: Flug-Deko |
+| Commit mit diesem Abschnitt | Abschluss: Bewegungs-Prüfung der Flug-Deko, `pui.mjs` im Hochformat mit Teilen, nachgemessene Sprung-Zahlen, Doku |
+
+Gepusht wird nach diesem Commit (Auftrag: „arbeite diese erst ab, pushe dann"). Ob es geklappt hat, zeigt `git log origin/dev..dev` (leer = alles auf GitHub) und der Eintrag „Git-Stand" in `HANDOFF.md`.

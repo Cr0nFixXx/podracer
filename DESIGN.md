@@ -113,7 +113,7 @@ Leitidee: **Lenken hebt, Tasten neigen.** Der Pod kippt nie von selbst – jede 
 |---|---|---|---|
 | Triebwerkshub | Lenken | äußeres Triebwerk +1,1 m, inneres −0,22 m, keine Kippung | – |
 | Slide | Leertaste + Lenken | Haftung ×0,24, Gierrate ×1,16, Exit-Schub bis +7 m/s | Bremswirkung ×0,42 statt voller Luftbremse |
-| Anheben | `↓` | +1,6 m Schwebehöhe, Sprung über eine Lücke 10–40 % weiter (bis 2026-11-25: ≈ 2×) | −20 % Haftung, ~10 %/s Tempo in der Luft |
+| Anheben | `↓` | +1,6 m Schwebehöhe, Sprung über eine Lücke 13–24 % weiter (bis 2026-11-25: ≈ 2×) | −20 % Haftung, ~10 %/s Tempo in der Luft |
 | Neigen | `↑` | −0,45 m, +14 % Haftung, Landung in halber Zeit | weniger Bodenfreiheit |
 | Rolle 90° | `←` / `→` | Breite bis 22 %, passt durch enge Lücken | Lenkung −40 %, fliegt höher |
 

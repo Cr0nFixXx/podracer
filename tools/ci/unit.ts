@@ -27,7 +27,7 @@ import { PadRepeater, nextFocus, readPadNav, stepRange, type NavRect, type PadSn
 import { FLIGHT_BAND, FLIGHT_LOOK, FLIGHT_SPEED, buildIntroFlight, type FlightPose } from '../../src/game/introFlight';
 import { TrackLayer, TRACK_FADE_IN, TRACK_SEG, trackLife } from '../../src/game/groundTracks';
 import { flyerGeometry, flyerPlan, flyerTotal, FLYERS_BEFORE } from '../../src/game/flyerGeo';
-import { flyerSpots } from '../../src/game/flyers';
+import { addFlyers, flyerSpots } from '../../src/game/flyers';
 import * as GPU3 from 'three/webgpu';
 import { setupSunShadow, CSM_FAR, CSM_SPLIT, SH_BACK, SH_BOX } from '../../src/game/sunShadow';
 
@@ -2289,6 +2289,50 @@ test('flyers: holo boards hover beside open road on every world, spectator boxes
   }
 });
 
+// Movement (2026-11-26): the pictures are stills. What a still cannot show – that a craft flies nose first, leans into its turn and
+// stays at its height, that a box rises and sinks – is read from the matrices `update(t)` writes.
+test('flyers: every craft flies nose first round its circle at its speed and leans into the turn; a spectator box rises and sinks at its place', () => {
+  const m = new GPU3.Matrix4(), m2 = new GPU3.Matrix4(), e = m.elements, e2 = m2.elements; let craft = 0, boxes = 0;
+  for (const id of ['boonta', 'dunepass', 'aquilaris']) {
+    const tr = TRACKS.find(t => t.id === id)!, td = trackOf(id), group = new GPU3.Group();
+    const fl = addFlyers(td, THEMES[tr.theme], group as never, [], () => -1e4, 1, 9173 + td.N);
+    const mesh = (name: string) => group.children.find(c => c.name === name) as unknown as GPU3.InstancedMesh | undefined;
+    for (const kind of ['barge', 'freighter', 'cloudCar', 'transport'] as const) {
+      const list = fl.spots.craft[kind] ?? [], im = mesh('flyer:' + kind); if (!list.length) continue;
+      ok(!!im && im.count === list.length, `${id}: ${list.length} ${kind} planned, mesh has ${im?.count}`);
+      for (const t of [0, 7.3, 211]) for (let i = 0; i < list.length; i++) {
+        const c = list[i], dt = 0.2;
+        fl.update(t); im!.getMatrixAt(i, m); fl.update(t + dt); im!.getMatrixAt(i, m2);
+        const vx = (e2[12] - e[12]) / dt, vz = (e2[14] - e[14]) / dt, v = Math.hypot(vx, vz), sc = Math.hypot(e[8], e[9], e[10]);
+        // nose (+z of the model) along the way it moves
+        const nose = (e[8] * vx + e[10] * vz) / (Math.hypot(e[8], e[10]) * v);
+        ok(nose > 0.995, `${id}: ${kind} ${i} at ${t} s flies ${(Math.acos(Math.min(1, nose)) * 57.3).toFixed(0)}° off its nose`);
+        ok(Math.abs(v - Math.abs(c.w) * c.r) < 0.03 * v + 0.1, `${id}: ${kind} ${i} moves at ${v.toFixed(1)} m/s, its circle says ${(Math.abs(c.w) * c.r).toFixed(1)} m/s`);
+        // on its circle, at its height
+        ok(Math.abs(Math.hypot(e[12] - c.x, e[14] - c.z) - c.r) < 0.01, `${id}: ${kind} ${i} left its circle`);
+        ok(Math.abs(e[13] - c.y) <= c.bob + 0.01, `${id}: ${kind} ${i} at ${e[13].toFixed(1)} m, its height is ${c.y.toFixed(1)} ± ${c.bob.toFixed(1)} m`);
+        // its top (+y of the model) tips towards the centre of the circle, by a few degrees
+        const ux = e[4] / sc, uy = e[5] / sc, uz = e[6] / sc, inward = (ux * (c.x - e[12]) + uz * (c.z - e[14])) / c.r, lean = Math.acos(Math.min(1, uy));
+        ok(inward > 0 && lean > 0.015 && lean < 0.35, `${id}: ${kind} ${i} leans ${(lean * 57.3).toFixed(1)}° ${inward > 0 ? 'into' : 'out of'} its turn`);
+        ok(Math.abs(sc - c.size) < 1e-3, `${id}: ${kind} ${i} drawn at × ${sc.toFixed(2)}, planned × ${c.size.toFixed(2)}`);
+        craft++;
+      }
+    }
+    const bx = mesh('flyer:box');
+    if (fl.spots.boxes.length) {
+      ok(!!bx && bx.count === fl.spots.boxes.length, `${id}: ${fl.spots.boxes.length} boxes planned, mesh has ${bx?.count}`);
+      fl.spots.boxes.forEach((b, i) => {
+        let lo = 1e9, hi = -1e9; const period = 2 * Math.PI / b.w;
+        for (let k = 0; k <= 40; k++) { fl.update(k / 40 * period); bx!.getMatrixAt(i, m); lo = Math.min(lo, e[13]); hi = Math.max(hi, e[13]); ok(Math.abs(e[12] - b.x) < 1e-3 && Math.abs(e[14] - b.z) < 1e-3, `${id}: spectator box ${i} drifts sideways`); }
+        ok(Math.abs(lo - b.y) < 0.2 && Math.abs(hi - (b.y + b.rise)) < 0.2, `${id}: spectator box ${i} moves between ${lo.toFixed(1)} and ${hi.toFixed(1)} m, planned ${b.y.toFixed(1)} to ${(b.y + b.rise).toFixed(1)} m`);
+        ok(period >= 18 && period <= 32.01, `${id}: spectator box ${i} takes ${period.toFixed(0)} s up and down`);
+        boxes++;
+      });
+    } else ok(!bx, `${id}: boxes drawn that were not planned`);
+  }
+  if (process.env.DEBUG) console.log(`   ${craft} craft poses, ${boxes} spectator boxes`);
+  ok(craft > 300 && boxes >= 12, `only ${craft} craft poses and ${boxes} boxes were looked at`);
+});
 test('flyers: the models have the shapes they are named after (sail barge, saucer freighter with a side cockpit, twin-pod cloud car, transport, spectator box, holo board)', () => {
   const box = (g: GPU3.BufferGeometry) => { g.computeBoundingBox(); const b = g.boundingBox!; return { x0: b.min.x, x1: b.max.x, y0: b.min.y, y1: b.max.y, z0: b.min.z, z1: b.max.z, w: b.max.x - b.min.x, h: b.max.y - b.min.y, l: b.max.z - b.min.z }; };
   /** widest extent in x of the vertices inside a slab of y */
@@ -2368,9 +2412,10 @@ test('jump: over a gap nose up carries 10–40 % further, nose down brings the p
     const gap = (r.gapEnd - r.b) * DS, full = jumpOver(td, r, top * 0.98), up = jumpOver(td, r, top * 0.98, { pitch: 1 }), down = jumpOver(td, r, top * 0.98, { pitch: -1 }), slow = jumpOver(td, r, 60);
     // (a ramp without a gap: with the nose up the pod also hovers 1.6 m higher – the repulsors catch it that much sooner, the two cancel out)
     if (gap > 0 && !(up.dist > full.dist * 1.1 && up.dist < full.dist * 1.4)) bad.push(`${id} ramp ${r.a}: nose up ${up.dist.toFixed(0)} m, level ${full.dist.toFixed(0)} m`);
-    // (a dive right off the lip comes down after 44–50 m: over the widest gaps that is the far edge – the pilot's risk)
+    // (a dive right off the lip comes down after 44–63 m: over the widest gaps that is the far edge – the pilot's risk)
     if (!((down.dist > 0 || gap > 0) && down.dist < full.dist * 0.85)) bad.push(`${id} ramp ${r.a}: nose down ${down.dist.toFixed(0)} m, level ${full.dist.toFixed(0)} m`);
     if (gap > 0) for (const [name, j, room] of [['level', full, 30], ['slow (60 m/s)', slow, 10]] as const) if (!(j.dist >= gap + room)) bad.push(`${id} ramp ${r.a}: ${name} ${j.dist.toFixed(0)} m over a gap of ${gap} m`);
+    if (process.env.DEBUG) console.log(`   ${id.padEnd(11)} ramp ${r.a} gap ${gap} m · level ${full.dist.toFixed(0)} m · nose up ${up.dist.toFixed(0)} m · nose down ${down.dist.toFixed(0)} m · slow (60 m/s) ${slow.dist.toFixed(0)} m`);
   } }
   eq(bad.length, 0, `${bad.length} · ${bad.slice(0, 5).join(' · ')} –`);
 });

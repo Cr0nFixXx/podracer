@@ -65,3 +65,10 @@ Auftrag und Entscheidungen: [Protokoll](docs/verlauf/2026-11-23-nach-der-probefa
 - [ ] Sprünge auf den sechs Schlucht-Strecken: Lücken 70–90 m, ein weiter Sprung (nur mit Boost), ein Abwurf
 - [x] Untergründe „deutlich" (Eis 45 % Haftung …) – **bitte fahren:** Eissee (Frostspalt, Heuler-Schlucht), Schlamm, Dünen
 - [x] Flug-Deko: Segelbarke, Zuschauer-Logen, Frachter, Wolkenwagen, Transporter, Holo-Werbetafeln statt Zeppelinen; 20 % weniger – **bitte ansehen:** Größe der Holo-Tafeln (25 m), Transporter statt zweitem Frachter über Aquilaris, wirken die Kreise natürlich?
+
+**Zwischentest des Nutzers vom 2026-11-25** – alle elf Punkte gebaut ([Protokoll](docs/verlauf/2026-11-25-zwischentest.md)), offen ist nur die Probefahrt. **Bitte fahren** (Tabelle mit Stellschrauben im Protokoll unter „Nicht geprüft – bitte selbst fahren"):
+- [ ] Rammen: Stärke recht (der Gerammte verliert bis 24, der Rammende ein Drittel davon)? HUD-Zeile „Treffer · Name · %", Rauch des Gegners
+- [ ] Sprungweite (volles Tempo 89–126 m, Boost 99–159 m) und Intro-Flug (145 m/s)
+- [ ] Flug-Deko: Menge am Himmel, Größe der Holo-Tafeln, Kreise und Flackern in Bewegung
+- [ ] Bildrate mit den größeren Schatten- und Spiegelungs-Karten („Hoch", „Ultra")
+- [ ] Röhrenboden auf Oovo IV, Spuren hinter dem Pod bei vollem Tempo, Kamera-Abstand, Teile-Lack an anderen Pods als der Aurora

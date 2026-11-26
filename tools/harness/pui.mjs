@@ -48,13 +48,16 @@ for (const [w, h] of sizes) {
     if (name === 'settings') { await click(p, 'Steuerung'); await sleep(500); const i2 = await audit(p); const f2 = await p.evaluate(() => { const e = document.querySelector('[data-fit-scale]'); return [e.dataset.fitScale, e.dataset.fitShrunk]; }); scales.push(f2[0]); if (f2[1] === '1') i2.push('emergency shrink'); if (i2.length) bad++; console.log(`${w}x${h} keys     ${i2.length ? 'FAIL ' + i2.slice(0, 3).join(' | ') : 'ok'}`); }
     if (btn) { await click(p, 'Zurück'); await sleep(500); }
   }
+  // The menus have two layouts: landscape (720 units high, every landscape window is a scaled copy of 1280 × 720) and portrait
+  // (800 × 1000). The two checks below change the screens' content, so they run once per layout.
+  const twoLayouts = w === 1280 || w === 800;
   // planet filter
   // (a track of another planet must leave the list, a track of the chosen planet must stay – the names come from src/game/data.ts → TRACKS)
-  if (w === 1280) { await click(p, 'Rennen starten'); await sleep(600); const listed = () => p.evaluate(() => ['Frostspalt-Ring', 'Boonta-Kessel'].map(n => document.body.textContent.includes(n))); const before = await listed(); await p.select('select[aria-label="Planet"]', 'Tatooine'); await sleep(400); const after = await listed(); const fine = before[0] && before[1] && !after[0] && after[1]; console.log('planet filter "Tatooine": Frostspalt-Ring (Ando Prime) listed before/after:', before[0], after[0], '· Boonta-Kessel (Tatooine) before/after:', before[1], after[1], fine ? 'ok' : 'FAIL'); if (!fine) bad++; }
+  if (twoLayouts) { await click(p, 'Rennen starten'); await sleep(600); const listed = () => p.evaluate(() => ['Frostspalt-Ring', 'Boonta-Kessel'].map(n => document.body.textContent.includes(n))); const before = await listed(); await p.select('select[aria-label="Planet"]', 'Tatooine'); await sleep(400); const after = await listed(); const fine = before[0] && before[1] && !after[0] && after[1]; console.log('planet filter "Tatooine": Frostspalt-Ring (Ando Prime) listed before/after:', before[0], after[0], '· Boonta-Kessel (Tatooine) before/after:', before[1], after[1], fine ? 'ok' : 'FAIL'); if (!fine) bad++; }
   // 2026-11-25 (reported by the user: "im Hauptmenü werden beim ausgewählten Podracer nicht die eingebauten Teile angezeigt"): a pod
   // with Tuning-Teile and Style-Teile must look the same in the main menu and in the hangar. Every pod preview writes what it shows
   // into `data-pod-look` (pod | fins, intake, nozzle | part tier per tuning value | canopy | paint of the parts).
-  if (w === 1280) {
+  if (twoLayouts) {
     await click(p, 'Zurück'); await sleep(400);
     const look = () => p.evaluate(() => document.querySelector('[data-pod-look]')?.dataset.podLook ?? '(no pod preview)');
     const pod = (await look()).split('|')[0];

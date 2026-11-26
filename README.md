@@ -50,7 +50,7 @@ In der Ansicht „Cockpit" (`C`) sitzt man im Pod und sieht das eigene Cockpit v
 
 ### Flugmanöver
 1. **Slide / Drift:** `Leertaste` halten und lenken – die Haftung lässt weich nach, das Heck bricht aus und schwingt herum, der Pod driftet weit auf seinem Schwung (bis etwa 60° quer). Gegenlenken fängt ihn ab; nach dem Loslassen greift er über etwa eine halbe Sekunde wieder. Nach einem langen Slide loslassen und Schub geben: kurzer Extra-Schub (Balken unter der Fluglage-Anzeige wird gelb).
-2. **Weiter springen:** auf der Rampe und in der Luft `↓` halten – der Pod hebt die Nase und gleitet (über einer Lücke 10–40 % weiter, kostet etwas Tempo). Ein Sprung trägt bei vollem Tempo rund 90–125 m (knapp eine Sekunde in der Luft), mit Boost 100–160 m.
+2. **Weiter springen:** auf der Rampe und in der Luft `↓` halten – der Pod hebt die Nase und gleitet (über einer Lücke rund 15–25 % weiter, kostet etwas Tempo). Ein Sprung trägt bei vollem Tempo rund 90–125 m (knapp eine Sekunde in der Luft), mit Boost 100–160 m.
 3. **Schneller landen:** in der Luft `↑` halten – der Pod taucht ab (direkt an der Rampenkante gedrückt reicht das nur knapp über eine 50-m-Lücke). Am Boden drückt `↑` den Pod tiefer und gibt mehr Haftung.
 4. **Hochkant durch Lücken:** `←` oder `→` halten – der Pod rollt 90° und ist nur noch ein Viertel so breit. **Im gerollten Zustand ist die Steuerung mitgedreht:** `↓` (Anheben) zieht den Pod zur Rollseite hin, `↑` (Neigen) von ihr weg; `A`/`D` bewegen ihn auf und ab. Die Lenkung über `↑`/`↓` ist dabei kräftiger als die normale Lenkung.
 5. Cockpit und Triebwerke neigen sich nur gemeinsam und nur, solange `↑`/`↓` gedrückt ist. Beim Lenken hebt sich das äußere Triebwerk als Ganzes, ohne zu kippen.
